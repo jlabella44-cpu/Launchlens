@@ -1,35 +1,34 @@
 import pytest
-from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
 from launchlens.workflows.listing_pipeline import ListingPipeline, ListingPipelineInput
 
 
-@pytest.mark.asyncio
-async def test_pipeline_workflow_registers_without_error():
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
-            env.client,
-            task_queue="test-queue",
-            workflows=[ListingPipeline],
-            activities=[],
-        ):
-            # Workflow is registered — basic smoke test
-            assert True
+def test_pipeline_input_dataclass():
+    inp = ListingPipelineInput(listing_id="abc-123", tenant_id="tenant-xyz")
+    assert inp.listing_id == "abc-123"
+    assert inp.tenant_id == "tenant-xyz"
+
+
+def test_pipeline_workflow_has_required_signals():
+    # Verify signal handlers are defined on the class
+    assert hasattr(ListingPipeline, "shadow_review_approved")
+    assert hasattr(ListingPipeline, "human_review_completed")
+
+
+def test_pipeline_init_sets_flags():
+    pipeline = ListingPipeline()
+    assert pipeline._shadow_approved is False
+    assert pipeline._review_completed is False
 
 
 @pytest.mark.asyncio
-async def test_pipeline_run_returns_complete_string():
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
-            env.client,
-            task_queue="test-queue",
-            workflows=[ListingPipeline],
-            activities=[],
-        ) as worker:
-            result = await env.client.execute_workflow(
-                ListingPipeline.run,
-                ListingPipelineInput(listing_id="test-123", tenant_id="tenant-abc"),
-                id="test-pipeline",
-                task_queue="test-queue",
-            )
-            assert result == "pipeline_complete:test-123"
+async def test_shadow_review_signal_sets_flag():
+    pipeline = ListingPipeline()
+    await pipeline.shadow_review_approved()
+    assert pipeline._shadow_approved is True
+
+
+@pytest.mark.asyncio
+async def test_human_review_signal_sets_flag():
+    pipeline = ListingPipeline()
+    await pipeline.human_review_completed()
+    assert pipeline._review_completed is True

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 # BASELINE_FHA_TERMS: hardcoded, version-controlled, legal-reviewed.
 # Cannot be deleted by admin action. DB table fha_filter_terms is ADDITIVE only.
 BASELINE_FHA_TERMS = [
-    r'\bperfect[\s-]for[\s-](?:families|couples|singles|retirees|young[\s-]professionals)\b',
+    r'\b(?:perfect|ideal|great)[\s-]for[\s-](?:families|couples|singles|retirees|young[\s-]professionals)\b',
     r'\bfamily[\s-]friendly\b',
     r'\bno[\s-](?:section[\s-]8|vouchers?|hud)\b',
     r'\bwalk(?:ing)?[\s-]distance[\s-](?:to|from)[\s-](?:church|mosque|synagogue|temple)\b',
