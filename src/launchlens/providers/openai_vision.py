@@ -53,12 +53,11 @@ class OpenAIVisionProvider(VisionProvider):
                     timeout=30.0,
                 )
                 response.raise_for_status()
-
-        content = response.json()["choices"][0]["message"]["content"]
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"GPT-4V returned unparseable JSON: {content!r}") from e
+                content = response.json()["choices"][0]["message"]["content"]
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"GPT-4V returned unparseable JSON: {content!r}") from e
 
         return [
             VisionLabel(
