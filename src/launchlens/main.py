@@ -1,10 +1,27 @@
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from launchlens.middleware.tenant import TenantMiddleware
 from launchlens.api import listings, assets, admin
+from launchlens.database import AsyncSessionLocal
+from launchlens.services.outbox_poller import OutboxPoller
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    poller = OutboxPoller(session_factory=AsyncSessionLocal)
+    task = asyncio.create_task(poller.run())
+    yield
+    poller.stop()
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="LaunchLens", version="0.1.0")
+    app = FastAPI(title="LaunchLens", version="0.1.0", lifespan=lifespan)
     app.middleware("http")(TenantMiddleware())
     app.include_router(listings.router, prefix="/listings", tags=["listings"])
     app.include_router(assets.router, prefix="/assets", tags=["assets"])
