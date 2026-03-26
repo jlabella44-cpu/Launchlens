@@ -32,5 +32,11 @@ class Settings(BaseSettings):
     shadow_review_enabled: bool = True
     shadow_review_max_listings: int = 100
 
+    # Provider API keys
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    google_vision_api_key: str = ""
+    use_mock_providers: bool = False
+
 
 settings = Settings()
