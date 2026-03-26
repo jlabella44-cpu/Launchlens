@@ -30,6 +30,7 @@ dev = [
     "factory-boy>=3.3",
     "coverage>=7.5",
     "moto[s3]>=5.0",
+    "fakeredis>=2.23",
 ]
 
 [tool.pytest.ini_options]
