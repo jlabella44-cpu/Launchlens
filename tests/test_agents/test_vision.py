@@ -82,3 +82,79 @@ async def test_tier1_emits_event(db_session, listing, assets):
     )).scalars().all()
     assert len(rows) == 1
     assert rows[0].payload["asset_count"] == 3
+
+
+from launchlens.models.vision_result import VisionResult as VRModel
+
+
+@pytest.fixture
+async def tier1_results(db_session, listing, assets):
+    """Pre-populate Tier 1 VisionResults for 3 hero candidates."""
+    for a in assets:
+        a.state = "ingested"
+        db_session.add(VRModel(
+            asset_id=a.id,
+            tier=1,
+            room_label="living_room",
+            is_interior=True,
+            quality_score=85,
+            commercial_score=60,
+            hero_candidate=True,
+            raw_labels={},
+            model_used="google-vision-v1",
+        ))
+    await db_session.flush()
+
+
+@pytest.mark.asyncio
+async def test_tier2_creates_results_for_hero_candidates(db_session, listing, assets, tier1_results):
+    gpt_labels = [
+        VisionLabel(name="primary exterior", confidence=0.95, category="shot_type"),
+        VisionLabel(name="golden hour", confidence=0.88, category="quality"),
+    ]
+    gpt_provider = MagicMock()
+    gpt_provider.analyze = AsyncMock(return_value=gpt_labels)
+
+    agent = VisionAgent(
+        vision_provider=gpt_provider,
+        session_factory=make_session_factory(db_session),
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    count = await agent.run_tier2(ctx)
+
+    assert count == 3  # one Tier 2 result per hero candidate
+    tier2_rows = (
+        await db_session.execute(
+            select(VRModel).where(VRModel.tier == 2)
+        )
+    ).scalars().all()
+    assert len(tier2_rows) == 3
+    assert all(r.model_used == "gpt-4o" for r in tier2_rows)
+
+
+@pytest.mark.asyncio
+async def test_tier2_skips_if_no_hero_candidates(db_session, listing, assets):
+    """If no Tier 1 hero candidates, Tier 2 should be a no-op."""
+    for a in assets:
+        a.state = "ingested"
+        db_session.add(VRModel(
+            asset_id=a.id,
+            tier=1,
+            room_label="bedroom",
+            is_interior=True,
+            quality_score=50,
+            commercial_score=20,
+            hero_candidate=False,
+            raw_labels={},
+            model_used="google-vision-v1",
+        ))
+    await db_session.flush()
+
+    gpt_provider = MagicMock()
+    gpt_provider.analyze = AsyncMock(return_value=[])
+    agent = VisionAgent(vision_provider=gpt_provider, session_factory=make_session_factory(db_session))
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    count = await agent.run_tier2(ctx)
+
+    assert count == 0
+    assert gpt_provider.analyze.call_count == 0

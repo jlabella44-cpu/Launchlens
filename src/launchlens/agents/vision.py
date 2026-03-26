@@ -6,7 +6,6 @@ from temporalio import activity
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
 from launchlens.models.vision_result import VisionResult
-from launchlens.models.listing import Listing, ListingState
 from launchlens.providers import get_vision_provider
 from launchlens.providers.base import VisionLabel
 from launchlens.services.events import emit_event
@@ -111,8 +110,67 @@ class VisionAgent(BaseAgent):
         return {"tier1_count": tier1_count, "tier2_count": tier2_count}
 
     async def run_tier2(self, context: AgentContext) -> int:
-        """GPT-4V re-ranking — implemented in Task 3."""
-        return 0
+        """Run GPT-4V on top hero candidates from Tier 1. Returns count of Tier 2 results."""
+        listing_id = uuid.UUID(context.listing_id)
+
+        async with self._session_factory() as session:
+            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+                result = await session.execute(
+                    select(VisionResult)
+                    .join(Asset, VisionResult.asset_id == Asset.id)
+                    .where(
+                        Asset.listing_id == listing_id,
+                        VisionResult.tier == 1,
+                        VisionResult.hero_candidate.is_(True),
+                    )
+                    .order_by(VisionResult.quality_score.desc())
+                    .limit(TIER2_CANDIDATE_LIMIT)
+                )
+                candidates = result.scalars().all()
+
+                if not candidates:
+                    return 0
+
+                count = 0
+                for vr in candidates:
+                    asset = await session.get(Asset, vr.asset_id)
+                    labels = await self._vision_provider.analyze(image_url=asset.file_path)
+
+                    quality_labels = [l for l in labels if l.category == "quality"]
+                    shot_labels = [l for l in labels if l.category == "shot_type"]
+
+                    quality_score = int(
+                        (sum(l.confidence for l in quality_labels) / len(quality_labels) * 100)
+                        if quality_labels else vr.quality_score
+                    )
+                    hero_explanation = quality_labels[0].name if quality_labels else None
+                    room_label = shot_labels[0].name if shot_labels else vr.room_label
+
+                    tier2 = VisionResult(
+                        asset_id=vr.asset_id,
+                        tier=2,
+                        room_label=room_label,
+                        is_interior=vr.is_interior,
+                        quality_score=quality_score,
+                        commercial_score=vr.commercial_score,
+                        hero_candidate=True,
+                        hero_explanation=hero_explanation,
+                        raw_labels={"labels": [{"name": l.name, "confidence": l.confidence} for l in labels]},
+                        model_used="gpt-4o",
+                    )
+                    session.add(tier2)
+                    count += 1
+
+                if count > 0:
+                    await emit_event(
+                        session=session,
+                        event_type="vision.tier2.completed",
+                        payload={"candidate_count": count},
+                        tenant_id=context.tenant_id,
+                        listing_id=context.listing_id,
+                    )
+
+        return count
 
 
 @activity.defn
