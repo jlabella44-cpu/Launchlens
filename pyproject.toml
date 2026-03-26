@@ -29,6 +29,7 @@ dev = [
     "pytest-httpx>=0.30",
     "factory-boy>=3.3",
     "coverage>=7.5",
+    "moto[s3]>=5.0",
 ]
 
 [tool.pytest.ini_options]
