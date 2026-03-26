@@ -1,7 +1,8 @@
+import asyncio
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
 
 from alembic import context
@@ -18,10 +19,12 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    return os.getenv(
+    sync_url = os.getenv(
         "DATABASE_URL_SYNC",
         "postgresql://launchlens:password@localhost/launchlens",
     )
+    # Convert sync URL to asyncpg URL for async engine
+    return sync_url.replace("postgresql://", "postgresql+asyncpg://")
 
 
 def run_migrations_offline() -> None:
@@ -36,18 +39,21 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def do_run_migrations(connection):
+    context.configure(connection=connection, target_metadata=target_metadata)
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    connectable = create_async_engine(get_url(), poolclass=pool.NullPool)
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+    await connectable.dispose()
+
+
 def run_migrations_online() -> None:
-    configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = get_url()
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-        with context.begin_transaction():
-            context.run_migrations()
+    asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():

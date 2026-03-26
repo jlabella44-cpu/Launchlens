@@ -9,7 +9,7 @@ from launchlens.database import Base, get_db
 from launchlens.config import settings
 
 
-TEST_DB_URL = "postgresql+asyncpg://launchlens:password@localhost:5432/launchlens_test"
+TEST_DB_URL = "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test"
 
 
 @pytest.fixture(scope="session")
@@ -27,17 +27,25 @@ async def test_engine():
     # but RLS is not actually enforced in production.
     import subprocess
     import os
+    import sys
+
+    alembic_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "alembic.exe")
+    if not os.path.exists(alembic_exe):
+        # Fallback: try same dir as python (non-Windows layout)
+        alembic_exe = os.path.join(os.path.dirname(sys.executable), "alembic")
 
     env = os.environ.copy()
     env["DATABASE_URL_SYNC"] = TEST_DB_URL.replace("+asyncpg", "")
-    subprocess.run(["alembic", "upgrade", "head"], env=env, check=True)
+    subprocess.run([alembic_exe, "upgrade", "head"], env=env, check=True)
 
-    engine = create_async_engine(TEST_DB_URL, echo=False)
+    from sqlalchemy.pool import NullPool
+    engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
     yield engine
 
-    # Teardown: drop all tables
+    # Teardown: truncate all data but keep schema so re-runs work without re-migrating
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
     await engine.dispose()
 
 
