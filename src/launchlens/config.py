@@ -1,0 +1,36 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # App
+    app_env: str = "development"
+    log_level: str = "INFO"
+
+    # Database
+    database_url: str
+    database_url_sync: str = ""
+
+    # Auth
+    jwt_secret: str
+    jwt_algorithm: str = "HS256"
+
+    # Temporal
+    temporal_host: str = "localhost:7233"
+    temporal_namespace: str = "default"
+    temporal_task_queue: str = "launchlens-main"
+
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+
+    # S3
+    s3_bucket_name: str = "launchlens-dev"
+    aws_region: str = "us-east-1"
+
+    # Feature flags
+    shadow_review_enabled: bool = True
+    shadow_review_max_listings: int = 100
+
+
+settings = Settings()
