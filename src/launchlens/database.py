@@ -1,5 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import text
+from fastapi import Request
 from launchlens.config import settings
 
 
@@ -11,6 +13,14 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db():
+async def get_db(request: Request = None):
+    tenant_id = getattr(request.state, "tenant_id", None) if request else None
     async with AsyncSessionLocal() as session:
+        if tenant_id:
+            # CRITICAL: SET LOCAL is transaction-scoped — auto-reset on COMMIT/ROLLBACK
+            # Never use SET (session-scoped) — leaks across pooled connections
+            await session.execute(
+                text("SET LOCAL app.current_tenant = :tid"),
+                {"tid": str(tenant_id)},
+            )
         yield session
