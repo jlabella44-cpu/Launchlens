@@ -1,8 +1,9 @@
 import uuid
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from launchlens.database import get_db
 from launchlens.temporal_client import get_temporal_client
@@ -10,8 +11,10 @@ from launchlens.temporal_client import get_temporal_client
 logger = logging.getLogger(__name__)
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.user import User
+from launchlens.models.tenant import Tenant
 from launchlens.api.deps import get_current_user
 from launchlens.models.asset import Asset
+from launchlens.services.plan_limits import check_listing_quota, check_asset_quota, get_limits
 from launchlens.models.package_selection import PackageSelection
 from launchlens.api.schemas.listings import (
     CreateListingRequest, UpdateListingRequest, ListingResponse,
@@ -29,6 +32,27 @@ async def create_listing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Check monthly listing quota
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    count_result = await db.execute(
+        select(func.count(Listing.id)).where(
+            Listing.tenant_id == current_user.tenant_id,
+            Listing.created_at >= month_start,
+        )
+    )
+    current_count = count_result.scalar() or 0
+
+    if not check_listing_quota(tenant.plan, current_count):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Monthly listing limit reached ({current_count}). Upgrade your plan for more.",
+        )
+
     listing = Listing(
         id=uuid.uuid4(),
         tenant_id=current_user.tenant_id,
@@ -114,6 +138,23 @@ async def register_assets(
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
+
+    # Check per-listing asset quota
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    existing_count_result = await db.execute(
+        select(func.count(Asset.id)).where(Asset.listing_id == listing.id)
+    )
+    existing_count = existing_count_result.scalar() or 0
+
+    if not check_asset_quota(tenant.plan, existing_count, len(body.assets)):
+        max_allowed = get_limits(tenant.plan)["max_assets_per_listing"]
+        raise HTTPException(
+            status_code=403,
+            detail=f"Asset limit reached ({existing_count}/{max_allowed}). Upgrade your plan for more.",
+        )
 
     for a in body.assets:
         asset = Asset(
