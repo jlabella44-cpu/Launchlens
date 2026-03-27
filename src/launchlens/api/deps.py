@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from launchlens.database import get_db
 from launchlens.models.user import User, UserRole
+from launchlens.models.tenant import Tenant
 from launchlens.services.auth import decode_token
 
 _bearer = HTTPBearer(auto_error=True)
@@ -42,3 +43,13 @@ async def get_current_tenant(request: Request) -> str:
     if not tenant_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return tenant_id
+
+
+async def get_tenant(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Tenant:
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return tenant
