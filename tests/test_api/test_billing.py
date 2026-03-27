@@ -1,4 +1,5 @@
 # tests/test_api/test_billing.py
+import json
 import uuid
 import pytest
 from unittest.mock import patch, MagicMock
@@ -120,3 +121,82 @@ async def test_checkout_requires_auth(async_client: AsyncClient):
         "cancel_url": "https://app.test/no",
     })
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+@patch("launchlens.api.billing.BillingService")
+async def test_webhook_checkout_completed_updates_plan(MockBilling, async_client: AsyncClient, db_session):
+    from launchlens.models.tenant import Tenant
+
+    tenant = Tenant(
+        id=uuid.uuid4(), name="WebhookCo", plan="starter",
+        stripe_customer_id="cus_wh1", stripe_subscription_id=None,
+    )
+    db_session.add(tenant)
+    await db_session.commit()
+
+    mock_event = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "customer": "cus_wh1",
+                "subscription": "sub_new123",
+                "metadata": {"tenant_id": str(tenant.id)},
+            }
+        },
+    }
+    mock_svc = MockBilling.return_value
+    mock_svc.construct_webhook_event.return_value = MagicMock(**mock_event)
+    mock_svc.construct_webhook_event.return_value.type = "checkout.session.completed"
+    mock_svc.construct_webhook_event.return_value.__getitem__ = lambda self, key: mock_event[key]
+
+    resp = await async_client.post(
+        "/billing/webhook",
+        content=json.dumps(mock_event),
+        headers={"stripe-signature": "test_sig", "content-type": "application/json"},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+@patch("launchlens.api.billing.BillingService")
+async def test_webhook_subscription_deleted_downgrades(MockBilling, async_client: AsyncClient, db_session):
+    from launchlens.models.tenant import Tenant
+
+    tenant = Tenant(
+        id=uuid.uuid4(), name="DowngradeCo", plan="pro",
+        stripe_customer_id="cus_wh2", stripe_subscription_id="sub_old",
+    )
+    db_session.add(tenant)
+    await db_session.commit()
+
+    mock_event = {
+        "type": "customer.subscription.deleted",
+        "data": {
+            "object": {
+                "customer": "cus_wh2",
+                "metadata": {"tenant_id": str(tenant.id)},
+            }
+        },
+    }
+    mock_svc = MockBilling.return_value
+    mock_svc.construct_webhook_event.return_value = MagicMock(**mock_event)
+    mock_svc.construct_webhook_event.return_value.type = "customer.subscription.deleted"
+    mock_svc.construct_webhook_event.return_value.__getitem__ = lambda self, key: mock_event[key]
+
+    resp = await async_client.post(
+        "/billing/webhook",
+        content=json.dumps(mock_event),
+        headers={"stripe-signature": "test_sig", "content-type": "application/json"},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_webhook_missing_signature_returns_400(async_client: AsyncClient):
+    resp = await async_client.post(
+        "/billing/webhook",
+        content=b'{"type": "test"}',
+        headers={"content-type": "application/json"},
+    )
+    assert resp.status_code == 400

@@ -1,3 +1,6 @@
+import uuid
+
+import stripe as stripe_mod
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -81,3 +84,57 @@ async def create_portal(
         return_url=body.return_url,
     )
     return PortalResponse(portal_url=url)
+
+
+@router.post("/webhook")
+async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+
+    svc = BillingService()
+    try:
+        event = svc.construct_webhook_event(payload, sig_header)
+    except (stripe_mod.SignatureVerificationError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    event_type = event.type
+    data_object = event["data"]["object"]
+
+    if event_type == "checkout.session.completed":
+        tenant_id_str = data_object.get("metadata", {}).get("tenant_id")
+        if tenant_id_str:
+            tenant = await db.get(Tenant, uuid.UUID(tenant_id_str))
+            if tenant:
+                tenant.stripe_subscription_id = data_object.get("subscription")
+                if not tenant.stripe_customer_id:
+                    tenant.stripe_customer_id = data_object.get("customer")
+                tenant.plan = "pro"
+                await db.commit()
+
+    elif event_type == "customer.subscription.updated":
+        customer_id = data_object.get("customer")
+        if customer_id:
+            tenant = (await db.execute(
+                select(Tenant).where(Tenant.stripe_customer_id == customer_id)
+            )).scalar_one_or_none()
+            if tenant:
+                items = data_object.get("items", {}).get("data", [])
+                if items:
+                    price_id = items[0].get("price", {}).get("id", "")
+                    tenant.plan = svc.resolve_plan(price_id)
+                await db.commit()
+
+    elif event_type == "customer.subscription.deleted":
+        customer_id = data_object.get("customer")
+        if customer_id:
+            tenant = (await db.execute(
+                select(Tenant).where(Tenant.stripe_customer_id == customer_id)
+            )).scalar_one_or_none()
+            if tenant:
+                tenant.plan = "starter"
+                tenant.stripe_subscription_id = None
+                await db.commit()
+
+    return {"status": "ok"}

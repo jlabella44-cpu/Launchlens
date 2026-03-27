@@ -5,7 +5,7 @@ from starlette.responses import JSONResponse
 from launchlens.config import settings
 
 
-_PUBLIC_PATHS = {"/health", "/auth/register", "/auth/login"}
+_PUBLIC_PATHS = {"/health", "/auth/register", "/auth/login", "/billing/webhook"}
 
 
 class TenantMiddleware:
