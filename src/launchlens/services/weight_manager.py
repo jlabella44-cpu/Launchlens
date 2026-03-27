@@ -40,9 +40,15 @@ class WeightManager:
 
     def score(self, features: dict) -> float:
         """
-        Swappable scoring backend.
-        Phase 1: returns composite of quality + commercial scores weighted by room weight.
+        Composite scoring for photo selection.
+        Formula: (quality*0.5 + commercial*0.3 + hero_bonus*0.2) * room_weight
+        Clamped to [0.0, 1.0].
         Phase 2: XGBoost model (see TODOS.md TODO-4).
         """
-        # Stub — full implementation in Agent Pipeline plan
-        return features.get("quality_score", 50) / 100.0
+        quality = features.get("quality_score", 50) / 100.0
+        commercial = features.get("commercial_score", 50) / 100.0
+        hero_bonus = 1.0 if features.get("hero_candidate", False) else 0.0
+        room_weight = features.get("room_weight", 1.0)
+
+        composite = (quality * 0.5) + (commercial * 0.3) + (hero_bonus * 0.2)
+        return min(1.0, max(0.0, composite * room_weight))

@@ -1,16 +1,94 @@
+# src/launchlens/agents/packaging.py
+import uuid
+from sqlalchemy import select
 from temporalio import activity
+
+from launchlens.database import AsyncSessionLocal
+from launchlens.models.asset import Asset
+from launchlens.models.vision_result import VisionResult
+from launchlens.models.listing import Listing, ListingState
+from launchlens.models.package_selection import PackageSelection
+from launchlens.services.events import emit_event
+from launchlens.services.weight_manager import WeightManager
 from .base import BaseAgent, AgentContext
+
+MLS_MAX_PHOTOS = 25  # 1 hero + 24 supporting
 
 
 class PackagingAgent(BaseAgent):
     agent_name = "packaging"
 
-    async def execute(self, context: AgentContext):
-        raise NotImplementedError("PackagingAgent not yet implemented")
+    def __init__(self, session_factory=None, weight_manager=None):
+        self._session_factory = session_factory or AsyncSessionLocal
+        self._wm = weight_manager or WeightManager()
+
+    async def execute(self, context: AgentContext) -> dict:
+        listing_id = uuid.UUID(context.listing_id)
+
+        async with self._session_factory() as session:
+            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+                # Load best VisionResult per asset (prefer Tier 2 over Tier 1)
+                result = await session.execute(
+                    select(VisionResult)
+                    .join(Asset, VisionResult.asset_id == Asset.id)
+                    .where(Asset.listing_id == listing_id)
+                    .order_by(VisionResult.tier.desc(), VisionResult.quality_score.desc())
+                )
+                all_vrs = result.scalars().all()
+
+                # Deduplicate: keep best tier result per asset
+                seen: dict[uuid.UUID, VisionResult] = {}
+                for vr in all_vrs:
+                    if vr.asset_id not in seen:
+                        seen[vr.asset_id] = vr
+
+                # Score each asset
+                scored = []
+                for asset_id, vr in seen.items():
+                    features = {
+                        "quality_score": vr.quality_score or 50,
+                        "commercial_score": vr.commercial_score or 50,
+                        "hero_candidate": vr.hero_candidate or False,
+                        "room_weight": 1.0,  # TODO: load from LearningWeight
+                    }
+                    score = self._wm.score(features)
+                    scored.append((score, asset_id, vr))
+
+                scored.sort(key=lambda x: x[0], reverse=True)
+                top = scored[:MLS_MAX_PHOTOS]
+
+                hero_asset_id = str(top[0][1]) if top else None
+
+                # Write PackageSelection rows
+                for position, (score, asset_id, vr) in enumerate(top):
+                    ps = PackageSelection(
+                        tenant_id=uuid.UUID(context.tenant_id),
+                        listing_id=listing_id,
+                        asset_id=asset_id,
+                        channel="mls",
+                        position=position,
+                        selected_by="ai",
+                        composite_score=score,
+                    )
+                    session.add(ps)
+
+                # Transition listing state
+                listing = await session.get(Listing, listing_id)
+                listing.state = ListingState.AWAITING_REVIEW
+
+                await emit_event(
+                    session=session,
+                    event_type="packaging.completed",
+                    payload={"hero_asset_id": hero_asset_id, "total_selected": len(top)},
+                    tenant_id=context.tenant_id,
+                    listing_id=context.listing_id,
+                )
+
+        return {"hero_asset_id": hero_asset_id, "total_selected": len(top)}
 
 
 @activity.defn
-async def run_packaging(listing_id: str, tenant_id: str) -> str:
+async def run_packaging(listing_id: str, tenant_id: str) -> dict:
     agent = PackagingAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
     return await agent.execute(ctx)
