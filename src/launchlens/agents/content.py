@@ -1,4 +1,6 @@
+import json
 import uuid
+
 from sqlalchemy import select
 from temporalio import activity
 
@@ -9,10 +11,11 @@ from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_llm_provider
 from launchlens.services.events import emit_event
 from launchlens.services.fha_filter import fha_check
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 _PROMPT_TEMPLATE = """\
-Write a compelling real estate listing description for the following property.
+Write two real estate listing descriptions for the following property.
 Be specific and factual. Do not use Fair Housing Act prohibited language.
 
 Property details:
@@ -21,7 +24,11 @@ Property details:
 Key features identified from photos:
 {photo_features}
 
-Write a 2-3 sentence description."""
+Return ONLY a JSON object with this exact structure:
+{{
+  "mls_safe": "...(2-3 sentences, factual only, no agent promotion, no personality)...",
+  "marketing": "...(2-3 sentences, compelling, personality allowed, but still FHA compliant)..."
+}}"""
 
 _FHA_RETRY_SUFFIX = (
     "\n\nIMPORTANT: The previous attempt contained language that may violate the Fair Housing Act. "
@@ -63,26 +70,36 @@ class ContentAgent(BaseAgent):
                     photo_features=features_text or "modern interior",
                 )
 
-                copy = await self._llm_provider.complete(
+                raw = await self._llm_provider.complete(
                     prompt=prompt, context=listing.metadata_
                 )
-                fha_result = fha_check({"copy": copy})
+                parsed = json.loads(raw)
+                mls_safe = parsed["mls_safe"]
+                marketing = parsed["marketing"]
+                fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
 
                 if not fha_result.passed:
-                    copy = await self._llm_provider.complete(
+                    raw = await self._llm_provider.complete(
                         prompt=prompt + _FHA_RETRY_SUFFIX, context=listing.metadata_
                     )
-                    fha_result = fha_check({"copy": copy})
+                    parsed = json.loads(raw)
+                    mls_safe = parsed["mls_safe"]
+                    marketing = parsed["marketing"]
+                    fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
 
                 await emit_event(
                     session=session,
                     event_type="content.completed",
-                    payload={"fha_passed": fha_result.passed, "copy_length": len(copy)},
+                    payload={
+                        "fha_passed": fha_result.passed,
+                        "mls_safe_length": len(mls_safe),
+                        "marketing_length": len(marketing),
+                    },
                     tenant_id=context.tenant_id,
                     listing_id=context.listing_id,
                 )
 
-        return {"copy": copy, "fha_passed": fha_result.passed}
+        return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed}
 
 
 @activity.defn
