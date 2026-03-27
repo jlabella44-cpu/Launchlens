@@ -132,3 +132,26 @@ async def test_change_role_invalid_returns_400(async_client: AsyncClient):
         "role": "superadmin"
     }, headers=_auth(token))
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_platform_stats(async_client: AsyncClient):
+    token, _ = await _register_admin(async_client)
+    await async_client.post("/listings", json={
+        "address": {"street": "Stats St"}, "metadata": {},
+    }, headers=_auth(token))
+
+    resp = await async_client.get("/admin/stats", headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_tenants"] >= 1
+    assert body["total_users"] >= 1
+    assert body["total_listings"] >= 1
+    assert isinstance(body["listings_by_state"], dict)
+    assert "new" in body["listings_by_state"]
+
+
+@pytest.mark.asyncio
+async def test_platform_stats_requires_admin(async_client: AsyncClient):
+    resp = await async_client.get("/admin/stats")
+    assert resp.status_code in (401, 403)

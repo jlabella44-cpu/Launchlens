@@ -11,6 +11,7 @@ from launchlens.models.listing import Listing
 from launchlens.api.schemas.admin import (
     TenantResponse, TenantDetailResponse, UpdateTenantRequest,
     UserResponse, InviteUserRequest, UpdateUserRoleRequest,
+    PlatformStatsResponse,
 )
 
 router = APIRouter()
@@ -157,3 +158,28 @@ async def change_user_role(
     await db.commit()
     await db.refresh(user)
     return UserResponse.from_orm_user(user)
+
+
+@router.get("/stats", response_model=PlatformStatsResponse)
+async def platform_stats(
+    admin_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    total_tenants = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
+    total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    total_listings = (await db.execute(select(func.count(Listing.id)))).scalar() or 0
+
+    state_rows = (await db.execute(
+        select(Listing.state, func.count(Listing.id)).group_by(Listing.state)
+    )).all()
+    listings_by_state = {
+        row[0].value if hasattr(row[0], 'value') else row[0]: row[1]
+        for row in state_rows
+    }
+
+    return PlatformStatsResponse(
+        total_tenants=total_tenants,
+        total_users=total_users,
+        total_listings=total_listings,
+        listings_by_state=listings_by_state,
+    )
