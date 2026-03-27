@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from launchlens.database import get_db
+from launchlens.database import get_db, AsyncSessionLocal
 from launchlens.models.user import User, UserRole
 from launchlens.models.tenant import Tenant
 from launchlens.services.auth import decode_token
@@ -35,6 +35,12 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin role required")
     return user
+
+
+async def get_db_admin():
+    """DB session without tenant RLS scope — for admin cross-tenant queries."""
+    async with AsyncSessionLocal() as session:
+        yield session
 
 
 async def get_current_tenant(request: Request) -> str:

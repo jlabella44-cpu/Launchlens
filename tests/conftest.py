@@ -6,6 +6,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from launchlens.main import app
 from launchlens.database import Base, get_db
+from launchlens.api.deps import get_db_admin
 from launchlens.config import settings
 
 
@@ -91,7 +92,12 @@ async def async_client(test_engine):
                 )
             yield session
 
+    async def override_get_db_admin():
+        async with _test_session_factory() as session:
+            yield session
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db_admin] = override_get_db_admin
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
