@@ -4,6 +4,7 @@ import pytest
 import jwt as pyjwt
 from httpx import AsyncClient
 from launchlens.config import settings
+from launchlens.models.listing import ListingState
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -132,3 +133,78 @@ async def test_update_listing_metadata_only(async_client: AsyncClient):
     assert resp.status_code == 200
     assert resp.json()["metadata"]["beds"] == 3
     assert resp.json()["address"]["street"] == "Keep St"
+
+
+@pytest.mark.asyncio
+async def test_get_package_empty(async_client: AsyncClient):
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Pkg St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+
+    resp = await async_client.get(f"/listings/{listing_id}/package", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_start_review(async_client: AsyncClient, db_session):
+    token, tenant_id = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Review St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+
+    from launchlens.models.listing import Listing
+    from sqlalchemy import update
+    await db_session.execute(
+        update(Listing).where(Listing.id == uuid.UUID(listing_id)).values(state=ListingState.AWAITING_REVIEW)
+    )
+    await db_session.commit()
+
+    resp = await async_client.post(f"/listings/{listing_id}/review", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["state"] == "in_review"
+
+
+@pytest.mark.asyncio
+async def test_approve_listing(async_client: AsyncClient, db_session):
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Approve St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+
+    from launchlens.models.listing import Listing
+    from sqlalchemy import update
+    await db_session.execute(
+        update(Listing).where(Listing.id == uuid.UUID(listing_id)).values(state=ListingState.IN_REVIEW)
+    )
+    await db_session.commit()
+
+    resp = await async_client.post(f"/listings/{listing_id}/approve", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["state"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_approve_wrong_state_returns_409(async_client: AsyncClient):
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Bad Approve St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+    resp = await async_client.post(f"/listings/{listing_id}/approve", headers=_auth(token))
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_review_wrong_state_returns_409(async_client: AsyncClient):
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Bad Review St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+    resp = await async_client.post(f"/listings/{listing_id}/review", headers=_auth(token))
+    assert resp.status_code == 409

@@ -8,6 +8,7 @@ from launchlens.models.listing import Listing, ListingState
 from launchlens.models.user import User
 from launchlens.api.deps import get_current_user
 from launchlens.models.asset import Asset
+from launchlens.models.package_selection import PackageSelection
 from launchlens.api.schemas.listings import (
     CreateListingRequest, UpdateListingRequest, ListingResponse,
 )
@@ -149,3 +150,84 @@ async def list_assets(
         select(Asset).where(Asset.listing_id == listing.id).order_by(Asset.created_at)
     )
     return result.scalars().all()
+
+
+@router.get("/{listing_id}/package")
+async def get_package(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    result = await db.execute(
+        select(PackageSelection)
+        .where(PackageSelection.listing_id == listing.id)
+        .order_by(PackageSelection.position)
+    )
+    selections = result.scalars().all()
+    return [
+        {
+            "asset_id": str(s.asset_id),
+            "channel": s.channel,
+            "position": s.position,
+            "composite_score": s.composite_score,
+            "selected_by": s.selected_by,
+        }
+        for s in selections
+    ]
+
+
+@router.post("/{listing_id}/review")
+async def start_review(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    if listing.state != ListingState.AWAITING_REVIEW:
+        raise HTTPException(status_code=409, detail=f"Cannot start review: listing is {listing.state.value}")
+
+    listing.state = ListingState.IN_REVIEW
+    await db.commit()
+    await db.refresh(listing)
+    return {"listing_id": str(listing.id), "state": listing.state.value}
+
+
+@router.post("/{listing_id}/approve")
+async def approve_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    if listing.state != ListingState.IN_REVIEW:
+        raise HTTPException(status_code=409, detail=f"Cannot approve: listing is {listing.state.value}")
+
+    listing.state = ListingState.APPROVED
+    await db.commit()
+    await db.refresh(listing)
+    return {"listing_id": str(listing.id), "state": listing.state.value}
