@@ -67,3 +67,68 @@ async def test_update_tenant_name(async_client: AsyncClient):
     }, headers=_auth(token))
     assert resp.status_code == 200
     assert resp.json()["name"] == "Renamed Corp"
+
+
+@pytest.mark.asyncio
+async def test_list_users_for_tenant(async_client: AsyncClient):
+    token, tenant_id = await _register_admin(async_client)
+    resp = await async_client.get(f"/admin/tenants/{tenant_id}/users", headers=_auth(token))
+    assert resp.status_code == 200
+    users = resp.json()
+    assert len(users) >= 1
+    assert users[0]["email"].endswith("@example.com")
+    assert "role" in users[0]
+
+
+@pytest.mark.asyncio
+async def test_invite_user(async_client: AsyncClient):
+    token, tenant_id = await _register_admin(async_client)
+    invite_email = f"invited-{uuid.uuid4()}@example.com"
+    resp = await async_client.post(f"/admin/tenants/{tenant_id}/users", json={
+        "email": invite_email,
+        "password": "InvitedPass1!",
+        "name": "Invited User",
+        "role": "operator",
+    }, headers=_auth(token))
+    assert resp.status_code == 201
+    assert resp.json()["email"] == invite_email
+    assert resp.json()["role"] == "operator"
+
+
+@pytest.mark.asyncio
+async def test_invite_duplicate_email_returns_409(async_client: AsyncClient):
+    token, tenant_id = await _register_admin(async_client)
+    email = f"dup-{uuid.uuid4()}@example.com"
+    payload = {"email": email, "password": "DupPass1!", "name": "Dup", "role": "operator"}
+    await async_client.post(f"/admin/tenants/{tenant_id}/users", json=payload, headers=_auth(token))
+    resp = await async_client.post(f"/admin/tenants/{tenant_id}/users", json=payload, headers=_auth(token))
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_change_user_role(async_client: AsyncClient):
+    token, tenant_id = await _register_admin(async_client)
+    email = f"role-{uuid.uuid4()}@example.com"
+    invite_resp = await async_client.post(f"/admin/tenants/{tenant_id}/users", json={
+        "email": email, "password": "RolePass1!", "name": "Role User", "role": "operator",
+    }, headers=_auth(token))
+    user_id = invite_resp.json()["id"]
+    resp = await async_client.patch(f"/admin/users/{user_id}/role", json={
+        "role": "viewer"
+    }, headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["role"] == "viewer"
+
+
+@pytest.mark.asyncio
+async def test_change_role_invalid_returns_400(async_client: AsyncClient):
+    token, tenant_id = await _register_admin(async_client)
+    email = f"bad-{uuid.uuid4()}@example.com"
+    invite_resp = await async_client.post(f"/admin/tenants/{tenant_id}/users", json={
+        "email": email, "password": "BadPass1!", "name": "Bad", "role": "operator",
+    }, headers=_auth(token))
+    user_id = invite_resp.json()["id"]
+    resp = await async_client.patch(f"/admin/users/{user_id}/role", json={
+        "role": "superadmin"
+    }, headers=_auth(token))
+    assert resp.status_code == 400

@@ -4,11 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from launchlens.api.deps import require_admin, get_db_admin
-from launchlens.models.user import User
+from launchlens.services.auth import hash_password
+from launchlens.models.user import User, UserRole
 from launchlens.models.tenant import Tenant
 from launchlens.models.listing import Listing
 from launchlens.api.schemas.admin import (
     TenantResponse, TenantDetailResponse, UpdateTenantRequest,
+    UserResponse, InviteUserRequest, UpdateUserRoleRequest,
 )
 
 router = APIRouter()
@@ -84,3 +86,74 @@ async def update_tenant(
     await db.commit()
     await db.refresh(tenant)
     return tenant
+
+
+VALID_ROLES = {r.value for r in UserRole}
+
+
+@router.get("/tenants/{tenant_id}/users", response_model=list[UserResponse])
+async def list_users(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    result = await db.execute(
+        select(User).where(User.tenant_id == tenant_id).order_by(User.created_at)
+    )
+    return [UserResponse.from_orm_user(u) for u in result.scalars().all()]
+
+
+@router.post("/tenants/{tenant_id}/users", status_code=201, response_model=UserResponse)
+async def invite_user(
+    tenant_id: uuid.UUID,
+    body: InviteUserRequest,
+    admin_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    if body.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
+
+    existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    user = User(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        email=body.email,
+        password_hash=hash_password(body.password),
+        name=body.name,
+        role=UserRole(body.role),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return UserResponse.from_orm_user(user)
+
+
+@router.patch("/users/{user_id}/role", response_model=UserResponse)
+async def change_user_role(
+    user_id: uuid.UUID,
+    body: UpdateUserRoleRequest,
+    admin_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    if body.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
+
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.role = UserRole(body.role)
+    await db.commit()
+    await db.refresh(user)
+    return UserResponse.from_orm_user(user)
