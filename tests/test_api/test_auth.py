@@ -1,10 +1,12 @@
 # tests/test_api/test_auth.py
 import uuid
 
+import jwt as pyjwt
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
 
+from launchlens.config import settings
 from launchlens.models.user import User, UserRole
 from launchlens.services.auth import hash_password, verify_password, create_access_token, decode_token
 
@@ -108,3 +110,55 @@ async def test_login_unknown_email_returns_401(async_client: AsyncClient):
         "password": "anything",
     })
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_valid_token(async_client: AsyncClient):
+    """A token from /auth/login should work as Bearer on a protected route."""
+    email = f"test-{uuid.uuid4()}@example.com"
+    reg = await async_client.post("/auth/register", json={
+        "email": email, "password": "ValidPass1!", "name": "Eve", "company_name": "Eve Corp"
+    })
+    token = reg.json()["access_token"]
+    resp = await async_client.get("/listings", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_missing_token_returns_401(async_client: AsyncClient):
+    resp = await async_client.get("/listings")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_invalid_token_returns_401(async_client: AsyncClient):
+    resp = await async_client.get("/listings", headers={"Authorization": "Bearer garbage"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_me_returns_current_user(async_client: AsyncClient):
+    """GET /auth/me returns the authenticated user's profile."""
+    email = f"test-{uuid.uuid4()}@example.com"
+    reg = await async_client.post("/auth/register", json={
+        "email": email, "password": "ValidPass1!", "name": "Frank", "company_name": "Frank LLC"
+    })
+    token = reg.json()["access_token"]
+    resp = await async_client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["email"] == email
+    assert body["role"] == UserRole.ADMIN.value
+
+
+@pytest.mark.asyncio
+async def test_admin_only_endpoint_rejects_non_admin(async_client: AsyncClient):
+    """Admin-only route should return 403 for non-admin users."""
+    viewer_payload = {
+        "sub": str(uuid.uuid4()),
+        "tenant_id": str(uuid.uuid4()),
+        "role": UserRole.VIEWER.value,
+    }
+    viewer_token = pyjwt.encode(viewer_payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    resp = await async_client.get("/admin/health", headers={"Authorization": f"Bearer {viewer_token}"})
+    assert resp.status_code == 403

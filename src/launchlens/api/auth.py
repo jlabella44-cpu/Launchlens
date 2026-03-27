@@ -7,7 +7,8 @@ from launchlens.database import get_db
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User, UserRole
 from launchlens.services.auth import hash_password, verify_password, create_access_token
-from launchlens.api.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
+from launchlens.api.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from launchlens.api.deps import get_current_user
 
 router = APIRouter()
 
@@ -44,3 +45,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     return TokenResponse(access_token=create_access_token(user))
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user

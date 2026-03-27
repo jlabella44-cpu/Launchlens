@@ -1,6 +1,7 @@
 import jwt
 from jwt.exceptions import InvalidTokenError
-from fastapi import Request, HTTPException
+from fastapi import Request
+from starlette.responses import JSONResponse
 from launchlens.config import settings
 
 
@@ -14,7 +15,7 @@ class TenantMiddleware:
 
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Missing token")
+            return JSONResponse(status_code=401, content={"detail": "Missing token"})
 
         token = auth.removeprefix("Bearer ")
         try:
@@ -25,9 +26,9 @@ class TenantMiddleware:
             )
             tenant_id = payload.get("tenant_id")
             if not tenant_id:
-                raise HTTPException(status_code=401, detail="No tenant in token")
+                return JSONResponse(status_code=401, content={"detail": "No tenant in token"})
         except InvalidTokenError:
-            raise HTTPException(status_code=401, detail="Invalid token")
+            return JSONResponse(status_code=401, content={"detail": "Invalid token"})
 
         request.state.tenant_id = tenant_id
         return await call_next(request)
