@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str
     jwt_algorithm: str = "HS256"
+    jwt_expiry_hours: int = 24
 
     # Temporal
     temporal_host: str = "localhost:7233"

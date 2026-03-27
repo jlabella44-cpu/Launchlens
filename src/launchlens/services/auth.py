@@ -1,0 +1,33 @@
+from datetime import datetime, timedelta, timezone
+
+import bcrypt
+import jwt
+from fastapi import HTTPException
+
+from launchlens.config import settings
+from launchlens.models.user import User
+
+
+def hash_password(plain: str) -> str:
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+def create_access_token(user: User) -> str:
+    payload = {
+        "sub": str(user.id),
+        "tenant_id": str(user.tenant_id),
+        "role": user.role.value,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
