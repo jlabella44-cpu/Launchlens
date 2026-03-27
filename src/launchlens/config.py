@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 24
 
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_starter: str = ""
+    stripe_price_pro: str = ""
+    stripe_price_enterprise: str = ""
+
     # Temporal
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "default"

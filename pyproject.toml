@@ -22,6 +22,7 @@ dependencies = [
     "boto3>=1.34",
     "httpx>=0.27",
     "anthropic>=0.28",
+    "stripe>=8.0",
 ]
 
 [project.optional-dependencies]
