@@ -1,9 +1,13 @@
 import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from launchlens.database import get_db
+from launchlens.temporal_client import get_temporal_client
+
+logger = logging.getLogger(__name__)
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.user import User
 from launchlens.api.deps import get_current_user
@@ -125,6 +129,18 @@ async def register_assets(
         listing.state = ListingState.UPLOADING
 
     await db.commit()
+
+    # Trigger the pipeline if listing just entered UPLOADING
+    if listing.state == ListingState.UPLOADING:
+        try:
+            client = get_temporal_client()
+            await client.start_pipeline(
+                listing_id=str(listing.id),
+                tenant_id=str(current_user.tenant_id),
+            )
+        except Exception:
+            logger.exception("Pipeline trigger failed for listing %s", listing.id)
+
     return CreateAssetsResponse(
         count=len(body.assets),
         listing_state=listing.state.value,
@@ -230,4 +246,12 @@ async def approve_listing(
     listing.state = ListingState.APPROVED
     await db.commit()
     await db.refresh(listing)
+
+    # Signal the waiting workflow to continue post-approval pipeline
+    try:
+        client = get_temporal_client()
+        await client.signal_review_completed(listing_id=str(listing.id))
+    except Exception:
+        logger.exception("Review signal failed for listing %s", listing.id)
+
     return {"listing_id": str(listing.id), "state": listing.state.value}

@@ -2,6 +2,7 @@
 import uuid
 import pytest
 import jwt as pyjwt
+from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient
 from launchlens.config import settings
 
@@ -80,3 +81,23 @@ async def test_register_assets_requires_auth(async_client: AsyncClient):
         "assets": [{"file_path": "s3://x.jpg", "file_hash": "x"}]
     })
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+@patch("launchlens.api.listings.get_temporal_client")
+async def test_register_assets_triggers_pipeline(mock_get_client, async_client: AsyncClient):
+    """Registering assets should start the Temporal pipeline."""
+    mock_client = AsyncMock()
+    mock_get_client.return_value = mock_client
+
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Pipeline St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+
+    resp = await async_client.post(f"/listings/{listing_id}/assets", json={
+        "assets": [{"file_path": "s3://bucket/photo.jpg", "file_hash": "abc"}]
+    }, headers=_auth(token))
+    assert resp.status_code == 201
+    mock_client.start_pipeline.assert_called_once()
