@@ -4,10 +4,12 @@ from fastapi import Request, HTTPException
 from launchlens.config import settings
 
 
+_PUBLIC_PATHS = {"/health", "/auth/register", "/auth/login"}
+
+
 class TenantMiddleware:
     async def __call__(self, request: Request, call_next):
-        # Skip auth for health check
-        if request.url.path == "/health":
+        if request.url.path in _PUBLIC_PATHS:
             return await call_next(request)
 
         auth = request.headers.get("Authorization", "")

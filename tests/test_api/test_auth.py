@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 from fastapi import HTTPException
+from httpx import AsyncClient
 
 from launchlens.models.user import User, UserRole
 from launchlens.services.auth import hash_password, verify_password, create_access_token, decode_token
@@ -53,3 +54,57 @@ def test_decode_token_invalid_raises():
     with pytest.raises(HTTPException) as exc_info:
         decode_token("not.a.valid.token")
     assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_register_creates_user_and_returns_token(async_client: AsyncClient):
+    email = f"test-{uuid.uuid4()}@example.com"
+    resp = await async_client.post("/auth/register", json={
+        "email": email,
+        "password": "StrongPass1!",
+        "name": "Alice Smith",
+        "company_name": "Acme Realty",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "access_token" in body
+    assert body["token_type"] == "bearer"
+
+
+@pytest.mark.asyncio
+async def test_register_duplicate_email_returns_409(async_client: AsyncClient):
+    email = f"test-{uuid.uuid4()}@example.com"
+    payload = {"email": email, "password": "StrongPass1!", "name": "Bob", "company_name": "Corp"}
+    await async_client.post("/auth/register", json=payload)
+    resp = await async_client.post("/auth/register", json=payload)
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_login_success(async_client: AsyncClient):
+    email = f"test-{uuid.uuid4()}@example.com"
+    await async_client.post("/auth/register", json={
+        "email": email, "password": "MyPass123!", "name": "Carol", "company_name": "Homes Inc"
+    })
+    resp = await async_client.post("/auth/login", json={"email": email, "password": "MyPass123!"})
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
+
+
+@pytest.mark.asyncio
+async def test_login_wrong_password_returns_401(async_client: AsyncClient):
+    email = f"test-{uuid.uuid4()}@example.com"
+    await async_client.post("/auth/register", json={
+        "email": email, "password": "correctpass", "name": "Dave", "company_name": "Listings Co"
+    })
+    resp = await async_client.post("/auth/login", json={"email": email, "password": "wrong"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_unknown_email_returns_401(async_client: AsyncClient):
+    resp = await async_client.post("/auth/login", json={
+        "email": f"ghost-{uuid.uuid4()}@example.com",
+        "password": "anything",
+    })
+    assert resp.status_code == 401
