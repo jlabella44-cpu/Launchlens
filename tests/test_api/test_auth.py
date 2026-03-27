@@ -152,13 +152,27 @@ async def test_get_me_returns_current_user(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_admin_only_endpoint_rejects_non_admin(async_client: AsyncClient):
+async def test_admin_only_endpoint_rejects_non_admin(async_client: AsyncClient, db_session):
     """Admin-only route should return 403 for non-admin users."""
-    viewer_payload = {
-        "sub": str(uuid.uuid4()),
-        "tenant_id": str(uuid.uuid4()),
-        "role": UserRole.VIEWER.value,
-    }
-    viewer_token = pyjwt.encode(viewer_payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    from launchlens.models.tenant import Tenant
+    from launchlens.services.auth import hash_password, create_access_token
+
+    # Create a viewer user directly in DB
+    tenant = Tenant(id=uuid.uuid4(), name="ViewerCo", plan="starter")
+    db_session.add(tenant)
+    await db_session.flush()
+
+    viewer = User(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        email=f"viewer-{uuid.uuid4()}@example.com",
+        password_hash=hash_password("TestPass1!"),
+        name="Viewer",
+        role=UserRole.VIEWER,
+    )
+    db_session.add(viewer)
+    await db_session.commit()
+
+    viewer_token = create_access_token(viewer)
     resp = await async_client.get("/admin/health", headers={"Authorization": f"Bearer {viewer_token}"})
     assert resp.status_code == 403

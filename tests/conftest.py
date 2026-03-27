@@ -76,11 +76,27 @@ def tenant_auth_headers(tenant_id: str) -> dict:
 
 
 @pytest.fixture
-async def async_client():
+async def async_client(test_engine):
+    from sqlalchemy import text
+
+    _test_session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
+
+    async def override_get_db(request=None):
+        tenant_id = getattr(request.state, "tenant_id", None) if request else None
+        async with _test_session_factory() as session:
+            if tenant_id:
+                await session.execute(
+                    text("SET LOCAL app.current_tenant = :tid"),
+                    {"tid": str(tenant_id)},
+                )
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
