@@ -1,27 +1,36 @@
-import uuid
 import logging
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+import uuid
+from datetime import datetime, timedelta, timezone
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from launchlens.api.deps import get_current_user
+from launchlens.api.schemas.assets import (
+    AssetResponse,
+    CreateAssetsRequest,
+    CreateAssetsResponse,
+)
+from launchlens.api.schemas.listings import (
+    BundleMetadata,
+    CreateListingRequest,
+    ExportMode,
+    ExportResponse,
+    ListingResponse,
+    UpdateListingRequest,
+)
+from launchlens.services.storage import StorageService
 from launchlens.database import get_db
+from launchlens.models.asset import Asset
+from launchlens.models.listing import Listing, ListingState
+from launchlens.models.package_selection import PackageSelection
+from launchlens.models.tenant import Tenant
+from launchlens.models.user import User
+from launchlens.services.plan_limits import check_asset_quota, check_listing_quota, get_limits
 from launchlens.temporal_client import get_temporal_client
 
 logger = logging.getLogger(__name__)
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.user import User
-from launchlens.models.tenant import Tenant
-from launchlens.api.deps import get_current_user
-from launchlens.models.asset import Asset
-from launchlens.services.plan_limits import check_listing_quota, check_asset_quota, get_limits
-from launchlens.models.package_selection import PackageSelection
-from launchlens.api.schemas.listings import (
-    CreateListingRequest, UpdateListingRequest, ListingResponse,
-)
-from launchlens.api.schemas.assets import (
-    CreateAssetsRequest, CreateAssetsResponse, AssetResponse,
-)
 
 router = APIRouter()
 
@@ -77,7 +86,7 @@ async def list_listings(
         .order_by(Listing.created_at.desc())
     )
     listings = result.scalars().all()
-    return [ListingResponse.from_orm_listing(l) for l in listings]
+    return [ListingResponse.from_orm_listing(listing) for listing in listings]
 
 
 @router.get("/{listing_id}", response_model=ListingResponse)
@@ -296,3 +305,51 @@ async def approve_listing(
         logger.exception("Review signal failed for listing %s", listing.id)
 
     return {"listing_id": str(listing.id), "state": listing.state.value}
+
+
+_EXPORTABLE_STATES = {ListingState.APPROVED, ListingState.EXPORTING, ListingState.DELIVERED}
+
+
+@router.get("/{listing_id}/export", response_model=ExportResponse)
+async def export_listing(
+    listing_id: uuid.UUID,
+    mode: ExportMode = ExportMode.marketing,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    if listing.state not in _EXPORTABLE_STATES:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot export: listing is {listing.state.value}",
+        )
+
+    bundle_path = (
+        listing.mls_bundle_path if mode == ExportMode.mls else listing.marketing_bundle_path
+    )
+    if not bundle_path:
+        raise HTTPException(status_code=404, detail="Export not yet generated")
+
+    storage = StorageService()
+    expires_in = 3600
+    download_url = storage.presigned_url(bundle_path, expires_in=expires_in)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+    return ExportResponse(
+        listing_id=listing.id,
+        mode=mode.value,
+        download_url=download_url,
+        expires_at=expires_at,
+        bundle=BundleMetadata(
+            includes_flyer=(mode == ExportMode.marketing),
+            includes_social_posts=(mode == ExportMode.marketing),
+        ),
+    )
