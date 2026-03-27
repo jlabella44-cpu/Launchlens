@@ -1,0 +1,16 @@
+.git
+.env
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+node_modules
+frontend
+*.egg-info
+dist
+build
+.venv
+design-system
+docs
+tests
+alembic/versions/__pycache__
