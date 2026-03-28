@@ -1,9 +1,11 @@
 import asyncio
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from launchlens.middleware.tenant import TenantMiddleware
-from launchlens.api import listings, assets, admin, auth, billing
+
+from launchlens.api import admin, assets, auth, billing, demo, listings
 from launchlens.database import AsyncSessionLocal
+from launchlens.middleware.tenant import TenantMiddleware
 from launchlens.services.outbox_poller import OutboxPoller
 
 
@@ -28,6 +30,7 @@ def create_app() -> FastAPI:
     app.include_router(listings.router, prefix="/listings", tags=["listings"])
     app.include_router(assets.router, prefix="/assets", tags=["assets"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
+    app.include_router(demo.router, prefix="/demo", tags=["demo"])
 
     @app.get("/health")
     async def health():
