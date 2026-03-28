@@ -1,6 +1,6 @@
 """Test listing search/filter/pagination."""
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
 import pytest

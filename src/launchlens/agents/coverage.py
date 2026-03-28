@@ -55,4 +55,4 @@ class CoverageAgent(BaseAgent):
 async def run_coverage(listing_id: str, tenant_id: str) -> dict:
     agent = CoverageAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

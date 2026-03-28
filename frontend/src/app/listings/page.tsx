@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { ListingCard } from "@/components/listings/listing-card";
@@ -13,14 +14,25 @@ import type { ListingResponse } from "@/lib/types";
 function ListingsDashboard() {
   const [listings, setListings] = useState<ListingResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showBrandBanner, setShowBrandBanner] = useState(false);
 
   useEffect(() => {
     apiClient
       .getListings()
       .then(setListings)
-      .catch(console.error)
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Failed to load listings");
+      })
       .finally(() => setLoading(false));
+
+    apiClient
+      .getBrandKit()
+      .then((kit) => {
+        if (!kit) setShowBrandBanner(true);
+      })
+      .catch(() => {});
   }, []);
 
   function handleCreated(listing: ListingResponse) {
@@ -31,6 +43,25 @@ function ListingsDashboard() {
     <>
       <Nav />
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+        {showBrandBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-xl bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 flex items-center justify-between"
+          >
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text)]">
+                Set up your branding
+              </p>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                Add your logo, colors, and brokerage info for branded exports.
+              </p>
+            </div>
+            <Link href="/settings">
+              <Button variant="secondary">Settings</Button>
+            </Link>
+          </motion.div>
+        )}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1
@@ -46,7 +77,16 @@ function ListingsDashboard() {
           <Button onClick={() => setDialogOpen(true)}>New Listing</Button>
         </div>
 
-        {loading ? (
+        {error ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-20"
+          >
+            <p className="text-red-600 mb-2">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </motion.div>
+        ) : loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
               <div

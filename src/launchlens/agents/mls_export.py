@@ -225,4 +225,4 @@ async def run_mls_export(
 ) -> dict:
     agent = MLSExportAgent(content_result=content_result, flyer_s3_key=flyer_s3_key)
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)
