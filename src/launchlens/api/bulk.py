@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from launchlens.api.deps import get_current_user, get_db
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.user import User
+from launchlens.services.endpoint_rate_limit import rate_limit
 from launchlens.services.storage import StorageService
 from launchlens.temporal_client import get_temporal_client
 
@@ -36,6 +37,7 @@ class BulkExportRequest(BaseModel):
 @router.post("/approve")
 async def bulk_approve(
     body: BulkApproveRequest,
+    _rl=Depends(rate_limit(3, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

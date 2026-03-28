@@ -32,6 +32,7 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [quotaError, setQuotaError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
@@ -172,7 +173,12 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
       setFiles([]);
       onUploaded();
     } catch (err: unknown) {
-      toast(err instanceof Error ? err.message : "Upload failed", "error");
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      if (msg.includes("limit reached") || msg.includes("Upgrade")) {
+        setQuotaError(msg);
+      } else {
+        toast(msg, "error");
+      }
     } finally {
       setUploading(false);
     }
@@ -186,6 +192,18 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
       >
         Upload Photos
       </h3>
+
+      {quotaError && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800 font-medium">{quotaError}</p>
+          <a
+            href="/pricing"
+            className="text-sm text-[var(--color-primary)] underline mt-1 inline-block"
+          >
+            Upgrade your plan for more
+          </a>
+        </div>
+      )}
 
       {/* Drop zone */}
       <div

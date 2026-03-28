@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
+    # CORS
+    cors_origins: str = "http://localhost:3000"
+
     # Database
     database_url: str
     database_url_sync: str = ""
@@ -36,6 +39,10 @@ class Settings(BaseSettings):
     s3_bucket_name: str = "launchlens-dev"
     aws_region: str = "us-east-1"
 
+    # Monitoring
+    sentry_dsn: str = ""
+    git_sha: str = ""
+
     # Feature flags
     shadow_review_enabled: bool = True
     shadow_review_max_listings: int = 100
@@ -45,6 +52,40 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
     use_mock_providers: bool = False
+
+    # ClamAV
+    clamav_host: str = "localhost"
+    clamav_port: int = 3310
+
+    # OpenTelemetry
+    otel_exporter_endpoint: str = ""  # Empty = disabled
+
+    # RESO MLS
+    reso_api_url: str = ""
+    reso_api_key: str = ""
+
+    # Canva
+    canva_api_key: str = ""
+
+    # Credit bundles (Stripe price IDs for one-time purchases)
+    stripe_price_credit_bundle_5: str = ""
+    stripe_price_credit_bundle_10: str = ""
+    stripe_price_credit_bundle_25: str = ""
+    stripe_price_credit_bundle_50: str = ""
+
+    # New tier pricing (Stripe price IDs)
+    stripe_price_lite: str = ""
+    stripe_price_active_agent: str = ""
+    stripe_price_team: str = ""
+    stripe_price_annual: str = ""
+
+    # Email / Notifications
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_from: str = "noreply@launchlens.com"
+    email_enabled: bool = False
 
     # Video (Kling AI)
     kling_access_key: str = ""

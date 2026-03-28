@@ -10,6 +10,7 @@ import json
 import anthropic
 
 from launchlens.config import settings
+from launchlens.services.metrics import record_provider_call
 
 from .base import LLMProvider
 
@@ -31,10 +32,15 @@ class ClaudeProvider(LLMProvider):
         context_str = json.dumps(context, indent=2) if context else ""
         user_content = f"{prompt}\n\nContext:\n{context_str}" if context_str else prompt
 
-        message = await self._client.messages.create(
-            model=_MODEL,
-            max_tokens=1024,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
-        )
-        return message.content[0].text
+        try:
+            message = await self._client.messages.create(
+                model=_MODEL,
+                max_tokens=1024,
+                system=_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_content}],
+            )
+            record_provider_call("claude", True)
+            return message.content[0].text
+        except Exception:
+            record_provider_call("claude", False)
+            raise

@@ -33,6 +33,14 @@ export function Nav() {
           Pricing
         </Link>
         {user && (
+          <Link
+            href="/settings"
+            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            Settings
+          </Link>
+        )}
+        {user && (
           <>
             <span className="text-sm text-[var(--color-text-secondary)]">
               {user.email}

@@ -87,4 +87,4 @@ class LearningAgent(BaseAgent):
 async def run_learning(listing_id: str, tenant_id: str) -> dict:
     agent = LearningAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

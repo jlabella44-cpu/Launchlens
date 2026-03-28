@@ -124,12 +124,32 @@ function ListingDetail() {
     );
   }
 
+  async function handleRetryPipeline() {
+    setActionLoading(true);
+    try {
+      const res = await apiClient.retryPipeline(id);
+      setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
+      toast("Pipeline restarted", "success");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to retry", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   if (!listing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--color-text-secondary)]">
-          {fetchError || "Listing not found."}
-        </p>
+        <div className="text-center">
+          <p className="text-[var(--color-text-secondary)] mb-4">
+            {fetchError || "Listing not found."}
+          </p>
+          {fetchError && (
+            <Button onClick={() => { setFetchError(""); setLoading(true); fetchData(); }}>
+              Retry
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -140,18 +160,18 @@ function ListingDetail() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-6">
           <Link
             href="/listings"
-            className="text-sm text-[var(--color-primary)] hover:underline mb-2 inline-block cursor-pointer"
+            className="text-sm text-[var(--color-primary)] hover:underline mb-2 inline-block cursor-pointer min-h-[44px] flex items-center touch-manipulation"
           >
             &larr; Back to Listings
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1
-              className="text-3xl font-bold text-[var(--color-text)]"
+              className="text-2xl sm:text-3xl font-bold text-[var(--color-text)]"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {addr.street || "Listing"}
@@ -208,14 +228,16 @@ function ListingDetail() {
 
           {/* Right: Package + Actions */}
           <div className="space-y-6">
-            {/* 3D Photo Orbit */}
+            {/* 3D Photo Orbit — hidden on mobile for performance */}
             {selections.length > 0 && (
-              <SceneWrapper
-                className="w-full h-[300px]"
-                camera={{ position: [0, 2, 5], fov: 50 }}
-              >
-                <PhotoOrbit photos={selections} heroIndex={0} />
-              </SceneWrapper>
+              <div className="hidden lg:block">
+                <SceneWrapper
+                  className="w-full h-[300px]"
+                  camera={{ position: [0, 2, 5], fov: 50 }}
+                >
+                  <PhotoOrbit photos={selections} heroIndex={0} />
+                </SceneWrapper>
+              </div>
             )}
 
             <PackageViewer selections={selections} />
@@ -228,7 +250,7 @@ function ListingDetail() {
               >
                 Actions
               </h3>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                 {listing.state === "awaiting_review" && (
                   <Button onClick={handleStartReview} loading={actionLoading}>
                     Start Review
@@ -248,6 +270,24 @@ function ListingDetail() {
                       Quick Download Marketing
                     </Button>
                   </>
+                )}
+                {["failed", "pipeline_timeout"].includes(listing.state) && (
+                  <div className="w-full bg-red-50 border border-red-200 rounded-xl p-5">
+                    <h4 className="text-red-800 font-semibold mb-1">Pipeline Failed</h4>
+                    <p className="text-sm text-red-600 mb-4">
+                      {listing.state === "pipeline_timeout"
+                        ? "Processing timed out. This can happen with large photo sets."
+                        : "Something went wrong while processing your listing photos."}
+                    </p>
+                    <div className="flex gap-3">
+                      <Button onClick={handleRetryPipeline} loading={actionLoading}>
+                        Retry Processing
+                      </Button>
+                      <Link href="/listings">
+                        <Button variant="secondary">Back to Listings</Button>
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
 
