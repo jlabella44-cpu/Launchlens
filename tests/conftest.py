@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from unittest.mock import MagicMock, patch
 
@@ -12,7 +13,10 @@ from launchlens.config import settings
 from launchlens.database import Base, get_db
 from launchlens.main import app
 
-TEST_DB_URL = "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test"
+TEST_DB_URL = os.environ.get(
+    "TEST_DB_URL",
+    "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test",
+)
 
 
 @pytest.fixture(scope="session")
@@ -37,11 +41,11 @@ async def test_engine():
     # create_all only creates tables — it skips the manual op.execute() calls in the
     # migration that enable RLS. Without this, cross-tenant isolation tests pass
     # but RLS is not actually enforced in production.
-    import os
     import shutil
     import subprocess
     import sys
 
+    # Find alembic: check Scripts/ (Windows), then same dir as python, then PATH
     alembic_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "alembic.exe")
     if not os.path.exists(alembic_exe):
         alembic_exe = os.path.join(os.path.dirname(sys.executable), "alembic")
