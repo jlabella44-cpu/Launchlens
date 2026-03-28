@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProviderWrapper } from "./auth-wrapper";
-import { ClientProviders } from "./client-providers";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { OfflineBanner } from "@/components/ui/offline-banner";
 
 export const metadata: Metadata = {
   title: "LaunchLens — Listing Media OS",
@@ -22,9 +23,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <ClientProviders>
+        <ErrorBoundary>
+          <OfflineBanner />
           <AuthProviderWrapper>{children}</AuthProviderWrapper>
-        </ClientProviders>
+        </ErrorBoundary>
       </body>
     </html>
   );

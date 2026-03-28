@@ -12,13 +12,14 @@ import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PackageViewer } from "@/components/listings/package-viewer";
 import { PipelineStatus } from "@/components/listings/pipeline-status";
+import { PipelineProgress } from "@/components/listings/pipeline-progress";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
 import apiClient from "@/lib/api-client";
+import { useToast } from "@/components/ui/toast";
 import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
 import { VideoPlayer } from "@/components/listings/video-player";
 import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
-import { useToast } from "@/contexts/toast-context";
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
@@ -32,20 +33,18 @@ const PhotoOrbit = dynamic(
 function ListingDetail() {
   const params = useParams();
   const id = params.id as string;
-  const toast = useToast();
+  const { toast } = useToast();
 
   const [listing, setListing] = useState<ListingResponse | null>(null);
   const [assets, setAssets] = useState<AssetResponse[]>([]);
   const [selections, setSelections] = useState<PackageSelection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
   const [showVideoUpload, setShowVideoUpload] = useState(false);
-  const [retryLoading, setRetryLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
-    setFetchError(null);
     try {
       const [l, a] = await Promise.all([
         apiClient.getListing(id),
@@ -62,26 +61,34 @@ function ListingDetail() {
         const pkg = await apiClient.getPackage(id);
         setSelections(pkg);
       }
-    } catch (err: any) {
-      setFetchError(err.message || "Failed to load listing");
-      toast.error("Failed to load listing data");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load listing";
+      setFetchError(msg);
     } finally {
       setLoading(false);
     }
-  }, [id, toast]);
+  }, [id]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Auto-refresh while listing is in a processing state
+  useEffect(() => {
+    const PROCESSING_STATES = ["uploading", "analyzing", "exporting"];
+    if (!listing || !PROCESSING_STATES.includes(listing.state)) return;
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [listing?.state, fetchData]);
 
   async function handleStartReview() {
     setActionLoading(true);
     try {
       const res = await apiClient.startReview(id);
       setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
-      toast.success("Review started");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to start review");
+      toast("Review started", "success");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to start review", "error");
     } finally {
       setActionLoading(false);
     }
@@ -93,9 +100,8 @@ function ListingDetail() {
       const res = await apiClient.approveListing(id);
       setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
       setActionDone("approved");
-      toast.success("Package approved! Generating export bundles...");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to approve listing");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to approve", "error");
     } finally {
       setActionLoading(false);
     }
@@ -105,21 +111,8 @@ function ListingDetail() {
     try {
       const res = await apiClient.getExport(id, mode);
       window.open(res.download_url, "_blank");
-    } catch (err: any) {
-      toast.error(err.message || "Export not available yet");
-    }
-  }
-
-  async function handleRetry() {
-    setRetryLoading(true);
-    try {
-      const res = await apiClient.retryListing(id);
-      setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
-      toast.success("Pipeline restarted");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to retry processing");
-    } finally {
-      setRetryLoading(false);
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Export not available yet", "error");
     }
   }
 
@@ -131,59 +124,54 @@ function ListingDetail() {
     );
   }
 
-  // Error state with retry
-  if (fetchError && !listing) {
-    return (
-      <>
-        <Nav />
-        <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
-          <div className="text-center py-20">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
-              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3l9.66 16.5H2.34L12 3z" />
-              </svg>
-            </div>
-            <h2
-              className="text-xl font-bold text-[var(--color-text)] mb-2"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Failed to load listing
-            </h2>
-            <p className="text-[var(--color-text-secondary)] mb-6">{fetchError}</p>
-            <Button onClick={fetchData}>Retry</Button>
-          </div>
-        </main>
-      </>
-    );
+  async function handleRetryPipeline() {
+    setActionLoading(true);
+    try {
+      const res = await apiClient.retryPipeline(id);
+      setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
+      toast("Pipeline restarted", "success");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to retry", "error");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   if (!listing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--color-text-secondary)]">Listing not found.</p>
+        <div className="text-center">
+          <p className="text-[var(--color-text-secondary)] mb-4">
+            {fetchError || "Listing not found."}
+          </p>
+          {fetchError && (
+            <Button onClick={() => { setFetchError(""); setLoading(true); fetchData(); }}>
+              Retry
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
 
   const addr = listing.address;
   const meta = listing.metadata;
-  const isFailed = listing.state === "failed" || listing.state === "pipeline_timeout";
 
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-6">
           <Link
             href="/listings"
-            className="text-sm text-[var(--color-primary)] hover:underline mb-2 inline-block cursor-pointer"
+            className="text-sm text-[var(--color-primary)] hover:underline mb-2 inline-block cursor-pointer min-h-[44px] flex items-center touch-manipulation"
           >
             &larr; Back to Listings
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1
-              className="text-3xl font-bold text-[var(--color-text)]"
+              className="text-2xl sm:text-3xl font-bold text-[var(--color-text)]"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {addr.street || "Listing"}
@@ -200,43 +188,10 @@ function ListingDetail() {
           )}
         </div>
 
-        {/* Pipeline Failure Banner */}
-        {isFailed && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8 p-4 rounded-xl bg-red-50 border border-red-200"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-red-800">
-                  {listing.state === "pipeline_timeout" ? "Processing Timed Out" : "Processing Failed"}
-                </h3>
-                <p className="text-sm text-red-600 mt-1">
-                  {listing.state === "pipeline_timeout"
-                    ? "The AI pipeline took too long to process your listing. This can happen with large photo sets."
-                    : "An error occurred while processing your listing. You can retry to restart the pipeline."}
-                </p>
-                <Button
-                  onClick={handleRetry}
-                  loading={retryLoading}
-                  className="mt-3"
-                >
-                  Retry Processing
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
         {/* Pipeline Status */}
-        <div className="mb-8">
+        <div className="mb-8 space-y-4">
           <PipelineStatus state={listing.state} />
+          <PipelineProgress listingId={id} listingState={listing.state} />
         </div>
 
         {/* Two-column layout */}
@@ -273,14 +228,16 @@ function ListingDetail() {
 
           {/* Right: Package + Actions */}
           <div className="space-y-6">
-            {/* 3D Photo Orbit */}
+            {/* 3D Photo Orbit — hidden on mobile for performance */}
             {selections.length > 0 && (
-              <SceneWrapper
-                className="w-full h-[300px]"
-                camera={{ position: [0, 2, 5], fov: 50 }}
-              >
-                <PhotoOrbit photos={selections} heroIndex={0} />
-              </SceneWrapper>
+              <div className="hidden lg:block">
+                <SceneWrapper
+                  className="w-full h-[300px]"
+                  camera={{ position: [0, 2, 5], fov: 50 }}
+                >
+                  <PhotoOrbit photos={selections} heroIndex={0} />
+                </SceneWrapper>
+              </div>
             )}
 
             <PackageViewer selections={selections} />
@@ -293,7 +250,7 @@ function ListingDetail() {
               >
                 Actions
               </h3>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                 {listing.state === "awaiting_review" && (
                   <Button onClick={handleStartReview} loading={actionLoading}>
                     Start Review
@@ -313,6 +270,24 @@ function ListingDetail() {
                       Quick Download Marketing
                     </Button>
                   </>
+                )}
+                {["failed", "pipeline_timeout"].includes(listing.state) && (
+                  <div className="w-full bg-red-50 border border-red-200 rounded-xl p-5">
+                    <h4 className="text-red-800 font-semibold mb-1">Pipeline Failed</h4>
+                    <p className="text-sm text-red-600 mb-4">
+                      {listing.state === "pipeline_timeout"
+                        ? "Processing timed out. This can happen with large photo sets."
+                        : "Something went wrong while processing your listing photos."}
+                    </p>
+                    <div className="flex gap-3">
+                      <Button onClick={handleRetryPipeline} loading={actionLoading}>
+                        Retry Processing
+                      </Button>
+                      <Link href="/listings">
+                        <Button variant="secondary">Back to Listings</Button>
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
 

@@ -30,6 +30,8 @@ class ListingPipelineInput:
     listing_id: str
     tenant_id: str
     plan: str = "starter"
+    billing_model: str = "legacy"
+    enabled_addons: list[str] | None = None
 
 
 _DEFAULT_RETRY = RetryPolicy(maximum_attempts=3)
@@ -93,20 +95,29 @@ class ListingPipeline:
         )
 
         # Start video generation in parallel with human review
-        video_task = workflow.execute_activity(
-            run_video, ctx,
-            start_to_close_timeout=timedelta(minutes=30),  # Kling generation takes time
-            retry_policy=_DEFAULT_RETRY,
-        )
+        # For credit users, only run if video add-on is enabled
+        addons = input.enabled_addons or []
+        run_video_step = True
+        if input.billing_model == "credit" and "ai_video_tour" not in addons:
+            run_video_step = False
+
+        video_task = None
+        if run_video_step:
+            video_task = workflow.execute_activity(
+                run_video, ctx,
+                start_to_close_timeout=timedelta(minutes=30),
+                retry_policy=_DEFAULT_RETRY,
+            )
 
         # Wait for human review (listing is now AWAITING_REVIEW)
         await workflow.wait_condition(lambda: self._review_completed)
 
         # Collect video result (may already be done) — don't block pipeline on failure
-        try:
-            await video_task
-        except Exception:
-            pass  # Video is optional; pipeline continues without it
+        if video_task:
+            try:
+                await video_task
+            except Exception:
+                pass  # Video is optional; pipeline continues without it
 
         # Phase 2: Post-approval pipeline
         # Step 1: Content (dual-tone)
@@ -124,7 +135,12 @@ class ListingPipeline:
                 retry_policy=_DEFAULT_RETRY,
             )
         ]
-        if input.plan in ("pro", "enterprise"):
+        # Social content: plan-gated for legacy, addon-gated for credit users
+        run_social = (
+            (input.billing_model == "credit" and "social_content_pack" in addons)
+            or (input.billing_model != "credit" and input.plan in ("pro", "enterprise"))
+        )
+        if run_social:
             parallel_tasks.append(
                 workflow.execute_activity(
                     run_social_content, ctx,

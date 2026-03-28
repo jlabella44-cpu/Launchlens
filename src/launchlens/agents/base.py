@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from launchlens.services.metrics import StepTimer
+from launchlens.telemetry import agent_span
+
 
 @dataclass
 class AgentContext:
@@ -19,6 +22,17 @@ class BaseAgent(ABC):
     @abstractmethod
     async def execute(self, context: AgentContext): ...
 
+    async def instrumented_execute(self, context: AgentContext) -> dict:
+        """Wrap execute() with OpenTelemetry tracing and step metrics."""
+        async with agent_span(self.agent_name, context.listing_id, context.tenant_id) as span:
+            with StepTimer(self.agent_name):
+                result = await self.execute(context)
+                if span and isinstance(result, dict):
+                    for key, value in result.items():
+                        if isinstance(value, (int, float, bool, str)):
+                            span.set_attribute(f"result.{key}", value)
+                return result
+
     async def handle_failure(self, error: Exception, context: "AgentContext", session=None) -> None:
         """
         Emit a failure event and re-raise so Temporal retries the activity.
@@ -33,4 +47,18 @@ class BaseAgent(ABC):
                 tenant_id=str(context.tenant_id),
                 listing_id=str(context.listing_id) if context.listing_id else None,
             )
+
+            # Send failure notification email
+            if context.listing_id:
+                try:
+                    from launchlens.models.listing import Listing
+                    from launchlens.services.notifications import notify_pipeline_failed
+                    listing = await session.get(Listing, context.listing_id)
+                    if listing:
+                        await notify_pipeline_failed(
+                            session, listing, str(context.tenant_id), str(error),
+                        )
+                except Exception:
+                    pass  # Don't let notification failure mask the original error
+
         raise error  # Temporal sees the failure and applies retry policy

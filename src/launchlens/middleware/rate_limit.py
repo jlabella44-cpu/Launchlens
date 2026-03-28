@@ -9,6 +9,8 @@ Limits:
   - Unauthenticated (public paths): 20 req/min per IP
 
 Skips: /health, /docs, /openapi.json
+
+IP extraction: Only trusts X-Forwarded-For when TRUSTED_PROXY_COUNT > 0.
 """
 import logging
 
@@ -16,6 +18,11 @@ from fastapi import Request
 from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
+
+# Number of trusted reverse proxies in front of the app.
+# 0 = direct connection (ignore X-Forwarded-For entirely).
+# 1 = single proxy (use rightmost-1 entry in X-Forwarded-For).
+TRUSTED_PROXY_COUNT: int = 0
 
 _SKIP_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 
@@ -26,6 +33,18 @@ _PUBLIC_CAPACITY = 20
 _PUBLIC_REFILL = 20 / 60
 
 _limiter = None
+
+
+def _extract_client_ip(request: Request) -> str:
+    """Extract client IP, only trusting X-Forwarded-For when behind known proxies."""
+    if TRUSTED_PROXY_COUNT > 0:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            parts = [p.strip() for p in forwarded.split(",")]
+            # Use the entry at position -(TRUSTED_PROXY_COUNT) from the right
+            idx = max(0, len(parts) - TRUSTED_PROXY_COUNT)
+            return parts[idx]
+    return request.client.host if request.client else "unknown"
 
 
 def _get_limiter():
@@ -56,8 +75,7 @@ class APIRateLimitMiddleware:
         if tenant_id:
             key = f"tenant:{tenant_id}"
         else:
-            forwarded = request.headers.get("x-forwarded-for")
-            ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+            ip = _extract_client_ip(request)
             key = f"ip:{ip}"
 
         try:

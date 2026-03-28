@@ -7,6 +7,10 @@ from fastapi import HTTPException
 from launchlens.config import settings
 from launchlens.models.user import User
 
+# Pre-computed dummy hash for constant-time comparison when user not found.
+# Prevents timing-based user enumeration attacks.
+_DUMMY_HASH = bcrypt.hashpw(b"dummy-password-for-timing", bcrypt.gensalt()).decode()
+
 
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
@@ -14,6 +18,12 @@ def hash_password(plain: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+def verify_password_constant_time(plain: str, hashed: str | None) -> bool:
+    """Verify password with constant-time behaviour even when user doesn't exist."""
+    target = hashed if hashed is not None else _DUMMY_HASH
+    return bcrypt.checkpw(plain.encode(), target.encode())
 
 
 def create_access_token(user: User) -> str:
