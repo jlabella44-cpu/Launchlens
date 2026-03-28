@@ -38,6 +38,13 @@ class WeightManager:
         new_weight = current_weight + delta - pull
         return max(WEIGHT_MIN, min(WEIGHT_MAX, new_weight))
 
+    def apply_decay(self, weight: float, days_since_update: int) -> float:
+        """Regress stale weights toward 1.0 after 90 days of inactivity."""
+        if days_since_update < 90:
+            return weight
+        decay = min(0.1 * ((days_since_update - 90) / 30), 0.5)  # max 50% decay
+        return weight * (1 - decay) + 1.0 * decay
+
     def score(self, features: dict) -> float:
         """
         Composite scoring for photo selection.

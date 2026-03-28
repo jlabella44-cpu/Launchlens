@@ -1,5 +1,6 @@
 # src/launchlens/agents/packaging.py
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from temporalio import activity
@@ -45,17 +46,29 @@ class PackagingAgent(BaseAgent):
                     if vr.asset_id not in seen:
                         seen[vr.asset_id] = vr
 
-                # Load LearningWeight rows for this tenant (Thompson Sampling weights)
-                tenant_id_uuid = uuid.UUID(context.tenant_id)
-                lw_rows = (await session.execute(
-                    select(LearningWeight).where(LearningWeight.tenant_id == tenant_id_uuid)
-                )).scalars().all()
-                weight_by_room: dict[str, float] = {lw.room_label: lw.weight for lw in lw_rows}
+                # Load tenant learning weights
+                tenant_id = uuid.UUID(context.tenant_id)
+                lw_result = await session.execute(
+                    select(LearningWeight).where(LearningWeight.tenant_id == tenant_id)
+                )
+                weight_map = {lw.room_label: lw for lw in lw_result.scalars().all()}
 
                 # Score each asset
+                now = datetime.now(timezone.utc)
                 scored = []
                 for asset_id, vr in seen.items():
-                    room_weight = weight_by_room.get(vr.room_label or "", 1.0)
+                    room_weight = 1.0
+                    lw = weight_map.get(vr.room_label) if vr.room_label else None
+                    if lw:
+                        room_weight = self._wm.blend(
+                            context.tenant_id, vr.room_label,
+                            lw.labeled_listing_count, lw.weight,
+                        )
+                        # Apply decay for stale weights
+                        if lw.updated_at:
+                            days_stale = (now - lw.updated_at).days
+                            room_weight = self._wm.apply_decay(room_weight, days_stale)
+
                     features = {
                         "quality_score": vr.quality_score or 50,
                         "commercial_score": vr.commercial_score or 50,
@@ -95,6 +108,10 @@ class PackagingAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
+                # Send review-ready notification email
+                from launchlens.services.notifications import notify_review_ready
+                await notify_review_ready(session, listing, context.tenant_id)
+
         return {"hero_asset_id": hero_asset_id, "total_selected": len(top)}
 
 
@@ -102,4 +119,4 @@ class PackagingAgent(BaseAgent):
 async def run_packaging(listing_id: str, tenant_id: str) -> dict:
     agent = PackagingAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

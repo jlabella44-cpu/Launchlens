@@ -1,58 +1,84 @@
-"""
-Email service for sending transactional emails.
+"""Email service — SMTP for production, NoOp for dev/test."""
 
-In development mode (USE_MOCK_EMAIL=true or no SMTP configured),
-emails are logged instead of sent.
-"""
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
+
+from launchlens.config import settings
 
 logger = logging.getLogger(__name__)
 
-_TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "email"
+TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "email"
+
+
+def _load_template(name: str, **kwargs: str) -> str:
+    """Load an HTML template and substitute {placeholders}."""
+    path = TEMPLATE_DIR / name
+    html = path.read_text()
+    for key, value in kwargs.items():
+        html = html.replace(f"{{{{{key}}}}}", value)
+    return html
 
 
 class EmailService:
-    """Simple email service with template support."""
+    """Send emails via SMTP."""
 
-    def __init__(self, mock: bool = True):
-        self._mock = mock
-
-    async def send_template(
+    def __init__(
         self,
-        to: str,
-        template_name: str,
-        context: dict,
-        subject: str | None = None,
-    ) -> bool:
-        """Send a templated email. Returns True if sent/logged successfully."""
-        template_path = _TEMPLATE_DIR / f"{template_name}.html"
-        if template_path.exists():
-            html = template_path.read_text()
-            for key, value in context.items():
-                html = html.replace(f"{{{{{key}}}}}", str(value))
-        else:
-            html = f"Template '{template_name}' not found. Context: {context}"
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        sender: str | None = None,
+    ) -> None:
+        self.host = host or settings.smtp_host
+        self.port = port or settings.smtp_port
+        self.user = user or settings.smtp_user
+        self.password = password or settings.smtp_password
+        self.sender = sender or settings.email_from
 
-        subject = subject or f"LaunchLens — {template_name.replace('_', ' ').title()}"
+    def send(self, to: str, subject: str, html_body: str) -> None:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = self.sender
+        msg["To"] = to
+        msg.attach(MIMEText(html_body, "html"))
 
-        if self._mock:
-            logger.info(
-                "email.mock to=%s subject=%s template=%s context=%s",
-                to, subject, template_name, context,
-            )
-            return True
+        with smtplib.SMTP(self.host, self.port) as server:
+            server.starttls()
+            if self.user and self.password:
+                server.login(self.user, self.password)
+            server.sendmail(self.sender, [to], msg.as_string())
+        logger.info("email_sent", extra={"to": to, "subject": subject})
 
-        # Production: integrate with SES, SendGrid, etc.
-        logger.info("email.sent to=%s subject=%s", to, subject)
-        return True
+    def send_pipeline_complete(self, to: str, listing_address: str, listing_id: str) -> None:
+        html = _load_template("pipeline_complete.html", address=listing_address, listing_id=listing_id)
+        self.send(to, f"Your listing is ready: {listing_address}", html)
+
+    def send_pipeline_failed(self, to: str, listing_address: str, error: str) -> None:
+        html = _load_template("pipeline_failed.html", address=listing_address, error=error)
+        self.send(to, f"Pipeline issue: {listing_address}", html)
+
+    def send_review_ready(self, to: str, listing_address: str, listing_id: str) -> None:
+        html = _load_template("review_ready.html", address=listing_address, listing_id=listing_id)
+        self.send(to, f"Ready for review: {listing_address}", html)
+
+    def send_welcome(self, to: str, name: str) -> None:
+        html = _load_template("welcome.html", name=name)
+        self.send(to, "Welcome to LaunchLens", html)
 
 
-_email_service: EmailService | None = None
+class NoOpEmailService(EmailService):
+    """Does nothing — used in dev/test."""
+
+    def send(self, to: str, subject: str, html_body: str) -> None:
+        logger.debug("noop_email", extra={"to": to, "subject": subject})
 
 
 def get_email_service() -> EmailService:
-    global _email_service
-    if _email_service is None:
-        _email_service = EmailService(mock=True)
-    return _email_service
+    """Return the appropriate email service based on config."""
+    if not settings.email_enabled:
+        return NoOpEmailService()
+    return EmailService()

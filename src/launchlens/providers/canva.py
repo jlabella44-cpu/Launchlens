@@ -1,101 +1,108 @@
-"""CanvaProvider — two-step design rendering via the Canva Connect API.
-
-Step 1: Claude generates a design-spec JSON (layout, colors, text blocks).
-Step 2: Canva renders the spec via their Design API and returns a public URL.
-
-This is used by the BrandAgent for flyer generation when `template_provider`
-is set to "canva".
-"""
-import json
+# src/launchlens/providers/canva.py
+"""Canva Connect API template provider."""
+import logging
 
 import httpx
 
-from launchlens.providers.base import LLMProvider
+from .base import LLMProvider, TemplateProvider
+
+logger = logging.getLogger(__name__)
 
 _CANVA_API_BASE = "https://api.canva.com/rest/v1"
 
-_DESIGN_PROMPT_TEMPLATE = """\
-You are a real estate marketing designer. Create a Canva design spec for a property flyer.
 
-Property details:
-{details}
+class CanvaTemplateProvider(TemplateProvider):
+    """Renders listing flyers via the Canva Connect API."""
 
-Return ONLY valid JSON with this structure:
-{{
-  "template_id": "listing-flyer-v1",
-  "background_color": "#FFFFFF",
-  "text_blocks": [
-    {{"id": "headline", "text": "...", "font_size": 36, "color": "#111111"}},
-    {{"id": "address", "text": "...", "font_size": 18, "color": "#555555"}},
-    {{"id": "details", "text": "...", "font_size": 14, "color": "#555555"}}
-  ],
-  "image_url": "{hero_image_url}"
-}}
-"""
-
-
-class CanvaProvider:
-    """Renders listing flyers by combining Claude's design JSON with Canva's render API."""
-
-    def __init__(self, api_token: str, llm_provider: LLMProvider | None = None):
-        self._token = api_token
+    def __init__(self, api_key: str, llm_provider: LLMProvider | None = None):
+        self._api_key = api_key
         self._llm = llm_provider
 
-    async def render_flyer(
-        self,
-        listing_details: dict,
-        hero_image_url: str = "",
-        brand_color: str = "#2563EB",
-    ) -> str:
-        """Generate and render a listing flyer. Returns the Canva export URL."""
-        design_json = await self._generate_design_spec(listing_details, hero_image_url, brand_color)
-        export_url = await self._render_with_canva(design_json)
-        return export_url
+    async def render(self, template_id: str, data: dict) -> bytes:
+        """
+        Autofill a Canva design with listing data and export it as a PDF.
 
-    async def _generate_design_spec(
-        self, listing_details: dict, hero_image_url: str, brand_color: str
-    ) -> dict:
-        """Step 1: Ask Claude to produce a design spec JSON."""
-        if self._llm is None:
-            raise RuntimeError("LLM provider required for design spec generation")
+        Steps:
+        1. POST /autofills — kick off an autofill job for the given brand template.
+        2. Poll GET /autofills/{job_id} until status == 'success'.
+        3. POST /exports — request a PDF export of the resulting design.
+        4. Poll GET /exports/{job_id} until status == 'success', then download.
+        """
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
 
-        details_text = json.dumps(listing_details, indent=2)
-        prompt = _DESIGN_PROMPT_TEMPLATE.format(
-            details=details_text,
-            hero_image_url=hero_image_url,
-        )
-        raw = await self._llm.complete(prompt=prompt, context={"brand_color": brand_color})
-
-        # Strip markdown fences if present
-        raw = raw.strip()
-        if raw.startswith("```"):
-            lines = raw.splitlines()
-            raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-
-        return json.loads(raw)
-
-    async def _render_with_canva(self, design_spec: dict) -> str:
-        """Step 2: Send design spec to Canva and return the export URL."""
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{_CANVA_API_BASE}/designs",
-                headers={
-                    "Authorization": f"Bearer {self._token}",
-                    "Content-Type": "application/json",
+        async with httpx.AsyncClient(base_url=_CANVA_API_BASE, timeout=60) as client:
+            # 1. Start autofill
+            autofill_resp = await client.post(
+                "/autofills",
+                headers=headers,
+                json={
+                    "brand_template_id": template_id,
+                    "data": _build_autofill_data(data),
                 },
-                json={"design": design_spec},
             )
-            response.raise_for_status()
-            design_id = response.json()["design"]["id"]
+            autofill_resp.raise_for_status()
+            autofill_job = autofill_resp.json()["job"]
+            design_id = await _poll_job(client, headers, f"/autofills/{autofill_job['id']}", "design_id")
 
-            # Export the design as PDF
-            export_response = await client.post(
-                f"{_CANVA_API_BASE}/exports",
-                headers={
-                    "Authorization": f"Bearer {self._token}",
-                    "Content-Type": "application/json",
-                },
+            # 2. Export as PDF
+            export_resp = await client.post(
+                "/exports",
+                headers=headers,
                 json={"design_id": design_id, "format": "pdf"},
             )
-            export_response.raise_for_status()
-            return export_response.json()["export"]["url"]
+            export_resp.raise_for_status()
+            export_job = export_resp.json()["job"]
+            pdf_url = await _poll_job(client, headers, f"/exports/{export_job['id']}", "url")
+
+            # 3. Download the rendered PDF
+            pdf_resp = await client.get(pdf_url)
+            pdf_resp.raise_for_status()
+            return pdf_resp.content
+
+
+async def _poll_job(
+    client: httpx.AsyncClient,
+    headers: dict,
+    path: str,
+    result_key: str,
+    max_attempts: int = 20,
+    delay_s: float = 2.0,
+) -> str:
+    """Poll a Canva async job until it succeeds; return the value at result_key."""
+    import asyncio
+
+    for _ in range(max_attempts):
+        resp = await client.get(path, headers=headers)
+        resp.raise_for_status()
+        job = resp.json()["job"]
+        status = job.get("status")
+        if status == "success":
+            return job["result"][result_key]
+        if status == "failed":
+            raise RuntimeError(f"Canva job failed: {job}")
+        await asyncio.sleep(delay_s)
+    raise TimeoutError(f"Canva job at {path} did not complete in time")
+
+
+def _build_autofill_data(data: dict) -> list[dict]:
+    """Convert listing data dict into Canva autofill field objects."""
+    field_map = {
+        "address": "property_address",
+        "price": "listing_price",
+        "bedrooms": "bedrooms",
+        "bathrooms": "bathrooms",
+        "sqft": "square_footage",
+        "description": "property_description",
+        "agent_name": "agent_name",
+        "agent_phone": "agent_phone",
+        "agent_email": "agent_email",
+        "photo_url": "hero_image_url",
+    }
+    fields = []
+    for data_key, canva_field in field_map.items():
+        if data_key in data:
+            fields.append({"name": canva_field, "value": {"type": "text", "text": str(data[data_key])}})
+    return fields

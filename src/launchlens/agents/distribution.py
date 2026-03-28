@@ -4,6 +4,7 @@ from temporalio import activity
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.listing import Listing, ListingState
+from launchlens.models.performance_event import PerformanceEvent
 from launchlens.services.events import emit_event
 
 from .base import AgentContext, BaseAgent
@@ -31,6 +32,19 @@ class DistributionAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
+                # Record performance event for learning loop
+                session.add(PerformanceEvent(
+                    tenant_id=uuid.UUID(context.tenant_id),
+                    listing_id=listing_id,
+                    signal_type="listing_delivered",
+                    value=1.0,
+                    source="pipeline",
+                ))
+
+                # Send pipeline-complete notification email
+                from launchlens.services.notifications import notify_pipeline_complete
+                await notify_pipeline_complete(session, listing, context.tenant_id)
+
         return {"status": "delivered"}
 
 
@@ -38,4 +52,4 @@ class DistributionAgent(BaseAgent):
 async def run_distribution(listing_id: str, tenant_id: str) -> dict:
     agent = DistributionAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

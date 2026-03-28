@@ -212,3 +212,37 @@ async def test_review_wrong_state_returns_409(async_client: AsyncClient):
     listing_id = create_resp.json()["id"]
     resp = await async_client.post(f"/listings/{listing_id}/review", headers=_auth(token))
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_retry_listing_wrong_state_returns_409(async_client: AsyncClient):
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Retry St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+    # NEW state is not retryable
+    resp = await async_client.post(f"/listings/{listing_id}/retry", headers=_auth(token))
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_retry_failed_listing(async_client: AsyncClient, db_session):
+    from launchlens.models.listing import Listing
+
+    token, tenant_id = await _register(async_client)
+
+    # Create a listing then set it to FAILED directly in DB
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Failed St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+
+    listing = await db_session.get(Listing, uuid.UUID(listing_id))
+    listing.state = ListingState.FAILED
+    await db_session.commit()
+
+    resp = await async_client.post(f"/listings/{listing_id}/retry", headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["state"] == "uploading"

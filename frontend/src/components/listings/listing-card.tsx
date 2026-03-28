@@ -28,7 +28,7 @@ export function ListingCard({ listing }: ListingCardProps) {
     >
       <div className="flex items-start justify-between mb-3">
         <h3
-          className="text-lg font-semibold text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors"
+          className="text-lg font-semibold text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors truncate"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           {address.street || "New Listing"}

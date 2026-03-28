@@ -14,6 +14,7 @@ import type { ListingResponse } from "@/lib/types";
 function ListingsDashboard() {
   const [listings, setListings] = useState<ListingResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showBrandBanner, setShowBrandBanner] = useState(false);
 
@@ -21,7 +22,9 @@ function ListingsDashboard() {
     apiClient
       .getListings()
       .then(setListings)
-      .catch(console.error)
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Failed to load listings");
+      })
       .finally(() => setLoading(false));
 
     apiClient
@@ -74,7 +77,16 @@ function ListingsDashboard() {
           <Button onClick={() => setDialogOpen(true)}>New Listing</Button>
         </div>
 
-        {loading ? (
+        {error ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-20"
+          >
+            <p className="text-red-600 mb-2">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </motion.div>
+        ) : loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
               <div
