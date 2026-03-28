@@ -1,5 +1,7 @@
 """SocialCutAgent — creates platform-specific video clips from a property tour video."""
 
+import subprocess
+import tempfile
 import uuid
 
 from sqlalchemy import select
@@ -46,10 +48,36 @@ class VideoCutter:
         height: int,
         max_duration: int,
     ) -> bytes:
-        """Crop/resize a video for a specific platform. Returns video bytes.
-        MVP: returns the source bytes truncated (actual FFmpeg cropping in Phase 2).
-        """
-        return source_bytes
+        """Crop/resize a video for a specific platform using FFmpeg. Returns video bytes."""
+        with (
+            tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as src_f,
+            tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as dst_f,
+        ):
+            src_path = src_f.name
+            dst_path = dst_f.name
+            src_f.write(source_bytes)
+
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg", "-i", src_path,
+                    "-t", str(max_duration),
+                    "-vf", (
+                        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
+                    ),
+                    "-c:v", "libx264", "-preset", "fast",
+                    "-y", dst_path,
+                ],
+                check=True,
+                capture_output=True,
+            )
+            with open(dst_path, "rb") as f:
+                return f.read()
+        finally:
+            import os
+            os.unlink(src_path)
+            os.unlink(dst_path)
 
 
 class SocialCutAgent(BaseAgent):
@@ -81,17 +109,19 @@ class SocialCutAgent(BaseAgent):
 
                 # Generate a cut for each platform
                 cuts = []
+                source_bytes = self._storage.download(video.s3_key)
+
                 for platform, spec in PLATFORM_SPECS.items():
                     cut_bytes = self._cutter.create_cut(
-                        source_bytes=b"placeholder",  # MVP: actual download in Phase 2
+                        source_bytes=source_bytes,
                         width=spec["width"],
                         height=spec["height"],
                         max_duration=spec["max_duration"],
                     )
 
-                    s3_key = self._storage.upload_bytes(
-                        data=cut_bytes,
+                    s3_key = self._storage.upload(
                         key=f"videos/{listing_id}/social/{platform}.mp4",
+                        data=cut_bytes,
                         content_type="video/mp4",
                     )
 

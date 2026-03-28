@@ -30,5 +30,8 @@ def get_template_provider() -> TemplateProvider:
     if settings.use_mock_providers:
         from .mock import MockTemplateProvider
         return MockTemplateProvider()
-    from .mock import MockTemplateProvider  # Canva not yet implemented
+    if settings.canva_api_key:
+        from .canva import CanvaTemplateProvider
+        return CanvaTemplateProvider(api_key=settings.canva_api_key, llm_provider=get_llm_provider())
+    from .mock import MockTemplateProvider
     return MockTemplateProvider()
