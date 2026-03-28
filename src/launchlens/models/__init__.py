@@ -17,3 +17,4 @@ from .social_content import SocialContent                     # noqa
 from .video_asset import VideoAsset                          # noqa
 from .dollhouse_scene import DollhouseScene                  # noqa
 from .api_key import APIKey                                  # noqa
+from .notification_preference import NotificationPreference  # noqa

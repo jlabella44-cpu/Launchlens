@@ -64,6 +64,14 @@ class Settings(BaseSettings):
     # Canva
     canva_api_key: str = ""
 
+    # Email / Notifications
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_from: str = "noreply@launchlens.com"
+    email_enabled: bool = False
+
     # Video (Kling AI)
     kling_access_key: str = ""
     kling_secret_key: str = ""
