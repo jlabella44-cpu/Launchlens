@@ -83,7 +83,7 @@ async def test_cleanup_deletes_associated_assets(db_session):
 @pytest.mark.asyncio
 async def test_cleanup_with_storage_deletes_s3(db_session):
     from unittest.mock import MagicMock
-    expired = await _make_demo(db_session, expired=True)
+    await _make_demo(db_session, expired=True)
     storage = MagicMock()
     result = await cleanup_expired_demos(db_session, storage=storage)
     assert result["s3_cleaned"] == 1

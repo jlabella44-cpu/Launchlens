@@ -37,7 +37,7 @@ async def cleanup_expired_demos(session: AsyncSession, storage: StorageService |
     if not expired:
         return {"deleted_listings": 0, "deleted_assets": 0, "s3_cleaned": 0}
 
-    listing_ids = [l.id for l in expired]
+    listing_ids = [listing.id for listing in expired]
     s3_cleaned = 0
 
     if storage:
