@@ -50,6 +50,28 @@ class Settings(BaseSettings):
     google_vision_api_key: str = ""
     use_mock_providers: bool = False
 
+    # ClamAV
+    clamav_host: str = "localhost"
+    clamav_port: int = 3310
+
+    # OpenTelemetry
+    otel_exporter_endpoint: str = ""  # Empty = disabled
+
+    # RESO MLS
+    reso_api_url: str = ""
+    reso_api_key: str = ""
+
+    # Canva
+    canva_api_key: str = ""
+
+    # Email / Notifications
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_from: str = "noreply@launchlens.com"
+    email_enabled: bool = False
+
     # Video (Kling AI)
     kling_access_key: str = ""
     kling_secret_key: str = ""
