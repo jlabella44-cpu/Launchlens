@@ -48,26 +48,9 @@ async def create_listing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Check monthly listing quota
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
-
-    now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    count_result = await db.execute(
-        select(func.count(Listing.id)).where(
-            Listing.tenant_id == current_user.tenant_id,
-            Listing.created_at >= month_start,
-        )
-    )
-    current_count = count_result.scalar() or 0
-
-    if not check_listing_quota(tenant.plan, current_count):
-        raise HTTPException(
-            status_code=403,
-            detail=f"Monthly listing limit reached ({current_count}). Upgrade your plan for more.",
-        )
 
     listing = Listing(
         id=uuid.uuid4(),
@@ -76,6 +59,43 @@ async def create_listing(
         metadata_=body.metadata,
         state=ListingState.NEW,
     )
+
+    if tenant.billing_model == "credit":
+        # Credit-based billing: deduct credits
+        from launchlens.services.credits import CreditService, InsufficientCreditsError
+        credit_svc = CreditService()
+        cost = tenant.per_listing_credit_cost
+        try:
+            await credit_svc.deduct_credits(
+                db, tenant.id, cost,
+                transaction_type="listing_debit",
+                reference_type="listing",
+                reference_id=str(listing.id),
+                description=f"Listing at {body.address.get('street', 'new listing')}",
+            )
+            listing.credit_cost = cost
+        except InsufficientCreditsError:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Insufficient credits. Need {cost} credit(s). Purchase more to continue.",
+            )
+    else:
+        # Legacy billing: monthly quota check
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        count_result = await db.execute(
+            select(func.count(Listing.id)).where(
+                Listing.tenant_id == current_user.tenant_id,
+                Listing.created_at >= month_start,
+            )
+        )
+        current_count = count_result.scalar() or 0
+        if not check_listing_quota(tenant.plan, current_count):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Monthly listing limit reached ({current_count}). Upgrade your plan for more.",
+            )
+
     db.add(listing)
     await db.commit()
     await db.refresh(listing)
@@ -516,6 +536,41 @@ async def retry_pipeline(
         logger.exception("Pipeline retry trigger failed for listing %s", listing.id)
 
     return {"listing_id": str(listing.id), "state": "uploading"}
+
+
+@router.post("/{listing_id}/cancel")
+async def cancel_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a listing and refund credits if using credit billing."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    cancellable = {ListingState.NEW, ListingState.UPLOADING, ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    if listing.state not in cancellable:
+        raise HTTPException(409, f"Cannot cancel: listing is {listing.state.value}")
+
+    credits_refunded = 0
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if tenant and tenant.billing_model == "credit" and listing.credit_cost:
+        from launchlens.services.credits import CreditService
+        credit_svc = CreditService()
+        txn = await credit_svc.refund_credits(db, current_user.tenant_id, str(listing_id))
+        if txn:
+            credits_refunded = txn.amount
+
+    listing.state = ListingState.FAILED  # reuse FAILED state for cancelled
+    await db.commit()
+
+    return {"listing_id": str(listing.id), "state": "cancelled", "credits_refunded": credits_refunded}
 
 
 @router.get("/{listing_id}/pipeline-status")
