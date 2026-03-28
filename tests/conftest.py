@@ -42,16 +42,23 @@ async def test_engine():
     import subprocess
     import sys
 
-    # Find alembic binary: try standard locations, then fall back to shutil.which
+    # Find alembic binary: try standard locations, then fall back to shutil.which,
+    # then fall back to running as a Python module.
     alembic_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "alembic.exe")
     if not os.path.exists(alembic_exe):
         alembic_exe = os.path.join(os.path.dirname(sys.executable), "alembic")
     if not os.path.exists(alembic_exe):
-        alembic_exe = shutil.which("alembic") or "alembic"
+        found = shutil.which("alembic")
+        alembic_exe = found if found else None
 
     env = os.environ.copy()
     env["DATABASE_URL_SYNC"] = TEST_DB_URL.replace("+asyncpg", "")
-    subprocess.run([alembic_exe, "upgrade", "head"], env=env, check=True)
+    if alembic_exe:
+        subprocess.run([alembic_exe, "upgrade", "head"], env=env, check=True)
+    else:
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"], env=env, check=True,
+        )
 
     from sqlalchemy.pool import NullPool
     engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
