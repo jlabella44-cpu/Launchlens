@@ -1,16 +1,18 @@
 # src/launchlens/agents/packaging.py
 import uuid
+
 from sqlalchemy import select
 from temporalio import activity
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
-from launchlens.models.vision_result import VisionResult
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
+from launchlens.models.vision_result import VisionResult
 from launchlens.services.events import emit_event
 from launchlens.services.weight_manager import WeightManager
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 MLS_MAX_PHOTOS = 25  # 1 hero + 24 supporting
 

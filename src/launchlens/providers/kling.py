@@ -2,10 +2,12 @@
 Ported from Juke Marketing Engine (app/services/video_generator.py).
 """
 
-import time
 import asyncio
-import jwt as pyjwt
+import time
+
 import httpx
+import jwt as pyjwt
+
 from launchlens.config import settings
 
 

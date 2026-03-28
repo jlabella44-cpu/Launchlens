@@ -2,10 +2,9 @@
 Ported from Juke Marketing Engine.
 """
 
+import os
 import subprocess
 import tempfile
-import os
-from pathlib import Path
 
 
 class VideoStitcher:

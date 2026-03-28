@@ -2,29 +2,34 @@
 Ported from Juke Marketing Engine with adaptations for LaunchLens pipeline.
 """
 
-import uuid
 import asyncio
-import tempfile
 import os
+import tempfile
+import uuid
+
 import httpx
 from sqlalchemy import select
 
-from launchlens.database import AsyncSessionLocal
-from launchlens.models.listing import Listing
-from launchlens.models.asset import Asset
-from launchlens.models.package_selection import PackageSelection
-from launchlens.models.vision_result import VisionResult
-from launchlens.models.video_asset import VideoAsset
-from launchlens.providers.kling import KlingProvider
-from launchlens.services.storage import StorageService
-from launchlens.services.video_stitcher import VideoStitcher
-from launchlens.services.events import emit_event
 from launchlens.agents.video_prompts import (
-    get_prompt_for_room, get_camera_control, get_transition,
-    NEGATIVE_PROMPT, SLOT_ORDER,
+    NEGATIVE_PROMPT,
+    SLOT_ORDER,
+    get_camera_control,
+    get_prompt_for_room,
+    get_transition,
 )
 from launchlens.config import settings
-from .base import BaseAgent, AgentContext
+from launchlens.database import AsyncSessionLocal
+from launchlens.models.asset import Asset
+from launchlens.models.listing import Listing
+from launchlens.models.package_selection import PackageSelection
+from launchlens.models.video_asset import VideoAsset
+from launchlens.models.vision_result import VisionResult
+from launchlens.providers.kling import KlingProvider
+from launchlens.services.events import emit_event
+from launchlens.services.storage import StorageService
+from launchlens.services.video_stitcher import VideoStitcher
+
+from .base import AgentContext, BaseAgent
 
 
 class VideoAgent(BaseAgent):

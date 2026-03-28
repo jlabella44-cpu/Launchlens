@@ -7,7 +7,9 @@ the dependency footprint minimal.
 Endpoint: POST https://vision.googleapis.com/v1/images:annotate
 """
 import httpx
+
 from launchlens.config import settings
+
 from .base import VisionLabel, VisionProvider
 
 _ENDPOINT = "https://vision.googleapis.com/v1/images:annotate"

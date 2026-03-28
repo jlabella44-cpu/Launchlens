@@ -1,5 +1,6 @@
 # src/launchlens/agents/vision.py
 import uuid
+
 from sqlalchemy import select
 from temporalio import activity
 
@@ -9,7 +10,8 @@ from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_vision_provider
 from launchlens.providers.base import VisionLabel
 from launchlens.services.events import emit_event
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 ROOM_LABEL_MAP = {
     "living room": "living_room",
@@ -36,7 +38,7 @@ TIER2_CANDIDATE_LIMIT = 20
 
 def _labels_to_vision_result(asset_id: uuid.UUID, labels: list[VisionLabel]) -> VisionResult:
     """Map VisionLabel list → VisionResult row for Tier 1."""
-    top_confidence = max((l.confidence for l in labels), default=0.0)
+    top_confidence = max((lbl.confidence for lbl in labels), default=0.0)
     quality_score = int(top_confidence * 100)
 
     room_label = None
@@ -46,7 +48,7 @@ def _labels_to_vision_result(asset_id: uuid.UUID, labels: list[VisionLabel]) -> 
             room_label = mapped
             break
 
-    commercial_count = sum(1 for l in labels if l.name.lower() in COMMERCIAL_LABELS)
+    commercial_count = sum(1 for lbl in labels if lbl.name.lower() in COMMERCIAL_LABELS)
     commercial_score = min(100, commercial_count * 20)
 
     is_interior = room_label not in (None, "exterior", "garage", "pool", "backyard")
@@ -60,7 +62,7 @@ def _labels_to_vision_result(asset_id: uuid.UUID, labels: list[VisionLabel]) -> 
         quality_score=quality_score,
         commercial_score=commercial_score,
         hero_candidate=hero_candidate,
-        raw_labels={"labels": [{"name": l.name, "confidence": l.confidence} for l in labels]},
+        raw_labels={"labels": [{"name": lbl.name, "confidence": lbl.confidence} for lbl in labels]},
         model_used="google-vision-v1",
     )
 
@@ -136,11 +138,11 @@ class VisionAgent(BaseAgent):
                     asset = await session.get(Asset, vr.asset_id)
                     labels = await self._vision_provider.analyze(image_url=asset.file_path)
 
-                    quality_labels = [l for l in labels if l.category == "quality"]
-                    shot_labels = [l for l in labels if l.category == "shot_type"]
+                    quality_labels = [lbl for lbl in labels if lbl.category == "quality"]
+                    shot_labels = [lbl for lbl in labels if lbl.category == "shot_type"]
 
                     quality_score = int(
-                        (sum(l.confidence for l in quality_labels) / len(quality_labels) * 100)
+                        (sum(lbl.confidence for lbl in quality_labels) / len(quality_labels) * 100)
                         if quality_labels else vr.quality_score
                     )
                     hero_explanation = quality_labels[0].name if quality_labels else None
@@ -155,7 +157,7 @@ class VisionAgent(BaseAgent):
                         commercial_score=vr.commercial_score,
                         hero_candidate=True,
                         hero_explanation=hero_explanation,
-                        raw_labels={"labels": [{"name": l.name, "confidence": l.confidence} for l in labels]},
+                        raw_labels={"labels": [{"name": lbl.name, "confidence": lbl.confidence} for lbl in labels]},
                         model_used="gpt-4o",
                     )
                     session.add(tier2)

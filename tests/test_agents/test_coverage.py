@@ -1,9 +1,10 @@
+
 import pytest
-import uuid
-from launchlens.agents.coverage import CoverageAgent, REQUIRED_SHOTS
-from launchlens.agents.base import AgentContext
-from launchlens.models.vision_result import VisionResult
 from sqlalchemy import select
+
+from launchlens.agents.base import AgentContext
+from launchlens.agents.coverage import CoverageAgent
+from launchlens.models.vision_result import VisionResult
 from tests.test_agents.conftest import make_session_factory
 
 

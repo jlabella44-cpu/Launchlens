@@ -1,5 +1,6 @@
-import pytest
 import fakeredis
+import pytest
+
 from launchlens.services.rate_limiter import RateLimiter
 
 

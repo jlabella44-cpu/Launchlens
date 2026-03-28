@@ -1,15 +1,17 @@
-import uuid
 import json
+import uuid
+
 from sqlalchemy import select
 
 from launchlens.database import AsyncSessionLocal
-from launchlens.models.listing import Listing
 from launchlens.models.asset import Asset
-from launchlens.models.vision_result import VisionResult
 from launchlens.models.dollhouse_scene import DollhouseScene
+from launchlens.models.listing import Listing
+from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_vision_provider
 from launchlens.services.events import emit_event
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 ROOM_COLORS = {
     "living_room": "#FEF3C7",

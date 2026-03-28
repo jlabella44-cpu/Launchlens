@@ -1,7 +1,9 @@
 import uuid
-from sqlalchemy import UUID, String, Integer
+
+from sqlalchemy import UUID, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from .base import TenantScopedModel
 
 

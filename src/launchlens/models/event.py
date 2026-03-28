@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import UUID, String, DateTime, func
+
+from sqlalchemy import UUID, DateTime, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from launchlens.database import Base
 
 

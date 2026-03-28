@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
+
 from sqlalchemy import UUID, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from launchlens.database import Base
 
 

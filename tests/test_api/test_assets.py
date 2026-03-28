@@ -1,9 +1,11 @@
 # tests/test_api/test_assets.py
 import uuid
-import pytest
+from unittest.mock import AsyncMock, patch
+
 import jwt as pyjwt
-from unittest.mock import patch, AsyncMock
+import pytest
 from httpx import AsyncClient
+
 from launchlens.config import settings
 
 

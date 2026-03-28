@@ -1,4 +1,5 @@
 import uuid
+
 from sqlalchemy import select
 from temporalio import activity
 
@@ -6,7 +7,8 @@ from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
 from launchlens.models.vision_result import VisionResult
 from launchlens.services.events import emit_event
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 REQUIRED_SHOTS = {"exterior", "living_room", "kitchen", "bedroom", "bathroom"}
 

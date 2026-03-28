@@ -1,9 +1,10 @@
 import pytest
-from launchlens.agents.distribution import DistributionAgent
+from sqlalchemy import select
+
 from launchlens.agents.base import AgentContext
+from launchlens.agents.distribution import DistributionAgent
 from launchlens.models.listing import ListingState
 from launchlens.models.outbox import Outbox
-from sqlalchemy import select
 from tests.test_agents.conftest import make_session_factory
 
 

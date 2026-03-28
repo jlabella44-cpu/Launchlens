@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from launchlens.providers.claude import ClaudeProvider
+
+import pytest
+
 from launchlens.providers.base import LLMProvider
+from launchlens.providers.claude import ClaudeProvider
 
 
 def test_claude_provider_is_llm_provider():

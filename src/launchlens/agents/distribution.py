@@ -1,10 +1,12 @@
 import uuid
+
 from temporalio import activity
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.listing import Listing, ListingState
 from launchlens.services.events import emit_event
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 
 class DistributionAgent(BaseAgent):

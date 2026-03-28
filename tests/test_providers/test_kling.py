@@ -1,6 +1,7 @@
 # tests/test_providers/test_kling.py
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 
 
 def test_kling_provider_exists():
@@ -10,7 +11,7 @@ def test_kling_provider_exists():
 
 
 def test_video_prompts_exist():
-    from launchlens.agents.video_prompts import ROOM_PROMPTS, ROOM_CAMERA_CONTROLS, NEGATIVE_PROMPT
+    from launchlens.agents.video_prompts import NEGATIVE_PROMPT, ROOM_CAMERA_CONTROLS, ROOM_PROMPTS
     assert "kitchen" in ROOM_PROMPTS
     assert "living_room" in ROOM_PROMPTS
     assert "exterior" in ROOM_PROMPTS

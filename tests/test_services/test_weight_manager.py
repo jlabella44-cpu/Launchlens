@@ -1,4 +1,5 @@
 import pytest
+
 from launchlens.services.weight_manager import WeightManager
 
 TENANT = "tenant-abc"

@@ -6,7 +6,8 @@ Returns mock providers when USE_MOCK_PROVIDERS=true (tests, local dev).
 Returns real providers otherwise (requires API keys in environment).
 """
 from launchlens.config import settings
-from .base import VisionProvider, LLMProvider, TemplateProvider
+
+from .base import LLMProvider, TemplateProvider, VisionProvider
 
 
 def get_vision_provider() -> VisionProvider:

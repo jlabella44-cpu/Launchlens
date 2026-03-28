@@ -1,9 +1,11 @@
-import uuid
 import enum
+import uuid
 from datetime import datetime
-from sqlalchemy import UUID, String, DateTime, func
+
+from sqlalchemy import UUID, DateTime, String, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
+
 from launchlens.database import Base
 
 
