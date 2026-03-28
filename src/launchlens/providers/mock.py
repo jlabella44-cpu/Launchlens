@@ -1,6 +1,6 @@
 # src/launchlens/providers/mock.py
 """Mock provider implementations for tests and local development."""
-from .base import VisionLabel, VisionProvider, LLMProvider, TemplateProvider
+from .base import LLMProvider, TemplateProvider, VisionLabel, VisionProvider
 
 
 class MockVisionProvider(VisionProvider):
@@ -10,6 +10,9 @@ class MockVisionProvider(VisionProvider):
             VisionLabel(name="hardwood floor", confidence=0.91, category="feature"),
             VisionLabel(name="natural light", confidence=0.88, category="quality"),
         ]
+
+    async def analyze_with_prompt(self, image_url: str, prompt: str) -> str:
+        return "{}"
 
 
 class MockLLMProvider(LLMProvider):

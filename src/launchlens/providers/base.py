@@ -23,6 +23,10 @@ class VisionProvider(ABC):
         """Return labels for the given image URL."""
         ...
 
+    async def analyze_with_prompt(self, image_url: str, prompt: str) -> str:
+        """Send an image with a custom prompt. Returns raw text response."""
+        raise NotImplementedError
+
 
 class LLMProvider(ABC):
     @abstractmethod

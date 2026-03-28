@@ -10,8 +10,11 @@ calls to avoid OpenAI rate limits. Default is 5.
 """
 import asyncio
 import json
+
 import httpx
+
 from launchlens.config import settings
+
 from .base import VisionLabel, VisionProvider
 
 _ENDPOINT = "https://api.openai.com/v1/chat/completions"
@@ -67,3 +70,28 @@ class OpenAIVisionProvider(VisionProvider):
             )
             for item in data.get("labels", [])
         ]
+
+    async def analyze_with_prompt(self, image_url: str, prompt: str) -> str:
+        payload = {
+            "model": "gpt-4o",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                    ],
+                },
+            ],
+            "max_tokens": 2000,
+        }
+        async with self._semaphore:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    _ENDPOINT,
+                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    json=payload,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                return response.json()["choices"][0]["message"]["content"]
