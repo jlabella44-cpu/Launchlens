@@ -15,6 +15,8 @@ import type {
   DemoUploadRequest,
   DemoUploadResponse,
   DemoViewResponse,
+  BrandKitResponse,
+  BrandKitUpsertRequest,
   PipelineStatusResponse,
   ReviewQueueItem,
   RejectRequest,
@@ -155,6 +157,21 @@ class ApiClient {
 
   async demoClaim(id: string): Promise<{ listing_id: string }> {
     return this.request<{ listing_id: string }>(`/demo/${id}/claim`, { method: "POST" });
+  }
+  // Brand Kit
+  async getBrandKit(): Promise<BrandKitResponse | null> {
+    return this.request<BrandKitResponse | null>("/brand-kit");
+  }
+
+  async upsertBrandKit(data: BrandKitUpsertRequest): Promise<BrandKitResponse> {
+    return this.request<BrandKitResponse>("/brand-kit", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getLogoUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
+    return this.request("/brand-kit/logo-upload-url", { method: "POST" });
   }
 
   // Upload URLs

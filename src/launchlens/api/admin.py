@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +19,9 @@ from launchlens.models.listing import Listing
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User, UserRole
 from launchlens.services.auth import hash_password
+from launchlens.services.events import emit_event
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -92,6 +96,13 @@ async def update_tenant(
     if body.webhook_url is not None:
         tenant.webhook_url = body.webhook_url or None  # empty string → None
 
+    changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    await emit_event(
+        session=db,
+        event_type="tenant.updated",
+        payload={"changes": changes, "admin_user_id": str(admin_user.id)},
+        tenant_id=str(tenant_id),
+    )
     await db.commit()
     await db.refresh(tenant)
     return tenant
@@ -173,6 +184,12 @@ async def invite_user(
         role=UserRole(body.role),
     )
     db.add(user)
+    await emit_event(
+        session=db,
+        event_type="user.invited",
+        payload={"email": body.email, "role": body.role, "admin_user_id": str(admin_user.id)},
+        tenant_id=str(tenant_id),
+    )
     await db.commit()
     await db.refresh(user)
     return UserResponse.from_orm_user(user)
@@ -192,7 +209,19 @@ async def change_user_role(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    old_role = user.role.value
     user.role = UserRole(body.role)
+    await emit_event(
+        session=db,
+        event_type="user.role_changed",
+        payload={
+            "user_id": str(user_id),
+            "old_role": old_role,
+            "new_role": body.role,
+            "admin_user_id": str(admin_user.id),
+        },
+        tenant_id=str(user.tenant_id),
+    )
     await db.commit()
     await db.refresh(user)
     return UserResponse.from_orm_user(user)
