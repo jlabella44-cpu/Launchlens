@@ -534,8 +534,8 @@ async def run_compliance_scan(
             detail=f"Compliance scan requires packaged photos. Current state: {listing.state.value}",
         )
 
-    from launchlens.agents.photo_compliance import PhotoComplianceAgent
     from launchlens.agents.base import AgentContext
+    from launchlens.agents.photo_compliance import PhotoComplianceAgent
 
     agent = PhotoComplianceAgent()
     ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
