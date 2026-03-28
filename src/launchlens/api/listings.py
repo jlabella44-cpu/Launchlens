@@ -13,14 +13,19 @@ from launchlens.api.schemas.assets import (
     CreateAssetsResponse,
 )
 from launchlens.api.schemas.listings import (
+    ActionResponse,
     BundleMetadata,
+    CancelResponse,
     CreateListingRequest,
     ExportMode,
     ExportResponse,
     ListingResponse,
+    PipelineStatusResponse,
+    PipelineStepStatus,
     UpdateListingRequest,
     VideoUploadRequest,
 )
+from launchlens.api.schemas.pagination import PaginatedResponse
 from launchlens.database import get_db
 from launchlens.models.asset import Asset
 from launchlens.models.dollhouse_scene import DollhouseScene
@@ -103,44 +108,60 @@ async def create_listing(
     return ListingResponse.from_orm_listing(listing)
 
 
-@router.get("", response_model=list[ListingResponse])
+@router.get("")
 async def list_listings(
     state: str | None = None,
     search: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    page: int = 1,
+    page_size: int = 50,
     _rl=Depends(rate_limit(60, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    List listings with optional filters.
-    - state: filter by listing state (e.g. "approved", "delivered")
-    - search: search in address fields (street, city)
-    - limit/offset: pagination (default 50, max 200)
+    List listings with optional filters and pagination.
+
+    - **state**: filter by listing state (e.g. "approved", "delivered")
+    - **search**: search in address fields (street, city)
+    - **page**: page number (default 1)
+    - **page_size**: items per page (default 50, max 200)
     """
-    limit = min(limit, 200)
-    query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
+    page_size = min(page_size, 200)
+    offset = (max(page, 1) - 1) * page_size
+
+    base_query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
 
     if state:
         try:
             validated_state = ListingState(state)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid listing state: {state}")
-        query = query.where(Listing.state == validated_state)
+        base_query = base_query.where(Listing.state == validated_state)
 
     if search:
-        # Search in JSONB address field — street or city contains search term
         search_pattern = f"%{search}%"
-        query = query.where(
+        base_query = base_query.where(
             Listing.address["street"].astext.ilike(search_pattern)
             | Listing.address["city"].astext.ilike(search_pattern)
         )
 
-    query = query.order_by(Listing.created_at.desc()).limit(limit).offset(offset)
+    # Count total
+    count_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
+    total = count_result.scalar() or 0
+
+    # Fetch page
+    query = base_query.order_by(Listing.created_at.desc()).limit(page_size).offset(offset)
     result = await db.execute(query)
     listings = result.scalars().all()
-    return [ListingResponse.from_orm_listing(listing) for listing in listings]
+    items = [ListingResponse.from_orm_listing(listing) for listing in listings]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": (offset + page_size) < total,
+    }
 
 
 @router.get("/{listing_id}", response_model=ListingResponse)
@@ -474,7 +495,7 @@ async def reorder_package(
     return {"swaps_applied": swapped}
 
 
-@router.post("/{listing_id}/review")
+@router.post("/{listing_id}/review", response_model=ActionResponse)
 async def start_review(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -505,7 +526,7 @@ async def start_review(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/approve")
+@router.post("/{listing_id}/approve", response_model=ActionResponse)
 async def approve_listing(
     listing_id: uuid.UUID,
     _rl=Depends(rate_limit(5, 60)),
@@ -543,7 +564,7 @@ async def approve_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/reject")
+@router.post("/{listing_id}/reject", response_model=ActionResponse)
 async def reject_listing(
     listing_id: uuid.UUID,
     body: dict,
@@ -632,7 +653,7 @@ async def retry_pipeline(
     return {"listing_id": str(listing.id), "state": "uploading"}
 
 
-@router.post("/{listing_id}/cancel")
+@router.post("/{listing_id}/cancel", response_model=CancelResponse)
 async def cancel_listing(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -667,7 +688,7 @@ async def cancel_listing(
     return {"listing_id": str(listing.id), "state": "cancelled", "credits_refunded": credits_refunded}
 
 
-@router.get("/{listing_id}/pipeline-status")
+@router.get("/{listing_id}/pipeline-status", response_model=PipelineStatusResponse)
 async def get_pipeline_status(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -972,35 +993,4 @@ async def listing_activity(
     ]
 
 
-@router.post("/{listing_id}/retry")
-async def retry_listing(
-    listing_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Reset a failed/timed-out listing to UPLOADING and re-trigger the pipeline."""
-    listing = await db.get(Listing, listing_id)
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    retryable_states = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
-    if listing.state not in retryable_states:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot retry listing in state '{listing.state}'. Must be 'failed' or 'pipeline_timeout'.",
-        )
-
-    listing.state = ListingState.UPLOADING
-    await db.commit()
-    await db.refresh(listing)
-
-    # Re-trigger Temporal pipeline
-    tenant = await db.get(Tenant, current_user.tenant_id)
-    plan = tenant.plan if tenant else "starter"
-    try:
-        tc = await get_temporal_client()
-        await tc.start_pipeline(str(listing_id), str(current_user.tenant_id), plan)
-    except Exception:
-        logger.warning("Failed to start Temporal pipeline for retry of %s", listing_id)
-
-    return {"listing_id": str(listing.id), "state": listing.state.value}
+    # Duplicate retry endpoint removed — use the one at line ~616

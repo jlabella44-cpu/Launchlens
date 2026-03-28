@@ -59,6 +59,30 @@ class ExportResponse(BaseModel):
     bundle: BundleMetadata
 
 
+class ActionResponse(BaseModel):
+    listing_id: str
+    state: str
+
+
+class CancelResponse(BaseModel):
+    listing_id: str
+    state: str
+    credits_refunded: int = 0
+
+
+class PipelineStepStatus(BaseModel):
+    name: str
+    status: str
+    completed_at: str | None = None
+    progress: str | None = None
+
+
+class PipelineStatusResponse(BaseModel):
+    listing_id: str
+    listing_state: str
+    steps: list[PipelineStepStatus]
+
+
 class VideoUploadRequest(BaseModel):
     s3_key: str
     video_type: str = "user_raw"

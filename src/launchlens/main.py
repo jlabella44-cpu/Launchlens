@@ -46,12 +46,35 @@ async def lifespan(app: FastAPI):
         pass
 
 
+_TAG_METADATA = [
+    {"name": "auth", "description": "Registration, login, and user profile"},
+    {"name": "listings", "description": "Property listing CRUD, pipeline control, export"},
+    {"name": "credits", "description": "Credit balance, transactions, and bundle purchases"},
+    {"name": "addons", "description": "Premium add-on catalog and per-listing activation"},
+    {"name": "billing", "description": "Stripe checkout, subscriptions, invoices, webhooks"},
+    {"name": "brand-kit", "description": "Tenant branding configuration (colors, logo, fonts)"},
+    {"name": "admin", "description": "Platform administration, tenant management, analytics"},
+    {"name": "assets", "description": "Photo asset management"},
+    {"name": "settings", "description": "Tenant settings and preferences"},
+    {"name": "analytics", "description": "Usage metrics and reporting"},
+    {"name": "demo", "description": "Public demo listing upload"},
+    {"name": "sse", "description": "Server-Sent Events for real-time pipeline updates"},
+]
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="LaunchLens",
-        version="0.9.4",
-        description="The Listing Media OS — from raw photos to launch-ready marketing in minutes.",
+        title="LaunchLens API",
+        version="1.0.0",
+        description=(
+            "AI-powered real estate listing media automation. "
+            "Upload property photos, get MLS bundles, branded flyers, "
+            "AI descriptions, social content, video tours, and 3D floorplans."
+        ),
         lifespan=lifespan,
+        openapi_tags=_TAG_METADATA,
+        docs_url="/docs",
+        redoc_url="/redoc",
     )
     # CORS — must be added before other middleware so OPTIONS preflight works
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
