@@ -3,22 +3,23 @@
 End-to-end smoke test: run all agents in sequence with mock providers.
 Verifies state machine progression and that each agent produces correct DB output.
 """
-import pytest
 import uuid
 from unittest.mock import AsyncMock, MagicMock
-from launchlens.agents.ingestion import IngestionAgent
-from launchlens.agents.vision import VisionAgent
-from launchlens.agents.coverage import CoverageAgent
-from launchlens.agents.packaging import PackagingAgent
-from launchlens.agents.content import ContentAgent
-from launchlens.agents.brand import BrandAgent
-from launchlens.agents.distribution import DistributionAgent
+
+import pytest
+from sqlalchemy import select
+
 from launchlens.agents.base import AgentContext
+from launchlens.agents.brand import BrandAgent
+from launchlens.agents.content import ContentAgent
+from launchlens.agents.coverage import CoverageAgent
+from launchlens.agents.distribution import DistributionAgent
+from launchlens.agents.ingestion import IngestionAgent
+from launchlens.agents.packaging import PackagingAgent
+from launchlens.agents.vision import VisionAgent
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.vision_result import VisionResult
-from launchlens.models.package_selection import PackageSelection
 from launchlens.providers.base import VisionLabel
-from sqlalchemy import select
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -92,7 +93,7 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
     mock_vision.analyze = mock_analyze
 
     mock_llm = MagicMock()
-    mock_llm.complete = AsyncMock(return_value="Stunning 4BR/3BA home with modern finishes.")
+    mock_llm.complete = AsyncMock(return_value='{"mls_safe": "Spacious 4BR/3BA home with modern finishes.", "marketing": "Stunning 4BR/3BA home with modern finishes and natural light."}')
 
     mock_template = MagicMock()
     mock_template.render = AsyncMock(return_value=b"%PDF-content")
@@ -125,7 +126,8 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
     # Step 5: Content
     r = await ContentAgent(llm_provider=mock_llm, session_factory=sf).execute(ctx)
     assert r["fha_passed"] is True
-    assert len(r["copy"]) > 0
+    assert len(r["mls_safe"]) > 0
+    assert len(r["marketing"]) > 0
 
     # Step 6: Brand
     r = await BrandAgent(template_provider=mock_template, storage_service=mock_storage, session_factory=sf).execute(ctx)

@@ -1,5 +1,5 @@
-import uuid
 from temporalio.client import Client
+
 from launchlens.config import settings
 from launchlens.workflows.listing_pipeline import ListingPipeline, ListingPipelineInput
 
@@ -13,12 +13,12 @@ class TemporalClient:
             self._client = await Client.connect(settings.temporal_host, namespace=settings.temporal_namespace)
         return self._client
 
-    async def start_pipeline(self, listing_id: str, tenant_id: str) -> str:
+    async def start_pipeline(self, listing_id: str, tenant_id: str, plan: str = "starter") -> str:
         client = await self._connect()
         workflow_id = f"listing-pipeline-{listing_id}"
         handle = await client.start_workflow(
             ListingPipeline.run,
-            ListingPipelineInput(listing_id=listing_id, tenant_id=tenant_id),
+            ListingPipelineInput(listing_id=listing_id, tenant_id=tenant_id, plan=plan),
             id=workflow_id,
             task_queue=settings.temporal_task_queue,
         )

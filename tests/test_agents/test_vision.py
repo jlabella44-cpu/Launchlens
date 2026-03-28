@@ -1,12 +1,13 @@
 # tests/test_agents/test_vision.py
-import uuid
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from launchlens.agents.vision import VisionAgent
+
+import pytest
+from sqlalchemy import select
+
 from launchlens.agents.base import AgentContext
+from launchlens.agents.vision import VisionAgent
 from launchlens.models.vision_result import VisionResult
 from launchlens.providers.base import VisionLabel
-from sqlalchemy import select
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -84,15 +85,12 @@ async def test_tier1_emits_event(db_session, listing, assets):
     assert rows[0].payload["asset_count"] == 3
 
 
-from launchlens.models.vision_result import VisionResult as VRModel
-
-
 @pytest.fixture
 async def tier1_results(db_session, listing, assets):
     """Pre-populate Tier 1 VisionResults for 3 hero candidates."""
     for a in assets:
         a.state = "ingested"
-        db_session.add(VRModel(
+        db_session.add(VisionResult(
             asset_id=a.id,
             tier=1,
             room_label="living_room",
@@ -125,7 +123,7 @@ async def test_tier2_creates_results_for_hero_candidates(db_session, listing, as
     assert count == 3  # one Tier 2 result per hero candidate
     tier2_rows = (
         await db_session.execute(
-            select(VRModel).where(VRModel.tier == 2)
+            select(VisionResult).where(VisionResult.tier == 2)
         )
     ).scalars().all()
     assert len(tier2_rows) == 3
@@ -137,7 +135,7 @@ async def test_tier2_skips_if_no_hero_candidates(db_session, listing, assets):
     """If no Tier 1 hero candidates, Tier 2 should be a no-op."""
     for a in assets:
         a.state = "ingested"
-        db_session.add(VRModel(
+        db_session.add(VisionResult(
             asset_id=a.id,
             tier=1,
             room_label="bedroom",

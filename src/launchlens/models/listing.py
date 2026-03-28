@@ -1,10 +1,12 @@
-import uuid
 import enum
+import uuid
 from datetime import datetime
-from sqlalchemy import UUID, String, DateTime, func
+
+from sqlalchemy import UUID, Boolean, DateTime, String, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from .base import TenantScopedModel
 
 
@@ -22,6 +24,8 @@ class ListingState(str, enum.Enum):
     TRACKING = "tracking"
     PIPELINE_TIMEOUT = "pipeline_timeout"
     FAILED = "failed"
+    EXPORTING = "exporting"
+    DEMO = "demo"
 
 
 class Listing(TenantScopedModel):
@@ -35,3 +39,7 @@ class Listing(TenantScopedModel):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    mls_bundle_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    marketing_bundle_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    demo_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

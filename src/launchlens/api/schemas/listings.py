@@ -1,5 +1,7 @@
+import enum
 import uuid
 from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -35,3 +37,23 @@ class ListingResponse(BaseModel):
             created_at=listing.created_at,
             updated_at=listing.updated_at,
         )
+
+
+class ExportMode(str, enum.Enum):
+    mls = "mls"
+    marketing = "marketing"
+
+
+class BundleMetadata(BaseModel):
+    photo_count: int | None = None
+    includes_description: bool = True
+    includes_flyer: bool = False
+    includes_social_posts: bool = False
+
+
+class ExportResponse(BaseModel):
+    listing_id: uuid.UUID
+    mode: str
+    download_url: str
+    expires_at: datetime
+    bundle: BundleMetadata

@@ -1,6 +1,7 @@
 import pytest
-from launchlens.providers.base import VisionLabel, VisionProvider, LLMProvider, TemplateProvider
-from launchlens.providers.mock import MockVisionProvider, MockLLMProvider, MockTemplateProvider
+
+from launchlens.providers.base import LLMProvider, TemplateProvider, VisionLabel, VisionProvider
+from launchlens.providers.mock import MockLLMProvider, MockTemplateProvider, MockVisionProvider
 
 
 def test_vision_label_dataclass():
@@ -31,7 +32,7 @@ async def test_mock_vision_provider_analyze_returns_labels():
     labels = await provider.analyze(image_url="https://example.com/photo.jpg")
     assert isinstance(labels, list)
     assert len(labels) > 0
-    assert all(isinstance(l, VisionLabel) for l in labels)
+    assert all(isinstance(lbl, VisionLabel) for lbl in labels)
 
 
 @pytest.mark.asyncio

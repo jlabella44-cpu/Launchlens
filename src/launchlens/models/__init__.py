@@ -13,3 +13,4 @@ from .brand_kit import BrandKit                               # noqa
 from .compliance_event import ComplianceEvent                 # noqa
 from .user import User                                        # noqa
 from .prompt_version import PromptVersion                     # noqa
+from .social_content import SocialContent                     # noqa

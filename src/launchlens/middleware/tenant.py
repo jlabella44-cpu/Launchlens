@@ -1,16 +1,17 @@
 import jwt
-from jwt.exceptions import InvalidTokenError
 from fastapi import Request
+from jwt.exceptions import InvalidTokenError
 from starlette.responses import JSONResponse
+
 from launchlens.config import settings
 
-
-_PUBLIC_PATHS = {"/health", "/auth/register", "/auth/login", "/billing/webhook"}
+_PUBLIC_PATHS = {"/health", "/auth/register", "/auth/login", "/billing/webhook", "/demo/upload"}
 
 
 class TenantMiddleware:
     async def __call__(self, request: Request, call_next):
-        if request.url.path in _PUBLIC_PATHS:
+        path = request.url.path
+        if path in _PUBLIC_PATHS or (path.startswith("/demo/") and request.method == "GET"):
             return await call_next(request)
 
         auth = request.headers.get("Authorization", "")

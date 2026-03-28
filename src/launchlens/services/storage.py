@@ -8,7 +8,9 @@ All asset uploads use a consistent key scheme:
 Presigned URLs expire in 1 hour by default.
 """
 import io
+
 import boto3
+
 from launchlens.config import settings
 
 
@@ -37,6 +39,11 @@ class StorageService:
             Params={"Bucket": self._bucket, "Key": key},
             ExpiresIn=expires_in,
         )
+
+    def download(self, key: str) -> bytes:
+        """Download an object from S3 and return its bytes."""
+        response = self._client.get_object(Bucket=self._bucket, Key=key)
+        return response["Body"].read()
 
     def delete(self, key: str) -> None:
         """Delete an object from S3."""
