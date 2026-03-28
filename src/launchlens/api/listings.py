@@ -80,14 +80,35 @@ async def create_listing(
 
 @router.get("", response_model=list[ListingResponse])
 async def list_listings(
+    state: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Listing)
-        .where(Listing.tenant_id == current_user.tenant_id)
-        .order_by(Listing.created_at.desc())
-    )
+    """
+    List listings with optional filters.
+    - state: filter by listing state (e.g. "approved", "delivered")
+    - search: search in address fields (street, city)
+    - limit/offset: pagination (default 50, max 200)
+    """
+    limit = min(limit, 200)
+    query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
+
+    if state:
+        query = query.where(Listing.state == state)
+
+    if search:
+        # Search in JSONB address field — street or city contains search term
+        search_pattern = f"%{search}%"
+        query = query.where(
+            Listing.address["street"].astext.ilike(search_pattern)
+            | Listing.address["city"].astext.ilike(search_pattern)
+        )
+
+    query = query.order_by(Listing.created_at.desc()).limit(limit).offset(offset)
+    result = await db.execute(query)
     listings = result.scalars().all()
     return [ListingResponse.from_orm_listing(listing) for listing in listings]
 

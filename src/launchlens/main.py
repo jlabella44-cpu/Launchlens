@@ -7,6 +7,8 @@ from launchlens.api import admin, assets, auth, billing, demo, listings
 from launchlens.config import settings
 from launchlens.database import AsyncSessionLocal
 from launchlens.logging_config import setup_logging
+from launchlens.middleware.rate_limit import APIRateLimitMiddleware
+from launchlens.middleware.request_id import RequestIDMiddleware
 from launchlens.middleware.tenant import TenantMiddleware
 from launchlens.services.outbox_poller import OutboxPoller
 
@@ -28,7 +30,11 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="LaunchLens", version="0.9.3", lifespan=lifespan)
+    # Middleware order: request ID → rate limit → tenant auth
+    # (outermost runs first, so list is reverse order)
     app.middleware("http")(TenantMiddleware())
+    app.middleware("http")(APIRateLimitMiddleware())
+    app.middleware("http")(RequestIDMiddleware())
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(listings.router, prefix="/listings", tags=["listings"])

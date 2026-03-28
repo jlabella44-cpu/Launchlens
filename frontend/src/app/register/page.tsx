@@ -21,6 +21,9 @@ const HeroScene = dynamic(
 export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
+  const claimId = searchParams.get("claim");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +36,18 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(email, password, name);
+
+      // If claiming a demo, convert it to a real listing
+      if (claimId) {
+        try {
+          const result = await apiClient.demoClaim(claimId);
+          router.push(`/listings/${result.listing_id}`);
+          return;
+        } catch {
+          // Claim failed — still redirect to listings
+        }
+      }
+
       router.push("/listings");
     } catch (err: any) {
       setError(err.message || "Registration failed");
@@ -70,9 +85,17 @@ export default function RegisterPage() {
           >
             Create Account
           </h1>
-          <p className="text-[var(--color-text-secondary)] mb-8">
-            Start launching listings in minutes
+          <p className="text-[var(--color-text-secondary)] mb-2">
+            {claimId
+              ? "Create an account to claim your AI-curated package"
+              : "Start launching listings in minutes"}
           </p>
+          {plan && (
+            <p className="text-sm text-[var(--color-primary)] font-medium mb-6">
+              Selected plan: <span className="capitalize">{plan}</span>
+            </p>
+          )}
+          {!plan && <div className="mb-6" />}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
