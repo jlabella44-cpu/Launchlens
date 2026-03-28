@@ -5,8 +5,8 @@ import logging
 from fastapi import FastAPI
 
 from launchlens.config import settings
-from launchlens.monitoring.sentry import init_sentry
 from launchlens.monitoring.middleware import RequestMetricsMiddleware
+from launchlens.monitoring.sentry import init_sentry
 
 logger = logging.getLogger(__name__)
 

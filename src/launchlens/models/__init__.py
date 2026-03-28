@@ -14,3 +14,6 @@ from .compliance_event import ComplianceEvent                 # noqa
 from .user import User                                        # noqa
 from .prompt_version import PromptVersion                     # noqa
 from .social_content import SocialContent                     # noqa
+from .video_asset import VideoAsset                          # noqa
+from .dollhouse_scene import DollhouseScene                  # noqa
+from .api_key import APIKey                                  # noqa

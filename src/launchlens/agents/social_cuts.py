@@ -1,14 +1,16 @@
 """SocialCutAgent — creates platform-specific video clips from a property tour video."""
 
 import uuid
+
 from sqlalchemy import select
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.listing import Listing
 from launchlens.models.video_asset import VideoAsset
-from launchlens.services.storage import StorageService
 from launchlens.services.events import emit_event
-from .base import BaseAgent, AgentContext
+from launchlens.services.storage import StorageService
+
+from .base import AgentContext, BaseAgent
 
 PLATFORM_SPECS: dict[str, dict] = {
     "instagram": {

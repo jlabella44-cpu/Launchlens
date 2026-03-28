@@ -1,13 +1,14 @@
 # tests/test_agents/test_social_cuts.py
 import uuid
-import pytest
 from unittest.mock import MagicMock
-from sqlalchemy import select
-from tests.test_agents.conftest import make_session_factory
+
+import pytest
+
 from launchlens.agents.base import AgentContext
-from launchlens.agents.social_cuts import SocialCutAgent, PLATFORM_SPECS
-from launchlens.models.video_asset import VideoAsset
+from launchlens.agents.social_cuts import PLATFORM_SPECS, SocialCutAgent
 from launchlens.models.listing import Listing, ListingState
+from launchlens.models.video_asset import VideoAsset
+from tests.test_agents.conftest import make_session_factory
 
 
 def test_platform_specs_exist():
