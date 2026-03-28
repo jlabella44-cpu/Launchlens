@@ -23,3 +23,7 @@ class BillingStatusResponse(BaseModel):
     plan: str
     stripe_customer_id: str | None
     stripe_subscription_id: str | None
+
+
+class ChangePlanRequest(BaseModel):
+    plan: str  # "starter", "pro", "enterprise"
