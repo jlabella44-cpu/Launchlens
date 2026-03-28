@@ -1,4 +1,5 @@
 from temporalio import activity
+
 from launchlens.agents.base import AgentContext
 
 
@@ -50,8 +51,21 @@ async def run_distribution(context: AgentContext) -> dict:
     return await DistributionAgent().execute(context)
 
 
+@activity.defn
+async def run_social_content(context: AgentContext) -> dict:
+    from launchlens.agents.social_content import SocialContentAgent
+    return await SocialContentAgent().execute(context)
+
+
+@activity.defn
+async def run_mls_export(context: AgentContext, content_result: dict, flyer_s3_key: str | None) -> dict:
+    from launchlens.agents.mls_export import MLSExportAgent
+    return await MLSExportAgent(content_result=content_result, flyer_s3_key=flyer_s3_key).execute(context)
+
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
-    run_coverage, run_packaging, run_content, run_brand, run_distribution,
+    run_coverage, run_packaging, run_content, run_brand,
+    run_social_content, run_mls_export, run_distribution,
 ]

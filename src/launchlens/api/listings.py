@@ -187,6 +187,7 @@ async def register_assets(
             await client.start_pipeline(
                 listing_id=str(listing.id),
                 tenant_id=str(current_user.tenant_id),
+                plan=tenant.plan,
             )
         except Exception:
             logger.exception("Pipeline trigger failed for listing %s", listing.id)
