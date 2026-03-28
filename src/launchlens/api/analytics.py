@@ -8,7 +8,7 @@ Endpoints:
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select, case, extract
+from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchlens.api.deps import get_current_user, get_db
