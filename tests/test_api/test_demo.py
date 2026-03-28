@@ -1,8 +1,18 @@
 import uuid
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from tests.conftest import make_jwt
+
+
+@pytest.fixture(autouse=True)
+def _mock_demo_limiter():
+    """All demo tests bypass the Redis rate limiter."""
+    limiter = MagicMock()
+    limiter.acquire.return_value = True
+    with patch("launchlens.api.demo._get_demo_limiter", return_value=limiter):
+        yield
 
 
 def _photo_paths(n: int) -> list[str]:
