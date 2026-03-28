@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from launchlens.api import admin, assets, auth, billing, demo, listings
+from launchlens.api import admin, assets, auth, billing, demo, listings, tenant_settings
 from launchlens.config import settings
 from launchlens.database import AsyncSessionLocal
 from launchlens.logging_config import setup_logging
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(assets.router, prefix="/assets", tags=["assets"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
+    app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
 
     @app.get("/health")
     async def health():

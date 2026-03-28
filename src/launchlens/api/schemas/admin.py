@@ -10,6 +10,7 @@ class TenantResponse(BaseModel):
     plan: str
     stripe_customer_id: str | None
     stripe_subscription_id: str | None
+    webhook_url: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -23,6 +24,7 @@ class TenantDetailResponse(TenantResponse):
 class UpdateTenantRequest(BaseModel):
     name: str | None = None
     plan: str | None = None
+    webhook_url: str | None = None
 
 
 class UserResponse(BaseModel):
