@@ -63,9 +63,15 @@ async def run_mls_export(context: AgentContext, content_result: dict, flyer_s3_k
     return await MLSExportAgent(content_result=content_result, flyer_s3_key=flyer_s3_key).execute(context)
 
 
+@activity.defn
+async def run_floorplan(context: AgentContext) -> dict:
+    from launchlens.agents.floorplan import FloorplanAgent
+    return await FloorplanAgent().execute(context)
+
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
-    run_coverage, run_packaging, run_content, run_brand,
+    run_coverage, run_floorplan, run_packaging, run_content, run_brand,
     run_social_content, run_mls_export, run_distribution,
 ]

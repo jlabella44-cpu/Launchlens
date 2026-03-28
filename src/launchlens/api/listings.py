@@ -22,6 +22,7 @@ from launchlens.api.schemas.listings import (
 )
 from launchlens.database import get_db
 from launchlens.models.asset import Asset
+from launchlens.models.dollhouse_scene import DollhouseScene
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
 from launchlens.models.tenant import Tenant
@@ -130,6 +131,34 @@ async def update_listing(
     await db.commit()
     await db.refresh(listing)
     return ListingResponse.from_orm_listing(listing)
+
+
+@router.get("/{listing_id}/dollhouse")
+async def get_dollhouse(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    listing = (await db.execute(
+        select(Listing).where(Listing.id == listing_id, Listing.tenant_id == current_user.tenant_id)
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    scene = (await db.execute(
+        select(DollhouseScene)
+        .where(DollhouseScene.listing_id == listing.id)
+        .order_by(DollhouseScene.created_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    if not scene:
+        raise HTTPException(status_code=404, detail="Dollhouse not ready — upload a floorplan and run the pipeline")
+
+    return {
+        "scene_json": scene.scene_json,
+        "room_count": scene.room_count,
+        "created_at": scene.created_at.isoformat(),
+    }
 
 
 @router.post("/{listing_id}/assets", status_code=201, response_model=CreateAssetsResponse)

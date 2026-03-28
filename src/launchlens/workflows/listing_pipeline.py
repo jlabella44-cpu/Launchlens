@@ -11,6 +11,7 @@ with workflow.unsafe.imports_passed_through():
         run_content,
         run_coverage,
         run_distribution,
+        run_floorplan,
         run_ingestion,
         run_mls_export,
         run_packaging,
@@ -75,6 +76,11 @@ class ListingPipeline:
         await workflow.execute_activity(
             run_coverage, ctx,
             start_to_close_timeout=_DEFAULT_TIMEOUT,
+            retry_policy=_DEFAULT_RETRY,
+        )
+        await workflow.execute_activity(
+            run_floorplan, ctx,
+            start_to_close_timeout=_VISION_TIER2_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
         await workflow.execute_activity(
