@@ -132,48 +132,116 @@ export interface DemoViewResponse {
   photos: { file_path: string; room_label?: string; quality_score?: number }[];
 }
 
-// Credit system types
+export interface BillingStatusResponse {
+  plan: string;
+  plan_tier: string;
+  billing_model: string;
+  credit_balance: number;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+}
 
 export interface CreditBalance {
   balance: number;
-  billing_model: "legacy" | "credit";
-  tier: string;
-  per_listing_credit_cost: number;
-  rollover_cap: number | null;
+  rollover_balance: number;
+  rollover_cap: number;
+  period_start: string;
+  period_end: string;
 }
 
 export interface CreditTransaction {
   id: string;
   amount: number;
-  type: "purchase" | "usage" | "refund" | "rollover" | "bonus";
-  description: string;
-  listing_id: string | null;
+  balance_after: number;
+  transaction_type: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  description: string | null;
   created_at: string;
-}
-
-export interface CreditBundle {
-  id: string;
-  credits: number;
-  price_cents: number;
-  label: string;
-}
-
-export interface CreditCheckoutResponse {
-  checkout_url: string;
 }
 
 export interface Addon {
   id: string;
-  addon_type: "ai_video_tour" | "3d_floorplan" | "social_pack";
+  slug: string;
+  name: string;
   credit_cost: number;
-  status: "active" | "cancelled";
-  listing_id: string;
+  is_active: boolean;
+}
+
+export interface CreditBundle {
+  size: number;
+  price_cents: number;
+  per_credit_cents: number;
+}
+
+export interface Invoice {
+  id: string;
+  amount_paid: number;
+  currency: string;
+  status: string;
+  created: number;
+  hosted_invoice_url: string | null;
+}
+
+export interface UsageResponse {
+  listings_this_month: number;
+  total_assets: number;
+  total_listings: number;
+}
+
+export interface PlanLimits {
+  max_listings_per_month: number;
+  max_assets_per_listing: number;
+  tier2_vision: boolean;
+  social_content: boolean;
+}
+
+export interface BrandKitResponse {
+  id: string;
+  tenant_id: string;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  font_primary: string | null;
+  agent_name: string | null;
+  brokerage_name: string | null;
+  raw_config: Record<string, unknown>;
   created_at: string;
 }
 
-export interface BillingStatus {
-  billing_model: "legacy" | "credit";
-  plan: string;
-  tier: string;
-  stripe_customer_id: string | null;
+export interface BrandKitUpsertRequest {
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  font_primary?: string | null;
+  agent_name?: string | null;
+  brokerage_name?: string | null;
+  raw_config?: Record<string, unknown>;
+}
+
+export interface PipelineStep {
+  name: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "skipped";
+  completed_at: string | null;
+  progress: string | null;
+}
+
+export interface PipelineStatusResponse {
+  listing_id: string;
+  state: string;
+  steps: PipelineStep[];
+}
+
+export interface ReviewQueueItem {
+  id: string;
+  address: Record<string, string>;
+  metadata: Record<string, number | string>;
+  state: string;
+  asset_count: number;
+  created_at: string;
+}
+
+export interface RejectRequest {
+  reason: "quality" | "incomplete" | "non_compliant" | "other";
+  detail?: string;
 }

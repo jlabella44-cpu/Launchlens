@@ -10,6 +10,7 @@ from launchlens.models.listing import Listing
 from launchlens.models.video_asset import VideoAsset
 from launchlens.providers import get_vision_provider
 from launchlens.services.events import emit_event
+from launchlens.services.metrics import record_cost
 
 from .base import AgentContext, BaseAgent
 
@@ -93,4 +94,5 @@ class ChapterAgent(BaseAgent):
                     listing_id=str(listing_id),
                 )
 
+        record_cost(self.agent_name, "openai_gpt4v", 1)
         return {"chapter_count": len(chapters), "video_asset_id": str(video.id)}
