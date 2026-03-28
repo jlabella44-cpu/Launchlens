@@ -22,4 +22,4 @@ jobs:
       - name: Run ruff
         run: |
           ruff --version
-          ruff check src/ tests/
+          ruff check src/ tests/ || (echo "--- Ruff failed, showing details ---" && ruff check src/ tests/ --output-format=text 2>&1; exit 1)
