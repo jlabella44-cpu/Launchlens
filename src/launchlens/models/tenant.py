@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import UUID, DateTime, String, func
+from sqlalchemy import UUID, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from launchlens.database import Base
@@ -15,4 +15,5 @@ class Tenant(Base):
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    credit_balance: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

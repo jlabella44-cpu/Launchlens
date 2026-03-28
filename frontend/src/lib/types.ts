@@ -159,3 +159,54 @@ export interface PlanLimits {
   tier2_vision: boolean;
   social_content: boolean;
 }
+
+// Admin types
+export interface AdminStatsResponse {
+  total_tenants: number;
+  total_users: number;
+  total_listings: number;
+  listings_by_state: Record<string, number>;
+}
+
+export interface AdminTenantResponse {
+  id: string;
+  name: string;
+  plan: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  webhook_url: string | null;
+  credit_balance?: number;
+  created_at: string;
+}
+
+export interface CreditTransactionResponse {
+  id: string;
+  tenant_id: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface TenantCreditsResponse {
+  tenant_id: string;
+  credit_balance: number;
+  transactions: CreditTransactionResponse[];
+}
+
+export interface CreditSummaryResponse {
+  total_credits_outstanding: number;
+  credits_purchased_this_month: number;
+  credits_used_this_month: number;
+  credits_adjusted_this_month: number;
+  tenant_count_with_credits: number;
+}
+
+export interface RevenueBreakdownResponse {
+  subscription_tenant_count: number;
+  credit_purchase_count: number;
+  total_credits_purchased: number;
+  top_tenants_by_usage: { tenant_id: string; name: string; credits_used: number }[];
+  avg_credits_per_listing: number | null;
+}

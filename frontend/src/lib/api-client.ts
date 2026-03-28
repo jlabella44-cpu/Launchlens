@@ -18,6 +18,12 @@ import type {
   BillingStatusResponse,
   Invoice,
   UsageResponse,
+  AdminStatsResponse,
+  AdminTenantResponse,
+  TenantCreditsResponse,
+  CreditTransactionResponse,
+  CreditSummaryResponse,
+  RevenueBreakdownResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -183,6 +189,34 @@ class ApiClient {
   // Usage (analytics)
   async getUsage(): Promise<UsageResponse> {
     return this.request<UsageResponse>("/analytics/usage");
+  }
+
+  // Admin
+  async adminStats(): Promise<AdminStatsResponse> {
+    return this.request<AdminStatsResponse>("/admin/stats");
+  }
+
+  async adminTenants(): Promise<AdminTenantResponse[]> {
+    return this.request<AdminTenantResponse[]>("/admin/tenants");
+  }
+
+  async adminTenantCredits(tenantId: string): Promise<TenantCreditsResponse> {
+    return this.request<TenantCreditsResponse>(`/admin/tenants/${tenantId}/credits`);
+  }
+
+  async adminAdjustCredits(tenantId: string, amount: number, reason: string): Promise<CreditTransactionResponse> {
+    return this.request<CreditTransactionResponse>(`/admin/tenants/${tenantId}/credits/adjust`, {
+      method: "POST",
+      body: JSON.stringify({ amount, reason }),
+    });
+  }
+
+  async adminCreditsSummary(): Promise<CreditSummaryResponse> {
+    return this.request<CreditSummaryResponse>("/admin/credits/summary");
+  }
+
+  async adminRevenue(): Promise<RevenueBreakdownResponse> {
+    return this.request<RevenueBreakdownResponse>("/admin/analytics/revenue");
   }
 }
 
