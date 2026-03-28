@@ -157,6 +157,16 @@ class ApiClient {
     return this.request<{ listing_id: string }>(`/demo/${id}/claim`, { method: "POST" });
   }
 
+  // Upload URLs
+  async getUploadUrls(listingId: string, filenames: string[]): Promise<{
+    urls: { filename: string; key: string; upload_url: string; content_type: string }[];
+  }> {
+    return this.request(`/listings/${listingId}/upload-urls`, {
+      method: "POST",
+      body: JSON.stringify({ filenames }),
+    });
+  }
+
   // Pipeline status
   async getPipelineStatus(listingId: string): Promise<PipelineStatusResponse> {
     return this.request<PipelineStatusResponse>(`/listings/${listingId}/pipeline-status`);

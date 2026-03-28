@@ -184,6 +184,47 @@ async def get_dollhouse(
     }
 
 
+@router.post("/{listing_id}/upload-urls")
+async def get_upload_urls(
+    listing_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate presigned PUT URLs for direct browser-to-S3 upload."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    filenames = body.get("filenames", [])
+    if not filenames or not isinstance(filenames, list):
+        raise HTTPException(status_code=400, detail="filenames must be a non-empty list")
+    if len(filenames) > 50:
+        raise HTTPException(status_code=400, detail="Maximum 50 files per batch")
+
+    ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+    storage = StorageService()
+    urls = []
+    for fname in filenames:
+        ext = "." + fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type: {fname}. Allowed: {ALLOWED_EXTENSIONS}",
+            )
+        content_type = "image/png" if ext == ".png" else "image/jpeg"
+        key = f"listings/{listing_id}/photos/{fname}"
+        url = storage.presigned_upload_url(key, content_type=content_type)
+        urls.append({"filename": fname, "key": key, "upload_url": url, "content_type": content_type})
+
+    return {"urls": urls}
+
+
 @router.post("/{listing_id}/assets", status_code=201, response_model=CreateAssetsResponse)
 async def register_assets(
     listing_id: uuid.UUID,
