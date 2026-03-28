@@ -21,13 +21,15 @@ jobs:
 
       - name: Run ruff
         run: |
+          set +e
           ruff --version
-          ruff check src/ tests/ --output-format=full 2>&1 | tee /tmp/ruff-output.txt
-          exit ${PIPESTATUS[0]}
-
-      - name: Upload ruff output on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ruff-output
-          path: /tmp/ruff-output.txt
+          OUTPUT=$(ruff check src/ tests/ --output-format=full 2>&1)
+          EXIT_CODE=$?
+          echo "$OUTPUT"
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "### Ruff Output" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          exit $EXIT_CODE
