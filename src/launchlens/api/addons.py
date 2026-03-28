@@ -1,6 +1,6 @@
 """Add-on management API — catalog, per-listing activation."""
-import uuid
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -64,7 +64,7 @@ async def activate_addon(
         )
     )).scalar_one_or_none()
     if existing:
-        raise HTTPException(409, f"Add-on already activated for this listing")
+        raise HTTPException(409, "Add-on already activated for this listing")
 
     # Deduct credits
     credit_svc = CreditService()
