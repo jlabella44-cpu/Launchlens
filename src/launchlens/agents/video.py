@@ -26,6 +26,7 @@ from launchlens.models.video_asset import VideoAsset
 from launchlens.models.vision_result import VisionResult
 from launchlens.providers.kling import KlingProvider
 from launchlens.services.events import emit_event
+from launchlens.services.metrics import record_cost
 from launchlens.services.storage import StorageService
 from launchlens.services.video_stitcher import VideoStitcher
 
@@ -130,6 +131,7 @@ class VideoAgent(BaseAgent):
                     except OSError:
                         pass
 
+        record_cost(self.agent_name, "kling", len(successful))
         return {
             "status": "ready",
             "clip_count": len(successful),

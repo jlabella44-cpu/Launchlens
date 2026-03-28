@@ -86,6 +86,10 @@ class PackagingAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
+                # Send review-ready notification email
+                from launchlens.services.notifications import notify_review_ready
+                await notify_review_ready(session, listing, context.tenant_id)
+
         return {"hero_asset_id": hero_asset_id, "total_selected": len(top)}
 
 
@@ -93,4 +97,4 @@ class PackagingAgent(BaseAgent):
 async def run_packaging(listing_id: str, tenant_id: str) -> dict:
     agent = PackagingAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

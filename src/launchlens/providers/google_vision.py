@@ -9,6 +9,7 @@ Endpoint: POST https://vision.googleapis.com/v1/images:annotate
 import httpx
 
 from launchlens.config import settings
+from launchlens.services.metrics import record_provider_call
 
 from .base import VisionLabel, VisionProvider
 
@@ -26,14 +27,19 @@ class GoogleVisionProvider(VisionProvider):
                 "features": [{"type": "LABEL_DETECTION", "maxResults": 20}],
             }]
         }
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                _ENDPOINT,
-                params={"key": self._api_key},
-                json=payload,
-                timeout=10.0,
-            )
-            response.raise_for_status()
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    _ENDPOINT,
+                    params={"key": self._api_key},
+                    json=payload,
+                    timeout=10.0,
+                )
+                response.raise_for_status()
+            record_provider_call("google_vision", True)
+        except Exception:
+            record_provider_call("google_vision", False)
+            raise
 
         data = response.json()
         annotations = (

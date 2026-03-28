@@ -17,3 +17,8 @@ from .social_content import SocialContent                     # noqa
 from .video_asset import VideoAsset                          # noqa
 from .dollhouse_scene import DollhouseScene                  # noqa
 from .api_key import APIKey                                  # noqa
+from .notification_preference import NotificationPreference  # noqa
+from .credit_account import CreditAccount                    # noqa
+from .credit_transaction import CreditTransaction            # noqa
+from .addon_catalog import AddonCatalog                      # noqa
+from .addon_purchase import AddonPurchase                    # noqa

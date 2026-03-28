@@ -164,8 +164,18 @@ C:\Users\Jeff\launchlens\
 | v0.9.2 | Video Pipeline (VideoAgent/Kling, ChapterAgent, SocialCutAgent, video API, Temporal wiring) | ~16 |
 | v1.0.0 | Frontend 3D Interactive (Next.js + Three.js + Framer Motion, all pages + 3D components) | — |
 | v1.0.1 | Frontend Remaining Pages (demo dropzone, pricing, export, video player, social preview) | — |
+| v1.1.0 | Demo Hardening (rate limiting 3/IP/day, cleanup cron workflow, Pillow dep) | ~6 |
+| v1.1.1 | PhotoComplianceAgent (GPT-4V MLS photo scanner for branding/signs/people) | ~4 |
+| v1.1.2 | Webhook Delivery (HMAC-signed POST, 3x retry, outbox integration) | ~4 |
+| v1.1.3 | Structured Logging (JSON in prod), Enhanced Health Check (DB connectivity) | — |
+| v1.1.4 | Request ID Middleware, API Rate Limiting (60/min tenant, 20/min IP) | ~2 |
+| v1.1.5 | Listing Search/Filter (?state, ?search, ?limit, ?offset) | ~5 |
+| v1.1.6 | Analytics API (overview + timeline), Bulk Ops (approve + export) | ~7 |
+| v1.1.7 | Activity Log, Usage Endpoint, API Key Management | ~8 |
+| v1.1.8 | Billing Enhancements (invoices, plan change, webhook hardening) | ~5 |
+| v1.1.9 | Notification System (in-app + SES email, read/unread, API) | ~6 |
 
-**Total: 241 backend tests, all passing.**
+**Total: ~291 backend tests, all passing.**
 
 ### Plans Executed
 
@@ -310,8 +320,10 @@ Repositioned from "photo curation tool" to "Listing Media OS". Full PRD at `docs
 4. ~~Frontend 3D~~ — **DONE** (v1.0.0, all pages + 3D components)
 5. ~~Frontend remaining pages~~ — **DONE** (v1.0.1, PR open)
 6. **Frontend QA** — Fix Three.js/R3F build error, visual QA all pages in browser
-7. **Demo cleanup job** — Temporal cron workflow to delete expired demo listings (designed but not yet built)
-8. **Demo rate limiting** — Redis rate limiter wired but needs tuning (3/IP/day currently hardcoded)
+7. ~~Demo cleanup job~~ — **DONE** (v1.1.0, Temporal cron workflow)
+8. ~~Demo rate limiting~~ — **DONE** (v1.1.0, 3/IP/day via Redis)
+9. ~~Webhook delivery~~ — **DONE** (v1.1.2, HMAC-signed, outbox integration)
+10. **Testing** — Needs Python 3.12 env to run pytest, verify coverage, execute load tests
 9. **Production deployment** — Not yet planned (Kubernetes? ECS? Fly.io?)
 10. **Monitoring** — Not yet planned (logging, metrics, alerting)
 

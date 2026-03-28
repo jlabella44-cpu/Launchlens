@@ -33,7 +33,8 @@ export function Button({
         inline-flex items-center justify-center gap-2
         px-6 py-3 rounded-lg font-medium text-sm
         transition-all duration-200
-        cursor-pointer
+        cursor-pointer touch-manipulation
+        min-h-[44px]
         disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2
         ${VARIANTS[variant]}

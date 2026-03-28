@@ -1,35 +1,27 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 20px; }
-    .container { max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    h1 { color: #1e293b; font-size: 24px; margin-bottom: 8px; }
-    .plan-badge { display: inline-block; background: #2563eb; color: #fff; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; text-transform: capitalize; }
-    p { color: #64748b; font-size: 15px; line-height: 1.6; }
-    .steps { margin: 24px 0; padding: 0; list-style: none; }
-    .steps li { padding: 12px 0; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 14px; }
-    .steps li:last-child { border-bottom: none; }
-    .steps li strong { color: #1e293b; }
-    .cta { display: inline-block; background: #2563eb; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; margin-top: 16px; }
-    .footer { text-align: center; margin-top: 32px; color: #94a3b8; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Welcome to LaunchLens, {{name}}!</h1>
-    <p>Your account is ready. You signed up for the <span class="plan-badge">{{plan}}</span> plan.</p>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1E293B;">
+  <div style="background: #2563EB; color: white; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+    <h1 style="margin: 0; font-size: 24px;">Welcome to LaunchLens</h1>
+  </div>
+  <div style="background: #F8FAFC; padding: 24px; border: 1px solid #E2E8F0; border-top: none; border-radius: 0 0 8px 8px;">
+    <p>Hi <strong>{{name}}</strong>,</p>
+    <p>Welcome to LaunchLens — the Listing Media OS. From raw listing photos to launch-ready marketing in minutes.</p>
     <p>Here's how to get started:</p>
-    <ol class="steps">
-      <li><strong>Set up your branding</strong> — Add your logo, colors, and brokerage info</li>
-      <li><strong>Upload your first listing</strong> — Our AI pipeline handles the rest</li>
-      <li><strong>Get credits</strong> — Each listing costs 1 credit to process</li>
+    <ol style="line-height: 1.8;">
+      <li>Upload your listing photos</li>
+      <li>AI analyzes, scores, and packages them</li>
+      <li>Review the AI selections</li>
+      <li>Download MLS-ready and marketing packages</li>
     </ol>
-    <a href="{{app_url}}/onboarding" class="cta">Get Started</a>
-    <div class="footer">
-      <p>LaunchLens — From raw listing media to launch-ready marketing in minutes.</p>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="https://app.launchlens.com/listings"
+         style="background: #F97316; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+        Create Your First Listing
+      </a>
     </div>
+    <p style="color: #64748B; font-size: 14px;">— The LaunchLens Team</p>
   </div>
 </body>
 </html>

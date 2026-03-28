@@ -8,6 +8,10 @@ import type {
   CreateListingRequest,
   CreateAssetsRequest,
   CreateAssetsResponse,
+  CreditBalance,
+  CreditTransaction,
+  CreditBundle,
+  Addon,
   VideoResponse,
   SocialCut,
   VideoUploadRequest,
@@ -15,8 +19,14 @@ import type {
   DemoUploadRequest,
   DemoUploadResponse,
   DemoViewResponse,
+  BillingStatusResponse,
+  Invoice,
+  UsageResponse,
   BrandKitResponse,
   BrandKitUpsertRequest,
+  PipelineStatusResponse,
+  ReviewQueueItem,
+  RejectRequest,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -127,6 +137,10 @@ class ApiClient {
     return this.request(`/listings/${listingId}/review`, { method: "POST" });
   }
 
+  async retryPipeline(listingId: string): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/retry`, { method: "POST" });
+  }
+
   async approveListing(listingId: string): Promise<{ listing_id: string; state: string }> {
     return this.request(`/listings/${listingId}/approve`, { method: "POST" });
   }
@@ -167,6 +181,35 @@ class ApiClient {
   async demoClaim(id: string): Promise<{ listing_id: string }> {
     return this.request<{ listing_id: string }>(`/demo/${id}/claim`, { method: "POST" });
   }
+
+  // Billing
+  async billingStatus(): Promise<BillingStatusResponse> {
+    return this.request<BillingStatusResponse>("/billing/status");
+  }
+
+  async billingCheckout(priceId: string, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
+    return this.request<{ checkout_url: string }>("/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ price_id: priceId, success_url: successUrl, cancel_url: cancelUrl }),
+    });
+  }
+
+  async billingPortal(returnUrl: string): Promise<{ portal_url: string }> {
+    return this.request<{ portal_url: string }>("/billing/portal", {
+      method: "POST",
+      body: JSON.stringify({ return_url: returnUrl }),
+    });
+  }
+
+  async billingInvoices(limit = 10): Promise<{ invoices: Invoice[] }> {
+    return this.request<{ invoices: Invoice[] }>(`/billing/invoices?limit=${limit}`);
+  }
+
+  // Usage (analytics)
+  async getUsage(): Promise<UsageResponse> {
+    return this.request<UsageResponse>("/analytics/usage");
+  }
+
   // Brand Kit
   async getBrandKit(): Promise<BrandKitResponse | null> {
     return this.request<BrandKitResponse | null>("/brand-kit");
@@ -181,6 +224,78 @@ class ApiClient {
 
   async getLogoUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
     return this.request("/brand-kit/logo-upload-url", { method: "POST" });
+  }
+
+  // Upload URLs
+  async getUploadUrls(listingId: string, filenames: string[]): Promise<{
+    urls: { filename: string; key: string; upload_url: string; content_type: string }[];
+  }> {
+    return this.request(`/listings/${listingId}/upload-urls`, {
+      method: "POST",
+      body: JSON.stringify({ filenames }),
+    });
+  }
+
+  // Pipeline status
+  async getPipelineStatus(listingId: string): Promise<PipelineStatusResponse> {
+    return this.request<PipelineStatusResponse>(`/listings/${listingId}/pipeline-status`);
+  }
+
+  // Review queue
+  async getReviewQueue(): Promise<ListingResponse[]> {
+    return this.request<ListingResponse[]>("/listings?state=awaiting_review");
+  }
+
+  // Reject
+  async rejectListing(listingId: string, data: RejectRequest): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelListing(listingId: string): Promise<{ listing_id: string; state: string; credits_refunded: number }> {
+    return this.request(`/listings/${listingId}/cancel`, { method: "POST" });
+  }
+
+  // Credits
+  async getCreditBalance(): Promise<CreditBalance> {
+    return this.request<CreditBalance>("/credits/balance");
+  }
+
+  async getCreditTransactions(limit = 50, offset = 0): Promise<CreditTransaction[]> {
+    return this.request<CreditTransaction[]>(`/credits/transactions?limit=${limit}&offset=${offset}`);
+  }
+
+  async getCreditPricing(): Promise<{ bundles: CreditBundle[] }> {
+    return this.request("/credits/pricing");
+  }
+
+  async purchaseCredits(bundleSize: number, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
+    return this.request("/credits/purchase", {
+      method: "POST",
+      body: JSON.stringify({ bundle_size: bundleSize, success_url: successUrl, cancel_url: cancelUrl }),
+    });
+  }
+
+  // Addons
+  async getAddons(): Promise<Addon[]> {
+    return this.request<Addon[]>("/addons");
+  }
+
+  async activateAddon(listingId: string, addonSlug: string): Promise<{ id: string; addon_slug: string; status: string }> {
+    return this.request(`/listings/${listingId}/addons`, {
+      method: "POST",
+      body: JSON.stringify({ addon_slug: addonSlug }),
+    });
+  }
+
+  async getListingAddons(listingId: string): Promise<{ addon_slug: string; addon_name: string; status: string }[]> {
+    return this.request(`/listings/${listingId}/addons`);
+  }
+
+  async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
+    return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
   }
 }
 
