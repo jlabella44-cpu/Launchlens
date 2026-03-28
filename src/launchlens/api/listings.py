@@ -26,6 +26,7 @@ from launchlens.models.asset import Asset
 from launchlens.models.dollhouse_scene import DollhouseScene
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
+from launchlens.models.performance_event import PerformanceEvent
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.models.video_asset import VideoAsset
@@ -48,26 +49,9 @@ async def create_listing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Check monthly listing quota
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
-
-    now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    count_result = await db.execute(
-        select(func.count(Listing.id)).where(
-            Listing.tenant_id == current_user.tenant_id,
-            Listing.created_at >= month_start,
-        )
-    )
-    current_count = count_result.scalar() or 0
-
-    if not check_listing_quota(tenant.plan, current_count):
-        raise HTTPException(
-            status_code=403,
-            detail=f"Monthly listing limit reached ({current_count}). Upgrade your plan for more.",
-        )
 
     listing = Listing(
         id=uuid.uuid4(),
@@ -76,6 +60,43 @@ async def create_listing(
         metadata_=body.metadata,
         state=ListingState.NEW,
     )
+
+    if tenant.billing_model == "credit":
+        # Credit-based billing: deduct credits
+        from launchlens.services.credits import CreditService, InsufficientCreditsError
+        credit_svc = CreditService()
+        cost = tenant.per_listing_credit_cost
+        try:
+            await credit_svc.deduct_credits(
+                db, tenant.id, cost,
+                transaction_type="listing_debit",
+                reference_type="listing",
+                reference_id=str(listing.id),
+                description=f"Listing at {body.address.get('street', 'new listing')}",
+            )
+            listing.credit_cost = cost
+        except InsufficientCreditsError:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Insufficient credits. Need {cost} credit(s). Purchase more to continue.",
+            )
+    else:
+        # Legacy billing: monthly quota check
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        count_result = await db.execute(
+            select(func.count(Listing.id)).where(
+                Listing.tenant_id == current_user.tenant_id,
+                Listing.created_at >= month_start,
+            )
+        )
+        current_count = count_result.scalar() or 0
+        if not check_listing_quota(tenant.plan, current_count):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Monthly listing limit reached ({current_count}). Upgrade your plan for more.",
+            )
+
     db.add(listing)
     await db.commit()
     await db.refresh(listing)
@@ -360,6 +381,99 @@ async def get_package(
     ]
 
 
+@router.post("/{listing_id}/package/reorder")
+async def reorder_package(
+    listing_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reorder photos in a package. Body: {"swaps": [{"from_position": 0, "to_position": 3}]}."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    reviewable = {ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}
+    if listing.state not in reviewable:
+        raise HTTPException(status_code=409, detail="Listing is not in a reviewable state")
+
+    swaps = body.get("swaps", [])
+    if not swaps:
+        raise HTTPException(status_code=422, detail="No swaps provided")
+
+    # Load all selections for this listing
+    result = await db.execute(
+        select(PackageSelection)
+        .where(PackageSelection.listing_id == listing.id)
+        .order_by(PackageSelection.position)
+    )
+    selections = {s.position: s for s in result.scalars().all()}
+
+    # Load vision results for room labels
+    from launchlens.models.vision_result import VisionResult
+    vr_result = await db.execute(
+        select(VisionResult).where(
+            VisionResult.asset_id.in_([s.asset_id for s in selections.values()])
+        )
+    )
+    vr_map = {vr.asset_id: vr for vr in vr_result.scalars().all()}
+
+    swapped = 0
+    for swap in swaps:
+        from_pos = swap.get("from_position")
+        to_pos = swap.get("to_position")
+        if from_pos is None or to_pos is None:
+            continue
+
+        sel_from = selections.get(from_pos)
+        sel_to = selections.get(to_pos)
+        if not sel_from or not sel_to:
+            continue
+
+        # Swap positions
+        sel_from.position, sel_to.position = sel_to.position, sel_from.position
+        sel_from.selected_by = "human"
+        sel_to.selected_by = "human"
+
+        # Emit override events with room_label for learning agent
+        from_vr = vr_map.get(sel_from.asset_id)
+        to_vr = vr_map.get(sel_to.asset_id)
+
+        await emit_event(
+            session=db,
+            event_type="package.override.swap_to",
+            payload={
+                "asset_id": str(sel_from.asset_id),
+                "room_label": from_vr.room_label if from_vr else None,
+                "from_position": to_pos,
+                "to_position": from_pos,
+            },
+            tenant_id=str(current_user.tenant_id),
+            listing_id=str(listing.id),
+        )
+        await emit_event(
+            session=db,
+            event_type="package.override.swap_from",
+            payload={
+                "asset_id": str(sel_to.asset_id),
+                "room_label": to_vr.room_label if to_vr else None,
+                "from_position": from_pos,
+                "to_position": to_pos,
+            },
+            tenant_id=str(current_user.tenant_id),
+            listing_id=str(listing.id),
+        )
+        swapped += 1
+
+    await db.commit()
+    return {"swaps_applied": swapped}
+
+
 @router.post("/{listing_id}/review")
 async def start_review(
     listing_id: uuid.UUID,
@@ -478,6 +592,81 @@ async def reject_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
+@router.post("/{listing_id}/retry")
+async def retry_pipeline(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset a failed listing and re-trigger the pipeline."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    retryable = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    if listing.state not in retryable:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Can only retry failed listings, current state: {listing.state.value}",
+        )
+
+    listing.state = ListingState.UPLOADING
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    await db.commit()
+
+    try:
+        client = get_temporal_client()
+        await client.start_pipeline(
+            listing_id=str(listing.id),
+            tenant_id=str(current_user.tenant_id),
+            plan=tenant.plan if tenant else "starter",
+        )
+    except Exception:
+        logger.exception("Pipeline retry trigger failed for listing %s", listing.id)
+
+    return {"listing_id": str(listing.id), "state": "uploading"}
+
+
+@router.post("/{listing_id}/cancel")
+async def cancel_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a listing and refund credits if using credit billing."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    cancellable = {ListingState.NEW, ListingState.UPLOADING, ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    if listing.state not in cancellable:
+        raise HTTPException(409, f"Cannot cancel: listing is {listing.state.value}")
+
+    credits_refunded = 0
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if tenant and tenant.billing_model == "credit" and listing.credit_cost:
+        from launchlens.services.credits import CreditService
+        credit_svc = CreditService()
+        txn = await credit_svc.refund_credits(db, current_user.tenant_id, str(listing_id))
+        if txn:
+            credits_refunded = txn.amount
+
+    listing.state = ListingState.FAILED  # reuse FAILED state for cancelled
+    await db.commit()
+
+    return {"listing_id": str(listing.id), "state": "cancelled", "credits_refunded": credits_refunded}
+
+
 @router.get("/{listing_id}/pipeline-status")
 async def get_pipeline_status(
     listing_id: uuid.UUID,
@@ -585,6 +774,16 @@ async def export_listing(
     expires_in = 900  # 15 minutes
     download_url = storage.presigned_url(bundle_path, expires_in=expires_in)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+    # Record performance event for learning loop
+    db.add(PerformanceEvent(
+        tenant_id=current_user.tenant_id,
+        listing_id=listing.id,
+        signal_type="export_downloaded",
+        value=1.0,
+        source="user",
+    ))
+    await db.commit()
 
     return ExportResponse(
         listing_id=listing.id,
@@ -771,3 +970,37 @@ async def listing_activity(
         }
         for e in events
     ]
+
+
+@router.post("/{listing_id}/retry")
+async def retry_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset a failed/timed-out listing to UPLOADING and re-trigger the pipeline."""
+    listing = await db.get(Listing, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    retryable_states = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    if listing.state not in retryable_states:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot retry listing in state '{listing.state}'. Must be 'failed' or 'pipeline_timeout'.",
+        )
+
+    listing.state = ListingState.UPLOADING
+    await db.commit()
+    await db.refresh(listing)
+
+    # Re-trigger Temporal pipeline
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    plan = tenant.plan if tenant else "starter"
+    try:
+        tc = await get_temporal_client()
+        await tc.start_pipeline(str(listing_id), str(current_user.tenant_id), plan)
+    except Exception:
+        logger.warning("Failed to start Temporal pipeline for retry of %s", listing_id)
+
+    return {"listing_id": str(listing.id), "state": listing.state.value}

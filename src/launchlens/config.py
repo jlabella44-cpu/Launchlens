@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
+    # CORS
+    cors_origins: str = "http://localhost:3000"
+
     # Database
     database_url: str
     database_url_sync: str = ""
@@ -63,6 +66,18 @@ class Settings(BaseSettings):
 
     # Canva
     canva_api_key: str = ""
+
+    # Credit bundles (Stripe price IDs for one-time purchases)
+    stripe_price_credit_bundle_5: str = ""
+    stripe_price_credit_bundle_10: str = ""
+    stripe_price_credit_bundle_25: str = ""
+    stripe_price_credit_bundle_50: str = ""
+
+    # New tier pricing (Stripe price IDs)
+    stripe_price_lite: str = ""
+    stripe_price_active_agent: str = ""
+    stripe_price_team: str = ""
+    stripe_price_annual: str = ""
 
     # Email / Notifications
     smtp_host: str = ""
