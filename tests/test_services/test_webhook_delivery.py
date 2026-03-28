@@ -5,8 +5,7 @@ import pytest
 
 from launchlens.services.webhook_delivery import _is_url_safe, deliver_webhook
 
-# All webhook tests patch _is_url_safe to skip DNS resolution in CI
-_SAFE_URL_PATCH = patch("launchlens.services.webhook_delivery._is_url_safe", return_value=True)
+_SSRF_PATCH_TARGET = "launchlens.services.webhook_delivery._is_url_safe"
 
 
 @pytest.mark.asyncio
@@ -14,7 +13,7 @@ async def test_successful_delivery():
     mock_response = AsyncMock()
     mock_response.status_code = 200
 
-    with _SAFE_URL_PATCH, patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -41,7 +40,7 @@ async def test_failed_delivery_retries():
     mock_response = AsyncMock()
     mock_response.status_code = 500
 
-    with _SAFE_URL_PATCH, patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -60,7 +59,7 @@ async def test_failed_delivery_retries():
 
 @pytest.mark.asyncio
 async def test_network_error_retries():
-    with _SAFE_URL_PATCH, patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.side_effect = Exception("Connection refused")
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -82,7 +81,7 @@ async def test_signature_header_present():
     mock_response = AsyncMock()
     mock_response.status_code = 200
 
-    with _SAFE_URL_PATCH, patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
