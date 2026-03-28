@@ -1,81 +1,62 @@
-"""
-CloudWatch custom metrics helpers.
-
-Namespace: LaunchLens
-"""
-
-from __future__ import annotations
+"""CloudWatch custom metrics helpers."""
 
 import functools
+import logging
 import time
-from typing import Any
 
-import structlog
+import boto3
 
-logger = structlog.get_logger(__name__)
+from launchlens.config import settings
 
-# Lazy-initialized CloudWatch client
-_cw_client = None
+logger = logging.getLogger(__name__)
+
+_cloudwatch_client = None
 
 
-def _get_cw_client():
-    global _cw_client
-    if _cw_client is None:
-        try:
-            import boto3
-            from launchlens.config import settings
-            _cw_client = boto3.client("cloudwatch", region_name=settings.aws_region)
-        except Exception:
-            logger.warning("cloudwatch_client_init_failed", exc_info=True)
-            return None
-    return _cw_client
+def _get_cloudwatch_client():
+    global _cloudwatch_client
+    if _cloudwatch_client is None:
+        _cloudwatch_client = boto3.client("cloudwatch", region_name=settings.aws_region)
+    return _cloudwatch_client
 
 
 def emit_metric(
     name: str,
     value: float,
-    unit: str = "Count",
+    unit: str = "None",
     dimensions: dict[str, str] | None = None,
 ) -> None:
-    """Emit a single CloudWatch metric data point."""
-    client = _get_cw_client()
-    if client is None:
+    """Emit a CloudWatch custom metric. No-op in development."""
+    if settings.app_env == "development":
         return
 
-    metric_data: dict[str, Any] = {
-        "MetricName": name,
-        "Value": value,
-        "Unit": unit,
-    }
-    if dimensions:
-        metric_data["Dimensions"] = [
-            {"Name": k, "Value": v} for k, v in dimensions.items()
-        ]
-
     try:
-        client.put_metric_data(
+        cw_dimensions = [{"Name": k, "Value": v} for k, v in (dimensions or {}).items()]
+        _get_cloudwatch_client().put_metric_data(
             Namespace="LaunchLens",
-            MetricData=[metric_data],
+            MetricData=[
+                {
+                    "MetricName": name,
+                    "Value": value,
+                    "Unit": unit,
+                    "Dimensions": cw_dimensions,
+                }
+            ],
         )
     except Exception:
-        logger.warning("cloudwatch_emit_failed", metric=name, exc_info=True)
+        logger.exception("Failed to emit metric %s", name)
 
 
-def time_metric(stage: str):
-    """Decorator that emits PipelineStageDuration for an async function."""
-    def decorator(fn):
-        @functools.wraps(fn)
+def time_metric(metric_name: str, dimensions: dict[str, str] | None = None):
+    """Decorator that times an async function and emits the duration as a metric."""
+    def decorator(func):
+        @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             start = time.monotonic()
             try:
-                return await fn(*args, **kwargs)
+                return await func(*args, **kwargs)
             finally:
-                elapsed = time.monotonic() - start
-                emit_metric(
-                    "PipelineStageDuration",
-                    value=elapsed,
-                    unit="Seconds",
-                    dimensions={"stage": stage},
-                )
+                duration_ms = (time.monotonic() - start) * 1000
+                emit_metric(metric_name, duration_ms, unit="Milliseconds", dimensions=dimensions)
         return wrapper
     return decorator

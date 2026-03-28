@@ -1,23 +1,24 @@
-"""
-LaunchLens Monitoring — structlog logging, CloudWatch metrics, Sentry error tracking.
+"""Monitoring package — initializes all observability components."""
 
-Call init_monitoring(app) during FastAPI lifespan to wire everything up.
-"""
+import logging
 
 from fastapi import FastAPI
 
 from launchlens.config import settings
+from launchlens.monitoring.sentry import init_sentry
+from launchlens.monitoring.middleware import RequestMetricsMiddleware
 
-from .logging import configure_structlog
-from .middleware import RequestMetricsMiddleware
-from .sentry import init_sentry
+logger = logging.getLogger(__name__)
 
 
 def init_monitoring(app: FastAPI) -> None:
-    """Initialize all monitoring subsystems and attach middleware."""
-    configure_structlog(environment=settings.environment)
+    """Initialize all monitoring: Sentry, request metrics middleware."""
     init_sentry(
         dsn=settings.sentry_dsn,
         environment=settings.environment,
+        release=settings.git_sha,
     )
-    app.add_middleware(RequestMetricsMiddleware)
+
+    app.middleware("http")(RequestMetricsMiddleware())
+
+    logger.info("Monitoring initialized")

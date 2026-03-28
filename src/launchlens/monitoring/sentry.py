@@ -1,18 +1,14 @@
-"""
-Sentry SDK initialization with FastAPI integration.
-"""
+"""Sentry SDK initialization."""
 
-import os
+import logging
 
-import structlog
-
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
-def init_sentry(dsn: str, environment: str = "production") -> None:
-    """Initialize Sentry error tracking. No-op if DSN is empty."""
+def init_sentry(dsn: str = "", environment: str = "development", release: str = "") -> None:
+    """Initialize Sentry SDK. No-op if DSN is not configured."""
     if not dsn:
-        logger.info("sentry_disabled", reason="no DSN configured")
+        logger.debug("Sentry DSN not configured — skipping Sentry init")
         return
 
     try:
@@ -23,14 +19,14 @@ def init_sentry(dsn: str, environment: str = "production") -> None:
         sentry_sdk.init(
             dsn=dsn,
             environment=environment,
-            release=os.environ.get("GIT_SHA", "unknown"),
-            traces_sample_rate=0.0,  # No performance tracing at beta
-            sample_rate=1.0,  # Capture all errors at beta scale
+            release=release or None,
+            sample_rate=1.0,
+            traces_sample_rate=0.1,
             integrations=[
                 StarletteIntegration(),
                 FastApiIntegration(),
             ],
         )
-        logger.info("sentry_initialized", environment=environment)
-    except Exception:
-        logger.warning("sentry_init_failed", exc_info=True)
+        logger.info("Sentry initialized (environment=%s)", environment)
+    except ImportError:
+        logger.warning("sentry-sdk not installed — Sentry disabled")

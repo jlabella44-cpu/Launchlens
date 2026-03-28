@@ -1,32 +1,46 @@
-"""
-Request metrics middleware — emits latency, count, and error metrics per endpoint.
-"""
+"""Request metrics middleware — records latency, count, and errors per endpoint."""
 
+import logging
 import time
 
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
+from fastapi import Request
 from starlette.responses import Response
 
-from .metrics import emit_metric
+from launchlens.monitoring.metrics import emit_metric
+
+logger = logging.getLogger(__name__)
 
 
-class RequestMetricsMiddleware(BaseHTTPMiddleware):
-    """Tracks request latency, count, and errors as CloudWatch metrics."""
+class RequestMetricsMiddleware:
+    """Emits CloudWatch metrics for every request: latency, count, errors."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        endpoint = f"{request.method} {request.url.path}"
+    async def __call__(self, request: Request, call_next) -> Response:
         start = time.monotonic()
-
         response = await call_next(request)
+        duration_ms = (time.monotonic() - start) * 1000
 
-        latency_ms = (time.monotonic() - start) * 1000
+        endpoint = request.url.path
         status = str(response.status_code)
 
-        emit_metric("RequestLatency", latency_ms, unit="Milliseconds", dimensions={"endpoint": endpoint})
-        emit_metric("RequestCount", 1, dimensions={"endpoint": endpoint, "status_code": status})
+        emit_metric(
+            "RequestLatency",
+            duration_ms,
+            unit="Milliseconds",
+            dimensions={"endpoint": endpoint},
+        )
+        emit_metric(
+            "RequestCount",
+            1,
+            unit="Count",
+            dimensions={"endpoint": endpoint, "status_code": status},
+        )
 
-        if response.status_code >= 500:
-            emit_metric("ErrorCount", 1, dimensions={"endpoint": endpoint})
+        if response.status_code >= 400:
+            emit_metric(
+                "ErrorCount",
+                1,
+                unit="Count",
+                dimensions={"endpoint": endpoint},
+            )
 
         return response
