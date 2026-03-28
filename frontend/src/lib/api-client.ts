@@ -50,7 +50,9 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(error.detail || `Request failed: ${response.status}`);
+      const err = new Error(error.detail || `Request failed: ${response.status}`) as Error & { status: number };
+      err.status = response.status;
+      throw err;
     }
 
     return response.json();
@@ -136,6 +138,11 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  // Retry failed listing
+  async retryListing(listingId: string): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/retry`, { method: "POST" });
   }
 
   // Demo (no auth required)

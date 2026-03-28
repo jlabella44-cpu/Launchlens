@@ -581,3 +581,37 @@ async def listing_activity(
         }
         for e in events
     ]
+
+
+@router.post("/{listing_id}/retry")
+async def retry_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset a failed/timed-out listing to UPLOADING and re-trigger the pipeline."""
+    listing = await db.get(Listing, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    retryable_states = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    if listing.state not in retryable_states:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot retry listing in state '{listing.state}'. Must be 'failed' or 'pipeline_timeout'.",
+        )
+
+    listing.state = ListingState.UPLOADING
+    await db.commit()
+    await db.refresh(listing)
+
+    # Re-trigger Temporal pipeline
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    plan = tenant.plan if tenant else "starter"
+    try:
+        tc = await get_temporal_client()
+        await tc.start_pipeline(str(listing_id), str(current_user.tenant_id), plan)
+    except Exception:
+        logger.warning("Failed to start Temporal pipeline for retry of %s", listing_id)
+
+    return {"listing_id": str(listing.id), "state": listing.state.value}

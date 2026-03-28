@@ -18,6 +18,7 @@ import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/typ
 import { VideoPlayer } from "@/components/listings/video-player";
 import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
+import { useToast } from "@/contexts/toast-context";
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
@@ -31,16 +32,20 @@ const PhotoOrbit = dynamic(
 function ListingDetail() {
   const params = useParams();
   const id = params.id as string;
+  const toast = useToast();
 
   const [listing, setListing] = useState<ListingResponse | null>(null);
   const [assets, setAssets] = useState<AssetResponse[]>([]);
   const [selections, setSelections] = useState<PackageSelection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
   const [showVideoUpload, setShowVideoUpload] = useState(false);
+  const [retryLoading, setRetryLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
+    setFetchError(null);
     try {
       const [l, a] = await Promise.all([
         apiClient.getListing(id),
@@ -57,12 +62,13 @@ function ListingDetail() {
         const pkg = await apiClient.getPackage(id);
         setSelections(pkg);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setFetchError(err.message || "Failed to load listing");
+      toast.error("Failed to load listing data");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, toast]);
 
   useEffect(() => {
     fetchData();
@@ -73,8 +79,9 @@ function ListingDetail() {
     try {
       const res = await apiClient.startReview(id);
       setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
-    } catch (err) {
-      console.error(err);
+      toast.success("Review started");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start review");
     } finally {
       setActionLoading(false);
     }
@@ -86,8 +93,9 @@ function ListingDetail() {
       const res = await apiClient.approveListing(id);
       setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
       setActionDone("approved");
-    } catch (err) {
-      console.error(err);
+      toast.success("Package approved! Generating export bundles...");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve listing");
     } finally {
       setActionLoading(false);
     }
@@ -98,7 +106,20 @@ function ListingDetail() {
       const res = await apiClient.getExport(id, mode);
       window.open(res.download_url, "_blank");
     } catch (err: any) {
-      alert(err.message || "Export not available yet");
+      toast.error(err.message || "Export not available yet");
+    }
+  }
+
+  async function handleRetry() {
+    setRetryLoading(true);
+    try {
+      const res = await apiClient.retryListing(id);
+      setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
+      toast.success("Pipeline restarted");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to retry processing");
+    } finally {
+      setRetryLoading(false);
     }
   }
 
@@ -107,6 +128,32 @@ function ListingDetail() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
       </div>
+    );
+  }
+
+  // Error state with retry
+  if (fetchError && !listing) {
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+          <div className="text-center py-20">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3l9.66 16.5H2.34L12 3z" />
+              </svg>
+            </div>
+            <h2
+              className="text-xl font-bold text-[var(--color-text)] mb-2"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Failed to load listing
+            </h2>
+            <p className="text-[var(--color-text-secondary)] mb-6">{fetchError}</p>
+            <Button onClick={fetchData}>Retry</Button>
+          </div>
+        </main>
+      </>
     );
   }
 
@@ -120,6 +167,7 @@ function ListingDetail() {
 
   const addr = listing.address;
   const meta = listing.metadata;
+  const isFailed = listing.state === "failed" || listing.state === "pipeline_timeout";
 
   return (
     <>
@@ -151,6 +199,40 @@ function ListingDetail() {
             </p>
           )}
         </div>
+
+        {/* Pipeline Failure Banner */}
+        {isFailed && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-4 rounded-xl bg-red-50 border border-red-200"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-red-800">
+                  {listing.state === "pipeline_timeout" ? "Processing Timed Out" : "Processing Failed"}
+                </h3>
+                <p className="text-sm text-red-600 mt-1">
+                  {listing.state === "pipeline_timeout"
+                    ? "The AI pipeline took too long to process your listing. This can happen with large photo sets."
+                    : "An error occurred while processing your listing. You can retry to restart the pipeline."}
+                </p>
+                <Button
+                  onClick={handleRetry}
+                  loading={retryLoading}
+                  className="mt-3"
+                >
+                  Retry Processing
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Pipeline Status */}
         <div className="mb-8">

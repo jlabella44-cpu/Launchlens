@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProviderWrapper } from "./auth-wrapper";
+import { ClientProviders } from "./client-providers";
 
 export const metadata: Metadata = {
   title: "LaunchLens — Listing Media OS",
@@ -21,7 +22,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <AuthProviderWrapper>{children}</AuthProviderWrapper>
+        <ClientProviders>
+          <AuthProviderWrapper>{children}</AuthProviderWrapper>
+        </ClientProviders>
       </body>
     </html>
   );

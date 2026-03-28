@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/api-client";
@@ -14,10 +15,12 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
   const [paths, setPaths] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [quotaHit, setQuotaHit] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setQuotaHit(false);
     const lines = paths
       .split("\n")
       .map((l) => l.trim())
@@ -39,7 +42,12 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
       setPaths("");
       onUploaded();
     } catch (err: any) {
-      setError(err.message || "Upload failed");
+      if (err.status === 403) {
+        setQuotaHit(true);
+        setError("You've reached the asset limit for your plan.");
+      } else {
+        setError(err.message || "Upload failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -68,7 +76,17 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
           />
         </div>
         {error && (
-          <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+            <p>{error}</p>
+            {quotaHit && (
+              <Link
+                href="/pricing"
+                className="inline-block mt-2 text-[var(--color-primary)] font-medium hover:underline"
+              >
+                Upgrade your plan &rarr;
+              </Link>
+            )}
+          </div>
         )}
         <Button type="submit" loading={loading}>
           Register Assets

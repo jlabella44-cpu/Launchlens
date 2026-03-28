@@ -9,22 +9,36 @@ import { CreateListingDialog } from "@/components/listings/create-listing-dialog
 import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/api-client";
 import type { ListingResponse } from "@/lib/types";
+import { useToast } from "@/contexts/toast-context";
 
 function ListingsDashboard() {
   const [listings, setListings] = useState<ListingResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const toast = useToast();
 
-  useEffect(() => {
+  function loadListings() {
+    setFetchError(null);
+    setLoading(true);
     apiClient
       .getListings()
       .then(setListings)
-      .catch(console.error)
+      .catch((err: any) => {
+        setFetchError(err.message || "Failed to load listings");
+        toast.error("Failed to load listings");
+      })
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadListings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleCreated(listing: ListingResponse) {
     setListings((prev) => [listing, ...prev]);
+    toast.success("Listing created");
   }
 
   return (
@@ -54,6 +68,16 @@ function ListingsDashboard() {
                 className="h-48 rounded-xl bg-white/50 animate-pulse"
               />
             ))}
+          </div>
+        ) : fetchError ? (
+          <div className="text-center py-20">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3l9.66 16.5H2.34L12 3z" />
+              </svg>
+            </div>
+            <p className="text-[var(--color-text-secondary)] mb-4">{fetchError}</p>
+            <Button onClick={loadListings}>Retry</Button>
           </div>
         ) : listings.length === 0 ? (
           <motion.div
