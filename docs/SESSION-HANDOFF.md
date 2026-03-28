@@ -156,6 +156,25 @@ C:\Users\Jeff\launchlens\
 | v0.8.2 | Admin Dashboard (tenant/user CRUD, platform stats) | ~12 |
 | v0.8.3 | CI/CD (lint, test, docker build workflows) | — |
 | v0.9.0 | Listing Media OS (SocialContentAgent, MLSExportAgent, dual-tone ContentAgent, export endpoint, demo pipeline, Temporal parallel Phase 2, PRD v3) | ~21 |
+| v0.9.1 | FloorplanAgent (GPT-4V floorplan → 3D dollhouse scene JSON, API endpoint) | ~8 |
+
+**Total: 222 tests, all passing.**
+
+### Plans Written, Awaiting Execution
+
+| Plan | File | Tasks | Key Features |
+|------|------|-------|-------------|
+| Frontend (3D Interactive) | `docs/plans/2026-03-27-frontend.md` | 5 | Next.js + Three.js + Framer Motion, glassmorphism, 3D tilt cards, FloatingHouse, PhotoOrbit, PipelineVisualizer |
+| Video Pipeline | `docs/plans/2026-03-27-video-pipeline.md` | 7 | Kling AI property tours (ported from Juke), ChapterAgent (GPT-4V auto-chapters), SocialCutAgent (platform clips), pro video showcase, user video upload |
+
+### Key Resources
+- **Stitch project ID:** `15760518019862690508` (design system configured)
+- **Magic MCP:** API key updated, needs Claude Code restart
+- **Juke Marketing Engine:** `C:\Users\Jeff\Projects\juke-marketing-engine\` — video_generator.py has production Kling pipeline to port
+- **PRD v2:** `docs/LaunchLens-PRD-v2.md` — Listing Media OS positioning
+- **PRD v3:** Created by other Claude window during v0.9.0
+- **MLS Compliance:** Phase 1 (export bundles) fully compliant. Phase 2 (browser automation) deferred. Phase 3 (RESO API certification) is the right path.
+- **Design System:** `design-system/launchlens/MASTER.md` — colors, fonts, effects, component patterns
 
 **Total: 214 tests, all passing.**
 
