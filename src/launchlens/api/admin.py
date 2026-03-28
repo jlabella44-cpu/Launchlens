@@ -23,7 +23,7 @@ router = APIRouter()
 
 
 @router.get("/health-detail")
-async def health_detail():
+async def health_detail(admin_user: User = Depends(require_admin)):
     return {"status": "ok", "detail": "admin"}
 
 
