@@ -118,6 +118,10 @@ class ApiClient {
     return this.request(`/listings/${listingId}/review`, { method: "POST" });
   }
 
+  async retryPipeline(listingId: string): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/retry`, { method: "POST" });
+  }
+
   async approveListing(listingId: string): Promise<{ listing_id: string; state: string }> {
     return this.request(`/listings/${listingId}/approve`, { method: "POST" });
   }
