@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
+    # CORS
+    cors_origins: str = "http://localhost:3000"
+
     # Database
     database_url: str
     database_url_sync: str = ""

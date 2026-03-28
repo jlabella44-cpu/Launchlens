@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from launchlens.api import (
     addons,
@@ -52,6 +53,16 @@ def create_app() -> FastAPI:
         description="The Listing Media OS — from raw photos to launch-ready marketing in minutes.",
         lifespan=lifespan,
     )
+    # CORS — must be added before other middleware so OPTIONS preflight works
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # Middleware order: security headers → request ID → rate limit → tenant auth
     # (outermost runs first, so list is reverse order)
     app.middleware("http")(TenantMiddleware())
