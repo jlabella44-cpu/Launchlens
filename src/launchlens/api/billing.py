@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 import stripe as stripe_mod
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from launchlens.api.deps import get_current_user
 from launchlens.api.schemas.billing import (
     BillingStatusResponse,
+    ChangePlanRequest,
     CheckoutRequest,
     CheckoutResponse,
     PortalRequest,
@@ -17,6 +19,8 @@ from launchlens.database import get_db
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.services.billing import BillingService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -88,6 +92,64 @@ async def create_portal(
     return PortalResponse(portal_url=url)
 
 
+@router.get("/invoices")
+async def list_invoices(
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List recent invoices from Stripe."""
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    if not tenant.stripe_customer_id:
+        return {"invoices": []}
+
+    svc = BillingService()
+    invoices = svc.list_invoices(tenant.stripe_customer_id, limit=min(limit, 50))
+    return {"invoices": invoices}
+
+
+@router.post("/change-plan")
+async def change_plan(
+    body: ChangePlanRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upgrade or downgrade subscription plan."""
+    if body.plan not in ("starter", "pro", "enterprise"):
+        raise HTTPException(status_code=400, detail="Invalid plan. Must be: starter, pro, enterprise")
+
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    if tenant.plan == body.plan:
+        raise HTTPException(status_code=400, detail=f"Already on {body.plan} plan")
+
+    if not tenant.stripe_subscription_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No active subscription. Use /billing/checkout to subscribe first.",
+        )
+
+    svc = BillingService()
+    try:
+        result = svc.change_subscription_plan(tenant.stripe_subscription_id, body.plan)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    tenant.plan = body.plan
+    await db.commit()
+
+    return {
+        "previous_plan": tenant.plan,
+        "new_plan": body.plan,
+        "subscription_id": result["subscription_id"],
+        "status": result["status"],
+    }
+
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     payload = await request.body()
@@ -138,5 +200,16 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                 tenant.plan = "starter"
                 tenant.stripe_subscription_id = None
                 await db.commit()
+
+    elif event_type == "invoice.payment_failed":
+        customer_id = data_object.get("customer")
+        if customer_id:
+            logger.warning("payment_failed customer=%s invoice=%s", customer_id, data_object.get("id"))
+            # Don't downgrade immediately — Stripe retries. Log for monitoring.
+
+    elif event_type == "invoice.paid":
+        customer_id = data_object.get("customer")
+        if customer_id:
+            logger.info("invoice_paid customer=%s amount=%s", customer_id, data_object.get("amount_paid"))
 
     return {"status": "ok"}
