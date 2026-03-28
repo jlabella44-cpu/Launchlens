@@ -14,21 +14,52 @@ from launchlens.api.schemas.demo import (
 )
 from launchlens.models.asset import Asset
 from launchlens.models.listing import Listing, ListingState
+from launchlens.services.rate_limiter import RateLimiter
 
 router = APIRouter()
 
 _DEMO_TTL_HOURS = 24
 _DEMO_PHOTO_MIN = 5
 _DEMO_PHOTO_MAX = 50
+_DEMO_RATE_LIMIT_PER_DAY = 3
 _DEMO_TENANT_ID = uuid.UUID(int=0)  # placeholder tenant for demo listings
+
+_demo_limiter: RateLimiter | None = None
+
+
+def _get_demo_limiter() -> RateLimiter:
+    global _demo_limiter
+    if _demo_limiter is None:
+        _demo_limiter = RateLimiter(
+            key_prefix="demo",
+            capacity=_DEMO_RATE_LIMIT_PER_DAY,
+            refill_rate=_DEMO_RATE_LIMIT_PER_DAY / 86400,
+        )
+    return _demo_limiter
+
+
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 @router.post("/upload", status_code=201, response_model=DemoUploadResponse)
 async def demo_upload(
     body: DemoUploadRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db_admin),
 ):
-    """Create a demo listing with uploaded photos. No auth required."""
+    """Create a demo listing with uploaded photos. No auth required. Rate limited: 3/IP/day."""
+    ip = _get_client_ip(request)
+    limiter = _get_demo_limiter()
+    if not limiter.acquire(key=ip, cost=1):
+        raise HTTPException(
+            status_code=429,
+            detail="Demo upload limit reached. Try again tomorrow.",
+        )
+
     count = len(body.file_paths)
     if count < _DEMO_PHOTO_MIN or count > _DEMO_PHOTO_MAX:
         raise HTTPException(

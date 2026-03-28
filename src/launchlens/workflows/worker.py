@@ -5,6 +5,7 @@ from temporalio.worker import Worker
 
 from launchlens.activities.pipeline import ALL_ACTIVITIES
 from launchlens.config import settings
+from launchlens.workflows.demo_cleanup import DemoCleanupWorkflow, run_demo_cleanup
 from launchlens.workflows.listing_pipeline import ListingPipeline
 
 
@@ -13,8 +14,8 @@ async def create_worker() -> Worker:
     return Worker(
         client,
         task_queue=settings.temporal_task_queue,
-        workflows=[ListingPipeline],
-        activities=ALL_ACTIVITIES,
+        workflows=[ListingPipeline, DemoCleanupWorkflow],
+        activities=[*ALL_ACTIVITIES, run_demo_cleanup],
     )
 
 
