@@ -8,6 +8,7 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from launchlens.activities.pipeline import (
         run_brand,
+        run_chapters,
         run_content,
         run_coverage,
         run_distribution,
@@ -16,6 +17,8 @@ with workflow.unsafe.imports_passed_through():
         run_mls_export,
         run_packaging,
         run_social_content,
+        run_social_cuts,
+        run_video,
         run_vision_tier1,
         run_vision_tier2,
     )
@@ -89,8 +92,18 @@ class ListingPipeline:
             retry_policy=_DEFAULT_RETRY,
         )
 
+        # Start video generation in parallel with human review
+        video_task = workflow.execute_activity(
+            run_video, ctx,
+            start_to_close_timeout=timedelta(minutes=30),  # Kling generation takes time
+            retry_policy=_DEFAULT_RETRY,
+        )
+
         # Wait for human review (listing is now AWAITING_REVIEW)
         await workflow.wait_condition(lambda: self._review_completed)
+
+        # Collect video result (may already be done)
+        video_result = await video_task
 
         # Phase 2: Post-approval pipeline
         # Step 1: Content (dual-tone)
@@ -119,6 +132,18 @@ class ListingPipeline:
         results = await asyncio.gather(*parallel_tasks)
         brand_result = results[0]
         flyer_key = brand_result.get("flyer_s3_key") if isinstance(brand_result, dict) else None
+
+        # Video post-processing (chapters + social cuts)
+        await workflow.execute_activity(
+            run_chapters, ctx,
+            start_to_close_timeout=_DEFAULT_TIMEOUT,
+            retry_policy=_DEFAULT_RETRY,
+        )
+        await workflow.execute_activity(
+            run_social_cuts, ctx,
+            start_to_close_timeout=_DEFAULT_TIMEOUT,
+            retry_policy=_DEFAULT_RETRY,
+        )
 
         # Step 3: MLS Export (builds both bundles)
         await workflow.execute_activity(

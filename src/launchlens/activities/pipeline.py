@@ -69,9 +69,28 @@ async def run_floorplan(context: AgentContext) -> dict:
     return await FloorplanAgent().execute(context)
 
 
+@activity.defn
+async def run_video(context: AgentContext) -> dict:
+    from launchlens.agents.video import VideoAgent
+    return await VideoAgent().execute(context)
+
+
+@activity.defn
+async def run_chapters(context: AgentContext) -> dict:
+    from launchlens.agents.chapter import ChapterAgent
+    return await ChapterAgent().execute(context)
+
+
+@activity.defn
+async def run_social_cuts(context: AgentContext) -> dict:
+    from launchlens.agents.social_cuts import SocialCutAgent
+    return await SocialCutAgent().execute(context)
+
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
     run_coverage, run_floorplan, run_packaging, run_content, run_brand,
     run_social_content, run_mls_export, run_distribution,
+    run_video, run_chapters, run_social_cuts,
 ]
