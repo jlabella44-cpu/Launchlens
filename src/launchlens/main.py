@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from launchlens.api import admin, assets, auth, billing, demo, listings, tenant_settings
+from launchlens.api import admin, analytics, assets, auth, billing, bulk, demo, listings, tenant_settings
 from launchlens.config import settings
 from launchlens.database import AsyncSessionLocal
 from launchlens.logging_config import setup_logging
@@ -29,7 +29,12 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="LaunchLens", version="0.9.3", lifespan=lifespan)
+    app = FastAPI(
+        title="LaunchLens",
+        version="0.9.4",
+        description="The Listing Media OS — from raw photos to launch-ready marketing in minutes.",
+        lifespan=lifespan,
+    )
     # Middleware order: request ID → rate limit → tenant auth
     # (outermost runs first, so list is reverse order)
     app.middleware("http")(TenantMiddleware())
@@ -42,6 +47,8 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
+    app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+    app.include_router(bulk.router, prefix="/bulk", tags=["bulk"])
 
     @app.get("/health")
     async def health():

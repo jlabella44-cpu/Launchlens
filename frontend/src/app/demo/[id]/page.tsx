@@ -7,6 +7,7 @@ import { Nav } from "@/components/layout/nav";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DemoPipelineStatus } from "@/components/listings/demo-pipeline-status";
 import apiClient from "@/lib/api-client";
 import type { DemoViewResponse } from "@/lib/types";
 
@@ -68,6 +69,10 @@ export default function DemoResultsPage() {
             Your AI-Curated Package
           </h1>
           <Badge state={demo.state} />
+        </div>
+
+        <div className="mb-6">
+          <DemoPipelineStatus state={demo.state} />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
