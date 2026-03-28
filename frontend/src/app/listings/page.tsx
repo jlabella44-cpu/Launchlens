@@ -30,16 +30,16 @@ function ListingsDashboard() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
+        <div className="flex items-start sm:items-center justify-between mb-8 gap-4">
           <div>
             <h1
-              className="text-3xl font-bold text-[var(--color-text)]"
+              className="text-2xl sm:text-3xl font-bold text-[var(--color-text)]"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Listings
             </h1>
-            <p className="text-[var(--color-text-secondary)] mt-1">
+            <p className="text-sm sm:text-base text-[var(--color-text-secondary)] mt-1">
               Manage your property listings
             </p>
           </div>

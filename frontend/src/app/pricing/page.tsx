@@ -55,12 +55,12 @@ export default function PricingPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-16">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-16">
         <div className="text-center mb-12">
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-bold text-[var(--color-text)] mb-3"
+            className="text-3xl sm:text-4xl font-bold text-[var(--color-text)] mb-3"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Listing Media OS

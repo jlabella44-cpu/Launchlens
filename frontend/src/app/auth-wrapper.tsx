@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/contexts/auth-context";
+import { PlanProvider } from "@/contexts/plan-context";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import type { ReactNode } from "react";
 
@@ -16,7 +17,9 @@ export function AuthProviderWrapper({ children }: { children: ReactNode }) {
 
   return (
     <AuthProvider>
-      {isPublicPath(pathname) ? children : <ProtectedRoute>{children}</ProtectedRoute>}
+      <PlanProvider>
+        {isPublicPath(pathname) ? children : <ProtectedRoute>{children}</ProtectedRoute>}
+      </PlanProvider>
     </AuthProvider>
   );
 }

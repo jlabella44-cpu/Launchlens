@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/ui/glass-card";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import apiClient from "@/lib/api-client";
 import type { SocialCut } from "@/lib/types";
 
@@ -35,12 +36,13 @@ export function SocialPreview({ listingId }: SocialPreviewProps) {
   return (
     <GlassCard tilt={false}>
       <h3
-        className="text-lg font-semibold mb-3"
+        className="text-lg font-semibold mb-3 flex items-center gap-2"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         Social Cuts
+        <PlanBadge feature="social_content" />
       </h3>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {cuts.map((cut, i) => {
           const meta = PLATFORM_META[cut.platform] || {
             icon: "?",

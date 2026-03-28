@@ -174,7 +174,26 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                 tenant.stripe_subscription_id = data_object.get("subscription")
                 if not tenant.stripe_customer_id:
                     tenant.stripe_customer_id = data_object.get("customer")
-                tenant.plan = "pro"
+                # Resolve plan from checkout session line items
+                line_items = data_object.get("line_items", {}).get("data", [])
+                if line_items:
+                    price_id = line_items[0].get("price", {}).get("id", "")
+                    tenant.plan = svc.resolve_plan(price_id)
+                else:
+                    # Fallback: fetch line items from subscription
+                    sub_id = data_object.get("subscription")
+                    if sub_id:
+                        try:
+                            sub = stripe_mod.Subscription.retrieve(sub_id)
+                            sub_items = sub.get("items", {}).get("data", [])
+                            if sub_items:
+                                price_id = sub_items[0].get("price", {}).get("id", "")
+                                tenant.plan = svc.resolve_plan(price_id)
+                        except Exception:
+                            logger.warning("Could not fetch subscription %s for plan resolution", sub_id)
+                            tenant.plan = "pro"
+                    else:
+                        tenant.plan = "pro"
                 await db.commit()
 
     elif event_type == "customer.subscription.updated":
