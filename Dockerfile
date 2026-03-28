@@ -1,24 +1,41 @@
-FROM python:3.12-slim
+# Build stage
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Install system deps for asyncpg and psycopg2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy source + deps manifest, then install
 COPY pyproject.toml ./
 COPY src/ src/
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN pip install --no-cache-dir -e .
 
-# Copy remaining app files
+# Runtime stage
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 curl ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user
+RUN useradd --create-home --shell /bin/bash launchlens
+USER launchlens
+
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /app /app
+
 COPY alembic/ alembic/
 COPY alembic.ini ./
 COPY docker/entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh
 
 EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["api"]
