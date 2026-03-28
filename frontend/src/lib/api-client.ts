@@ -8,6 +8,13 @@ import type {
   CreateListingRequest,
   CreateAssetsRequest,
   CreateAssetsResponse,
+  VideoResponse,
+  SocialCut,
+  VideoUploadRequest,
+  VideoUploadResponse,
+  DemoUploadRequest,
+  DemoUploadResponse,
+  DemoViewResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -113,6 +120,38 @@ class ApiClient {
   // Export
   async getExport(listingId: string, mode: "mls" | "marketing" = "marketing"): Promise<ExportResponse> {
     return this.request<ExportResponse>(`/listings/${listingId}/export?mode=${mode}`);
+  }
+
+  // Video
+  async getVideo(listingId: string): Promise<VideoResponse> {
+    return this.request<VideoResponse>(`/listings/${listingId}/video`);
+  }
+
+  async getSocialCuts(listingId: string): Promise<SocialCut[]> {
+    return this.request<SocialCut[]>(`/listings/${listingId}/video/social-cuts`);
+  }
+
+  async uploadVideo(listingId: string, data: VideoUploadRequest): Promise<VideoUploadResponse> {
+    return this.request<VideoUploadResponse>(`/listings/${listingId}/video/upload`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Demo (no auth required)
+  async demoUpload(data: DemoUploadRequest): Promise<DemoUploadResponse> {
+    return this.request<DemoUploadResponse>("/demo/upload", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async demoView(id: string): Promise<DemoViewResponse> {
+    return this.request<DemoViewResponse>(`/demo/${id}`);
+  }
+
+  async demoClaim(id: string): Promise<{ listing_id: string }> {
+    return this.request<{ listing_id: string }>(`/demo/${id}/claim`, { method: "POST" });
   }
 }
 

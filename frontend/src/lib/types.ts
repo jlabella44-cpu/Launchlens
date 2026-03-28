@@ -74,3 +74,60 @@ export interface CreateAssetsResponse {
   count: number;
   listing_state: string;
 }
+
+export interface VideoResponse {
+  s3_key: string;
+  video_type: "ai_generated" | "user_raw" | "professional";
+  duration_seconds: number | null;
+  status: string;
+  chapters: Chapter[] | null;
+  social_cuts: SocialCut[] | null;
+  thumbnail_s3_key: string | null;
+  clip_count: number | null;
+  created_at: string;
+}
+
+export interface Chapter {
+  time: number;
+  label: string;
+  description: string;
+}
+
+export interface SocialCut {
+  platform: string;
+  s3_key: string;
+  width: number;
+  height: number;
+  max_duration: number;
+}
+
+export interface VideoUploadRequest {
+  s3_key: string;
+  video_type: "user_raw" | "professional";
+  duration_seconds?: number;
+}
+
+export interface VideoUploadResponse {
+  id: string;
+  s3_key: string;
+  video_type: string;
+  status: string;
+}
+
+export interface DemoUploadRequest {
+  file_paths: string[];
+}
+
+export interface DemoUploadResponse {
+  demo_id: string;
+  photo_count: number;
+  expires_at: string;
+}
+
+export interface DemoViewResponse {
+  demo_id: string;
+  address: Record<string, string>;
+  state: string;
+  is_demo: boolean;
+  photos: { file_path: string; room_label?: string; quality_score?: number }[];
+}
