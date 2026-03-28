@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
@@ -13,12 +13,19 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { PackageViewer } from "@/components/listings/package-viewer";
 import { PipelineStatus } from "@/components/listings/pipeline-status";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
+import { usePlan } from "@/contexts/plan-context";
 import apiClient from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
-import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
+import type { ListingResponse, AssetResponse, PackageSelection, Addon } from "@/lib/types";
 import { VideoPlayer } from "@/components/listings/video-player";
 import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
+
+const ADDON_LABELS: Record<string, string> = {
+  ai_video_tour: "AI Video Tour",
+  "3d_floorplan": "3D Floorplan",
+  social_pack: "Social Pack",
+};
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
@@ -31,17 +38,24 @@ const PhotoOrbit = dynamic(
 
 function ListingDetail() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const { toast } = useToast();
+  const { billingModel, refresh: refreshPlan } = usePlan();
 
   const [listing, setListing] = useState<ListingResponse | null>(null);
   const [assets, setAssets] = useState<AssetResponse[]>([]);
   const [selections, setSelections] = useState<PackageSelection[]>([]);
+  const [addons, setAddons] = useState<Addon[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
   const [showVideoUpload, setShowVideoUpload] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  const isCredit = billingModel === "credit";
+  const canManageAddons = listing && ["new", "uploading"].includes(listing.state);
 
   const fetchData = useCallback(async () => {
     try {
@@ -59,6 +73,14 @@ function ListingDetail() {
       if (packageStates.includes(l.state)) {
         const pkg = await apiClient.getPackage(id);
         setSelections(pkg);
+      }
+
+      // Load addons for credit users
+      try {
+        const addonList = await apiClient.getAddons(id);
+        setAddons(addonList);
+      } catch {
+        // Addon endpoint may not exist yet
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load listing";
@@ -115,6 +137,30 @@ function ListingDetail() {
     }
   }
 
+  async function handleCancel() {
+    setCancelLoading(true);
+    try {
+      const res = await apiClient.cancelListing(id);
+      toast(`Listing cancelled. ${res.credits_refunded} credit(s) refunded.`, "success");
+      await refreshPlan();
+      router.push("/listings");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to cancel listing", "error");
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
+  async function handleAddAddon(addonType: string) {
+    try {
+      await apiClient.activateAddon(id, addonType);
+      toast(`${ADDON_LABELS[addonType] || addonType} activated`, "success");
+      await Promise.all([fetchData(), refreshPlan()]);
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to add addon", "error");
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -135,6 +181,10 @@ function ListingDetail() {
 
   const addr = listing.address;
   const meta = listing.metadata;
+  const activeAddons = addons.filter((a) => a.status === "active");
+  const availableAddonTypes = Object.keys(ADDON_LABELS).filter(
+    (type) => !activeAddons.some((a) => a.addon_type === type)
+  );
 
   return (
     <>
@@ -148,7 +198,7 @@ function ListingDetail() {
           >
             &larr; Back to Listings
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <h1
               className="text-3xl font-bold text-[var(--color-text)]"
               style={{ fontFamily: "var(--font-heading)" }}
@@ -156,6 +206,17 @@ function ListingDetail() {
               {addr.street || "Listing"}
             </h1>
             <Badge state={listing.state} />
+            {/* Addon badges */}
+            {activeAddons.map((addon) => (
+              <motion.span
+                key={addon.id}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+              >
+                {ADDON_LABELS[addon.addon_type] || addon.addon_type}
+              </motion.span>
+            ))}
           </div>
           {(addr.city || addr.state) && (
             <p className="text-[var(--color-text-secondary)] mt-1">
@@ -202,6 +263,32 @@ function ListingDetail() {
                 </div>
               )}
             </GlassCard>
+
+            {/* Add-on management for credit users */}
+            {isCredit && canManageAddons && availableAddonTypes.length > 0 && (
+              <GlassCard tilt={false}>
+                <h3
+                  className="text-lg font-semibold mb-3"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  Add-ons
+                </h3>
+                <div className="space-y-2">
+                  {availableAddonTypes.map((type) => (
+                    <div key={type} className="flex items-center justify-between">
+                      <span className="text-sm">{ADDON_LABELS[type]}</span>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleAddAddon(type)}
+                        className="text-xs px-3 py-1.5"
+                      >
+                        Add (+1 credit)
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            )}
           </div>
 
           {/* Right: Package + Actions */}
@@ -246,6 +333,16 @@ function ListingDetail() {
                       Quick Download Marketing
                     </Button>
                   </>
+                )}
+                {/* Cancel listing for credit users (early states only) */}
+                {isCredit && ["new", "uploading", "analyzing"].includes(listing.state) && (
+                  <Button
+                    variant="danger"
+                    onClick={handleCancel}
+                    loading={cancelLoading}
+                  >
+                    Cancel Listing
+                  </Button>
                 )}
               </div>
 

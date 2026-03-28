@@ -15,6 +15,12 @@ import type {
   DemoUploadRequest,
   DemoUploadResponse,
   DemoViewResponse,
+  CreditBalance,
+  CreditTransaction,
+  CreditBundle,
+  CreditCheckoutResponse,
+  Addon,
+  BillingStatus,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -152,6 +158,47 @@ class ApiClient {
 
   async demoClaim(id: string): Promise<{ listing_id: string }> {
     return this.request<{ listing_id: string }>(`/demo/${id}/claim`, { method: "POST" });
+  }
+
+  // Credits
+  async getCreditBalance(): Promise<CreditBalance> {
+    return this.request<CreditBalance>("/credits/balance");
+  }
+
+  async getCreditTransactions(): Promise<CreditTransaction[]> {
+    return this.request<CreditTransaction[]>("/credits/transactions");
+  }
+
+  async getCreditBundles(): Promise<CreditBundle[]> {
+    return this.request<CreditBundle[]>("/credits/bundles");
+  }
+
+  async purchaseCredits(bundleId: string): Promise<CreditCheckoutResponse> {
+    return this.request<CreditCheckoutResponse>("/credits/purchase", {
+      method: "POST",
+      body: JSON.stringify({ bundle_id: bundleId }),
+    });
+  }
+
+  // Billing
+  async getBillingStatus(): Promise<BillingStatus> {
+    return this.request<BillingStatus>("/billing/status");
+  }
+
+  // Addons
+  async getAddons(listingId: string): Promise<Addon[]> {
+    return this.request<Addon[]>(`/listings/${listingId}/addons`);
+  }
+
+  async activateAddon(listingId: string, addonType: string): Promise<Addon> {
+    return this.request<Addon>(`/listings/${listingId}/addons`, {
+      method: "POST",
+      body: JSON.stringify({ addon_type: addonType }),
+    });
+  }
+
+  async cancelListing(listingId: string): Promise<{ listing_id: string; credits_refunded: number }> {
+    return this.request(`/listings/${listingId}/cancel`, { method: "POST" });
   }
 }
 

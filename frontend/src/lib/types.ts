@@ -131,3 +131,49 @@ export interface DemoViewResponse {
   is_demo: boolean;
   photos: { file_path: string; room_label?: string; quality_score?: number }[];
 }
+
+// Credit system types
+
+export interface CreditBalance {
+  balance: number;
+  billing_model: "legacy" | "credit";
+  tier: string;
+  per_listing_credit_cost: number;
+  rollover_cap: number | null;
+}
+
+export interface CreditTransaction {
+  id: string;
+  amount: number;
+  type: "purchase" | "usage" | "refund" | "rollover" | "bonus";
+  description: string;
+  listing_id: string | null;
+  created_at: string;
+}
+
+export interface CreditBundle {
+  id: string;
+  credits: number;
+  price_cents: number;
+  label: string;
+}
+
+export interface CreditCheckoutResponse {
+  checkout_url: string;
+}
+
+export interface Addon {
+  id: string;
+  addon_type: "ai_video_tour" | "3d_floorplan" | "social_pack";
+  credit_cost: number;
+  status: "active" | "cancelled";
+  listing_id: string;
+  created_at: string;
+}
+
+export interface BillingStatus {
+  billing_model: "legacy" | "credit";
+  plan: string;
+  tier: string;
+  stripe_customer_id: string | null;
+}
