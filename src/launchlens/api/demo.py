@@ -39,9 +39,13 @@ def _get_demo_limiter() -> RateLimiter:
 
 
 def _get_client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    from launchlens.middleware.rate_limit import TRUSTED_PROXY_COUNT
+    if TRUSTED_PROXY_COUNT > 0:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            parts = [p.strip() for p in forwarded.split(",")]
+            idx = max(0, len(parts) - TRUSTED_PROXY_COUNT)
+            return parts[idx]
     return request.client.host if request.client else "unknown"
 
 

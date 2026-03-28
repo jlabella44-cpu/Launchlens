@@ -134,8 +134,44 @@ export interface DemoViewResponse {
 
 export interface BillingStatusResponse {
   plan: string;
+  plan_tier: string;
+  billing_model: string;
+  credit_balance: number;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+}
+
+export interface CreditBalance {
+  balance: number;
+  rollover_balance: number;
+  rollover_cap: number;
+  period_start: string;
+  period_end: string;
+}
+
+export interface CreditTransaction {
+  id: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface Addon {
+  id: string;
+  slug: string;
+  name: string;
+  credit_cost: number;
+  is_active: boolean;
+}
+
+export interface CreditBundle {
+  size: number;
+  price_cents: number;
+  per_credit_cents: number;
 }
 
 export interface Invoice {
@@ -160,53 +196,52 @@ export interface PlanLimits {
   social_content: boolean;
 }
 
-// Admin types
-export interface AdminStatsResponse {
-  total_tenants: number;
-  total_users: number;
-  total_listings: number;
-  listings_by_state: Record<string, number>;
+export interface BrandKitResponse {
+  id: string;
+  tenant_id: string;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  font_primary: string | null;
+  agent_name: string | null;
+  brokerage_name: string | null;
+  raw_config: Record<string, unknown>;
+  created_at: string;
 }
 
-export interface AdminTenantResponse {
-  id: string;
+export interface BrandKitUpsertRequest {
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  font_primary?: string | null;
+  agent_name?: string | null;
+  brokerage_name?: string | null;
+  raw_config?: Record<string, unknown>;
+}
+
+export interface PipelineStep {
   name: string;
-  plan: string;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
-  webhook_url: string | null;
-  credit_balance?: number;
-  created_at: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "skipped";
+  completed_at: string | null;
+  progress: string | null;
 }
 
-export interface CreditTransactionResponse {
+export interface PipelineStatusResponse {
+  listing_id: string;
+  state: string;
+  steps: PipelineStep[];
+}
+
+export interface ReviewQueueItem {
   id: string;
-  tenant_id: string;
-  amount: number;
-  balance_after: number;
-  transaction_type: string;
-  reason: string | null;
+  address: Record<string, string>;
+  metadata: Record<string, number | string>;
+  state: string;
+  asset_count: number;
   created_at: string;
 }
 
-export interface TenantCreditsResponse {
-  tenant_id: string;
-  credit_balance: number;
-  transactions: CreditTransactionResponse[];
-}
-
-export interface CreditSummaryResponse {
-  total_credits_outstanding: number;
-  credits_purchased_this_month: number;
-  credits_used_this_month: number;
-  credits_adjusted_this_month: number;
-  tenant_count_with_credits: number;
-}
-
-export interface RevenueBreakdownResponse {
-  subscription_tenant_count: number;
-  credit_purchase_count: number;
-  total_credits_purchased: number;
-  top_tenants_by_usage: { tenant_id: string; name: string; credits_used: number }[];
-  avg_credits_per_listing: number | null;
+export interface RejectRequest {
+  reason: "quality" | "incomplete" | "non_compliant" | "other";
+  detail?: string;
 }

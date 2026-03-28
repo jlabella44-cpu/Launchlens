@@ -94,7 +94,7 @@ async def test_login_success(async_client: AsyncClient):
 async def test_login_wrong_password_returns_401(async_client: AsyncClient):
     email = f"test-{uuid.uuid4()}@example.com"
     await async_client.post("/auth/register", json={
-        "email": email, "password": "correctpass", "name": "Dave", "company_name": "Listings Co"
+        "email": email, "password": "CorrectPass1!", "name": "Dave", "company_name": "Listings Co"
     })
     resp = await async_client.post("/auth/login", json={"email": email, "password": "wrong"})
     assert resp.status_code == 401

@@ -13,7 +13,7 @@ from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_llm_provider
 from launchlens.services.events import emit_event
 from launchlens.services.fha_filter import fha_check
-from launchlens.services.metrics import record_cost
+from launchlens.services.pii_filter import sanitize_for_prompt
 
 from .base import AgentContext, BaseAgent
 
@@ -76,7 +76,7 @@ class SocialContentAgent(BaseAgent):
                 hero_label = hero_vr.room_label if hero_vr else "exterior"
                 hero_quality = hero_vr.quality_score if hero_vr else 70
 
-                metadata = listing.metadata_ or {}
+                metadata = sanitize_for_prompt(listing.metadata_ or {})
                 address_dict = listing.address or {}
                 address_str = f"{address_dict.get('street', '')}, {address_dict.get('city', '')}, {address_dict.get('state', '')}"
 
@@ -145,8 +145,6 @@ class SocialContentAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
-        llm_calls = 2 if not fha_result.passed else 1
-        record_cost(self.agent_name, "claude", llm_calls)
         return {"platforms": ["instagram", "facebook"], "fha_passed": fha_result.passed}
 
 
@@ -154,4 +152,4 @@ class SocialContentAgent(BaseAgent):
 async def run_social_content(listing_id: str, tenant_id: str) -> dict:
     agent = SocialContentAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)
+    return await agent.execute(ctx)

@@ -31,6 +31,10 @@ class DistributionAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
+                # Send pipeline-complete notification email
+                from launchlens.services.notifications import notify_pipeline_complete
+                await notify_pipeline_complete(session, listing, context.tenant_id)
+
         return {"status": "delivered"}
 
 

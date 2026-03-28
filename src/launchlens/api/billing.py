@@ -19,6 +19,7 @@ from launchlens.database import get_db
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.services.billing import BillingService
+from launchlens.services.credits import TIER_CREDITS, CreditService
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,17 @@ async def change_plan(
     }
 
 
+# ---------------------------------------------------------------------------
+# Stripe Webhook
+# ---------------------------------------------------------------------------
+
+async def _find_tenant_by_customer(db: AsyncSession, customer_id: str) -> Tenant | None:
+    result = await db.execute(
+        select(Tenant).where(Tenant.stripe_customer_id == customer_id)
+    )
+    return result.scalar_one_or_none()
+
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     payload = await request.body()
@@ -164,71 +176,154 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     event_type = event.type
+    event_id = event.id  # Used as reference_id for idempotency
     data_object = event["data"]["object"]
+    credit_svc = CreditService()
 
     if event_type == "checkout.session.completed":
-        tenant_id_str = data_object.get("metadata", {}).get("tenant_id")
-        if tenant_id_str:
-            tenant = await db.get(Tenant, uuid.UUID(tenant_id_str))
-            if tenant:
-                tenant.stripe_subscription_id = data_object.get("subscription")
-                if not tenant.stripe_customer_id:
-                    tenant.stripe_customer_id = data_object.get("customer")
-                # Resolve plan from checkout session line items
-                line_items = data_object.get("line_items", {}).get("data", [])
-                if line_items:
-                    price_id = line_items[0].get("price", {}).get("id", "")
-                    tenant.plan = svc.resolve_plan(price_id)
-                else:
-                    # Fallback: fetch line items from subscription
-                    sub_id = data_object.get("subscription")
-                    if sub_id:
-                        try:
-                            sub = stripe_mod.Subscription.retrieve(sub_id)
-                            sub_items = sub.get("items", {}).get("data", [])
-                            if sub_items:
-                                price_id = sub_items[0].get("price", {}).get("id", "")
-                                tenant.plan = svc.resolve_plan(price_id)
-                        except Exception:
-                            logger.warning("Could not fetch subscription %s for plan resolution", sub_id)
-                            tenant.plan = "pro"
-                    else:
-                        tenant.plan = "pro"
-                await db.commit()
+        await _handle_checkout_completed(db, data_object, event_id, svc, credit_svc)
 
     elif event_type == "customer.subscription.updated":
-        customer_id = data_object.get("customer")
-        if customer_id:
-            tenant = (await db.execute(
-                select(Tenant).where(Tenant.stripe_customer_id == customer_id)
-            )).scalar_one_or_none()
-            if tenant:
-                items = data_object.get("items", {}).get("data", [])
-                if items:
-                    price_id = items[0].get("price", {}).get("id", "")
-                    tenant.plan = svc.resolve_plan(price_id)
-                await db.commit()
+        await _handle_subscription_updated(db, data_object, svc)
 
     elif event_type == "customer.subscription.deleted":
-        customer_id = data_object.get("customer")
-        if customer_id:
-            tenant = (await db.execute(
-                select(Tenant).where(Tenant.stripe_customer_id == customer_id)
-            )).scalar_one_or_none()
-            if tenant:
-                tenant.plan = "starter"
-                tenant.stripe_subscription_id = None
-                await db.commit()
+        await _handle_subscription_deleted(db, data_object)
+
+    elif event_type == "invoice.paid":
+        await _handle_invoice_paid(db, data_object, event_id, credit_svc)
 
     elif event_type == "invoice.payment_failed":
         customer_id = data_object.get("customer")
         if customer_id:
-            logger.warning("payment_failed customer=%s invoice=%s", customer_id, data_object.get("id"))
-            # Don't downgrade immediately — Stripe retries. Log for monitoring.
-
-    elif event_type == "invoice.paid":
-        customer_id = data_object.get("customer")
-        if customer_id:
-            logger.info("invoice_paid customer=%s amount=%s", customer_id, data_object.get("amount_paid"))
+            logger.warning(
+                "payment_failed customer=%s invoice=%s",
+                customer_id, data_object.get("id"),
+            )
 
     return {"status": "ok"}
+
+
+async def _handle_checkout_completed(
+    db: AsyncSession,
+    data_object: dict,
+    event_id: str,
+    svc: BillingService,
+    credit_svc: CreditService,
+) -> None:
+    metadata = data_object.get("metadata", {})
+    tenant_id_str = metadata.get("tenant_id")
+    if not tenant_id_str:
+        return
+
+    tenant_id = uuid.UUID(tenant_id_str)
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        return
+
+    # Credit bundle purchase
+    if metadata.get("type") == "credit_bundle":
+        bundle_size = int(metadata.get("bundle_size", 0))
+        if bundle_size > 0:
+            await credit_svc.add_credits(
+                db, tenant_id, bundle_size,
+                transaction_type="purchase",
+                reference_type="stripe_event",
+                reference_id=event_id,
+                description=f"Credit bundle: {bundle_size} credits",
+            )
+            await db.commit()
+        return
+
+    # Regular subscription checkout
+    tenant.stripe_subscription_id = data_object.get("subscription")
+    if not tenant.stripe_customer_id:
+        tenant.stripe_customer_id = data_object.get("customer")
+
+    # Resolve plan from subscription items
+    items = data_object.get("display_items", []) or []
+    if items and items[0].get("price", {}).get("id"):
+        tenant.plan = svc.resolve_plan(items[0]["price"]["id"])
+    else:
+        tenant.plan = "pro"  # fallback
+
+    # Set credit tier
+    included, cap = TIER_CREDITS.get(tenant.plan, (0, 0))
+    tenant.included_credits = included
+    tenant.rollover_cap = cap
+
+    await db.commit()
+
+
+async def _handle_subscription_updated(
+    db: AsyncSession,
+    data_object: dict,
+    svc: BillingService,
+) -> None:
+    customer_id = data_object.get("customer")
+    if not customer_id:
+        return
+
+    tenant = await _find_tenant_by_customer(db, customer_id)
+    if not tenant:
+        return
+
+    items = data_object.get("items", {}).get("data", [])
+    if items:
+        price_id = items[0].get("price", {}).get("id", "")
+        new_plan = svc.resolve_plan(price_id)
+        tenant.plan = new_plan
+
+        # Update credit tier
+        included, cap = TIER_CREDITS.get(new_plan, (0, 0))
+        tenant.included_credits = included
+        tenant.rollover_cap = cap
+
+    await db.commit()
+
+
+async def _handle_subscription_deleted(
+    db: AsyncSession,
+    data_object: dict,
+) -> None:
+    customer_id = data_object.get("customer")
+    if not customer_id:
+        return
+
+    tenant = await _find_tenant_by_customer(db, customer_id)
+    if not tenant:
+        return
+
+    # Downgrade to lite — preserve credit_balance (purchased credits are theirs)
+    tenant.plan = "lite"
+    tenant.included_credits = 0
+    tenant.rollover_cap = 0
+    tenant.stripe_subscription_id = None
+    await db.commit()
+
+
+async def _handle_invoice_paid(
+    db: AsyncSession,
+    data_object: dict,
+    event_id: str,
+    credit_svc: CreditService,
+) -> None:
+    customer_id = data_object.get("customer")
+    if not customer_id:
+        return
+
+    tenant = await _find_tenant_by_customer(db, customer_id)
+    if not tenant:
+        return
+
+    logger.info(
+        "invoice_paid customer=%s amount=%s",
+        customer_id, data_object.get("amount_paid"),
+    )
+
+    # Grant included credits on subscription renewal
+    if tenant.included_credits > 0:
+        await credit_svc.process_period_renewal(
+            db, tenant.id, tenant.included_credits,
+            reference_id=event_id,
+        )
+        await db.commit()

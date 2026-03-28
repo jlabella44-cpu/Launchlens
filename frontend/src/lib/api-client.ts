@@ -8,6 +8,10 @@ import type {
   CreateListingRequest,
   CreateAssetsRequest,
   CreateAssetsResponse,
+  CreditBalance,
+  CreditTransaction,
+  CreditBundle,
+  Addon,
   VideoResponse,
   SocialCut,
   VideoUploadRequest,
@@ -18,12 +22,11 @@ import type {
   BillingStatusResponse,
   Invoice,
   UsageResponse,
-  AdminStatsResponse,
-  AdminTenantResponse,
-  TenantCreditsResponse,
-  CreditTransactionResponse,
-  CreditSummaryResponse,
-  RevenueBreakdownResponse,
+  BrandKitResponse,
+  BrandKitUpsertRequest,
+  PipelineStatusResponse,
+  ReviewQueueItem,
+  RejectRequest,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -59,17 +62,31 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(error.detail || `Request failed: ${response.status}`);
+      const err = new Error(error.detail || `Request failed: ${response.status}`) as Error & { status: number };
+      err.status = response.status;
+      throw err;
     }
 
     return response.json();
   }
 
   // Auth
-  async register(email: string, password: string, name: string): Promise<TokenResponse> {
+  async register(
+    email: string,
+    password: string,
+    name: string,
+    companyName: string,
+    planTier?: string,
+  ): Promise<TokenResponse> {
     return this.request<TokenResponse>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({
+        email,
+        password,
+        name,
+        company_name: companyName,
+        plan_tier: planTier || undefined,
+      }),
     });
   }
 
@@ -122,6 +139,10 @@ class ApiClient {
     return this.request(`/listings/${listingId}/review`, { method: "POST" });
   }
 
+  async retryPipeline(listingId: string): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/retry`, { method: "POST" });
+  }
+
   async approveListing(listingId: string): Promise<{ listing_id: string; state: string }> {
     return this.request(`/listings/${listingId}/approve`, { method: "POST" });
   }
@@ -145,6 +166,11 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  // Retry failed listing
+  async retryListing(listingId: string): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/retry`, { method: "POST" });
   }
 
   // Demo (no auth required)
@@ -191,32 +217,92 @@ class ApiClient {
     return this.request<UsageResponse>("/analytics/usage");
   }
 
-  // Admin
-  async adminStats(): Promise<AdminStatsResponse> {
-    return this.request<AdminStatsResponse>("/admin/stats");
+  // Brand Kit
+  async getBrandKit(): Promise<BrandKitResponse | null> {
+    return this.request<BrandKitResponse | null>("/brand-kit");
   }
 
-  async adminTenants(): Promise<AdminTenantResponse[]> {
-    return this.request<AdminTenantResponse[]>("/admin/tenants");
-  }
-
-  async adminTenantCredits(tenantId: string): Promise<TenantCreditsResponse> {
-    return this.request<TenantCreditsResponse>(`/admin/tenants/${tenantId}/credits`);
-  }
-
-  async adminAdjustCredits(tenantId: string, amount: number, reason: string): Promise<CreditTransactionResponse> {
-    return this.request<CreditTransactionResponse>(`/admin/tenants/${tenantId}/credits/adjust`, {
-      method: "POST",
-      body: JSON.stringify({ amount, reason }),
+  async upsertBrandKit(data: BrandKitUpsertRequest): Promise<BrandKitResponse> {
+    return this.request<BrandKitResponse>("/brand-kit", {
+      method: "PUT",
+      body: JSON.stringify(data),
     });
   }
 
-  async adminCreditsSummary(): Promise<CreditSummaryResponse> {
-    return this.request<CreditSummaryResponse>("/admin/credits/summary");
+  async getLogoUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
+    return this.request("/brand-kit/logo-upload-url", { method: "POST" });
   }
 
-  async adminRevenue(): Promise<RevenueBreakdownResponse> {
-    return this.request<RevenueBreakdownResponse>("/admin/analytics/revenue");
+  // Upload URLs
+  async getUploadUrls(listingId: string, filenames: string[]): Promise<{
+    urls: { filename: string; key: string; upload_url: string; content_type: string }[];
+  }> {
+    return this.request(`/listings/${listingId}/upload-urls`, {
+      method: "POST",
+      body: JSON.stringify({ filenames }),
+    });
+  }
+
+  // Pipeline status
+  async getPipelineStatus(listingId: string): Promise<PipelineStatusResponse> {
+    return this.request<PipelineStatusResponse>(`/listings/${listingId}/pipeline-status`);
+  }
+
+  // Review queue
+  async getReviewQueue(): Promise<ListingResponse[]> {
+    return this.request<ListingResponse[]>("/listings?state=awaiting_review");
+  }
+
+  // Reject
+  async rejectListing(listingId: string, data: RejectRequest): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelListing(listingId: string): Promise<{ listing_id: string; state: string; credits_refunded: number }> {
+    return this.request(`/listings/${listingId}/cancel`, { method: "POST" });
+  }
+
+  // Credits
+  async getCreditBalance(): Promise<CreditBalance> {
+    return this.request<CreditBalance>("/credits/balance");
+  }
+
+  async getCreditTransactions(limit = 50, offset = 0): Promise<CreditTransaction[]> {
+    return this.request<CreditTransaction[]>(`/credits/transactions?limit=${limit}&offset=${offset}`);
+  }
+
+  async getCreditPricing(): Promise<{ bundles: CreditBundle[] }> {
+    return this.request("/credits/pricing");
+  }
+
+  async purchaseCredits(bundleSize: number, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
+    return this.request("/credits/purchase", {
+      method: "POST",
+      body: JSON.stringify({ bundle_size: bundleSize, success_url: successUrl, cancel_url: cancelUrl }),
+    });
+  }
+
+  // Addons
+  async getAddons(): Promise<Addon[]> {
+    return this.request<Addon[]>("/addons");
+  }
+
+  async activateAddon(listingId: string, addonSlug: string): Promise<{ id: string; addon_slug: string; status: string }> {
+    return this.request(`/listings/${listingId}/addons`, {
+      method: "POST",
+      body: JSON.stringify({ addon_slug: addonSlug }),
+    });
+  }
+
+  async getListingAddons(listingId: string): Promise<{ addon_slug: string; addon_name: string; status: string }[]> {
+    return this.request(`/listings/${listingId}/addons`);
+  }
+
+  async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
+    return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
   }
 }
 

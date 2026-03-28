@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/contexts/auth-context";
 import { PlanProvider } from "@/contexts/plan-context";
 import { ProtectedRoute } from "@/components/layout/protected-route";
+import { ToastProvider } from "@/components/ui/toast";
 import type { ReactNode } from "react";
 
 const PUBLIC_PATHS = ["/login", "/register", "/demo", "/pricing"];
@@ -18,7 +19,9 @@ export function AuthProviderWrapper({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <PlanProvider>
-        {isPublicPath(pathname) ? children : <ProtectedRoute>{children}</ProtectedRoute>}
+        <ToastProvider>
+          {isPublicPath(pathname) ? children : <ProtectedRoute>{children}</ProtectedRoute>}
+        </ToastProvider>
       </PlanProvider>
     </AuthProvider>
   );

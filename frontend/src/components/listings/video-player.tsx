@@ -40,7 +40,15 @@ export function VideoPlayer({ listingId, onNoVideo }: VideoPlayerProps) {
     }
   }
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <GlassCard tilt={false}>
+        <div className="h-48 rounded-lg bg-slate-100 animate-pulse flex items-center justify-center">
+          <span className="text-xs text-slate-400">Loading video...</span>
+        </div>
+      </GlassCard>
+    );
+  }
   if (!video) return null;
 
   return (
@@ -59,9 +67,9 @@ export function VideoPlayer({ listingId, onNoVideo }: VideoPlayerProps) {
 
       <video
         ref={videoRef}
-        src={video.s3_key}
+        src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/listings/${listingId}/video/stream?key=${encodeURIComponent(video.s3_key)}`}
         controls
-        poster={video.thumbnail_s3_key || undefined}
+        poster={video.thumbnail_s3_key ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/listings/${listingId}/video/stream?key=${encodeURIComponent(video.thumbnail_s3_key)}` : undefined}
         className="w-full rounded-lg bg-black"
       />
 
