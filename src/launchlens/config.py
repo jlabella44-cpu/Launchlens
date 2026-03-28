@@ -50,6 +50,20 @@ class Settings(BaseSettings):
     google_vision_api_key: str = ""
     use_mock_providers: bool = False
 
+    # ClamAV
+    clamav_host: str = "localhost"
+    clamav_port: int = 3310
+
+    # OpenTelemetry
+    otel_exporter_endpoint: str = ""  # Empty = disabled
+
+    # RESO MLS
+    reso_api_url: str = ""
+    reso_api_key: str = ""
+
+    # Canva
+    canva_api_key: str = ""
+
     # Video (Kling AI)
     kling_access_key: str = ""
     kling_secret_key: str = ""

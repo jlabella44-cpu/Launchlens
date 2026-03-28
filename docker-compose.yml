@@ -72,6 +72,23 @@ services:
     depends_on:
       - temporal
 
+  # ── ClamAV (virus scanning) ───────────────────────────────────
+  clamav:
+    image: clamav/clamav:1.2
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+
+  # ── Jaeger (OpenTelemetry traces) ────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    ports:
+      - "16686:16686"   # UI
+      - "4317:4317"     # OTLP gRPC
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
   # ── LaunchLens API ───────────────────────────────────────────
   api:
     build: .
@@ -84,6 +101,9 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - APP_ENV=development
       - USE_MOCK_PROVIDERS=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - CLAMAV_HOST=clamav
+      - CLAMAV_PORT=3310
     ports:
       - "8000:8000"
     volumes:
@@ -109,6 +129,9 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - APP_ENV=development
       - USE_MOCK_PROVIDERS=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - CLAMAV_HOST=clamav
+      - CLAMAV_PORT=3310
     volumes:
       - ./src:/app/src
     depends_on:
@@ -122,3 +145,4 @@ services:
 volumes:
   pgdata:
   pgdata_test:
+  clamav_data:
