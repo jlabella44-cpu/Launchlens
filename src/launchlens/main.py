@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from launchlens.api import (
+    addons,
     admin,
     analytics,
     assets,
@@ -11,6 +12,7 @@ from launchlens.api import (
     billing,
     brand_kit,
     bulk,
+    credits,
     demo,
     health,
     listings,
@@ -67,6 +69,8 @@ def create_app() -> FastAPI:
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
     app.include_router(bulk.router, prefix="/bulk", tags=["bulk"])
     app.include_router(brand_kit.router, prefix="/brand-kit", tags=["brand-kit"])
+    app.include_router(credits.router, prefix="/credits", tags=["credits"])
+    app.include_router(addons.router, tags=["addons"])
     app.include_router(sse.router, tags=["sse"])
     app.include_router(health.router)
 

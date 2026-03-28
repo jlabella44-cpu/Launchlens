@@ -134,8 +134,44 @@ export interface DemoViewResponse {
 
 export interface BillingStatusResponse {
   plan: string;
+  plan_tier: string;
+  billing_model: string;
+  credit_balance: number;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+}
+
+export interface CreditBalance {
+  balance: number;
+  rollover_balance: number;
+  rollover_cap: number;
+  period_start: string;
+  period_end: string;
+}
+
+export interface CreditTransaction {
+  id: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+export interface Addon {
+  id: string;
+  slug: string;
+  name: string;
+  credit_cost: number;
+  is_active: boolean;
+}
+
+export interface CreditBundle {
+  size: number;
+  price_cents: number;
+  per_credit_cents: number;
 }
 
 export interface Invoice {

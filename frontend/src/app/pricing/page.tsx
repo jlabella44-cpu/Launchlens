@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
@@ -8,136 +9,270 @@ import { Button } from "@/components/ui/button";
 
 const TIERS = [
   {
-    name: "Starter",
-    price: 29,
-    recommended: false,
-    features: {
-      "Listings / month": "5",
-      "Photos / listing": "25",
-      "AI Vision (Tier 2)": false,
-      "Social Content": false,
-      "AI Video Tours": false,
-      "MLS Export": true,
-      "Marketing Export": true,
-    },
+    name: "Lite",
+    price: 19,
+    period: "mo",
+    description: "For occasional listings. Pay per listing, no commitment.",
+    includedCredits: 0,
+    perListingPrice: 19,
+    features: [
+      "Pay-as-you-go listings",
+      "MLS + marketing bundles",
+      "AI photo analysis",
+      "Branded flyers",
+    ],
+    addons: true,
   },
   {
-    name: "Pro",
-    price: 99,
+    name: "Active Agent",
+    price: 39,
+    period: "mo",
     recommended: true,
-    features: {
-      "Listings / month": "50",
-      "Photos / listing": "50",
-      "AI Vision (Tier 2)": true,
-      "Social Content": true,
-      "AI Video Tours": true,
-      "MLS Export": true,
-      "Marketing Export": true,
-    },
+    description: "For agents listing 3-5 properties/month.",
+    includedCredits: 1,
+    perListingPrice: 14,
+    features: [
+      "1 included listing credit/month",
+      "Lower per-listing price",
+      "Unused credits roll over (cap: 3)",
+      "All Lite features",
+    ],
+    addons: true,
   },
   {
-    name: "Enterprise",
-    price: 299,
-    recommended: false,
-    features: {
-      "Listings / month": "500",
-      "Photos / listing": "100",
-      "AI Vision (Tier 2)": true,
-      "Social Content": true,
-      "AI Video Tours": true,
-      "MLS Export": true,
-      "Marketing Export": true,
-    },
+    name: "Team",
+    price: 99,
+    period: "mo",
+    description: "For brokerages and teams. Pooled credits, admin features.",
+    includedCredits: 5,
+    perListingPrice: 10,
+    features: [
+      "5 pooled listing credits/month",
+      "Team member management",
+      "Volume credit pricing",
+      "Priority support",
+      "Rollover cap: 10 credits",
+    ],
+    addons: true,
   },
 ];
 
+const CREDIT_BUNDLES = [
+  { size: 5, price: 95, perCredit: 19 },
+  { size: 10, price: 140, perCredit: 14 },
+  { size: 25, price: 300, perCredit: 12 },
+  { size: 50, price: 500, perCredit: 10 },
+];
+
+const ADDONS = [
+  { name: "AI Video Tour", cost: "1 credit", description: "AI-generated property tour video" },
+  { name: "3D Floorplan", cost: "1 credit", description: "Interactive 3D floorplan visualization" },
+  { name: "Social Content Pack", cost: "1 credit", description: "Instagram + Facebook captions & hashtags" },
+];
+
 export default function PricingPage() {
+  const [listingsPerMonth, setListingsPerMonth] = useState(3);
+
+  function calculateCost(tier: typeof TIERS[number]) {
+    const listingCreditsNeeded = Math.max(0, listingsPerMonth - tier.includedCredits);
+    return tier.price + listingCreditsNeeded * tier.perListingPrice;
+  }
+
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-16">
-        <div className="text-center mb-12">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-3xl sm:text-4xl font-bold text-[var(--color-text)] mb-3"
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-12"
+        >
+          <h1
+            className="text-4xl font-bold text-[var(--color-text)]"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Listing Media OS
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-lg text-[var(--color-text-secondary)]"
-          >
-            From raw listing media to launch-ready marketing in minutes.
-          </motion.p>
+            Pay for what you use
+          </h1>
+          <p className="text-lg text-[var(--color-text-secondary)] mt-3 max-w-2xl mx-auto">
+            Base account fee + per-listing credits. No wasted capacity in slow months.
+          </p>
+        </motion.div>
+
+        {/* Cost calculator */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-10"
+        >
+          <GlassCard tilt={false}>
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <span className="text-sm text-[var(--color-text-secondary)]">I list about</span>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                value={listingsPerMonth}
+                onChange={(e) => setListingsPerMonth(Number(e.target.value))}
+                className="w-40 accent-[var(--color-cta)]"
+              />
+              <span className="text-lg font-bold text-[var(--color-text)] min-w-[3ch] text-center">
+                {listingsPerMonth}
+              </span>
+              <span className="text-sm text-[var(--color-text-secondary)]">properties/month</span>
+            </div>
+          </GlassCard>
+        </motion.div>
+
+        {/* Plan cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          {TIERS.map((tier, i) => {
+            const monthlyCost = calculateCost(tier);
+
+            return (
+              <motion.div
+                key={tier.name}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.1 }}
+              >
+                <GlassCard
+                  tilt={false}
+                  className={`h-full flex flex-col ${
+                    tier.recommended
+                      ? "border-2 border-[var(--color-cta)] shadow-[0_0_30px_rgba(249,115,22,0.15)]"
+                      : ""
+                  }`}
+                >
+                  {tier.recommended && (
+                    <span className="text-xs font-bold text-[var(--color-cta)] uppercase tracking-wider mb-2">
+                      Most Popular
+                    </span>
+                  )}
+                  <h3
+                    className="text-xl font-bold text-[var(--color-text)]"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {tier.name}
+                  </h3>
+                  <div className="mt-2 mb-1">
+                    <span className="text-3xl font-bold text-[var(--color-text)]">${tier.price}</span>
+                    <span className="text-sm text-[var(--color-text-secondary)]">/{tier.period}</span>
+                  </div>
+                  <p className="text-xs text-[var(--color-text-secondary)] mb-1">
+                    + ${tier.perListingPrice}/listing credit
+                  </p>
+                  <div className="bg-[var(--color-background)] rounded-lg px-3 py-2 mb-4 text-center">
+                    <span className="text-sm font-medium text-[var(--color-text)]">
+                      ~${monthlyCost}/mo
+                    </span>
+                    <span className="text-xs text-[var(--color-text-secondary)] ml-1">
+                      at {listingsPerMonth} listings
+                    </span>
+                  </div>
+                  <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+                    {tier.description}
+                  </p>
+                  <ul className="space-y-2 mb-6 flex-1">
+                    {tier.features.map((f) => (
+                      <li key={f} className="text-sm text-[var(--color-text)] flex items-start gap-2">
+                        <svg className="w-4 h-4 text-[var(--color-success)] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href={`/register?plan=${tier.name.toLowerCase().replace(" ", "_")}`}>
+                    <Button variant={tier.recommended ? "primary" : "secondary"} className="w-full">
+                      Get Started
+                    </Button>
+                  </Link>
+                </GlassCard>
+              </motion.div>
+            );
+          })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {TIERS.map((tier, i) => (
-            <motion.div
-              key={tier.name}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <GlassCard
-                tilt
-                className={`relative ${
-                  tier.recommended
-                    ? "border-[var(--color-cta)] border-2 shadow-[0_0_30px_rgba(249,115,22,0.15)]"
-                    : ""
-                }`}
-              >
-                {tier.recommended && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[var(--color-cta)] text-white text-xs font-bold px-3 py-1 rounded-full">
-                    Recommended
-                  </span>
-                )}
-                <h2
-                  className="text-xl font-bold text-[var(--color-text)] mb-1"
+        {/* Annual option */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mb-16"
+        >
+          <GlassCard tilt={false}>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h3
+                  className="text-xl font-bold text-[var(--color-text)]"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
-                  {tier.name}
-                </h2>
-                <div className="mb-6">
-                  <span className="text-3xl font-bold text-[var(--color-text)]">
-                    ${tier.price}
-                  </span>
-                  <span className="text-sm text-[var(--color-text-secondary)]">/mo</span>
-                </div>
+                  Annual Credit Bank
+                </h3>
+                <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                  $399/year with 25 listing credits included. Best value for consistent agents.
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-[var(--color-text)]">$399</span>
+                <span className="text-sm text-[var(--color-text-secondary)]">/year</span>
+                <p className="text-xs text-[var(--color-success)]">Save vs monthly</p>
+              </div>
+              <Link href="/register?plan=annual">
+                <Button>Get Annual Plan</Button>
+              </Link>
+            </div>
+          </GlassCard>
+        </motion.div>
 
-                <ul className="space-y-3 mb-6">
-                  {Object.entries(tier.features).map(([feature, value]) => (
-                    <li key={feature} className="flex items-center justify-between text-sm">
-                      <span className="text-[var(--color-text-secondary)]">{feature}</span>
-                      {typeof value === "boolean" ? (
-                        value ? (
-                          <span className="text-green-500 font-bold">&#10003;</span>
-                        ) : (
-                          <span className="text-slate-300">&#x2014;</span>
-                        )
-                      ) : (
-                        <span className="font-medium text-[var(--color-text)]">{value}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link href={`/register?plan=${tier.name.toLowerCase()}`}>
-                  <Button
-                    className="w-full"
-                    variant={tier.recommended ? "primary" : "secondary"}
-                  >
-                    Get Started
-                  </Button>
-                </Link>
+        {/* Credit bundles */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="mb-16"
+        >
+          <h2
+            className="text-2xl font-bold text-[var(--color-text)] mb-6 text-center"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Credit Bundles
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {CREDIT_BUNDLES.map((bundle) => (
+              <GlassCard key={bundle.size} tilt={false} className="text-center">
+                <p className="text-2xl font-bold text-[var(--color-text)]">{bundle.size}</p>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-2">credits</p>
+                <p className="text-lg font-semibold text-[var(--color-text)]">${bundle.price}</p>
+                <p className="text-xs text-[var(--color-text-secondary)]">${bundle.perCredit}/credit</p>
               </GlassCard>
-            </motion.div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Add-ons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <h2
+            className="text-2xl font-bold text-[var(--color-text)] mb-6 text-center"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Premium Add-Ons
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {ADDONS.map((addon) => (
+              <GlassCard key={addon.name} tilt={false}>
+                <h4 className="font-semibold text-[var(--color-text)]">{addon.name}</h4>
+                <p className="text-sm text-[var(--color-text-secondary)] mt-1">{addon.description}</p>
+                <p className="text-sm font-medium text-[var(--color-cta)] mt-2">{addon.cost}</p>
+              </GlassCard>
+            ))}
+          </div>
+        </motion.div>
       </main>
     </>
   );

@@ -8,6 +8,10 @@ import type {
   CreateListingRequest,
   CreateAssetsRequest,
   CreateAssetsResponse,
+  CreditBalance,
+  CreditTransaction,
+  CreditBundle,
+  Addon,
   VideoResponse,
   SocialCut,
   VideoUploadRequest,
@@ -236,6 +240,50 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  async cancelListing(listingId: string): Promise<{ listing_id: string; state: string; credits_refunded: number }> {
+    return this.request(`/listings/${listingId}/cancel`, { method: "POST" });
+  }
+
+  // Credits
+  async getCreditBalance(): Promise<CreditBalance> {
+    return this.request<CreditBalance>("/credits/balance");
+  }
+
+  async getCreditTransactions(limit = 50, offset = 0): Promise<CreditTransaction[]> {
+    return this.request<CreditTransaction[]>(`/credits/transactions?limit=${limit}&offset=${offset}`);
+  }
+
+  async getCreditPricing(): Promise<{ bundles: CreditBundle[] }> {
+    return this.request("/credits/pricing");
+  }
+
+  async purchaseCredits(bundleSize: number, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
+    return this.request("/credits/purchase", {
+      method: "POST",
+      body: JSON.stringify({ bundle_size: bundleSize, success_url: successUrl, cancel_url: cancelUrl }),
+    });
+  }
+
+  // Addons
+  async getAddons(): Promise<Addon[]> {
+    return this.request<Addon[]>("/addons");
+  }
+
+  async activateAddon(listingId: string, addonSlug: string): Promise<{ id: string; addon_slug: string; status: string }> {
+    return this.request(`/listings/${listingId}/addons`, {
+      method: "POST",
+      body: JSON.stringify({ addon_slug: addonSlug }),
+    });
+  }
+
+  async getListingAddons(listingId: string): Promise<{ addon_slug: string; addon_name: string; status: string }[]> {
+    return this.request(`/listings/${listingId}/addons`);
+  }
+
+  async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
+    return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
   }
 }
 
