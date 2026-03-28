@@ -15,6 +15,9 @@ import type {
   DemoUploadRequest,
   DemoUploadResponse,
   DemoViewResponse,
+  BillingStatusResponse,
+  Invoice,
+  UsageResponse,
   BrandKitResponse,
   BrandKitUpsertRequest,
   PipelineStatusResponse,
@@ -158,6 +161,35 @@ class ApiClient {
   async demoClaim(id: string): Promise<{ listing_id: string }> {
     return this.request<{ listing_id: string }>(`/demo/${id}/claim`, { method: "POST" });
   }
+
+  // Billing
+  async billingStatus(): Promise<BillingStatusResponse> {
+    return this.request<BillingStatusResponse>("/billing/status");
+  }
+
+  async billingCheckout(priceId: string, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
+    return this.request<{ checkout_url: string }>("/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ price_id: priceId, success_url: successUrl, cancel_url: cancelUrl }),
+    });
+  }
+
+  async billingPortal(returnUrl: string): Promise<{ portal_url: string }> {
+    return this.request<{ portal_url: string }>("/billing/portal", {
+      method: "POST",
+      body: JSON.stringify({ return_url: returnUrl }),
+    });
+  }
+
+  async billingInvoices(limit = 10): Promise<{ invoices: Invoice[] }> {
+    return this.request<{ invoices: Invoice[] }>(`/billing/invoices?limit=${limit}`);
+  }
+
+  // Usage (analytics)
+  async getUsage(): Promise<UsageResponse> {
+    return this.request<UsageResponse>("/analytics/usage");
+  }
+
   // Brand Kit
   async getBrandKit(): Promise<BrandKitResponse | null> {
     return this.request<BrandKitResponse | null>("/brand-kit");

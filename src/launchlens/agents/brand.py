@@ -65,4 +65,4 @@ class BrandAgent(BaseAgent):
 async def run_brand(listing_id: str, tenant_id: str) -> dict:
     agent = BrandAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)
