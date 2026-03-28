@@ -131,3 +131,26 @@ export interface DemoViewResponse {
   is_demo: boolean;
   photos: { file_path: string; room_label?: string; quality_score?: number }[];
 }
+
+export interface BrandKitResponse {
+  id: string;
+  tenant_id: string;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  font_primary: string | null;
+  agent_name: string | null;
+  brokerage_name: string | null;
+  raw_config: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface BrandKitUpsertRequest {
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  font_primary?: string | null;
+  agent_name?: string | null;
+  brokerage_name?: string | null;
+  raw_config?: Record<string, unknown>;
+}
