@@ -97,7 +97,11 @@ async def list_listings(
     query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
 
     if state:
-        query = query.where(Listing.state == state)
+        try:
+            validated_state = ListingState(state)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid listing state: {state}")
+        query = query.where(Listing.state == validated_state)
 
     if search:
         # Search in JSONB address field — street or city contains search term
@@ -392,7 +396,7 @@ async def export_listing(
         raise HTTPException(status_code=404, detail="Export not yet generated")
 
     storage = StorageService()
-    expires_in = 3600
+    expires_in = 900  # 15 minutes
     download_url = storage.presigned_url(bundle_path, expires_in=expires_in)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 

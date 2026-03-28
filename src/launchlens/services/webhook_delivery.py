@@ -6,16 +6,57 @@ Includes HMAC signature for verification, retry with backoff.
 """
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
+import socket
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import httpx
+
+from launchlens.config import settings
 
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 10.0
 _MAX_RETRIES = 3
+
+# Private/reserved IP networks that webhooks must never target (SSRF protection)
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local / AWS metadata
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+
+def _is_url_safe(url: str) -> bool:
+    """Validate that a webhook URL targets a public IP, not internal/private ranges."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("https", "http"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        # Resolve hostname to IP and check against blocked ranges
+        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in resolved:
+            ip = ipaddress.ip_address(sockaddr[0])
+            for network in _BLOCKED_NETWORKS:
+                if ip in network:
+                    return False
+        return True
+    except (socket.gaierror, ValueError):
+        return False
 
 
 def _sign_payload(payload_bytes: bytes, secret: str) -> str:
@@ -36,9 +77,13 @@ async def deliver_webhook(
     Headers:
       X-LaunchLens-Event: event_type
       X-LaunchLens-Timestamp: ISO timestamp
-      X-LaunchLens-Signature: HMAC-SHA256 (using tenant_id as secret for now)
+      X-LaunchLens-Signature: HMAC-SHA256
       Content-Type: application/json
     """
+    if not _is_url_safe(url):
+        logger.warning("webhook.blocked_ssrf url=%s tenant=%s", url, tenant_id)
+        return False
+
     body = {
         "event": event_type,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -47,7 +92,11 @@ async def deliver_webhook(
         "data": payload,
     }
     body_bytes = json.dumps(body).encode()
-    signature = _sign_payload(body_bytes, tenant_id)
+    # Use a per-tenant HMAC key derived from the app secret + tenant_id
+    webhook_secret = hmac.new(
+        settings.jwt_secret.encode(), tenant_id.encode(), hashlib.sha256
+    ).hexdigest()
+    signature = _sign_payload(body_bytes, webhook_secret)
 
     headers = {
         "Content-Type": "application/json",
