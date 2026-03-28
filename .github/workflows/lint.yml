@@ -17,19 +17,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ruff
-        run: pip install "ruff>=0.4"
+        run: pip install ruff
 
       - name: Run ruff
-        run: |
-          set +e
-          ruff --version
-          OUTPUT=$(ruff check src/ tests/ --output-format=full 2>&1)
-          EXIT_CODE=$?
-          echo "$OUTPUT"
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "### Ruff Output" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-          exit $EXIT_CODE
+        run: ruff check src/ tests/
