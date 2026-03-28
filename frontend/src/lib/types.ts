@@ -131,3 +131,30 @@ export interface DemoViewResponse {
   is_demo: boolean;
   photos: { file_path: string; room_label?: string; quality_score?: number }[];
 }
+
+export interface PipelineStep {
+  name: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "skipped";
+  completed_at: string | null;
+  progress: string | null;
+}
+
+export interface PipelineStatusResponse {
+  listing_id: string;
+  state: string;
+  steps: PipelineStep[];
+}
+
+export interface ReviewQueueItem {
+  id: string;
+  address: Record<string, string>;
+  metadata: Record<string, number | string>;
+  state: string;
+  asset_count: number;
+  created_at: string;
+}
+
+export interface RejectRequest {
+  reason: "quality" | "incomplete" | "non_compliant" | "other";
+  detail?: string;
+}

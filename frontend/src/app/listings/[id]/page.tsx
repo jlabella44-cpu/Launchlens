@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PackageViewer } from "@/components/listings/package-viewer";
 import { PipelineStatus } from "@/components/listings/pipeline-status";
+import { PipelineProgress } from "@/components/listings/pipeline-progress";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
 import apiClient from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
@@ -168,8 +169,9 @@ function ListingDetail() {
         </div>
 
         {/* Pipeline Status */}
-        <div className="mb-8">
+        <div className="mb-8 space-y-4">
           <PipelineStatus state={listing.state} />
+          <PipelineProgress listingId={id} listingState={listing.state} />
         </div>
 
         {/* Two-column layout */}
