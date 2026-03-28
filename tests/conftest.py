@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from unittest.mock import MagicMock, patch
 
 import jwt
 import pytest
@@ -21,6 +22,15 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(autouse=True)
+def _mock_rate_limiter_global():
+    """Bypass Redis-backed rate limiter in all tests (Redis not available in CI)."""
+    mock_limiter = MagicMock()
+    mock_limiter.acquire.return_value = True
+    with patch("launchlens.middleware.rate_limit._get_limiter", return_value=mock_limiter):
+        yield
+
+
 @pytest.fixture(scope="session")
 async def test_engine():
     # CRITICAL: use Alembic (not create_all) so RLS policies and indexes are created.
@@ -28,17 +38,25 @@ async def test_engine():
     # migration that enable RLS. Without this, cross-tenant isolation tests pass
     # but RLS is not actually enforced in production.
     import os
+    import shutil
     import subprocess
     import sys
 
     alembic_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "alembic.exe")
     if not os.path.exists(alembic_exe):
-        # Fallback: try same dir as python (non-Windows layout)
         alembic_exe = os.path.join(os.path.dirname(sys.executable), "alembic")
+    if not os.path.exists(alembic_exe):
+        found = shutil.which("alembic")
+        alembic_exe = found if found else None
 
     env = os.environ.copy()
     env["DATABASE_URL_SYNC"] = TEST_DB_URL.replace("+asyncpg", "")
-    subprocess.run([alembic_exe, "upgrade", "head"], env=env, check=True)
+    if alembic_exe:
+        subprocess.run([alembic_exe, "upgrade", "head"], env=env, check=True)
+    else:
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"], env=env, check=True,
+        )
 
     from sqlalchemy.pool import NullPool
     engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
@@ -99,10 +117,17 @@ async def async_client(test_engine):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_admin] = override_get_db_admin
+
+    import launchlens.api.health as health_module
+    original_engine = health_module.engine
+    health_module.engine = test_engine
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
+
+    health_module.engine = original_engine
     app.dependency_overrides.clear()
 
 
