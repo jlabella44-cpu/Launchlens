@@ -88,10 +88,42 @@ async def update_tenant(
         if body.plan not in ("starter", "pro", "enterprise"):
             raise HTTPException(status_code=400, detail="Invalid plan. Must be: starter, pro, enterprise")
         tenant.plan = body.plan
+    if body.webhook_url is not None:
+        tenant.webhook_url = body.webhook_url or None  # empty string → None
 
     await db.commit()
     await db.refresh(tenant)
     return tenant
+
+
+@router.post("/tenants/{tenant_id}/test-webhook")
+async def test_webhook(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Send a test event to the tenant's webhook URL."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    if not tenant.webhook_url:
+        raise HTTPException(status_code=400, detail="No webhook URL configured for this tenant")
+
+    from launchlens.services.webhook_delivery import deliver_webhook
+
+    success = await deliver_webhook(
+        url=tenant.webhook_url,
+        event_type="webhook.test",
+        payload={"message": "This is a test webhook from LaunchLens", "tenant_name": tenant.name},
+        tenant_id=str(tenant_id),
+    )
+
+    return {
+        "delivered": success,
+        "webhook_url": tenant.webhook_url,
+        "event_type": "webhook.test",
+    }
 
 
 VALID_ROLES = {r.value for r in UserRole}
