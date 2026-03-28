@@ -1,74 +1,112 @@
+# tests/test_agents/test_watermark.py
 import io
 import uuid
 from unittest.mock import MagicMock
 
 import pytest
-from PIL import Image
 
 from launchlens.agents.base import AgentContext
 from launchlens.agents.watermark import WatermarkAgent
 from launchlens.models.asset import Asset
+from launchlens.models.brand_kit import BrandKit
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
 from tests.test_agents.conftest import make_session_factory
 
 
-def _make_jpeg():
-    img = Image.new("RGB", (100, 100), "red")
+def _make_jpeg_bytes() -> bytes:
+    """Create a minimal valid JPEG image in memory."""
+    from PIL import Image
+
     buf = io.BytesIO()
+    img = Image.new("RGB", (100, 60), color=(200, 100, 50))
     img.save(buf, format="JPEG")
     return buf.getvalue()
 
 
-def test_apply_watermark_returns_bytes():
-    agent = WatermarkAgent.__new__(WatermarkAgent)
-    jpeg_bytes = _make_jpeg()
-    result = agent._apply_watermark(jpeg_bytes)
-    assert isinstance(result, bytes)
-    assert len(result) > 0
-    # Verify it's a valid JPEG
-    img = Image.open(io.BytesIO(result))
-    assert img.format == "JPEG"
+@pytest.fixture
+async def listing_with_package(db_session):
+    tenant_id = uuid.uuid4()
+    listing = Listing(
+        tenant_id=tenant_id,
+        address={"street": "10 Watermark Ave"},
+        metadata_={},
+        state=ListingState.AWAITING_REVIEW,
+    )
+    db_session.add(listing)
+    await db_session.flush()
+
+    asset = Asset(
+        listing_id=listing.id,
+        tenant_id=tenant_id,
+        file_path=f"listings/{listing.id}/photo_0.jpg",
+        file_hash="deadbeef",
+        state="uploaded",
+    )
+    db_session.add(asset)
+    await db_session.flush()
+
+    pkg = PackageSelection(
+        tenant_id=tenant_id,
+        listing_id=listing.id,
+        asset_id=asset.id,
+        channel="mls",
+        position=0,
+        selected_by="ai",
+        composite_score=0.85,
+    )
+    db_session.add(pkg)
+    await db_session.flush()
+
+    return listing, asset
 
 
-def test_apply_watermark_handles_invalid_input():
-    agent = WatermarkAgent.__new__(WatermarkAgent)
-    bad_bytes = b"not-an-image"
-    result = agent._apply_watermark(bad_bytes)
-    assert result == bad_bytes
+@pytest.fixture
+async def listing_with_brand(db_session, listing_with_package):
+    listing, asset = listing_with_package
+    brand_kit = BrandKit(
+        tenant_id=listing.tenant_id,
+        brokerage_name="Acme Realty",
+        primary_color="#2563EB",
+    )
+    db_session.add(brand_kit)
+    await db_session.flush()
+    return listing, asset
 
 
 @pytest.mark.asyncio
-async def test_watermark_agent_execute(db_session, listing, assets):
-    listing.state = ListingState.APPROVED
-    await db_session.flush()
+async def test_watermark_agent_applies_overlay(db_session, listing_with_brand):
+    listing, asset = listing_with_brand
 
-    # Create PackageSelection rows for each asset
-    for i, asset in enumerate(assets):
-        ps = PackageSelection(
-            tenant_id=listing.tenant_id,
-            listing_id=listing.id,
-            asset_id=asset.id,
-            channel="mls",
-            position=i,
-            selected_by="ai",
-            composite_score=0.9 - i * 0.1,
-        )
-        db_session.add(ps)
-    await db_session.flush()
-
-    jpeg_bytes = _make_jpeg()
-
-    # Mock StorageService
+    jpeg_bytes = _make_jpeg_bytes()
     mock_storage = MagicMock()
     mock_storage.download.return_value = jpeg_bytes
-    upload_calls = []
+    mock_storage.upload.return_value = f"listings/{listing.id}/watermarked/{asset.id}.jpg"
 
-    def track_upload(key, data, content_type):
-        upload_calls.append({"key": key, "data": data, "content_type": content_type})
-        return key
+    agent = WatermarkAgent(
+        storage_service=mock_storage,
+        session_factory=make_session_factory(db_session),
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
-    mock_storage.upload.side_effect = track_upload
+    result = await agent.execute(ctx)
+
+    assert result["watermarked_count"] == 1
+    mock_storage.download.assert_called_once()
+    mock_storage.upload.assert_called_once()
+    _, uploaded_bytes, content_type = mock_storage.upload.call_args[0]
+    assert content_type == "image/jpeg"
+    assert len(uploaded_bytes) > 0
+
+
+@pytest.mark.asyncio
+async def test_watermark_agent_fallback_no_brand_kit(db_session, listing_with_package):
+    listing, asset = listing_with_package
+
+    jpeg_bytes = _make_jpeg_bytes()
+    mock_storage = MagicMock()
+    mock_storage.download.return_value = jpeg_bytes
+    mock_storage.upload.return_value = "wm_key"
 
     agent = WatermarkAgent(
         storage_service=mock_storage,
@@ -77,17 +115,48 @@ async def test_watermark_agent_execute(db_session, listing, assets):
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
     result = await agent.execute(ctx)
 
-    assert result["watermarked_count"] == 3
-    assert result["listing_id"] == str(listing.id)
+    # Should still complete using default watermark text
+    assert result["watermarked_count"] == 1
 
-    # Verify storage interactions
-    assert mock_storage.download.call_count == 3
-    assert mock_storage.upload.call_count == 3
 
-    # Verify upload keys follow expected pattern
-    for call in upload_calls:
-        assert call["key"].startswith(f"listings/{listing.id}/watermarked/")
-        assert call["content_type"] == "image/jpeg"
-        # Verify uploaded data is valid JPEG
-        img = Image.open(io.BytesIO(call["data"]))
-        assert img.format == "JPEG"
+@pytest.mark.asyncio
+async def test_watermark_agent_skips_failed_photos(db_session, listing_with_package):
+    listing, asset = listing_with_package
+
+    mock_storage = MagicMock()
+    mock_storage.download.side_effect = Exception("S3 error")
+
+    agent = WatermarkAgent(
+        storage_service=mock_storage,
+        session_factory=make_session_factory(db_session),
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    # Failed photos should be skipped, not raise
+    assert result["watermarked_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_watermark_agent_empty_package(db_session):
+    tenant_id = uuid.uuid4()
+    listing = Listing(
+        tenant_id=tenant_id,
+        address={"street": "Empty Package Rd"},
+        metadata_={},
+        state=ListingState.AWAITING_REVIEW,
+    )
+    db_session.add(listing)
+    await db_session.flush()
+
+    mock_storage = MagicMock()
+
+    agent = WatermarkAgent(
+        storage_service=mock_storage,
+        session_factory=make_session_factory(db_session),
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["watermarked_count"] == 0
+    mock_storage.download.assert_not_called()
