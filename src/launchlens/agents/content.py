@@ -11,6 +11,7 @@ from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_llm_provider
 from launchlens.services.events import emit_event
 from launchlens.services.fha_filter import fha_check
+from launchlens.services.metrics import record_cost
 
 from .base import AgentContext, BaseAgent
 
@@ -99,6 +100,8 @@ class ContentAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
+        llm_calls = 2 if not fha_result.passed else 1
+        record_cost(self.agent_name, "claude", llm_calls)
         return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed}
 
 
@@ -106,4 +109,4 @@ class ContentAgent(BaseAgent):
 async def run_content(listing_id: str, tenant_id: str) -> dict:
     agent = ContentAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

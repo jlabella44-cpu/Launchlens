@@ -10,6 +10,7 @@ from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_vision_provider
 from launchlens.providers.base import VisionLabel
 from launchlens.services.events import emit_event
+from launchlens.services.metrics import record_cost
 
 from .base import AgentContext, BaseAgent
 
@@ -77,7 +78,11 @@ class VisionAgent(BaseAgent):
     async def run_tier1(self, context: AgentContext) -> int:
         """Run Google Vision on all ingested assets. Returns count of results written."""
         listing_id = uuid.UUID(context.listing_id)
+        count = await self._run_tier1_inner(listing_id, context)
+        record_cost(self.agent_name, "google_vision", count)
+        return count
 
+    async def _run_tier1_inner(self, listing_id, context) -> int:
         async with self._session_factory() as session:
             async with (session.begin() if not session.in_transaction() else session.begin_nested()):
                 result = await session.execute(
@@ -114,7 +119,11 @@ class VisionAgent(BaseAgent):
     async def run_tier2(self, context: AgentContext) -> int:
         """Run GPT-4V on top hero candidates from Tier 1. Returns count of Tier 2 results."""
         listing_id = uuid.UUID(context.listing_id)
+        count = await self._run_tier2_inner(listing_id, context)
+        record_cost(self.agent_name, "openai_gpt4v", count)
+        return count
 
+    async def _run_tier2_inner(self, listing_id, context) -> int:
         async with self._session_factory() as session:
             async with (session.begin() if not session.in_transaction() else session.begin_nested()):
                 result = await session.execute(
@@ -179,4 +188,4 @@ class VisionAgent(BaseAgent):
 async def run_vision(listing_id: str, tenant_id: str) -> dict:
     agent = VisionAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

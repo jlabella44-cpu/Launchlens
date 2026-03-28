@@ -14,6 +14,7 @@ import json
 import httpx
 
 from launchlens.config import settings
+from launchlens.services.metrics import record_provider_call
 
 from .base import VisionLabel, VisionProvider
 
@@ -47,20 +48,25 @@ class OpenAIVisionProvider(VisionProvider):
             ],
             "max_tokens": 500,
         }
-        async with self._semaphore:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    _ENDPOINT,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                    json=payload,
-                    timeout=30.0,
-                )
-                response.raise_for_status()
-                content = response.json()["choices"][0]["message"]["content"]
-                try:
-                    data = json.loads(content)
-                except json.JSONDecodeError as e:
-                    raise ValueError(f"GPT-4V returned unparseable JSON: {content!r}") from e
+        try:
+            async with self._semaphore:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        _ENDPOINT,
+                        headers={"Authorization": f"Bearer {self._api_key}"},
+                        json=payload,
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
+                    content = response.json()["choices"][0]["message"]["content"]
+                    try:
+                        data = json.loads(content)
+                    except json.JSONDecodeError as e:
+                        raise ValueError(f"GPT-4V returned unparseable JSON: {content!r}") from e
+            record_provider_call("openai_gpt4v", True)
+        except Exception:
+            record_provider_call("openai_gpt4v", False)
+            raise
 
         return [
             VisionLabel(
@@ -85,13 +91,19 @@ class OpenAIVisionProvider(VisionProvider):
             ],
             "max_tokens": 2000,
         }
-        async with self._semaphore:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    _ENDPOINT,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                    json=payload,
-                    timeout=30.0,
-                )
-                response.raise_for_status()
-                return response.json()["choices"][0]["message"]["content"]
+        try:
+            async with self._semaphore:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        _ENDPOINT,
+                        headers={"Authorization": f"Bearer {self._api_key}"},
+                        json=payload,
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
+                    result = response.json()["choices"][0]["message"]["content"]
+            record_provider_call("openai_gpt4v", True)
+            return result
+        except Exception:
+            record_provider_call("openai_gpt4v", False)
+            raise

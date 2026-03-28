@@ -38,4 +38,4 @@ class DistributionAgent(BaseAgent):
 async def run_distribution(listing_id: str, tenant_id: str) -> dict:
     agent = DistributionAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)

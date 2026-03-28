@@ -29,6 +29,7 @@ from launchlens.models.package_selection import PackageSelection
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.models.video_asset import VideoAsset
+from launchlens.services.metrics import record_review_turnaround
 from launchlens.services.plan_limits import check_asset_quota, check_listing_quota, get_limits
 from launchlens.services.storage import StorageService
 from launchlens.temporal_client import get_temporal_client
@@ -346,6 +347,11 @@ async def approve_listing(
     if listing.state != ListingState.IN_REVIEW:
         raise HTTPException(status_code=409, detail=f"Cannot approve: listing is {listing.state.value}")
 
+    # Record review turnaround time (time since last state change, approx AWAITING_REVIEW)
+    if listing.updated_at:
+        turnaround = (datetime.now(timezone.utc) - listing.updated_at).total_seconds()
+        record_review_turnaround(turnaround)
+
     listing.state = ListingState.APPROVED
     await db.commit()
     await db.refresh(listing)
@@ -534,8 +540,8 @@ async def run_compliance_scan(
             detail=f"Compliance scan requires packaged photos. Current state: {listing.state.value}",
         )
 
-    from launchlens.agents.photo_compliance import PhotoComplianceAgent
     from launchlens.agents.base import AgentContext
+    from launchlens.agents.photo_compliance import PhotoComplianceAgent
 
     agent = PhotoComplianceAgent()
     ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))

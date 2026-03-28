@@ -19,6 +19,7 @@ from launchlens.models.listing import Listing
 from launchlens.models.package_selection import PackageSelection
 from launchlens.providers.openai_vision import OpenAIVisionProvider
 from launchlens.services.events import emit_event
+from launchlens.services.metrics import record_cost
 from launchlens.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -98,7 +99,7 @@ class PhotoComplianceAgent(BaseAgent):
 
         async with self._session_factory() as session:
             async with (session.begin() if not session.in_transaction() else session.begin_nested()):
-                listing = await session.get(Listing, listing_id)
+                await session.get(Listing, listing_id)  # verify listing exists
 
                 # Get packaged photos
                 result = await session.execute(
@@ -148,4 +149,5 @@ class PhotoComplianceAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
+        record_cost(self.agent_name, "openai_gpt4v", len(results))
         return report
