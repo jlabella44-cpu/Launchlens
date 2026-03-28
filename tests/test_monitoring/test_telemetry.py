@@ -4,12 +4,19 @@ import pytest
 
 from launchlens.telemetry import agent_span, get_tracer, init_tracing
 
+try:
+    import opentelemetry  # noqa: F401
+    _HAS_OTEL = True
+except ImportError:
+    _HAS_OTEL = False
+
 
 def test_init_tracing_does_not_raise():
     """init_tracing should not raise even without OTLP endpoint configured."""
     init_tracing()
 
 
+@pytest.mark.skipif(not _HAS_OTEL, reason="opentelemetry-sdk not installed")
 def test_get_tracer_returns_tracer():
     """get_tracer should return a tracer object after init."""
     init_tracing()
@@ -17,6 +24,7 @@ def test_get_tracer_returns_tracer():
     assert tracer is not None
 
 
+@pytest.mark.skipif(not _HAS_OTEL, reason="opentelemetry-sdk not installed")
 @pytest.mark.asyncio
 async def test_agent_span_yields_span():
     """agent_span should yield a span with correct attributes."""
