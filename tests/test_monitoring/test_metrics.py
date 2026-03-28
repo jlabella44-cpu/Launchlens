@@ -9,7 +9,7 @@ def test_emit_metric_calls_cloudwatch():
     mock_client = MagicMock()
     with patch("launchlens.monitoring.metrics._get_cloudwatch_client", return_value=mock_client):
         with patch("launchlens.monitoring.metrics.settings") as mock_settings:
-            mock_settings.environment = "production"
+            mock_settings.app_env = "production"
             emit_metric("RequestCount", 1, unit="Count", dimensions={"endpoint": "/health"})
             mock_client.put_metric_data.assert_called_once()
             call_args = mock_client.put_metric_data.call_args[1]
@@ -22,7 +22,7 @@ def test_emit_metric_calls_cloudwatch():
 def test_emit_metric_noop_in_development():
     from launchlens.monitoring.metrics import emit_metric
     with patch("launchlens.monitoring.metrics.settings") as mock_settings:
-        mock_settings.environment = "development"
+        mock_settings.app_env = "development"
         with patch("launchlens.monitoring.metrics._get_cloudwatch_client") as mock_cw:
             emit_metric("RequestCount", 1)
             mock_cw.assert_not_called()
