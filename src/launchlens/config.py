@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     s3_bucket_name: str = "launchlens-dev"
     aws_region: str = "us-east-1"
 
+    # Monitoring
+    sentry_dsn: str = ""
+    git_sha: str = ""
+
     # Feature flags
     shadow_review_enabled: bool = True
     shadow_review_max_listings: int = 100

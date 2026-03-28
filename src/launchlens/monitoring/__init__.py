@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 def init_monitoring(app: FastAPI) -> None:
     """Initialize all monitoring: Sentry, request metrics middleware."""
     init_sentry(
-        dsn=getattr(settings, "sentry_dsn", ""),
-        environment=getattr(settings, "environment", settings.app_env),
-        release=getattr(settings, "git_sha", ""),
+        dsn=settings.sentry_dsn,
+        environment=settings.app_env,
+        release=settings.git_sha,
     )
 
     app.middleware("http")(RequestMetricsMiddleware())
