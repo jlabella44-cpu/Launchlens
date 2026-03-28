@@ -42,6 +42,8 @@ async def test_engine():
     import subprocess
     import sys
 
+    # Find alembic binary: try standard locations, then fall back to shutil.which,
+    # then fall back to running as a Python module.
     alembic_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "alembic.exe")
     if not os.path.exists(alembic_exe):
         alembic_exe = os.path.join(os.path.dirname(sys.executable), "alembic")
