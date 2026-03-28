@@ -2,6 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, type ReactNode } from "react";
+import { SceneErrorBoundary } from "./error-boundary";
 
 interface SceneWrapperProps {
   children: ReactNode;
@@ -22,13 +23,15 @@ export function SceneWrapper({
 }: SceneWrapperProps) {
   return (
     <div className={`relative ${className}`}>
-      <Suspense fallback={<FallbackGradient />}>
-        <Canvas camera={camera} style={{ borderRadius: "var(--radius-md)" }}>
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[5, 5, 5]} intensity={0.8} />
-          {children}
-        </Canvas>
-      </Suspense>
+      <SceneErrorBoundary fallback={<FallbackGradient />}>
+        <Suspense fallback={<FallbackGradient />}>
+          <Canvas camera={camera} style={{ borderRadius: "var(--radius-md)" }}>
+            <ambientLight intensity={0.6} />
+            <directionalLight position={[5, 5, 5]} intensity={0.8} />
+            {children}
+          </Canvas>
+        </Suspense>
+      </SceneErrorBoundary>
     </div>
   );
 }

@@ -6,12 +6,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
-    environment: str = "development"
     log_level: str = "INFO"
-    git_sha: str = ""
-
-    # Monitoring
-    sentry_dsn: str = ""
 
     # Database
     database_url: str
@@ -40,6 +35,10 @@ class Settings(BaseSettings):
     # S3
     s3_bucket_name: str = "launchlens-dev"
     aws_region: str = "us-east-1"
+
+    # Monitoring
+    sentry_dsn: str = ""
+    git_sha: str = ""
 
     # Feature flags
     shadow_review_enabled: bool = True

@@ -98,7 +98,7 @@ class PhotoComplianceAgent(BaseAgent):
 
         async with self._session_factory() as session:
             async with (session.begin() if not session.in_transaction() else session.begin_nested()):
-                listing = await session.get(Listing, listing_id)
+                await session.get(Listing, listing_id)
 
                 # Get packaged photos
                 result = await session.execute(

@@ -137,7 +137,7 @@ export function CreateListingDialog({
                     <input
                       id="beds"
                       type="number"
-                      min="0"
+                      min="1"
                       required
                       value={beds}
                       onChange={(e) => setBeds(e.target.value)}
@@ -151,7 +151,7 @@ export function CreateListingDialog({
                     <input
                       id="baths"
                       type="number"
-                      min="0"
+                      min="1"
                       required
                       value={baths}
                       onChange={(e) => setBaths(e.target.value)}
@@ -165,7 +165,7 @@ export function CreateListingDialog({
                     <input
                       id="sqft"
                       type="number"
-                      min="0"
+                      min="1"
                       required
                       value={sqft}
                       onChange={(e) => setSqft(e.target.value)}
