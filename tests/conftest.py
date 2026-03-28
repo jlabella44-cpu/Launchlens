@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from unittest.mock import MagicMock, patch
 
 import jwt
 import pytest
@@ -21,6 +22,15 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(autouse=True)
+def _mock_rate_limiter_global():
+    """Bypass Redis-backed rate limiter in all tests (Redis not available in CI)."""
+    mock_limiter = MagicMock()
+    mock_limiter.acquire.return_value = True
+    with patch("launchlens.middleware.rate_limit._get_limiter", return_value=mock_limiter):
+        yield
+
+
 @pytest.fixture(scope="session")
 async def test_engine():
     # CRITICAL: use Alembic (not create_all) so RLS policies and indexes are created.
@@ -28,13 +38,16 @@ async def test_engine():
     # migration that enable RLS. Without this, cross-tenant isolation tests pass
     # but RLS is not actually enforced in production.
     import os
+    import shutil
     import subprocess
     import sys
 
+    # Find alembic binary: try standard locations, then fall back to shutil.which
     alembic_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "alembic.exe")
     if not os.path.exists(alembic_exe):
-        # Fallback: try same dir as python (non-Windows layout)
         alembic_exe = os.path.join(os.path.dirname(sys.executable), "alembic")
+    if not os.path.exists(alembic_exe):
+        alembic_exe = shutil.which("alembic") or "alembic"
 
     env = os.environ.copy()
     env["DATABASE_URL_SYNC"] = TEST_DB_URL.replace("+asyncpg", "")
