@@ -478,6 +478,46 @@ async def reject_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
+@router.post("/{listing_id}/retry")
+async def retry_pipeline(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset a failed listing and re-trigger the pipeline."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    retryable = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    if listing.state not in retryable:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Can only retry failed listings, current state: {listing.state.value}",
+        )
+
+    listing.state = ListingState.UPLOADING
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    await db.commit()
+
+    try:
+        client = get_temporal_client()
+        await client.start_pipeline(
+            listing_id=str(listing.id),
+            tenant_id=str(current_user.tenant_id),
+            plan=tenant.plan if tenant else "starter",
+        )
+    except Exception:
+        logger.exception("Pipeline retry trigger failed for listing %s", listing.id)
+
+    return {"listing_id": str(listing.id), "state": "uploading"}
+
+
 @router.get("/{listing_id}/pipeline-status")
 async def get_pipeline_status(
     listing_id: uuid.UUID,

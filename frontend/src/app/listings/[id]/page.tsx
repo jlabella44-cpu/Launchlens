@@ -124,12 +124,32 @@ function ListingDetail() {
     );
   }
 
+  async function handleRetryPipeline() {
+    setActionLoading(true);
+    try {
+      const res = await apiClient.retryPipeline(id);
+      setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
+      toast("Pipeline restarted", "success");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to retry", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   if (!listing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--color-text-secondary)]">
-          {fetchError || "Listing not found."}
-        </p>
+        <div className="text-center">
+          <p className="text-[var(--color-text-secondary)] mb-4">
+            {fetchError || "Listing not found."}
+          </p>
+          {fetchError && (
+            <Button onClick={() => { setFetchError(""); setLoading(true); fetchData(); }}>
+              Retry
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -250,6 +270,24 @@ function ListingDetail() {
                       Quick Download Marketing
                     </Button>
                   </>
+                )}
+                {["failed", "pipeline_timeout"].includes(listing.state) && (
+                  <div className="w-full bg-red-50 border border-red-200 rounded-xl p-5">
+                    <h4 className="text-red-800 font-semibold mb-1">Pipeline Failed</h4>
+                    <p className="text-sm text-red-600 mb-4">
+                      {listing.state === "pipeline_timeout"
+                        ? "Processing timed out. This can happen with large photo sets."
+                        : "Something went wrong while processing your listing photos."}
+                    </p>
+                    <div className="flex gap-3">
+                      <Button onClick={handleRetryPipeline} loading={actionLoading}>
+                        Retry Processing
+                      </Button>
+                      <Link href="/listings">
+                        <Button variant="secondary">Back to Listings</Button>
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
 
