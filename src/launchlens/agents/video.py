@@ -188,10 +188,10 @@ class VideoAgent(BaseAgent):
         """Download clip URLs to temporary files."""
         paths = []
         async with httpx.AsyncClient(timeout=60) as client:
-            for i, url in enumerate(urls):
+            for url in urls:
                 resp = await client.get(url)
-                path = os.path.join(tempfile.gettempdir(), f"launchlens_clip_{i}.mp4")
-                with open(path, "wb") as f:
+                fd, path = tempfile.mkstemp(suffix=".mp4", prefix="launchlens_clip_")
+                with os.fdopen(fd, "wb") as f:
                     f.write(resp.content)
                 paths.append(path)
         return paths

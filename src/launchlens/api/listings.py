@@ -19,6 +19,7 @@ from launchlens.api.schemas.listings import (
     ExportResponse,
     ListingResponse,
     UpdateListingRequest,
+    VideoUploadRequest,
 )
 from launchlens.database import get_db
 from launchlens.models.asset import Asset
@@ -447,7 +448,7 @@ async def get_video_social_cuts(
 @router.post("/{listing_id}/video/upload", status_code=201)
 async def upload_video(
     listing_id: uuid.UUID,
-    body: dict,
+    body: VideoUploadRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -458,16 +459,20 @@ async def upload_video(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    video_type = body.get("video_type", "user_raw")
-    if video_type not in ("user_raw", "professional"):
+    if body.video_type not in ("user_raw", "professional"):
         raise HTTPException(status_code=400, detail="video_type must be 'user_raw' or 'professional'")
+
+    # Validate S3 key is scoped to this tenant's namespace
+    tenant_prefix = f"videos/{listing_id}/"
+    if not body.s3_key.startswith(tenant_prefix):
+        raise HTTPException(status_code=400, detail=f"s3_key must start with {tenant_prefix}")
 
     video = VideoAsset(
         tenant_id=current_user.tenant_id,
         listing_id=listing.id,
-        s3_key=body["s3_key"],
-        video_type=video_type,
-        duration_seconds=body.get("duration_seconds"),
+        s3_key=body.s3_key,
+        video_type=body.video_type,
+        duration_seconds=body.duration_seconds,
         status="ready",
     )
     db.add(video)

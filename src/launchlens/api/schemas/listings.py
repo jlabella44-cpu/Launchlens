@@ -57,3 +57,9 @@ class ExportResponse(BaseModel):
     download_url: str
     expires_at: datetime
     bundle: BundleMetadata
+
+
+class VideoUploadRequest(BaseModel):
+    s3_key: str
+    video_type: str = "user_raw"
+    duration_seconds: int | None = None

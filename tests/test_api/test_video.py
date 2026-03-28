@@ -47,12 +47,29 @@ async def test_get_social_cuts_not_ready(async_client: AsyncClient):
 async def test_video_upload_endpoint_exists(async_client: AsyncClient):
     """POST /listings/{id}/video/upload should exist (even if it returns 404 for missing listing)."""
     token, _ = await _register(async_client)
+    fake_id = uuid.uuid4()
     resp = await async_client.post(
-        f"/listings/{uuid.uuid4()}/video/upload",
-        json={"s3_key": "videos/test.mp4", "video_type": "professional"},
+        f"/listings/{fake_id}/video/upload",
+        json={"s3_key": f"videos/{fake_id}/tour.mp4", "video_type": "professional"},
         headers=_auth(token),
     )
     assert resp.status_code == 404  # listing not found, but route exists
+
+
+@pytest.mark.asyncio
+async def test_video_upload_rejects_bad_s3_key(async_client: AsyncClient):
+    """S3 key must be scoped to the listing's namespace."""
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Upload St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+    resp = await async_client.post(
+        f"/listings/{listing_id}/video/upload",
+        json={"s3_key": "videos/other-tenant/evil.mp4", "video_type": "professional"},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio

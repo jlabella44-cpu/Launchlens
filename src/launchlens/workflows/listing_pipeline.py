@@ -102,8 +102,11 @@ class ListingPipeline:
         # Wait for human review (listing is now AWAITING_REVIEW)
         await workflow.wait_condition(lambda: self._review_completed)
 
-        # Collect video result (may already be done)
-        video_result = await video_task
+        # Collect video result (may already be done) — don't block pipeline on failure
+        try:
+            await video_task
+        except Exception:
+            pass  # Video is optional; pipeline continues without it
 
         # Phase 2: Post-approval pipeline
         # Step 1: Content (dual-tone)
