@@ -12,8 +12,8 @@ const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
   { ssr: false }
 );
-const FloatingHouse = dynamic(
-  () => import("@/components/three/floating-house").then((m) => ({ default: m.FloatingHouse })),
+const HeroScene = dynamic(
+  () => import("@/components/three/hero-scene").then((m) => ({ default: m.HeroScene })),
   { ssr: false }
 );
 
@@ -44,8 +44,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex">
       {/* Left: 3D Scene */}
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-gradient-to-br from-[var(--color-primary)] to-[#1E40AF] relative overflow-hidden">
-        <SceneWrapper className="w-full h-[500px]" camera={{ position: [0, 1, 4], fov: 45 }}>
-          <FloatingHouse />
+        <SceneWrapper className="w-full h-[500px]" camera={{ position: [0, 0, 6], fov: 50 }}>
+          <HeroScene />
         </SceneWrapper>
         <div className="absolute bottom-12 left-12 right-12 text-white">
           <h2
