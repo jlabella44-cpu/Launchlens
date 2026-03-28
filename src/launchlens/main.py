@@ -10,6 +10,7 @@ from launchlens.logging_config import setup_logging
 from launchlens.middleware.rate_limit import APIRateLimitMiddleware
 from launchlens.middleware.request_id import RequestIDMiddleware
 from launchlens.middleware.tenant import TenantMiddleware
+from launchlens.monitoring import init_monitoring
 from launchlens.services.outbox_poller import OutboxPoller
 
 setup_logging(app_env=settings.app_env, log_level=settings.log_level)
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     app.middleware("http")(TenantMiddleware())
     app.middleware("http")(APIRateLimitMiddleware())
     app.middleware("http")(RequestIDMiddleware())
+    init_monitoring(app)
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(listings.router, prefix="/listings", tags=["listings"])
