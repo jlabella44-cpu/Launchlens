@@ -14,6 +14,7 @@ import { PackageViewer } from "@/components/listings/package-viewer";
 import { PipelineStatus } from "@/components/listings/pipeline-status";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
 import apiClient from "@/lib/api-client";
+import { useToast } from "@/components/ui/toast";
 import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
 import { VideoPlayer } from "@/components/listings/video-player";
 import { VideoUpload } from "@/components/listings/video-upload";
@@ -31,11 +32,13 @@ const PhotoOrbit = dynamic(
 function ListingDetail() {
   const params = useParams();
   const id = params.id as string;
+  const { toast } = useToast();
 
   const [listing, setListing] = useState<ListingResponse | null>(null);
   const [assets, setAssets] = useState<AssetResponse[]>([]);
   const [selections, setSelections] = useState<PackageSelection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
   const [showVideoUpload, setShowVideoUpload] = useState(false);
@@ -57,8 +60,9 @@ function ListingDetail() {
         const pkg = await apiClient.getPackage(id);
         setSelections(pkg);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load listing";
+      setFetchError(msg);
     } finally {
       setLoading(false);
     }
@@ -68,13 +72,22 @@ function ListingDetail() {
     fetchData();
   }, [fetchData]);
 
+  // Auto-refresh while listing is in a processing state
+  useEffect(() => {
+    const PROCESSING_STATES = ["uploading", "analyzing", "exporting"];
+    if (!listing || !PROCESSING_STATES.includes(listing.state)) return;
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [listing?.state, fetchData]);
+
   async function handleStartReview() {
     setActionLoading(true);
     try {
       const res = await apiClient.startReview(id);
       setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
-    } catch (err) {
-      console.error(err);
+      toast("Review started", "success");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to start review", "error");
     } finally {
       setActionLoading(false);
     }
@@ -86,8 +99,8 @@ function ListingDetail() {
       const res = await apiClient.approveListing(id);
       setListing((prev) => (prev ? { ...prev, state: res.state } : prev));
       setActionDone("approved");
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to approve", "error");
     } finally {
       setActionLoading(false);
     }
@@ -97,8 +110,8 @@ function ListingDetail() {
     try {
       const res = await apiClient.getExport(id, mode);
       window.open(res.download_url, "_blank");
-    } catch (err: any) {
-      alert(err.message || "Export not available yet");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Export not available yet", "error");
     }
   }
 
@@ -113,7 +126,9 @@ function ListingDetail() {
   if (!listing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--color-text-secondary)]">Listing not found.</p>
+        <p className="text-[var(--color-text-secondary)]">
+          {fetchError || "Listing not found."}
+        </p>
       </div>
     );
   }

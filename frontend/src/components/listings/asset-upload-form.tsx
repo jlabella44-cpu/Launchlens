@@ -30,12 +30,17 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
 
     setLoading(true);
     try {
-      await apiClient.registerAssets(listingId, {
-        assets: lines.map((path) => ({
-          file_path: path,
-          file_hash: path.split("/").pop() || path,
-        })),
-      });
+      const assets = await Promise.all(
+        lines.map(async (path) => {
+          // Generate a deterministic hash from the full path using SubtleCrypto
+          const encoded = new TextEncoder().encode(path);
+          const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const file_hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+          return { file_path: path, file_hash };
+        })
+      );
+      await apiClient.registerAssets(listingId, { assets });
       setPaths("");
       onUploaded();
     } catch (err: any) {
