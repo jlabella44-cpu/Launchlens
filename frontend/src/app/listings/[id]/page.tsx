@@ -15,6 +15,9 @@ import { PipelineStatus } from "@/components/listings/pipeline-status";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
 import apiClient from "@/lib/api-client";
 import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
+import { VideoPlayer } from "@/components/listings/video-player";
+import { VideoUpload } from "@/components/listings/video-upload";
+import { SocialPreview } from "@/components/listings/social-preview";
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
@@ -35,6 +38,7 @@ function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
+  const [showVideoUpload, setShowVideoUpload] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -220,11 +224,11 @@ function ListingDetail() {
                 )}
                 {["approved", "exporting", "delivered"].includes(listing.state) && (
                   <>
-                    <Button onClick={() => handleExport("mls")} variant="secondary">
-                      Download MLS Package
-                    </Button>
+                    <Link href={`/listings/${id}/export`}>
+                      <Button variant="secondary">Export Packages</Button>
+                    </Link>
                     <Button onClick={() => handleExport("marketing")}>
-                      Download Marketing Package
+                      Quick Download Marketing
                     </Button>
                   </>
                 )}
@@ -247,6 +251,26 @@ function ListingDetail() {
             </GlassCard>
           </div>
         </div>
+
+        {/* Video + Social Section */}
+        {["approved", "exporting", "delivered"].includes(listing.state) && (
+          <div className="mt-8 space-y-6">
+            <VideoPlayer
+              listingId={id}
+              onNoVideo={() => setShowVideoUpload(true)}
+            />
+            {showVideoUpload && (
+              <VideoUpload
+                listingId={id}
+                onUploaded={() => {
+                  setShowVideoUpload(false);
+                  fetchData();
+                }}
+              />
+            )}
+            <SocialPreview listingId={id} />
+          </div>
+        )}
       </main>
     </>
   );
