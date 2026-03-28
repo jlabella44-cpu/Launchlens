@@ -12,14 +12,21 @@ from launchlens.api.schemas.assets import (
     CreateAssetsRequest,
     CreateAssetsResponse,
 )
+from launchlens.api.schemas.common import PaginatedResponse
 from launchlens.api.schemas.listings import (
+    ActivityEventResponse,
     BundleMetadata,
     CreateListingRequest,
+    DollhouseResponse,
     ExportMode,
     ExportResponse,
     ListingResponse,
+    ListingStateResponse,
+    PackageSelectionItem,
     UpdateListingRequest,
+    VideoResponse,
     VideoUploadRequest,
+    VideoUploadResponse,
 )
 from launchlens.database import get_db
 from launchlens.models.asset import Asset
@@ -78,12 +85,12 @@ async def create_listing(
     return ListingResponse.from_orm_listing(listing)
 
 
-@router.get("", response_model=list[ListingResponse])
+@router.get("", response_model=PaginatedResponse[ListingResponse])
 async def list_listings(
     state: str | None = None,
     search: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    page: int = 1,
+    page_size: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -91,26 +98,40 @@ async def list_listings(
     List listings with optional filters.
     - state: filter by listing state (e.g. "approved", "delivered")
     - search: search in address fields (street, city)
-    - limit/offset: pagination (default 50, max 200)
+    - page/page_size: pagination (default page=1, page_size=50, max page_size=200)
     """
-    limit = min(limit, 200)
-    query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
+    page_size = min(page_size, 200)
+    offset = (page - 1) * page_size
+
+    base_query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
 
     if state:
-        query = query.where(Listing.state == state)
+        base_query = base_query.where(Listing.state == state)
 
     if search:
         # Search in JSONB address field — street or city contains search term
         search_pattern = f"%{search}%"
-        query = query.where(
+        base_query = base_query.where(
             Listing.address["street"].astext.ilike(search_pattern)
             | Listing.address["city"].astext.ilike(search_pattern)
         )
 
-    query = query.order_by(Listing.created_at.desc()).limit(limit).offset(offset)
-    result = await db.execute(query)
+    total_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
+    total = total_result.scalar() or 0
+
+    result = await db.execute(
+        base_query.order_by(Listing.created_at.desc()).limit(page_size).offset(offset)
+    )
     listings = result.scalars().all()
-    return [ListingResponse.from_orm_listing(listing) for listing in listings]
+    items = [ListingResponse.from_orm_listing(listing) for listing in listings]
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=(offset + len(items)) < total,
+    )
 
 
 @router.get("/{listing_id}", response_model=ListingResponse)
@@ -156,7 +177,7 @@ async def update_listing(
     return ListingResponse.from_orm_listing(listing)
 
 
-@router.get("/{listing_id}/dollhouse")
+@router.get("/{listing_id}/dollhouse", response_model=DollhouseResponse)
 async def get_dollhouse(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -177,11 +198,11 @@ async def get_dollhouse(
     if not scene:
         raise HTTPException(status_code=404, detail="Dollhouse not ready — upload a floorplan and run the pipeline")
 
-    return {
-        "scene_json": scene.scene_json,
-        "room_count": scene.room_count,
-        "created_at": scene.created_at.isoformat(),
-    }
+    return DollhouseResponse(
+        scene_json=scene.scene_json,
+        room_count=scene.room_count,
+        created_at=scene.created_at.isoformat(),
+    )
 
 
 @router.post("/{listing_id}/assets", status_code=201, response_model=CreateAssetsResponse)
@@ -271,7 +292,7 @@ async def list_assets(
     return result.scalars().all()
 
 
-@router.get("/{listing_id}/package")
+@router.get("/{listing_id}/package", response_model=list[PackageSelectionItem])
 async def get_package(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -293,18 +314,18 @@ async def get_package(
     )
     selections = result.scalars().all()
     return [
-        {
-            "asset_id": str(s.asset_id),
-            "channel": s.channel,
-            "position": s.position,
-            "composite_score": s.composite_score,
-            "selected_by": s.selected_by,
-        }
+        PackageSelectionItem(
+            asset_id=str(s.asset_id),
+            channel=s.channel,
+            position=s.position,
+            composite_score=s.composite_score,
+            selected_by=s.selected_by,
+        )
         for s in selections
     ]
 
 
-@router.post("/{listing_id}/review")
+@router.post("/{listing_id}/review", response_model=ListingStateResponse)
 async def start_review(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -325,10 +346,10 @@ async def start_review(
     listing.state = ListingState.IN_REVIEW
     await db.commit()
     await db.refresh(listing)
-    return {"listing_id": str(listing.id), "state": listing.state.value}
+    return ListingStateResponse(listing_id=listing.id, state=listing.state.value)
 
 
-@router.post("/{listing_id}/approve")
+@router.post("/{listing_id}/approve", response_model=ListingStateResponse)
 async def approve_listing(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -357,7 +378,7 @@ async def approve_listing(
     except Exception:
         logger.exception("Review signal failed for listing %s", listing.id)
 
-    return {"listing_id": str(listing.id), "state": listing.state.value}
+    return ListingStateResponse(listing_id=listing.id, state=listing.state.value)
 
 
 _EXPORTABLE_STATES = {ListingState.APPROVED, ListingState.EXPORTING, ListingState.DELIVERED}
@@ -408,7 +429,7 @@ async def export_listing(
     )
 
 
-@router.get("/{listing_id}/video")
+@router.get("/{listing_id}/video", response_model=VideoResponse)
 async def get_video(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -429,17 +450,17 @@ async def get_video(
     if not video:
         raise HTTPException(status_code=404, detail="No video available")
 
-    return {
-        "s3_key": video.s3_key,
-        "video_type": video.video_type,
-        "duration_seconds": video.duration_seconds,
-        "status": video.status,
-        "chapters": video.chapters,
-        "social_cuts": video.social_cuts,
-        "thumbnail_s3_key": video.thumbnail_s3_key,
-        "clip_count": video.clip_count,
-        "created_at": video.created_at.isoformat(),
-    }
+    return VideoResponse(
+        s3_key=video.s3_key,
+        video_type=video.video_type,
+        duration_seconds=video.duration_seconds,
+        status=video.status,
+        chapters=video.chapters,
+        social_cuts=video.social_cuts,
+        thumbnail_s3_key=video.thumbnail_s3_key,
+        clip_count=video.clip_count,
+        created_at=video.created_at.isoformat(),
+    )
 
 
 @router.get("/{listing_id}/video/social-cuts")
@@ -466,7 +487,7 @@ async def get_video_social_cuts(
     return video.social_cuts
 
 
-@router.post("/{listing_id}/video/upload", status_code=201)
+@router.post("/{listing_id}/video/upload", status_code=201, response_model=VideoUploadResponse)
 async def upload_video(
     listing_id: uuid.UUID,
     body: VideoUploadRequest,
@@ -500,12 +521,12 @@ async def upload_video(
     await db.commit()
     await db.refresh(video)
 
-    return {
-        "id": str(video.id),
-        "s3_key": video.s3_key,
-        "video_type": video.video_type,
-        "status": video.status,
-    }
+    return VideoUploadResponse(
+        id=str(video.id),
+        s3_key=video.s3_key,
+        video_type=video.video_type,
+        status=video.status,
+    )
 
 
 @router.post("/{listing_id}/compliance")
@@ -543,7 +564,7 @@ async def run_compliance_scan(
     return report
 
 
-@router.get("/{listing_id}/activity")
+@router.get("/{listing_id}/activity", response_model=list[ActivityEventResponse])
 async def listing_activity(
     listing_id: uuid.UUID,
     limit: int = 50,
@@ -573,17 +594,17 @@ async def listing_activity(
     events = result.scalars().all()
 
     return [
-        {
-            "id": str(e.id),
-            "event_type": e.event_type,
-            "payload": e.payload,
-            "created_at": e.created_at.isoformat(),
-        }
+        ActivityEventResponse(
+            id=str(e.id),
+            event_type=e.event_type,
+            payload=e.payload,
+            created_at=e.created_at.isoformat(),
+        )
         for e in events
     ]
 
 
-@router.post("/{listing_id}/retry")
+@router.post("/{listing_id}/retry", response_model=ListingStateResponse)
 async def retry_listing(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -614,4 +635,4 @@ async def retry_listing(
     except Exception:
         logger.warning("Failed to start Temporal pipeline for retry of %s", listing_id)
 
-    return {"listing_id": str(listing.id), "state": listing.state.value}
+    return ListingStateResponse(listing_id=listing.id, state=listing.state.value)

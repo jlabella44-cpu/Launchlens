@@ -35,6 +35,21 @@ class RateLimiter:
         self._capacity = capacity
         self._refill_rate = refill_rate
 
+    def get_tokens(self, key: str) -> float:
+        """Return current token count (with time-based refill applied), without consuming any."""
+        bucket_key = f"{self._prefix}:{key}"
+        now = time.time()
+        try:
+            data = self._redis.hgetall(bucket_key)
+        except Exception:
+            return float(self._capacity)
+        if not data:
+            return float(self._capacity)
+        tokens = float(data.get(b"tokens", self._capacity))
+        last_refill = float(data.get(b"last_refill", now))
+        elapsed = now - last_refill
+        return min(float(self._capacity), tokens + elapsed * self._refill_rate)
+
     def acquire(self, key: str, cost: int = 1) -> bool:
         """Attempt to consume `cost` tokens. Returns True if allowed."""
         bucket_key = f"{self._prefix}:{key}"

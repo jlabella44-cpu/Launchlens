@@ -11,6 +11,7 @@ Limits:
 Skips: /health, /docs, /openapi.json
 """
 import logging
+import time
 
 from fastapi import Request
 from starlette.responses import JSONResponse
@@ -51,14 +52,18 @@ class APIRateLimitMiddleware:
             # If Redis is down, don't block requests
             return await call_next(request)
 
-        # Determine rate limit key
+        # Determine rate limit key and applicable limits
         tenant_id = getattr(request.state, "tenant_id", None)
         if tenant_id:
             key = f"tenant:{tenant_id}"
+            capacity = _TENANT_CAPACITY
+            refill_rate = _TENANT_REFILL
         else:
             forwarded = request.headers.get("x-forwarded-for")
             ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
             key = f"ip:{ip}"
+            capacity = _PUBLIC_CAPACITY
+            refill_rate = _PUBLIC_REFILL
 
         try:
             allowed = limiter.acquire(key=key, cost=1)
@@ -71,7 +76,24 @@ class APIRateLimitMiddleware:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Rate limit exceeded. Please slow down."},
-                headers={"Retry-After": "60"},
+                headers={
+                    "Retry-After": "60",
+                    "X-RateLimit-Limit": str(capacity),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(int(time.time()) + 60),
+                },
             )
 
-        return await call_next(request)
+        response = await call_next(request)
+
+        # Attach rate limit info headers to successful responses
+        try:
+            remaining = max(0, int(limiter.get_tokens(key)))
+            reset_ts = int(time.time() + (capacity - remaining) / refill_rate)
+            response.headers["X-RateLimit-Limit"] = str(capacity)
+            response.headers["X-RateLimit-Remaining"] = str(remaining)
+            response.headers["X-RateLimit-Reset"] = str(reset_ts)
+        except Exception:
+            pass
+
+        return response

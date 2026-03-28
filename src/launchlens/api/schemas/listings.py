@@ -63,3 +63,48 @@ class VideoUploadRequest(BaseModel):
     s3_key: str
     video_type: str = "user_raw"
     duration_seconds: int | None = None
+
+
+class ListingStateResponse(BaseModel):
+    listing_id: uuid.UUID
+    state: str
+
+
+class DollhouseResponse(BaseModel):
+    scene_json: dict
+    room_count: int | None
+    created_at: str
+
+
+class PackageSelectionItem(BaseModel):
+    asset_id: str
+    channel: str
+    position: int
+    composite_score: float | None = None
+    selected_by: str | None = None
+
+
+class VideoResponse(BaseModel):
+    s3_key: str
+    video_type: str
+    duration_seconds: int | None = None
+    status: str
+    chapters: list | None = None
+    social_cuts: list | None = None
+    thumbnail_s3_key: str | None = None
+    clip_count: int | None = None
+    created_at: str
+
+
+class VideoUploadResponse(BaseModel):
+    id: str
+    s3_key: str
+    video_type: str
+    status: str
+
+
+class ActivityEventResponse(BaseModel):
+    id: str
+    event_type: str
+    payload: dict | None = None
+    created_at: str

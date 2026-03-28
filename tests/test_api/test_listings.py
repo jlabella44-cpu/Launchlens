@@ -42,7 +42,9 @@ async def test_list_listings_empty(async_client: AsyncClient):
     token, _ = await _register(async_client)
     resp = await async_client.get("/listings", headers=_auth(token))
     assert resp.status_code == 200
-    assert resp.json() == []
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 @pytest.mark.asyncio
@@ -53,7 +55,9 @@ async def test_list_listings_returns_own(async_client: AsyncClient):
     }, headers=_auth(token))
     resp = await async_client.get("/listings", headers=_auth(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 1
+    data = resp.json()
+    assert len(data["items"]) == 1
+    assert data["total"] == 1
 
 
 @pytest.mark.asyncio
@@ -64,7 +68,9 @@ async def test_list_listings_tenant_isolation(async_client: AsyncClient):
         "address": {"street": "A St"}, "metadata": {},
     }, headers=_auth(token_a))
     resp = await async_client.get("/listings", headers=_auth(token_b))
-    assert resp.json() == []
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 @pytest.mark.asyncio

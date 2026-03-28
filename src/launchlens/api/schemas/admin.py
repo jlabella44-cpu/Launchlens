@@ -65,3 +65,9 @@ class PlatformStatsResponse(BaseModel):
     total_users: int
     total_listings: int
     listings_by_state: dict[str, int]
+
+
+class WebhookTestResponse(BaseModel):
+    delivered: bool
+    webhook_url: str
+    event_type: str

@@ -13,7 +13,9 @@ from launchlens.api.schemas.admin import (
     UpdateTenantRequest,
     UpdateUserRoleRequest,
     UserResponse,
+    WebhookTestResponse,
 )
+from launchlens.api.schemas.common import PaginatedResponse
 from launchlens.models.listing import Listing
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User, UserRole
@@ -32,13 +34,28 @@ async def admin_health(admin_user: User = Depends(require_admin)):
     return {"status": "ok", "role": admin_user.role.value}
 
 
-@router.get("/tenants", response_model=list[TenantResponse])
+@router.get("/tenants", response_model=PaginatedResponse[TenantResponse])
 async def list_tenants(
+    page: int = 1,
+    page_size: int = 50,
     admin_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db_admin),
 ):
-    result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
-    return result.scalars().all()
+    page_size = min(page_size, 200)
+    offset = (page - 1) * page_size
+
+    total = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
+    result = await db.execute(
+        select(Tenant).order_by(Tenant.created_at.desc()).limit(page_size).offset(offset)
+    )
+    items = result.scalars().all()
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=(offset + len(items)) < total,
+    )
 
 
 @router.get("/tenants/{tenant_id}", response_model=TenantDetailResponse)
@@ -97,7 +114,7 @@ async def update_tenant(
     return tenant
 
 
-@router.post("/tenants/{tenant_id}/test-webhook")
+@router.post("/tenants/{tenant_id}/test-webhook", response_model=WebhookTestResponse)
 async def test_webhook(
     tenant_id: uuid.UUID,
     admin_user: User = Depends(require_admin),
@@ -120,11 +137,11 @@ async def test_webhook(
         tenant_id=str(tenant_id),
     )
 
-    return {
-        "delivered": success,
-        "webhook_url": tenant.webhook_url,
-        "event_type": "webhook.test",
-    }
+    return WebhookTestResponse(
+        delivered=success,
+        webhook_url=tenant.webhook_url,
+        event_type="webhook.test",
+    )
 
 
 VALID_ROLES = {r.value for r in UserRole}
