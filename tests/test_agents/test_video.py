@@ -1,29 +1,26 @@
 # tests/test_agents/test_video.py
+import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+from sqlalchemy import select
+
+from launchlens.agents.base import AgentContext
+from launchlens.agents.video import VideoAgent
+from launchlens.models.asset import Asset
+from launchlens.models.listing import Listing, ListingState
+from launchlens.models.package_selection import PackageSelection
+from launchlens.models.video_asset import VideoAsset
+from launchlens.models.vision_result import VisionResult
+from tests.test_agents.conftest import make_session_factory
 
 
 def test_video_asset_model_exists():
-    from launchlens.models.video_asset import VideoAsset
     assert hasattr(VideoAsset, "listing_id")
     assert hasattr(VideoAsset, "video_type")
     assert hasattr(VideoAsset, "chapters")
     assert hasattr(VideoAsset, "social_cuts")
     assert hasattr(VideoAsset, "status")
-
-
-import uuid
-import json
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy import select
-from tests.test_agents.conftest import make_session_factory
-from launchlens.agents.base import AgentContext
-from launchlens.agents.video import VideoAgent
-from launchlens.models.video_asset import VideoAsset
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.asset import Asset
-from launchlens.models.vision_result import VisionResult
-from launchlens.models.package_selection import PackageSelection
 
 
 @pytest.fixture
