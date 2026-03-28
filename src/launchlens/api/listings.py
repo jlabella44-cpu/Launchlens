@@ -26,6 +26,7 @@ from launchlens.models.asset import Asset
 from launchlens.models.dollhouse_scene import DollhouseScene
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
+from launchlens.models.performance_event import PerformanceEvent
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.models.video_asset import VideoAsset
@@ -380,6 +381,99 @@ async def get_package(
     ]
 
 
+@router.post("/{listing_id}/package/reorder")
+async def reorder_package(
+    listing_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reorder photos in a package. Body: {"swaps": [{"from_position": 0, "to_position": 3}]}."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    reviewable = {ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}
+    if listing.state not in reviewable:
+        raise HTTPException(status_code=409, detail="Listing is not in a reviewable state")
+
+    swaps = body.get("swaps", [])
+    if not swaps:
+        raise HTTPException(status_code=422, detail="No swaps provided")
+
+    # Load all selections for this listing
+    result = await db.execute(
+        select(PackageSelection)
+        .where(PackageSelection.listing_id == listing.id)
+        .order_by(PackageSelection.position)
+    )
+    selections = {s.position: s for s in result.scalars().all()}
+
+    # Load vision results for room labels
+    from launchlens.models.vision_result import VisionResult
+    vr_result = await db.execute(
+        select(VisionResult).where(
+            VisionResult.asset_id.in_([s.asset_id for s in selections.values()])
+        )
+    )
+    vr_map = {vr.asset_id: vr for vr in vr_result.scalars().all()}
+
+    swapped = 0
+    for swap in swaps:
+        from_pos = swap.get("from_position")
+        to_pos = swap.get("to_position")
+        if from_pos is None or to_pos is None:
+            continue
+
+        sel_from = selections.get(from_pos)
+        sel_to = selections.get(to_pos)
+        if not sel_from or not sel_to:
+            continue
+
+        # Swap positions
+        sel_from.position, sel_to.position = sel_to.position, sel_from.position
+        sel_from.selected_by = "human"
+        sel_to.selected_by = "human"
+
+        # Emit override events with room_label for learning agent
+        from_vr = vr_map.get(sel_from.asset_id)
+        to_vr = vr_map.get(sel_to.asset_id)
+
+        await emit_event(
+            session=db,
+            event_type="package.override.swap_to",
+            payload={
+                "asset_id": str(sel_from.asset_id),
+                "room_label": from_vr.room_label if from_vr else None,
+                "from_position": to_pos,
+                "to_position": from_pos,
+            },
+            tenant_id=str(current_user.tenant_id),
+            listing_id=str(listing.id),
+        )
+        await emit_event(
+            session=db,
+            event_type="package.override.swap_from",
+            payload={
+                "asset_id": str(sel_to.asset_id),
+                "room_label": to_vr.room_label if to_vr else None,
+                "from_position": from_pos,
+                "to_position": to_pos,
+            },
+            tenant_id=str(current_user.tenant_id),
+            listing_id=str(listing.id),
+        )
+        swapped += 1
+
+    await db.commit()
+    return {"swaps_applied": swapped}
+
+
 @router.post("/{listing_id}/review")
 async def start_review(
     listing_id: uuid.UUID,
@@ -680,6 +774,16 @@ async def export_listing(
     expires_in = 900  # 15 minutes
     download_url = storage.presigned_url(bundle_path, expires_in=expires_in)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+    # Record performance event for learning loop
+    db.add(PerformanceEvent(
+        tenant_id=current_user.tenant_id,
+        listing_id=listing.id,
+        signal_type="export_downloaded",
+        value=1.0,
+        source="user",
+    ))
+    await db.commit()
 
     return ExportResponse(
         listing_id=listing.id,
