@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import UUID, Boolean, DateTime, String, func
+from sqlalchemy import UUID, Boolean, DateTime, Integer, String, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -41,5 +41,6 @@ class Listing(TenantScopedModel):
     )
     mls_bundle_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     marketing_bundle_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    credit_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     demo_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
