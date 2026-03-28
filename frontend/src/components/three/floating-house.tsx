@@ -1,53 +1,169 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { MeshDistortMaterial } from "@react-three/drei";
-import type { Mesh, Group } from "three";
+import * as THREE from "three";
+import type { Group, Points } from "three";
 
-export function FloatingHouse() {
-  const groupRef = useRef<Group>(null);
-  const roofRef = useRef<Mesh>(null);
+// House wireframe vertices — modern house silhouette
+const HOUSE_LINES = [
+  // Base
+  [-1.2, 0, -0.8], [1.2, 0, -0.8],
+  [1.2, 0, -0.8], [1.2, 0, 0.8],
+  [1.2, 0, 0.8], [-1.2, 0, 0.8],
+  [-1.2, 0, 0.8], [-1.2, 0, -0.8],
+  // Walls
+  [-1.2, 0, -0.8], [-1.2, 1, -0.8],
+  [1.2, 0, -0.8], [1.2, 1, -0.8],
+  [1.2, 0, 0.8], [1.2, 1, 0.8],
+  [-1.2, 0, 0.8], [-1.2, 1, 0.8],
+  // Top walls
+  [-1.2, 1, -0.8], [1.2, 1, -0.8],
+  [1.2, 1, -0.8], [1.2, 1, 0.8],
+  [1.2, 1, 0.8], [-1.2, 1, 0.8],
+  [-1.2, 1, 0.8], [-1.2, 1, -0.8],
+  // Roof
+  [-1.2, 1, -0.8], [0, 1.7, -0.8],
+  [0, 1.7, -0.8], [1.2, 1, -0.8],
+  [-1.2, 1, 0.8], [0, 1.7, 0.8],
+  [0, 1.7, 0.8], [1.2, 1, 0.8],
+  [0, 1.7, -0.8], [0, 1.7, 0.8],
+  // Door
+  [-0.15, 0, 0.81], [-0.15, 0.55, 0.81],
+  [-0.15, 0.55, 0.81], [0.15, 0.55, 0.81],
+  [0.15, 0.55, 0.81], [0.15, 0, 0.81],
+  // Windows
+  [-0.8, 0.45, 0.81], [-0.8, 0.75, 0.81],
+  [-0.8, 0.75, 0.81], [-0.45, 0.75, 0.81],
+  [-0.45, 0.75, 0.81], [-0.45, 0.45, 0.81],
+  [-0.45, 0.45, 0.81], [-0.8, 0.45, 0.81],
+  [0.45, 0.45, 0.81], [0.45, 0.75, 0.81],
+  [0.45, 0.75, 0.81], [0.8, 0.75, 0.81],
+  [0.8, 0.75, 0.81], [0.8, 0.45, 0.81],
+  [0.8, 0.45, 0.81], [0.45, 0.45, 0.81],
+];
+
+function HouseWireframe() {
+  const ref = useRef<THREE.LineSegments>(null);
+
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(HOUSE_LINES.flat());
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, []);
 
   useFrame((state) => {
-    if (!groupRef.current) return;
-    groupRef.current.rotation.y = state.clock.elapsedTime * 0.15;
-    groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.15;
+    if (!ref.current) return;
+    const material = ref.current.material as THREE.LineBasicMaterial;
+    material.opacity = 0.6 + Math.sin(state.clock.elapsedTime * 2) * 0.15;
   });
 
   return (
-    <group ref={groupRef} scale={1.2}>
-      {/* House body */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[1.6, 1.2, 1.2]} />
-        <meshStandardMaterial color="#2563EB" roughness={0.3} metalness={0.1} />
-      </mesh>
+    <lineSegments ref={ref} geometry={geometry}>
+      <lineBasicMaterial color="#60A5FA" transparent opacity={0.7} linewidth={1} />
+    </lineSegments>
+  );
+}
 
-      {/* Roof */}
-      <mesh ref={roofRef} position={[0, 0.9, 0]} rotation={[0, Math.PI / 4, 0]}>
-        <coneGeometry args={[1.3, 0.8, 4]} />
-        <meshStandardMaterial color="#1E293B" roughness={0.4} metalness={0.2} />
-      </mesh>
+function GlowParticles() {
+  const ref = useRef<Points>(null);
 
-      {/* Door */}
-      <mesh position={[0, -0.2, 0.61]}>
-        <boxGeometry args={[0.35, 0.6, 0.05]} />
-        <meshStandardMaterial color="#F97316" roughness={0.5} />
-      </mesh>
+  const { positions, velocities } = useMemo(() => {
+    const count = 120;
+    const pos = new Float32Array(count * 3);
+    const vel = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      // Distribute particles around the house shape
+      pos[i * 3] = (Math.random() - 0.5) * 3.5;
+      pos[i * 3 + 1] = Math.random() * 2.2;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 2.5;
+      vel[i * 3] = (Math.random() - 0.5) * 0.003;
+      vel[i * 3 + 1] = Math.random() * 0.005 + 0.002;
+      vel[i * 3 + 2] = (Math.random() - 0.5) * 0.003;
+    }
+    return { positions: pos, velocities: vel };
+  }, []);
 
-      {/* Windows */}
-      {[[-0.45, 0.2, 0.61], [0.45, 0.2, 0.61]].map((pos, i) => (
-        <mesh key={i} position={pos as [number, number, number]}>
-          <boxGeometry args={[0.3, 0.3, 0.05]} />
-          <MeshDistortMaterial color="#93C5FD" distort={0.15} speed={2} roughness={0.1} metalness={0.8} />
-        </mesh>
-      ))}
+  useFrame(() => {
+    if (!ref.current) return;
+    const pos = ref.current.geometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < pos.length / 3; i++) {
+      pos[i * 3] += velocities[i * 3];
+      pos[i * 3 + 1] += velocities[i * 3 + 1];
+      pos[i * 3 + 2] += velocities[i * 3 + 2];
+      // Reset particles that float too high
+      if (pos[i * 3 + 1] > 2.5) {
+        pos[i * 3] = (Math.random() - 0.5) * 3;
+        pos[i * 3 + 1] = -0.2;
+        pos[i * 3 + 2] = (Math.random() - 0.5) * 2;
+      }
+    }
+    ref.current.geometry.attributes.position.needsUpdate = true;
+  });
 
-      {/* Ground plane */}
-      <mesh position={[0, -0.65, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[1.5, 32]} />
-        <meshStandardMaterial color="#22C55E" roughness={0.8} transparent opacity={0.3} />
-      </mesh>
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={positions.length / 3}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        color="#F97316"
+        size={0.035}
+        transparent
+        opacity={0.8}
+        sizeAttenuation
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </points>
+  );
+}
+
+function FloorGrid() {
+  const ref = useRef<THREE.LineSegments>(null);
+
+  const geometry = useMemo(() => {
+    const lines: number[] = [];
+    const extent = 3;
+    const step = 0.4;
+    for (let x = -extent; x <= extent; x += step) {
+      lines.push(x, 0, -extent, x, 0, extent);
+    }
+    for (let z = -extent; z <= extent; z += step) {
+      lines.push(-extent, 0, z, extent, 0, z);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(lines), 3));
+    return geo;
+  }, []);
+
+  return (
+    <lineSegments ref={ref} geometry={geometry} position={[0, -0.01, 0]}>
+      <lineBasicMaterial color="#2563EB" transparent opacity={0.12} />
+    </lineSegments>
+  );
+}
+
+export function FloatingHouse() {
+  const groupRef = useRef<Group>(null);
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    groupRef.current.rotation.y = state.clock.elapsedTime * 0.12;
+    groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.6) * 0.1;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <HouseWireframe />
+      <GlowParticles />
+      <FloorGrid />
     </group>
   );
 }
