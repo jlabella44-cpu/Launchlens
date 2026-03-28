@@ -1,4 +1,5 @@
 import uuid
+
 from sqlalchemy import select
 from temporalio import activity
 
@@ -7,7 +8,8 @@ from launchlens.models.event import Event
 from launchlens.models.learning_weight import LearningWeight
 from launchlens.services.events import emit_event
 from launchlens.services.weight_manager import WeightManager
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 OVERRIDE_ACTION_MAP = {
     "package.override.approved": "approval",

@@ -1,8 +1,10 @@
 # tests/test_api/test_listings.py
 import uuid
-import pytest
+
 import jwt as pyjwt
+import pytest
 from httpx import AsyncClient
+
 from launchlens.config import settings
 from launchlens.models.listing import ListingState
 
@@ -156,8 +158,9 @@ async def test_start_review(async_client: AsyncClient, db_session):
     }, headers=_auth(token))
     listing_id = create_resp.json()["id"]
 
-    from launchlens.models.listing import Listing
     from sqlalchemy import update
+
+    from launchlens.models.listing import Listing
     await db_session.execute(
         update(Listing).where(Listing.id == uuid.UUID(listing_id)).values(state=ListingState.AWAITING_REVIEW)
     )
@@ -176,8 +179,9 @@ async def test_approve_listing(async_client: AsyncClient, db_session):
     }, headers=_auth(token))
     listing_id = create_resp.json()["id"]
 
-    from launchlens.models.listing import Listing
     from sqlalchemy import update
+
+    from launchlens.models.listing import Listing
     await db_session.execute(
         update(Listing).where(Listing.id == uuid.UUID(listing_id)).values(state=ListingState.IN_REVIEW)
     )

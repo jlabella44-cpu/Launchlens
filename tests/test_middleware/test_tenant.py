@@ -1,5 +1,6 @@
 # tests/test_middleware/test_tenant.py
 import uuid
+
 import pytest
 from httpx import AsyncClient
 

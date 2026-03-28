@@ -1,5 +1,6 @@
 # tests/test_models/test_listing.py
-from launchlens.models.listing import Listing, ListingState
+from launchlens.models.listing import ListingState
+
 
 def test_listing_state_enum_includes_shadow_review():
     assert ListingState.SHADOW_REVIEW in ListingState

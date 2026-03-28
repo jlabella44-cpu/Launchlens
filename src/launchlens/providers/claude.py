@@ -6,8 +6,11 @@ Model: claude-sonnet-4-6 (latest capable model per environment config).
 Context is serialized into the user message so Claude has full listing metadata.
 """
 import json
+
 import anthropic
+
 from launchlens.config import settings
+
 from .base import LLMProvider
 
 _MODEL = "claude-sonnet-4-6"

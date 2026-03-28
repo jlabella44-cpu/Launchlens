@@ -34,6 +34,7 @@ dev = [
     "coverage>=7.5",
     "moto[s3]>=5.0",
     "fakeredis>=2.23",
+    "ruff>=0.8",
 ]
 
 [tool.pytest.ini_options]
@@ -42,3 +43,11 @@ testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/launchlens"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]

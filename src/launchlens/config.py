@@ -46,5 +46,13 @@ class Settings(BaseSettings):
     google_vision_api_key: str = ""
     use_mock_providers: bool = False
 
+    # Video (Kling AI)
+    kling_access_key: str = ""
+    kling_secret_key: str = ""
+    kling_api_base_url: str = "https://api.klingai.com"
+    video_max_photos: int = 8
+    video_score_floor: float = 0.65
+    video_clip_duration: int = 5
+
 
 settings = Settings()

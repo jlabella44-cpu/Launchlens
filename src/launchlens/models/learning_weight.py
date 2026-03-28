@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import UUID, String, DateTime, UniqueConstraint, func
+
+from sqlalchemy import UUID, DateTime, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from launchlens.database import Base
 
 

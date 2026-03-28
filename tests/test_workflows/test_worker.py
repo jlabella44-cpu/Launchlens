@@ -1,5 +1,4 @@
 # tests/test_workflows/test_worker.py
-import pytest
 
 
 def test_worker_module_imports():

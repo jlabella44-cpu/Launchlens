@@ -1,4 +1,5 @@
 import uuid
+
 from sqlalchemy import select
 from temporalio import activity
 
@@ -8,7 +9,8 @@ from launchlens.models.package_selection import PackageSelection
 from launchlens.providers import get_template_provider
 from launchlens.services.events import emit_event
 from launchlens.services.storage import StorageService
-from .base import BaseAgent, AgentContext
+
+from .base import AgentContext, BaseAgent
 
 
 class BrandAgent(BaseAgent):

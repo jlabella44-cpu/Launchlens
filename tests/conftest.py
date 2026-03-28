@@ -1,14 +1,15 @@
-import uuid
 import asyncio
-import pytest
+import uuid
+
 import jwt
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from launchlens.main import app
-from launchlens.database import Base, get_db
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
 from launchlens.api.deps import get_db_admin
 from launchlens.config import settings
-
+from launchlens.database import Base, get_db
+from launchlens.main import app
 
 TEST_DB_URL = "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test"
 
@@ -26,8 +27,8 @@ async def test_engine():
     # create_all only creates tables — it skips the manual op.execute() calls in the
     # migration that enable RLS. Without this, cross-tenant isolation tests pass
     # but RLS is not actually enforced in production.
-    import subprocess
     import os
+    import subprocess
     import sys
 
     alembic_exe = os.path.join(os.path.dirname(sys.executable), "Scripts", "alembic.exe")

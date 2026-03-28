@@ -1,6 +1,8 @@
 import uuid
-from sqlalchemy import UUID, String, CheckConstraint
+
+from sqlalchemy import UUID, CheckConstraint, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from .base import TenantScopedModel
 
 

@@ -1,16 +1,17 @@
 # tests/test_api/test_billing.py
 import json
 import uuid
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from httpx import AsyncClient
+
 from launchlens.models.tenant import Tenant
 from launchlens.services.billing import BillingService
 
 
 def test_tenant_has_stripe_fields():
     """Tenant model must have stripe_customer_id and stripe_subscription_id."""
-    import inspect
     annotations = {}
     for cls in reversed(Tenant.__mro__):
         if hasattr(cls, '__annotations__'):

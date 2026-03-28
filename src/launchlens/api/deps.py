@@ -1,12 +1,12 @@
 import uuid
-from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from launchlens.database import get_db, AsyncSessionLocal
-from launchlens.models.user import User, UserRole
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from launchlens.database import AsyncSessionLocal, get_db
 from launchlens.models.tenant import Tenant
+from launchlens.models.user import User, UserRole
 from launchlens.services.auth import decode_token
 
 _bearer = HTTPBearer(auto_error=True)

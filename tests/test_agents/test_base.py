@@ -1,7 +1,9 @@
 # tests/test_agents/test_base.py
-import pytest
 from unittest.mock import AsyncMock, patch
-from launchlens.agents.base import BaseAgent, AgentContext
+
+import pytest
+
+from launchlens.agents.base import AgentContext, BaseAgent
 
 
 class ConcreteAgent(BaseAgent):

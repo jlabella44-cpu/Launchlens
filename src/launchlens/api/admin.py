@@ -1,18 +1,23 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
-from launchlens.api.deps import require_admin, get_db_admin
-from launchlens.services.auth import hash_password
-from launchlens.models.user import User, UserRole
-from launchlens.models.tenant import Tenant
-from launchlens.models.listing import Listing
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from launchlens.api.deps import get_db_admin, require_admin
 from launchlens.api.schemas.admin import (
-    TenantResponse, TenantDetailResponse, UpdateTenantRequest,
-    UserResponse, InviteUserRequest, UpdateUserRoleRequest,
+    InviteUserRequest,
     PlatformStatsResponse,
+    TenantDetailResponse,
+    TenantResponse,
+    UpdateTenantRequest,
+    UpdateUserRoleRequest,
+    UserResponse,
 )
+from launchlens.models.listing import Listing
+from launchlens.models.tenant import Tenant
+from launchlens.models.user import User, UserRole
+from launchlens.services.auth import hash_password
 
 router = APIRouter()
 

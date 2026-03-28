@@ -1,16 +1,18 @@
 # tests/test_agents/test_floorplan.py
-import uuid
 import json
-import pytest
+import uuid
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from sqlalchemy import select
-from tests.test_agents.conftest import make_session_factory
+
 from launchlens.agents.base import AgentContext
-from launchlens.agents.floorplan import FloorplanAgent, FLOORPLAN_EXTRACTION_PROMPT
+from launchlens.agents.floorplan import FLOORPLAN_EXTRACTION_PROMPT, FloorplanAgent
+from launchlens.models.asset import Asset
 from launchlens.models.dollhouse_scene import DollhouseScene
 from launchlens.models.listing import Listing, ListingState
-from launchlens.models.asset import Asset
 from launchlens.models.vision_result import VisionResult
+from tests.test_agents.conftest import make_session_factory
 
 
 def test_dollhouse_scene_model_exists():

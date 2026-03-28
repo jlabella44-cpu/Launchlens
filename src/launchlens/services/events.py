@@ -14,7 +14,9 @@ change AND the event.
 """
 import uuid
 from datetime import datetime, timezone
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from launchlens.models.event import Event
 from launchlens.models.outbox import Outbox
 

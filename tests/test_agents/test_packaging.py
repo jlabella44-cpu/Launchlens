@@ -1,12 +1,13 @@
+
 import pytest
-import uuid
-from launchlens.agents.packaging import PackagingAgent
-from launchlens.agents.base import AgentContext
-from launchlens.models.vision_result import VisionResult
-from launchlens.models.package_selection import PackageSelection
-from launchlens.models.listing import ListingState
-from launchlens.services.weight_manager import WeightManager
 from sqlalchemy import select
+
+from launchlens.agents.base import AgentContext
+from launchlens.agents.packaging import PackagingAgent
+from launchlens.models.listing import ListingState
+from launchlens.models.package_selection import PackageSelection
+from launchlens.models.vision_result import VisionResult
+from launchlens.services.weight_manager import WeightManager
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -91,7 +92,7 @@ async def test_packaging_prefers_tier2_over_tier1(db_session, listing, assets):
 
     agent = PackagingAgent(session_factory=make_session_factory(db_session))
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
-    result = await agent.execute(ctx)
+    await agent.execute(ctx)
 
     rows = (await db_session.execute(select(PackageSelection))).scalars().all()
     assert len(rows) == 1

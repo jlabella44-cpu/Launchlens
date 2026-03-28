@@ -1,9 +1,10 @@
-import pytest
-from sqlalchemy import select
 from datetime import datetime, timezone
 
-from launchlens.agents.learning import LearningAgent
+import pytest
+from sqlalchemy import select
+
 from launchlens.agents.base import AgentContext
+from launchlens.agents.learning import LearningAgent
 from launchlens.models.event import Event
 from launchlens.models.learning_weight import LearningWeight
 from tests.test_agents.conftest import make_session_factory

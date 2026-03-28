@@ -1,9 +1,10 @@
-import pytest
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import select
-from launchlens.services.outbox_poller import OutboxPoller
+
+import pytest
+
 from launchlens.models.outbox import Outbox
+from launchlens.services.outbox_poller import OutboxPoller
 
 
 @pytest.mark.asyncio

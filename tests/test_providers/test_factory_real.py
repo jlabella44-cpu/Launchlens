@@ -2,13 +2,13 @@
 Verify that factory returns the correct concrete class for each provider type.
 Tests use patched settings to control the use_mock_providers flag.
 """
-import pytest
 from unittest.mock import patch
-from launchlens.providers.factory import get_vision_provider, get_llm_provider, get_template_provider
-from launchlens.providers.mock import MockVisionProvider, MockLLMProvider, MockTemplateProvider
-from launchlens.providers.google_vision import GoogleVisionProvider
+
+from launchlens.providers.base import LLMProvider, VisionProvider
 from launchlens.providers.claude import ClaudeProvider
-from launchlens.providers.base import VisionProvider, LLMProvider, TemplateProvider
+from launchlens.providers.factory import get_llm_provider, get_template_provider, get_vision_provider
+from launchlens.providers.google_vision import GoogleVisionProvider
+from launchlens.providers.mock import MockTemplateProvider
 
 
 def test_factory_returns_google_vision_when_mock_disabled():
