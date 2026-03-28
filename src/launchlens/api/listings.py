@@ -541,3 +541,43 @@ async def run_compliance_scan(
     ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
     report = await agent.execute(ctx)
     return report
+
+
+@router.get("/{listing_id}/activity")
+async def listing_activity(
+    listing_id: uuid.UUID,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the event audit trail for a listing, newest first."""
+    from launchlens.models.event import Event
+
+    # Verify listing belongs to tenant
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    limit = min(limit, 200)
+    result = await db.execute(
+        select(Event)
+        .where(Event.listing_id == listing_id)
+        .order_by(Event.created_at.desc())
+        .limit(limit)
+    )
+    events = result.scalars().all()
+
+    return [
+        {
+            "id": str(e.id),
+            "event_type": e.event_type,
+            "payload": e.payload,
+            "created_at": e.created_at.isoformat(),
+        }
+        for e in events
+    ]
