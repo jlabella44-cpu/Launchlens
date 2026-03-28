@@ -6,6 +6,7 @@ from temporalio import activity
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
+from launchlens.models.learning_weight import LearningWeight
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
 from launchlens.models.vision_result import VisionResult
@@ -44,14 +45,22 @@ class PackagingAgent(BaseAgent):
                     if vr.asset_id not in seen:
                         seen[vr.asset_id] = vr
 
+                # Load LearningWeight rows for this tenant (Thompson Sampling weights)
+                tenant_id_uuid = uuid.UUID(context.tenant_id)
+                lw_rows = (await session.execute(
+                    select(LearningWeight).where(LearningWeight.tenant_id == tenant_id_uuid)
+                )).scalars().all()
+                weight_by_room: dict[str, float] = {lw.room_label: lw.weight for lw in lw_rows}
+
                 # Score each asset
                 scored = []
                 for asset_id, vr in seen.items():
+                    room_weight = weight_by_room.get(vr.room_label or "", 1.0)
                     features = {
                         "quality_score": vr.quality_score or 50,
                         "commercial_score": vr.commercial_score or 50,
                         "hero_candidate": vr.hero_candidate or False,
-                        "room_weight": 1.0,  # TODO: load from LearningWeight
+                        "room_weight": room_weight,
                     }
                     score = self._wm.score(features)
                     scored.append((score, asset_id, vr))

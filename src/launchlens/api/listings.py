@@ -1,8 +1,11 @@
+import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -640,3 +643,59 @@ async def listing_activity(
         }
         for e in events
     ]
+
+
+@router.get("/{listing_id}/events")
+async def listing_events_stream(
+    listing_id: uuid.UUID,
+    poll_interval: float = 2.0,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Server-Sent Events stream for real-time pipeline progress updates.
+
+    Streams events for the given listing as they are emitted. The client
+    receives one SSE data frame per event. The connection stays open until
+    the client disconnects.
+    """
+    from launchlens.models.event import Event
+
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    # Capture the last-seen event id so we only send new events on each poll
+    last_result = (await db.execute(
+        select(Event.id)
+        .where(Event.listing_id == listing_id)
+        .order_by(Event.created_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    last_seen_id = last_result
+
+    async def event_generator():
+        nonlocal last_seen_id
+        yield "retry: 3000\n\n"
+        while True:
+            await asyncio.sleep(poll_interval)
+            async with db.begin_nested():
+                query = select(Event).where(Event.listing_id == listing_id).order_by(Event.created_at)
+                if last_seen_id is not None:
+                    query = query.where(Event.id != last_seen_id)
+                rows = (await db.execute(query)).scalars().all()
+                for ev in rows:
+                    data = json.dumps({
+                        "id": str(ev.id),
+                        "event_type": ev.event_type,
+                        "payload": ev.payload,
+                        "created_at": ev.created_at.isoformat(),
+                    })
+                    yield f"data: {data}\n\n"
+                    last_seen_id = ev.id
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
