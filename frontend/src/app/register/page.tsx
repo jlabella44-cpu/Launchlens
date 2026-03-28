@@ -18,6 +18,12 @@ const HeroScene = dynamic(
   { ssr: false }
 );
 
+const PLAN_DISPLAY: Record<string, { name: string; price: string }> = {
+  lite: { name: "Lite", price: "Free" },
+  active_agent: { name: "Active Agent", price: "$39/mo" },
+  team: { name: "Team", price: "$99/mo" },
+};
+
 export default function RegisterPage() {
   return (
     <Suspense fallback={
@@ -37,17 +43,20 @@ function RegisterForm() {
   const plan = searchParams.get("plan");
   const claimId = searchParams.get("claim");
   const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const planInfo = plan ? PLAN_DISPLAY[plan] : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await register(email, password, name);
+      await register(email, password, name, companyName, plan || undefined);
 
       // If claiming a demo, convert it to a real listing
       if (claimId) {
@@ -56,11 +65,11 @@ function RegisterForm() {
           router.push(`/listings/${result.listing_id}`);
           return;
         } catch {
-          // Claim failed — still redirect to listings
+          // Claim failed — still redirect to onboarding
         }
       }
 
-      router.push("/listings");
+      router.push("/onboarding");
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
@@ -102,12 +111,23 @@ function RegisterForm() {
               ? "Create an account to claim your AI-curated package"
               : "Start launching listings in minutes"}
           </p>
-          {plan && (
-            <p className="text-sm text-[var(--color-primary)] font-medium mb-6">
-              Selected plan: <span className="capitalize">{plan}</span>
-            </p>
+
+          {planInfo ? (
+            <div className="mb-6 p-3 rounded-lg bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20">
+              <p className="text-sm font-medium text-[var(--color-primary)]">
+                Signing up for {planInfo.name} — {planInfo.price}
+              </p>
+            </div>
+          ) : (
+            <div className="mb-6">
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                No plan selected.{" "}
+                <Link href="/pricing" className="text-[var(--color-primary)] hover:underline">
+                  View pricing plans
+                </Link>
+              </p>
+            </div>
           )}
-          {!plan && <div className="mb-6" />}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -122,6 +142,21 @@ function RegisterForm() {
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-[var(--color-border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow"
                 placeholder="Jane Smith"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="company" className="block text-sm font-medium mb-1.5">
+                Company / Brokerage
+              </label>
+              <input
+                id="company"
+                type="text"
+                required
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-[var(--color-border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow"
+                placeholder="Acme Realty"
               />
             </div>
 
@@ -152,7 +187,7 @@ function RegisterForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-[var(--color-border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow"
-                placeholder="Min 8 characters"
+                placeholder="Min 8 chars, 1 upper, 1 lower, 1 digit"
               />
             </div>
 
@@ -165,6 +200,18 @@ function RegisterForm() {
             <Button type="submit" loading={loading} className="w-full">
               Create Account
             </Button>
+
+            {plan === "lite" && (
+              <p className="text-center text-xs text-[var(--color-text-secondary)]">
+                Want more features?{" "}
+                <Link
+                  href="/register?plan=active_agent"
+                  className="text-[var(--color-primary)] hover:underline"
+                >
+                  Start with Active Agent instead
+                </Link>
+              </p>
+            )}
           </form>
 
           <p className="mt-6 text-center text-sm text-[var(--color-text-secondary)]">
