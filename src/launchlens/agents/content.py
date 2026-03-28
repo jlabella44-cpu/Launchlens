@@ -11,7 +11,7 @@ from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_llm_provider
 from launchlens.services.events import emit_event
 from launchlens.services.fha_filter import fha_check
-from launchlens.services.metrics import record_cost
+from launchlens.services.pii_filter import sanitize_for_prompt
 
 from .base import AgentContext, BaseAgent
 
@@ -66,13 +66,14 @@ class ContentAgent(BaseAgent):
                     f"{vr.room_label} (q={vr.quality_score})" for vr in vrs if vr.room_label
                 )
 
+                safe_metadata = sanitize_for_prompt(listing.metadata_ or {})
                 prompt = _PROMPT_TEMPLATE.format(
-                    metadata=str(listing.metadata_),
+                    metadata=str(safe_metadata),
                     photo_features=features_text or "modern interior",
                 )
 
                 raw = await self._llm_provider.complete(
-                    prompt=prompt, context=listing.metadata_
+                    prompt=prompt, context=safe_metadata
                 )
                 parsed = json.loads(raw)
                 mls_safe = parsed["mls_safe"]
@@ -81,7 +82,7 @@ class ContentAgent(BaseAgent):
 
                 if not fha_result.passed:
                     raw = await self._llm_provider.complete(
-                        prompt=prompt + _FHA_RETRY_SUFFIX, context=listing.metadata_
+                        prompt=prompt + _FHA_RETRY_SUFFIX, context=safe_metadata
                     )
                     parsed = json.loads(raw)
                     mls_safe = parsed["mls_safe"]
@@ -100,8 +101,6 @@ class ContentAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
-        llm_calls = 2 if not fha_result.passed else 1
-        record_cost(self.agent_name, "claude", llm_calls)
         return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed}
 
 
@@ -109,4 +108,4 @@ class ContentAgent(BaseAgent):
 async def run_content(listing_id: str, tenant_id: str) -> dict:
     agent = ContentAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)
+    return await agent.execute(ctx)

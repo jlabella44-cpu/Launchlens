@@ -1,6 +1,6 @@
 """Test tenant settings API."""
 import uuid
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt as pyjwt
 import pytest

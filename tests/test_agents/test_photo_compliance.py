@@ -156,6 +156,7 @@ async def test_vision_failure_treated_as_compliant(db_session):
 @pytest.mark.asyncio
 async def test_compliance_emits_event(db_session):
     from sqlalchemy import select
+
     from launchlens.models.outbox import Outbox
 
     listing, tenant_id, assets = await _setup_listing_with_package(db_session, 1)

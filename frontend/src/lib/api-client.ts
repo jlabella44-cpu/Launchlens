@@ -18,6 +18,11 @@ import type {
   BillingStatusResponse,
   Invoice,
   UsageResponse,
+  BrandKitResponse,
+  BrandKitUpsertRequest,
+  PipelineStatusResponse,
+  ReviewQueueItem,
+  RejectRequest,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -183,6 +188,50 @@ class ApiClient {
   // Usage (analytics)
   async getUsage(): Promise<UsageResponse> {
     return this.request<UsageResponse>("/analytics/usage");
+  }
+
+  // Brand Kit
+  async getBrandKit(): Promise<BrandKitResponse | null> {
+    return this.request<BrandKitResponse | null>("/brand-kit");
+  }
+
+  async upsertBrandKit(data: BrandKitUpsertRequest): Promise<BrandKitResponse> {
+    return this.request<BrandKitResponse>("/brand-kit", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getLogoUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
+    return this.request("/brand-kit/logo-upload-url", { method: "POST" });
+  }
+
+  // Upload URLs
+  async getUploadUrls(listingId: string, filenames: string[]): Promise<{
+    urls: { filename: string; key: string; upload_url: string; content_type: string }[];
+  }> {
+    return this.request(`/listings/${listingId}/upload-urls`, {
+      method: "POST",
+      body: JSON.stringify({ filenames }),
+    });
+  }
+
+  // Pipeline status
+  async getPipelineStatus(listingId: string): Promise<PipelineStatusResponse> {
+    return this.request<PipelineStatusResponse>(`/listings/${listingId}/pipeline-status`);
+  }
+
+  // Review queue
+  async getReviewQueue(): Promise<ListingResponse[]> {
+    return this.request<ListingResponse[]>("/listings?state=awaiting_review");
+  }
+
+  // Reject
+  async rejectListing(listingId: string, data: RejectRequest): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
 }
 

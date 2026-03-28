@@ -76,7 +76,7 @@ export default function DemoResultsPage() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
-          {demo.photos.map((photo, i) => (
+          {(demo.photos ?? []).map((photo, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, scale: 0.9 }}

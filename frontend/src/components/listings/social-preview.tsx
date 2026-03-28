@@ -30,7 +30,15 @@ export function SocialPreview({ listingId }: SocialPreviewProps) {
       .finally(() => setLoading(false));
   }, [listingId]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <GlassCard tilt={false}>
+        <div className="h-32 rounded-lg bg-slate-100 animate-pulse flex items-center justify-center">
+          <span className="text-xs text-slate-400">Loading social cuts...</span>
+        </div>
+      </GlassCard>
+    );
+  }
   if (cuts.length === 0) return null;
 
   return (

@@ -159,3 +159,53 @@ export interface PlanLimits {
   tier2_vision: boolean;
   social_content: boolean;
 }
+
+export interface BrandKitResponse {
+  id: string;
+  tenant_id: string;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  font_primary: string | null;
+  agent_name: string | null;
+  brokerage_name: string | null;
+  raw_config: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface BrandKitUpsertRequest {
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  font_primary?: string | null;
+  agent_name?: string | null;
+  brokerage_name?: string | null;
+  raw_config?: Record<string, unknown>;
+}
+
+export interface PipelineStep {
+  name: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "skipped";
+  completed_at: string | null;
+  progress: string | null;
+}
+
+export interface PipelineStatusResponse {
+  listing_id: string;
+  state: string;
+  steps: PipelineStep[];
+}
+
+export interface ReviewQueueItem {
+  id: string;
+  address: Record<string, string>;
+  metadata: Record<string, number | string>;
+  state: string;
+  asset_count: number;
+  created_at: string;
+}
+
+export interface RejectRequest {
+  reason: "quality" | "incomplete" | "non_compliant" | "other";
+  detail?: string;
+}
