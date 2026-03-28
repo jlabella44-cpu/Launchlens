@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from launchlens.api import admin, analytics, assets, auth, billing, bulk, demo, listings, tenant_settings
+from launchlens.api import admin, analytics, assets, auth, billing, bulk, demo, health, listings, tenant_settings
 from launchlens.config import settings
 from launchlens.database import AsyncSessionLocal
 from launchlens.logging_config import setup_logging
@@ -51,22 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
     app.include_router(bulk.router, prefix="/bulk", tags=["bulk"])
-
-    @app.get("/health")
-    async def health():
-        """Enhanced health check — tests DB connectivity."""
-        checks = {"api": "ok"}
-
-        # DB check
-        try:
-            async with AsyncSessionLocal() as session:
-                await session.execute(__import__("sqlalchemy").text("SELECT 1"))
-            checks["database"] = "ok"
-        except Exception as e:
-            checks["database"] = f"error: {e}"
-
-        all_ok = all(v == "ok" for v in checks.values())
-        return {"status": "ok" if all_ok else "degraded", "checks": checks}
+    app.include_router(health.router)
 
     return app
 

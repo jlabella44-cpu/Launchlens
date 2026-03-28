@@ -99,10 +99,17 @@ async def async_client(test_engine):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_admin] = override_get_db_admin
+
+    import launchlens.api.health as health_module
+    original_engine = health_module.engine
+    health_module.engine = test_engine
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
+
+    health_module.engine = original_engine
     app.dependency_overrides.clear()
 
 

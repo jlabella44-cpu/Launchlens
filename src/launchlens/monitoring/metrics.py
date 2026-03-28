@@ -27,7 +27,7 @@ def emit_metric(
     dimensions: dict[str, str] | None = None,
 ) -> None:
     """Emit a CloudWatch custom metric. No-op in development."""
-    if settings.environment == "development":
+    if settings.app_env == "development":
         return
 
     try:
