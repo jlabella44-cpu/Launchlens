@@ -65,6 +65,7 @@ async def get_tenant(
         plan=tenant.plan,
         stripe_customer_id=tenant.stripe_customer_id,
         stripe_subscription_id=tenant.stripe_subscription_id,
+        webhook_url=tenant.webhook_url,
         created_at=tenant.created_at,
         user_count=user_count,
         listing_count=listing_count,
