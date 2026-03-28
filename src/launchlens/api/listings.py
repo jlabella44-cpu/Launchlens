@@ -360,6 +360,127 @@ async def approve_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
+@router.post("/{listing_id}/reject")
+async def reject_listing(
+    listing_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reject a listing with a reason code. Transitions state to FAILED."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    rejectable = {ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}
+    if listing.state not in rejectable:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot reject: listing is {listing.state.value}",
+        )
+
+    valid_reasons = {"quality", "incomplete", "non_compliant", "other"}
+    reason = body.get("reason", "")
+    if reason not in valid_reasons:
+        raise HTTPException(status_code=400, detail=f"Invalid reason. Must be one of: {valid_reasons}")
+
+    listing.state = ListingState.FAILED
+    await db.commit()
+    await db.refresh(listing)
+
+    # Emit audit event
+    try:
+        from launchlens.services.events import emit_event
+        await emit_event(
+            session=db,
+            event_type="listing.rejected",
+            payload={"reason": reason, "detail": body.get("detail", "")},
+            tenant_id=current_user.tenant_id,
+            listing_id=listing.id,
+        )
+    except Exception:
+        logger.exception("Failed to emit rejection event for listing %s", listing.id)
+
+    return {"listing_id": str(listing.id), "state": listing.state.value}
+
+
+@router.get("/{listing_id}/pipeline-status")
+async def get_pipeline_status(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return per-step pipeline progress for a listing."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    from launchlens.models.event import Event
+
+    result = await db.execute(
+        select(Event)
+        .where(Event.listing_id == listing_id)
+        .order_by(Event.created_at)
+    )
+    events = result.scalars().all()
+
+    # Build step list from known pipeline stages
+    pipeline_steps = [
+        "ingestion", "vision_tier1", "vision_tier2", "coverage",
+        "floorplan", "packaging", "compliance", "review",
+        "content", "brand", "social_content", "chapters",
+        "social_cuts", "mls_export", "watermark", "distribution",
+    ]
+
+    completed_steps = set()
+    step_times = {}
+    for evt in events:
+        et = evt.event_type
+        if et.endswith(".completed") or et.endswith(".done"):
+            step_name = et.rsplit(".", 1)[0]
+            completed_steps.add(step_name)
+            step_times[step_name] = evt.created_at.isoformat()
+
+    state_val = listing.state.value if hasattr(listing.state, "value") else listing.state
+    steps = []
+    for step in pipeline_steps:
+        if step in completed_steps:
+            status = "completed"
+        elif state_val in ("delivered", "failed"):
+            status = "skipped"
+        else:
+            status = "pending"
+        steps.append({
+            "name": step,
+            "status": status,
+            "completed_at": step_times.get(step),
+            "progress": None,
+        })
+
+    # Mark current active step
+    for s in steps:
+        if s["status"] == "pending":
+            if state_val not in ("new", "awaiting_review", "in_review", "delivered", "failed"):
+                s["status"] = "in_progress"
+            break
+
+    return {
+        "listing_id": str(listing.id),
+        "state": state_val,
+        "steps": steps,
+    }
+
+
 _EXPORTABLE_STATES = {ListingState.APPROVED, ListingState.EXPORTING, ListingState.DELIVERED}
 
 

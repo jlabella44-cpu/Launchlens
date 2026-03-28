@@ -15,6 +15,9 @@ import type {
   DemoUploadRequest,
   DemoUploadResponse,
   DemoViewResponse,
+  PipelineStatusResponse,
+  ReviewQueueItem,
+  RejectRequest,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -152,6 +155,24 @@ class ApiClient {
 
   async demoClaim(id: string): Promise<{ listing_id: string }> {
     return this.request<{ listing_id: string }>(`/demo/${id}/claim`, { method: "POST" });
+  }
+
+  // Pipeline status
+  async getPipelineStatus(listingId: string): Promise<PipelineStatusResponse> {
+    return this.request<PipelineStatusResponse>(`/listings/${listingId}/pipeline-status`);
+  }
+
+  // Review queue
+  async getReviewQueue(): Promise<ListingResponse[]> {
+    return this.request<ListingResponse[]>("/listings?state=awaiting_review");
+  }
+
+  // Reject
+  async rejectListing(listingId: string, data: RejectRequest): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
 }
 
