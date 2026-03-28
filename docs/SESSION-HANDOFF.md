@@ -37,8 +37,9 @@ C:\Users\Jeff\launchlens\
       base.py                  — TenantScopedModel (id, tenant_id, created_at)
       tenant.py                — Tenant (name, plan, stripe_customer_id, stripe_subscription_id)
       user.py                  — User (email, password_hash, name, role: UserRole enum)
-      listing.py               — Listing (address, metadata_, state: ListingState enum, lock_owner_id, lock_expires_at)
+      listing.py               — Listing (address, metadata_, state: ListingState enum, lock_owner_id, lock_expires_at, mls_bundle_path, marketing_bundle_path, is_demo, demo_expires_at)
       asset.py                 — Asset (listing_id, file_path, file_hash, state, required_for_mls)
+      social_content.py        — SocialContent (listing_id, platform, caption, hashtags, cta)
       vision_result.py         — VisionResult (asset_id, tier, room_label, quality_score, commercial_score, hero_candidate)
       package_selection.py     — PackageSelection (listing_id, asset_id, channel, position, composite_score, selected_by)
       event.py                 — Event (event_type, payload, tenant_id, listing_id)
@@ -57,16 +58,18 @@ C:\Users\Jeff\launchlens\
       vision.py                — VisionAgent: run_tier1 (Google Vision bulk), run_tier2 (GPT-4V top 20)
       coverage.py              — CoverageAgent: checks REQUIRED_SHOTS coverage
       packaging.py             — PackagingAgent: scores + selects top 25, state → AWAITING_REVIEW
-      content.py               — ContentAgent: Claude listing description + FHA compliance filter
+      content.py               — ContentAgent: dual-tone (mls_safe + marketing) via Claude, FHA compliant
       brand.py                 — BrandAgent: template render → S3 flyer upload
       learning.py              — LearningAgent: reads override events, updates weights
-      distribution.py          — DistributionAgent: state → DELIVERED (stub for actual MLS delivery)
+      distribution.py          — DistributionAgent: state → DELIVERED, emits pipeline.completed
+      social_content.py        — SocialContentAgent: Instagram + Facebook captions via Claude, FHA filtered
+      mls_export.py            — MLSExportAgent: dual ZIP bundles (MLS unbranded + marketing branded)
 
     activities/
-      pipeline.py              — 8 @activity.defn wrappers + ALL_ACTIVITIES list
+      pipeline.py              — 10 @activity.defn wrappers + ALL_ACTIVITIES list
 
     workflows/
-      listing_pipeline.py      — ListingPipeline: Phase 1 (ingestion→packaging) → wait signal → Phase 2 (content→distribution)
+      listing_pipeline.py      — ListingPipeline: Phase 1 (ingestion→packaging) → wait signal → Phase 2 (content→[brand+social parallel]→mls_export→distribution)
       worker.py                — Temporal worker (create_worker, main)
 
     services/
@@ -92,6 +95,7 @@ C:\Users\Jeff\launchlens\
       auth.py                  — POST /auth/register, POST /auth/login, GET /auth/me
       listings.py              — POST/GET /listings, GET/PATCH /listings/{id}, POST/GET assets, GET package, POST review/approve
       assets.py                — GET /assets (stub for standalone Phase 2 API)
+      demo.py                  — POST /demo/upload (no auth), GET /demo/{id}, POST /demo/{id}/claim
       billing.py               — POST /billing/checkout, GET /billing/status, POST /billing/portal, POST /billing/webhook
       admin.py                 — GET/PATCH /admin/tenants, GET/POST users, PATCH role, GET /admin/stats
       deps.py                  — get_current_user, require_admin, get_current_tenant, get_tenant, get_db_admin
@@ -101,6 +105,7 @@ C:\Users\Jeff\launchlens\
         assets.py              — AssetInput, CreateAssetsRequest, CreateAssetsResponse, AssetResponse
         billing.py             — CheckoutRequest/Response, PortalRequest/Response, BillingStatusResponse
         admin.py               — TenantResponse, TenantDetailResponse, UserResponse, InviteUserRequest, PlatformStatsResponse
+        demo.py                — DemoUploadRequest/Response, DemoViewResponse
 
     middleware/
       tenant.py                — TenantMiddleware: JWT decode, sets request.state.tenant_id, _PUBLIC_PATHS skip list
@@ -110,6 +115,7 @@ C:\Users\Jeff\launchlens\
     002_outbox_add_tenant_listing_delivered.py
     003_users_add_password_hash.py
     004_tenant_stripe_fields.py
+    005_social_content_export_demo.py
 
   tests/
     conftest.py                — test_engine (NullPool, port 5433), db_session, async_client (overrides get_db + get_db_admin)
@@ -149,8 +155,9 @@ C:\Users\Jeff\launchlens\
 | v0.8.1 | Docker Compose (full dev environment) | — |
 | v0.8.2 | Admin Dashboard (tenant/user CRUD, platform stats) | ~12 |
 | v0.8.3 | CI/CD (lint, test, docker build workflows) | — |
+| v0.9.0 | Listing Media OS (SocialContentAgent, MLSExportAgent, dual-tone ContentAgent, export endpoint, demo pipeline, Temporal parallel Phase 2, PRD v3) | ~21 |
 
-**Total: 193 tests, all passing.**
+**Total: 214 tests, all passing.**
 
 ---
 
@@ -172,21 +179,29 @@ RLS is enabled on all tenant-scoped tables (migration 001). `get_db` sets `SET L
 
 ### Listing State Machine
 ```
-NEW → UPLOADING → ANALYZING → AWAITING_REVIEW → IN_REVIEW → APPROVED → DELIVERED
+NEW → UPLOADING → ANALYZING → AWAITING_REVIEW → IN_REVIEW → APPROVED → EXPORTING → DELIVERED
+DEMO → (claimed) → UPLOADING → ... (normal flow)
+DEMO → (expired) → deleted by cleanup
 ```
 - `POST /listings/{id}/assets` → UPLOADING (triggers Temporal pipeline)
-- Pipeline runs → AWAITING_REVIEW
+- Pipeline Phase 1 runs → AWAITING_REVIEW
 - `POST /listings/{id}/review` → IN_REVIEW
-- `POST /listings/{id}/approve` → APPROVED (signals Temporal to continue → DELIVERED)
+- `POST /listings/{id}/approve` → APPROVED (signals Temporal to continue)
+- Phase 2: Content → [Brand + Social parallel] → MLSExport (EXPORTING) → Distribution (DELIVERED)
+- `GET /listings/{id}/export?mode=mls|marketing` → presigned S3 URL for ZIP bundle
+- `POST /demo/upload` → DEMO (no auth, 24h TTL, Phase 1 only)
+- `POST /demo/{id}/claim` → converts to real listing, triggers Phase 2
 
 ### Plan Limits
 ```python
 PLAN_LIMITS = {
-    "starter":    {"max_listings_per_month": 5,   "max_assets_per_listing": 25,  "tier2_vision": False},
-    "pro":        {"max_listings_per_month": 50,  "max_assets_per_listing": 50,  "tier2_vision": True},
-    "enterprise": {"max_listings_per_month": 500, "max_assets_per_listing": 100, "tier2_vision": True},
+    "starter":    {"max_listings_per_month": 5,   "max_assets_per_listing": 25,  "tier2_vision": False, "social_content": False},
+    "pro":        {"max_listings_per_month": 50,  "max_assets_per_listing": 50,  "tier2_vision": True,  "social_content": True},
+    "enterprise": {"max_listings_per_month": 500, "max_assets_per_listing": 100, "tier2_vision": True,  "social_content": True},
 }
 ```
+- SocialContentAgent is skipped for Starter tier (plan-gated in Temporal workflow)
+- MLS Export runs for all tiers; Marketing bundle includes social posts only for Pro+
 
 ### Design System (for frontend)
 Generated by UI/UX Pro Max, persisted at `design-system/launchlens/MASTER.md`:
@@ -199,7 +214,7 @@ Generated by UI/UX Pro Max, persisted at `design-system/launchlens/MASTER.md`:
 
 ## Plans Written But Not Yet Executed
 
-### v0.9.0 — Frontend (3D Interactive)
+### v1.0.0 — Frontend (3D Interactive)
 **File:** `docs/plans/2026-03-27-frontend.md`
 **5 tasks:**
 1. Scaffold (Next.js + Three.js + Framer Motion + design system)
@@ -208,45 +223,38 @@ Generated by UI/UX Pro Max, persisted at `design-system/launchlens/MASTER.md`:
 4. Listings dashboard (3D tilt cards, stagger animation, spring-animated create dialog)
 5. Listing detail (PhotoOrbit 3D carousel, PipelineVisualizer 3D, package viewer, review/approve)
 
+**Additional frontend work needed for v0.9.0 features:**
+- Demo dropzone landing page (hits `POST /demo/upload`)
+- Pipeline visualizer for demo flow
+- Export download page with MLS vs Marketing toggle
+- Social media preview cards
+- Pricing page with updated "Media OS" copy
+
 **Note:** Magic MCP (21st.dev) API key updated but needs Claude Code restart to activate. Stitch (Google) needs API enabled at console.
 
 ---
 
-## Strategic Pivot: "Listing Media OS"
+## Strategic Pivot: "Listing Media OS" (COMPLETED in v0.9.0)
 
-The current build is a solid foundation. The strategic feedback recommends repositioning from "photo curation tool" to "Listing Media OS":
+Repositioned from "photo curation tool" to "Listing Media OS". Full PRD at `docs/LaunchLens-PRD-v3.md`.
 
-### Phase 1: Fast Revenue (what we're building now)
-"MLS-Ready Photo Bundle in 3 Minutes"
-- Upload → AI curate → brand → export MLS-ready bundle
-- Agent manually uploads to MLS (but it's trivial with the prepared bundle)
-- $39-79/month, no MLS permission required
+### What was built in v0.9.0:
+1. **SocialContentAgent** — Instagram + Facebook captions via Claude, FHA compliant, Pro+ only
+2. **MLSExportAgent** — Dual ZIP bundles: MLS (unbranded, spec-compliant) + Marketing (branded, full content)
+3. **ContentAgent dual-tone** — Single Claude call returns `mls_safe` + `marketing` descriptions
+4. **Export endpoint** — `GET /listings/{id}/export?mode=mls|marketing` with presigned S3 URL
+5. **Demo pipeline** — Results-first onboarding: upload without auth → see AI results → register → claim
+6. **Temporal parallel Phase 2** — Content → [Brand + Social parallel] → MLS Export → Distribution
+7. **PRD v3** — Updated positioning, pricing copy, MLS compliance strategy
 
-### Phase 2: Power Feature
-"Automated MLS Upload" via browser automation (Playwright)
-- Agents connect MLS credentials
-- LaunchLens auto-uploads photos + metadata
-- $99-199/month, requires MLS compliance review
+### MLS Compliance Strategy:
+- **Phase 1 (NOW):** Export unbranded MLS bundles, branded content separate, agent manually uploads. LaunchLens is a prep tool.
+- **Phase 2:** Photo compliance scanner (detect branding/signs/people), two export modes already built
+- **Phase 3:** RESO Web API vendor certification. **No browser automation — ever.**
 
-### Phase 3: Enterprise
-"Stripe for Real Estate Listings"
-- Certified RESO/MLS vendor
-- Official listing input API
-- White-label to brokerages
-- $500-5,000/month
-
-### What needs to change in the codebase:
-1. **DistributionAgent** — Currently a stub. Needs to become MLS Export Agent (file packaging, download bundle, deep links)
-2. **New agent: SocialContentAgent** — Generate social media posts from listing data
-3. **New endpoint: GET /listings/{id}/export** — Download MLS-ready photo bundle as zip
-4. **PRD rewrite** — Reframe positioning, pricing, onboarding flow
-5. **Frontend** — Update copy, add export/download UI, social preview
-
-### What does NOT change:
-- All existing agents, models, services, API endpoints
-- Auth, payments, plan enforcement, admin dashboard
-- Docker Compose, CI/CD, Temporal wiring
-- The agent pipeline architecture (just add new agents)
+### What's next:
+- **Frontend** — Next.js 15 + React Three Fiber 3D interactive UI (plan at `docs/plans/2026-03-27-frontend.md`)
+- Frontend needs to add: demo dropzone landing page, export download UI, social preview, MLS vs Marketing toggle
 
 ---
 
@@ -263,11 +271,13 @@ The current build is a solid foundation. The strategic feedback recommends repos
 
 ## Pending Decisions
 
-1. **PRD rewrite** — Reposition as "Listing Media OS" before building more features?
-2. **New agents** — MLS Export Agent + Social Content Agent as next backend milestone?
+1. ~~PRD rewrite~~ — **DONE** (v0.9.0, PRD v3)
+2. ~~New agents~~ — **DONE** (SocialContentAgent, MLSExportAgent)
 3. **Frontend execution** — Build with Magic MCP after restart, or proceed without?
 4. **Production deployment** — Not yet planned (Kubernetes? ECS? Fly.io?)
 5. **Monitoring** — Not yet planned (logging, metrics, alerting)
+6. **Demo rate limiting** — Redis rate limiter wired but needs tuning (3/IP/day currently hardcoded)
+7. **Demo cleanup job** — Temporal cron workflow to delete expired demo listings (designed but not yet built)
 
 ---
 
@@ -286,7 +296,7 @@ DATABASE_URL="postgresql+asyncpg://launchlens:password@localhost:5433/launchlens
 DATABASE_URL_SYNC="postgresql://launchlens:password@localhost:5433/launchlens_test" \
 JWT_SECRET="dev-secret" python -m alembic upgrade head
 
-# Run tests (193 tests)
+# Run tests (214 tests)
 python -m pytest --tb=short -q
 
 # Start full stack
