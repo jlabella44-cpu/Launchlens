@@ -29,6 +29,8 @@ from launchlens.models.package_selection import PackageSelection
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.models.video_asset import VideoAsset
+from launchlens.services.endpoint_rate_limit import rate_limit
+from launchlens.services.events import emit_event
 from launchlens.services.plan_limits import check_asset_quota, check_listing_quota, get_limits
 from launchlens.services.storage import StorageService
 from launchlens.temporal_client import get_temporal_client
@@ -41,6 +43,7 @@ router = APIRouter()
 @router.post("", status_code=201, response_model=ListingResponse)
 async def create_listing(
     body: CreateListingRequest,
+    _rl=Depends(rate_limit(20, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -84,6 +87,7 @@ async def list_listings(
     search: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    _rl=Depends(rate_limit(60, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -188,10 +192,53 @@ async def get_dollhouse(
     }
 
 
+@router.post("/{listing_id}/upload-urls")
+async def get_upload_urls(
+    listing_id: uuid.UUID,
+    body: dict,
+    _rl=Depends(rate_limit(10, 60)),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate presigned S3 upload URLs for browser-direct uploads.
+
+    Request body: {"files": [{"filename": "photo1.jpg", "content_type": "image/jpeg"}, ...]}
+    Returns: {"upload_urls": [{"filename": ..., "upload": {...presigned post data...}}, ...]}
+    """
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    files = body.get("files", [])
+    if not files or len(files) > 50:
+        raise HTTPException(status_code=400, detail="Provide 1-50 files")
+
+    storage = StorageService()
+    upload_urls = []
+    for f in files:
+        filename = f.get("filename", "")
+        content_type = f.get("content_type", "image/jpeg")
+        key = f"listings/{listing_id}/uploads/{uuid.uuid4()}/{filename}"
+        try:
+            presigned = storage.presigned_upload_url(key=key, content_type=content_type)
+            upload_urls.append({"filename": filename, "key": key, "upload": presigned})
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    return {"upload_urls": upload_urls}
+
+
 @router.post("/{listing_id}/assets", status_code=201, response_model=CreateAssetsResponse)
 async def register_assets(
     listing_id: uuid.UUID,
     body: CreateAssetsRequest,
+    _rl=Depends(rate_limit(10, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -327,6 +374,13 @@ async def start_review(
         raise HTTPException(status_code=409, detail=f"Cannot start review: listing is {listing.state.value}")
 
     listing.state = ListingState.IN_REVIEW
+    await emit_event(
+        session=db,
+        event_type="listing.review_started",
+        payload={"user_id": str(current_user.id)},
+        tenant_id=str(current_user.tenant_id),
+        listing_id=str(listing.id),
+    )
     await db.commit()
     await db.refresh(listing)
     return {"listing_id": str(listing.id), "state": listing.state.value}
@@ -335,6 +389,7 @@ async def start_review(
 @router.post("/{listing_id}/approve")
 async def approve_listing(
     listing_id: uuid.UUID,
+    _rl=Depends(rate_limit(5, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
