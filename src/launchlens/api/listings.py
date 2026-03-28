@@ -485,3 +485,38 @@ async def upload_video(
         "video_type": video.video_type,
         "status": video.status,
     }
+
+
+@router.post("/{listing_id}/compliance")
+async def run_compliance_scan(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run photo compliance scan on a listing's packaged photos. Returns per-photo report."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    scannable = {
+        ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW,
+        ListingState.APPROVED, ListingState.EXPORTING, ListingState.DELIVERED,
+    }
+    if listing.state not in scannable:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Compliance scan requires packaged photos. Current state: {listing.state.value}",
+        )
+
+    from launchlens.agents.photo_compliance import PhotoComplianceAgent
+    from launchlens.agents.base import AgentContext
+
+    agent = PhotoComplianceAgent()
+    ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
+    report = await agent.execute(ctx)
+    return report

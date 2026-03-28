@@ -18,6 +18,12 @@ export function Nav() {
       </Link>
 
       <div className="flex items-center gap-4">
+        <Link
+          href="/pricing"
+          className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+        >
+          Pricing
+        </Link>
         {user && (
           <>
             <span className="text-sm text-[var(--color-text-secondary)]">

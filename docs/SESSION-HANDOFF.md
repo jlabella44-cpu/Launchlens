@@ -157,15 +157,19 @@ C:\Users\Jeff\launchlens\
 | v0.8.3 | CI/CD (lint, test, docker build workflows) | — |
 | v0.9.0 | Listing Media OS (SocialContentAgent, MLSExportAgent, dual-tone ContentAgent, export endpoint, demo pipeline, Temporal parallel Phase 2, PRD v3) | ~21 |
 | v0.9.1 | FloorplanAgent (GPT-4V floorplan → 3D dollhouse scene JSON, API endpoint) | ~8 |
+| v0.9.2 | Video Pipeline (VideoAgent/Kling, ChapterAgent, SocialCutAgent, video API, Temporal wiring) | ~16 |
+| v1.0.0 | Frontend 3D Interactive (Next.js + Three.js + Framer Motion, all pages + 3D components) | — |
+| v1.0.1 | Frontend Remaining Pages (demo dropzone, pricing, export, video player, social preview) | — |
 
-**Total: 222 tests, all passing.**
+**Total: 241 backend tests, all passing.**
 
-### Plans Written, Awaiting Execution
+### Plans Executed
 
-| Plan | File | Tasks | Key Features |
-|------|------|-------|-------------|
-| Frontend (3D Interactive) | `docs/plans/2026-03-27-frontend.md` | 5 | Next.js + Three.js + Framer Motion, glassmorphism, 3D tilt cards, FloatingHouse, PhotoOrbit, PipelineVisualizer |
-| Video Pipeline | `docs/plans/2026-03-27-video-pipeline.md` | 7 | Kling AI property tours (ported from Juke), ChapterAgent (GPT-4V auto-chapters), SocialCutAgent (platform clips), pro video showcase, user video upload |
+| Plan | File | Status |
+|------|------|--------|
+| Frontend (3D Interactive) | `docs/plans/2026-03-27-frontend.md` | DONE (v1.0.0) |
+| Video Pipeline | `docs/plans/2026-03-27-video-pipeline.md` | DONE (v0.9.2) |
+| Frontend Remaining Pages | `docs/plans/2026-03-27-frontend-remaining.md` | DONE (v1.0.1, PR open) |
 
 ### Key Resources
 - **Stitch project ID:** `15760518019862690508` (design system configured)
