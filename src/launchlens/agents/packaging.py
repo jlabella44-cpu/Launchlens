@@ -86,6 +86,10 @@ class PackagingAgent(BaseAgent):
                     listing_id=context.listing_id,
                 )
 
+                # Send review-ready notification email
+                from launchlens.services.notifications import notify_review_ready
+                await notify_review_ready(session, listing, context.tenant_id)
+
         return {"hero_asset_id": hero_asset_id, "total_selected": len(top)}
 
 

@@ -14,6 +14,7 @@ from launchlens.api import (
     demo,
     health,
     listings,
+    sse,
     tenant_settings,
 )
 from launchlens.config import settings
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
     app.include_router(bulk.router, prefix="/bulk", tags=["bulk"])
     app.include_router(brand_kit.router, prefix="/brand-kit", tags=["brand-kit"])
+    app.include_router(sse.router, tags=["sse"])
     app.include_router(health.router)
 
     return app
