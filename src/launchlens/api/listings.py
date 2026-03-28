@@ -20,7 +20,6 @@ from launchlens.api.schemas.listings import (
     ListingResponse,
     UpdateListingRequest,
 )
-from launchlens.services.storage import StorageService
 from launchlens.database import get_db
 from launchlens.models.asset import Asset
 from launchlens.models.listing import Listing, ListingState
@@ -28,6 +27,7 @@ from launchlens.models.package_selection import PackageSelection
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.services.plan_limits import check_asset_quota, check_listing_quota, get_limits
+from launchlens.services.storage import StorageService
 from launchlens.temporal_client import get_temporal_client
 
 logger = logging.getLogger(__name__)

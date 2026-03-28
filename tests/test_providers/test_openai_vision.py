@@ -1,9 +1,10 @@
-import pytest
-import asyncio
+
 import httpx
+import pytest
 from pytest_httpx import HTTPXMock
-from launchlens.providers.openai_vision import OpenAIVisionProvider
+
 from launchlens.providers.base import VisionLabel
+from launchlens.providers.openai_vision import OpenAIVisionProvider
 
 FAKE_GPT_RESPONSE = {
     "choices": [{
@@ -20,7 +21,7 @@ async def test_analyze_returns_vision_labels(httpx_mock: HTTPXMock):
     provider = OpenAIVisionProvider(api_key="test-key")
     labels = await provider.analyze(image_url="https://s3.example.com/photo.jpg")
     assert len(labels) == 2
-    assert all(isinstance(l, VisionLabel) for l in labels)
+    assert all(isinstance(lbl, VisionLabel) for lbl in labels)
     assert labels[0].name == "primary exterior"
     assert labels[0].category == "shot_type"
 

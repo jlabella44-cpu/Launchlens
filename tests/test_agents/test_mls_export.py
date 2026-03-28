@@ -2,9 +2,9 @@ import io
 import json
 import uuid
 import zipfile
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
 
 from launchlens.agents.base import AgentContext
 from launchlens.agents.mls_export import MLSExportAgent

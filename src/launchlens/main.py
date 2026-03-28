@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="LaunchLens", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="LaunchLens", version="0.9.0", lifespan=lifespan)
     app.middleware("http")(TenantMiddleware())
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])

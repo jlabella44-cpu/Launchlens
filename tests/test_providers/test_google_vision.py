@@ -1,8 +1,9 @@
-import pytest
 import httpx
+import pytest
 from pytest_httpx import HTTPXMock
-from launchlens.providers.google_vision import GoogleVisionProvider
+
 from launchlens.providers.base import VisionLabel
+from launchlens.providers.google_vision import GoogleVisionProvider
 
 FAKE_RESPONSE = {
     "responses": [{
@@ -21,7 +22,7 @@ async def test_analyze_returns_vision_labels(httpx_mock: HTTPXMock):
     provider = GoogleVisionProvider(api_key="test-key")
     labels = await provider.analyze(image_url="https://s3.example.com/photo.jpg")
     assert len(labels) == 3
-    assert all(isinstance(l, VisionLabel) for l in labels)
+    assert all(isinstance(lbl, VisionLabel) for lbl in labels)
     assert labels[0].name == "Living room"
     assert labels[0].confidence == pytest.approx(0.97)
 
@@ -31,7 +32,7 @@ async def test_analyze_maps_category_from_score(httpx_mock: HTTPXMock):
     httpx_mock.add_response(json=FAKE_RESPONSE)
     provider = GoogleVisionProvider(api_key="test-key")
     labels = await provider.analyze(image_url="https://s3.example.com/photo.jpg")
-    assert all(l.category == "general" for l in labels)
+    assert all(lbl.category == "general" for lbl in labels)
 
 
 @pytest.mark.asyncio
