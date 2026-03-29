@@ -7,10 +7,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from launchlens.api.deps import get_db_admin
-from launchlens.config import settings
-from launchlens.database import Base, get_db
-from launchlens.main import app
+from listingjet.api.deps import get_db_admin
+from listingjet.config import settings
+from listingjet.database import Base, get_db
+from listingjet.main import app
 
 TEST_DB_URL = "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test"
 
@@ -27,7 +27,7 @@ def _mock_rate_limiter_global():
     """Bypass Redis-backed rate limiter in all tests (Redis not available in CI)."""
     mock_limiter = MagicMock()
     mock_limiter.acquire.return_value = True
-    with patch("launchlens.middleware.rate_limit._get_limiter", return_value=mock_limiter):
+    with patch("listingjet.middleware.rate_limit._get_limiter", return_value=mock_limiter):
         yield
 
 
@@ -120,7 +120,7 @@ async def async_client(test_engine):
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_admin] = override_get_db_admin
 
-    import launchlens.api.health as health_module
+    import listingjet.api.health as health_module
     original_engine = health_module.engine
     health_module.engine = test_engine
 
@@ -139,7 +139,7 @@ async def two_tenants(async_client, db_session):
     tenant_a = str(uuid.uuid4())
     tenant_b = str(uuid.uuid4())
     # Create a listing for tenant_b directly in DB
-    from launchlens.models.listing import Listing, ListingState
+    from listingjet.models.listing import Listing, ListingState
 
     listing = Listing(
         tenant_id=tenant_b,

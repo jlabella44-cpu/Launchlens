@@ -5,7 +5,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -32,7 +32,7 @@ async def _create_listing(client: AsyncClient, token: str) -> str:
 
 async def _fund_account(db_session, tenant_id: str, amount: int = 10):
     """Give tenant credits via the service."""
-    from launchlens.services.credits import CreditService
+    from listingjet.services.credits import CreditService
     svc = CreditService()
     await svc.ensure_account(db_session, uuid.UUID(tenant_id))
     await svc.add_credits(
@@ -114,7 +114,7 @@ async def test_activate_addon_duplicate_409(async_client: AsyncClient, db_sessio
 async def test_activate_addon_insufficient_credits_402(async_client: AsyncClient, db_session):
     token, tenant_id = await _register(async_client)
     # Don't fund — ensure account with 0 credits
-    from launchlens.services.credits import CreditService
+    from listingjet.services.credits import CreditService
     svc = CreditService()
     await svc.ensure_account(db_session, uuid.UUID(tenant_id))
     await db_session.commit()

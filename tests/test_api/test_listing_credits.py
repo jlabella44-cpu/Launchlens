@@ -5,7 +5,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -24,8 +24,8 @@ def _auth(token: str) -> dict:
 
 async def _set_credit_billing(db_session, tenant_id: str, credits: int = 10, cost: int = 1):
     """Switch tenant to credit billing and fund their account."""
-    from launchlens.models.tenant import Tenant
-    from launchlens.services.credits import CreditService
+    from listingjet.models.tenant import Tenant
+    from listingjet.services.credits import CreditService
 
     tid = uuid.UUID(tenant_id)
     tenant = await db_session.get(Tenant, tid)
@@ -82,7 +82,7 @@ async def test_create_listing_legacy_billing_unchanged(async_client: AsyncClient
     token, tenant_id = await _register(async_client)
     # Default billing_model is "credit" per migration, but new tenants via register
     # may default differently. Set explicitly to legacy.
-    from launchlens.models.tenant import Tenant
+    from listingjet.models.tenant import Tenant
     tenant = await db_session.get(Tenant, uuid.UUID(tenant_id))
     tenant.billing_model = "legacy"
     await db_session.commit()
@@ -127,7 +127,7 @@ async def test_cancel_listing_refunds_credits(async_client: AsyncClient, db_sess
 async def test_cancel_listing_no_refund_legacy(async_client: AsyncClient, db_session):
     """Legacy billing cancel doesn't refund credits."""
     token, tenant_id = await _register(async_client)
-    from launchlens.models.tenant import Tenant
+    from listingjet.models.tenant import Tenant
     tenant = await db_session.get(Tenant, uuid.UUID(tenant_id))
     tenant.billing_model = "legacy"
     await db_session.commit()

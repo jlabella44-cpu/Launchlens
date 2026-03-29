@@ -5,7 +5,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register_admin(client: AsyncClient) -> tuple[str, str]:

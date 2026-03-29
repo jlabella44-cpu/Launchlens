@@ -1,6 +1,6 @@
 import pytest
 
-from launchlens.services.weight_manager import WeightManager
+from listingjet.services.weight_manager import WeightManager
 
 TENANT = "tenant-abc"
 ROOM = "kitchen"

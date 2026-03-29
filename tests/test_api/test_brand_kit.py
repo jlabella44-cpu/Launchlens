@@ -6,7 +6,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -27,8 +27,8 @@ def _auth(token: str) -> dict:
 def _mock_rate_limiter():
     limiter = MagicMock()
     limiter.acquire.return_value = True
-    with patch("launchlens.middleware.rate_limit._get_limiter", return_value=limiter), \
-         patch("launchlens.services.rate_limiter.RateLimiter", return_value=limiter):
+    with patch("listingjet.middleware.rate_limit._get_limiter", return_value=limiter), \
+         patch("listingjet.services.rate_limiter.RateLimiter", return_value=limiter):
         yield
 
 
@@ -90,7 +90,7 @@ async def test_logo_upload_url(_mock_rate_limiter, async_client):
     mock_storage = MagicMock()
     mock_storage.presigned_upload_url.return_value = "https://s3.example.com/presigned"
 
-    with patch("launchlens.api.brand_kit.StorageService", return_value=mock_storage):
+    with patch("listingjet.api.brand_kit.StorageService", return_value=mock_storage):
         resp = await async_client.post("/brand-kit/logo-upload-url", headers=_auth(token))
 
     assert resp.status_code == 200

@@ -6,7 +6,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -86,7 +86,7 @@ async def test_register_assets_requires_auth(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@patch("launchlens.api.listings.get_temporal_client")
+@patch("listingjet.api.listings.get_temporal_client")
 async def test_register_assets_triggers_pipeline(mock_get_client, async_client: AsyncClient):
     """Registering assets should start the Temporal pipeline."""
     mock_client = AsyncMock()

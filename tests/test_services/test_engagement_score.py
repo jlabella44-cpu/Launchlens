@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from launchlens.services.engagement_score import predict_engagement
+from listingjet.services.engagement_score import predict_engagement
 
 
 def _vr(quality=50, commercial=50, hero=False, room_label=None):

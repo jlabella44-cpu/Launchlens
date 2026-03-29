@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from launchlens.models.outbox import Outbox
-from launchlens.services.outbox_poller import OutboxPoller
+from listingjet.models.outbox import Outbox
+from listingjet.services.outbox_poller import OutboxPoller
 
 
 @pytest.mark.asyncio

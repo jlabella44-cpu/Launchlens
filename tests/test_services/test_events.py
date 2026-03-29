@@ -3,9 +3,9 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-from launchlens.models.event import Event
-from launchlens.models.outbox import Outbox
-from launchlens.services.events import emit_event
+from listingjet.models.event import Event
+from listingjet.models.outbox import Outbox
+from listingjet.services.events import emit_event
 
 
 @pytest.mark.asyncio

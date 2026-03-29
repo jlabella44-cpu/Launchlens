@@ -6,17 +6,17 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.floorplan import FLOORPLAN_EXTRACTION_PROMPT, FloorplanAgent
-from launchlens.models.asset import Asset
-from launchlens.models.dollhouse_scene import DollhouseScene
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.vision_result import VisionResult
+from listingjet.agents.base import AgentContext
+from listingjet.agents.floorplan import FLOORPLAN_EXTRACTION_PROMPT, FloorplanAgent
+from listingjet.models.asset import Asset
+from listingjet.models.dollhouse_scene import DollhouseScene
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.vision_result import VisionResult
 from tests.test_agents.conftest import make_session_factory
 
 
 def test_dollhouse_scene_model_exists():
-    from launchlens.models.dollhouse_scene import DollhouseScene
+    from listingjet.models.dollhouse_scene import DollhouseScene
     assert hasattr(DollhouseScene, "listing_id")
     assert hasattr(DollhouseScene, "scene_json")
     assert hasattr(DollhouseScene, "room_count")
@@ -148,7 +148,7 @@ async def test_floorplan_agent_emits_event(db_session, listing_with_floorplan):
     )
     await agent.execute(ctx)
 
-    from launchlens.models.event import Event
+    from listingjet.models.event import Event
     events = (await db_session.execute(
         select(Event).where(Event.event_type == "floorplan.completed")
     )).scalars().all()

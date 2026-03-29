@@ -1,6 +1,6 @@
 import pytest
 
-from launchlens.services.fha_filter import fha_check
+from listingjet.services.fha_filter import fha_check
 
 
 @pytest.mark.parametrize("text,should_flag", [

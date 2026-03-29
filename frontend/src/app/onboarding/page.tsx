@@ -67,7 +67,7 @@ function OnboardingFlow() {
       .catch(() => setHasBrandKit(false));
 
     // Load completed steps from localStorage
-    const saved = localStorage.getItem("launchlens_onboarding_done");
+    const saved = localStorage.getItem("listingjet_onboarding_done");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -82,7 +82,7 @@ function OnboardingFlow() {
     const step = STEPS[currentStep];
     const updated = new Set([...completedSteps, step.id]);
     setCompletedSteps(updated);
-    localStorage.setItem("launchlens_onboarding_done", JSON.stringify([...updated]));
+    localStorage.setItem("listingjet_onboarding_done", JSON.stringify([...updated]));
 
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -92,7 +92,7 @@ function OnboardingFlow() {
   }
 
   function handleFinish() {
-    localStorage.setItem("launchlens_onboarding_done", JSON.stringify([...completedSteps, STEPS[currentStep].id]));
+    localStorage.setItem("listingjet_onboarding_done", JSON.stringify([...completedSteps, STEPS[currentStep].id]));
     router.push("/listings");
   }
 
@@ -108,7 +108,7 @@ function OnboardingFlow() {
             className="text-3xl font-bold text-[var(--color-text)] mb-2"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Welcome to LaunchLens
+            Welcome to ListingJet
           </h1>
           <p className="text-[var(--color-text-secondary)] mb-8">
             Let&apos;s get you set up in a few quick steps.

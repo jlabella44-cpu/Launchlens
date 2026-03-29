@@ -6,7 +6,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -44,7 +44,7 @@ async def test_get_balance_after_add(async_client: AsyncClient, db_session):
     token, tenant_id = await _register(async_client)
 
     # Add credits via service
-    from launchlens.services.credits import CreditService
+    from listingjet.services.credits import CreditService
     svc = CreditService()
     await svc.ensure_account(db_session, uuid.UUID(tenant_id))
     await svc.add_credits(
@@ -77,7 +77,7 @@ async def test_get_transactions_after_deduct(async_client: AsyncClient, db_sessi
     token, tenant_id = await _register(async_client)
     tid = uuid.UUID(tenant_id)
 
-    from launchlens.services.credits import CreditService
+    from listingjet.services.credits import CreditService
     svc = CreditService()
     await svc.ensure_account(db_session, tid)
     await svc.add_credits(db_session, tid, 10, transaction_type="purchase", reference_id=str(uuid.uuid4()))
@@ -145,7 +145,7 @@ async def test_purchase_creates_checkout(async_client: AsyncClient):
     mock_session.url = "https://checkout.stripe.com/test"
 
     with (
-        patch("launchlens.api.credits.settings") as mock_settings,
+        patch("listingjet.api.credits.settings") as mock_settings,
         patch("stripe.checkout.Session.create", return_value=mock_session),
     ):
         mock_settings.stripe_price_credit_bundle_5 = "price_test_5"

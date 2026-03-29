@@ -3,8 +3,8 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-from launchlens.models.api_key import APIKey
-from launchlens.services.api_keys import create_api_key, generate_key, hash_key, validate_api_key
+from listingjet.models.api_key import APIKey
+from listingjet.services.api_keys import create_api_key, generate_key, hash_key, validate_api_key
 
 
 def test_generate_key_format():

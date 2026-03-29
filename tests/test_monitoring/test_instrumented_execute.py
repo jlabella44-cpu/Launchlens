@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from launchlens.agents.base import AgentContext, BaseAgent
+from listingjet.agents.base import AgentContext, BaseAgent
 
 
 class DummyAgent(BaseAgent):
@@ -33,7 +33,7 @@ async def test_instrumented_execute_tracks_duration():
     agent = DummyAgent()
     ctx = AgentContext(listing_id="lid", tenant_id="tid")
 
-    with patch("launchlens.agents.base.StepTimer") as MockTimer:
+    with patch("listingjet.agents.base.StepTimer") as MockTimer:
         mock_instance = MockTimer.return_value
         mock_instance.__enter__ = lambda self: self
         mock_instance.__exit__ = lambda self, *args: False

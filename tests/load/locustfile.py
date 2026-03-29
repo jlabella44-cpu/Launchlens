@@ -1,5 +1,5 @@
 """
-LaunchLens load tests.
+ListingJet load tests.
 
 Usage:
     locust -f tests/load/locustfile.py --host http://localhost:8000 --headless -u 50 -r 10 -t 60s
@@ -9,7 +9,7 @@ import uuid
 from locust import HttpUser, between, task
 
 
-class LaunchLensUser(HttpUser):
+class ListingJetUser(HttpUser):
     wait_time = between(0.5, 2)
 
     def on_start(self):

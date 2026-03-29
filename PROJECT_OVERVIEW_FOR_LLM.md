@@ -1,8 +1,8 @@
-# LaunchLens — Project Overview for LLM Sessions
+# ListingJet — Project Overview for LLM Sessions
 
 **Tagline:** "From raw listing media to launch-ready marketing in minutes."
 
-LaunchLens is a multi-tenant real estate listing media SaaS. Photographers and agents upload raw photos; a 15-agent AI pipeline curates, scores, packages, and delivers MLS-compliant bundles, branded content, AI descriptions, social captions, floor plan 3D scenes, and cinematic video tours. The frontend is a 3D interactive Next.js app.
+ListingJet is a multi-tenant real estate listing media SaaS. Photographers and agents upload raw photos; a 15-agent AI pipeline curates, scores, packages, and delivers MLS-compliant bundles, branded content, AI descriptions, social captions, floor plan 3D scenes, and cinematic video tours. The frontend is a 3D interactive Next.js app.
 
 ---
 
@@ -29,7 +29,7 @@ LaunchLens is a multi-tenant real estate listing media SaaS. Photographers and a
 ## Repository Layout
 
 ```
-src/launchlens/
+src/listingjet/
   main.py                    FastAPI app factory (create_app, lifespan, router mounts)
   config.py                  Settings (pydantic-settings, .env)
   database.py                SQLAlchemy engine, AsyncSessionLocal, get_db (sets RLS), get_db_admin
@@ -329,10 +329,10 @@ docker compose up -d postgres postgres-test redis temporal temporal-ui
 python -m alembic upgrade head
 
 # API
-uvicorn launchlens.main:app --reload --port 8000
+uvicorn listingjet.main:app --reload --port 8000
 
 # Worker
-python -m launchlens.workflows.worker
+python -m listingjet.workflows.worker
 
 # Tests
 python -m pytest --tb=short -q

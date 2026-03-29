@@ -6,7 +6,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -27,7 +27,7 @@ def _auth(token: str) -> dict:
 def _mock_rate_limiter():
     limiter = MagicMock()
     limiter.acquire.return_value = True
-    with patch("launchlens.middleware.rate_limit._get_limiter", return_value=limiter):
+    with patch("listingjet.middleware.rate_limit._get_limiter", return_value=limiter):
         yield
 
 
@@ -99,7 +99,7 @@ async def test_test_webhook_success(_mock_rate_limiter, async_client):
     )
 
     # Mock the delivery
-    with patch("launchlens.services.webhook_delivery.deliver_webhook", new_callable=AsyncMock, return_value=True):
+    with patch("listingjet.services.webhook_delivery.deliver_webhook", new_callable=AsyncMock, return_value=True):
         resp = await async_client.post("/settings/test-webhook", headers=_auth(token))
 
     assert resp.status_code == 200

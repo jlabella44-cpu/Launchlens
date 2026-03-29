@@ -11,10 +11,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.content import ContentAgent
-from launchlens.agents.ingestion import IngestionAgent
-from launchlens.agents.photo_compliance import PhotoComplianceAgent
+from listingjet.agents.base import AgentContext
+from listingjet.agents.content import ContentAgent
+from listingjet.agents.ingestion import IngestionAgent
+from listingjet.agents.photo_compliance import PhotoComplianceAgent
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ class TestPhotoComplianceVisionFailure:
             storage_service=mock_storage,
             session_factory=factory,
         )
-        with patch("launchlens.agents.photo_compliance.emit_event", new_callable=AsyncMock):
+        with patch("listingjet.agents.photo_compliance.emit_event", new_callable=AsyncMock):
             result = await agent.execute(ctx)
 
         assert result["all_compliant"] is True
@@ -199,7 +199,7 @@ class TestPhotoComplianceVisionFailure:
             storage_service=mock_storage,
             session_factory=factory,
         )
-        with patch("launchlens.agents.photo_compliance.emit_event", new_callable=AsyncMock):
+        with patch("listingjet.agents.photo_compliance.emit_event", new_callable=AsyncMock):
             result = await agent.execute(ctx)
 
         assert result["all_compliant"] is True

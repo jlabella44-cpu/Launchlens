@@ -89,7 +89,7 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
 
-  # ── LaunchLens API ───────────────────────────────────────────
+  # ── ListingJet API ───────────────────────────────────────────
   api:
     build: .
     command: api
@@ -117,7 +117,7 @@ services:
       temporal:
         condition: service_started
 
-  # ── LaunchLens Temporal Worker ───────────────────────────────
+  # ── ListingJet Temporal Worker ───────────────────────────────
   worker:
     build: .
     command: worker

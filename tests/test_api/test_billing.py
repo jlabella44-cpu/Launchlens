@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from httpx import AsyncClient
 
-from launchlens.models.tenant import Tenant
-from launchlens.services.billing import BillingService
+from listingjet.models.tenant import Tenant
+from listingjet.services.billing import BillingService
 
 
 def test_tenant_has_stripe_fields():
@@ -35,7 +35,7 @@ def _make_tenant(**overrides):
     return t
 
 
-@patch("launchlens.services.billing.stripe")
+@patch("listingjet.services.billing.stripe")
 def test_create_customer(mock_stripe):
     mock_stripe.Customer.create.return_value = MagicMock(id="cus_test123")
     svc = BillingService()
@@ -44,26 +44,26 @@ def test_create_customer(mock_stripe):
     mock_stripe.Customer.create.assert_called_once()
 
 
-@patch("launchlens.services.billing.stripe")
+@patch("listingjet.services.billing.stripe")
 def test_create_checkout_session(mock_stripe):
     mock_stripe.checkout.Session.create.return_value = MagicMock(url="https://checkout.stripe.com/pay/cs_test")
     svc = BillingService()
     url = svc.create_checkout_session(
         customer_id="cus_test123",
         price_id="price_pro",
-        success_url="https://app.launchlens.com/billing?success=true",
-        cancel_url="https://app.launchlens.com/billing?canceled=true",
+        success_url="https://app.listingjet.com/billing?success=true",
+        cancel_url="https://app.listingjet.com/billing?canceled=true",
     )
     assert url == "https://checkout.stripe.com/pay/cs_test"
 
 
-@patch("launchlens.services.billing.stripe")
+@patch("listingjet.services.billing.stripe")
 def test_create_portal_session(mock_stripe):
     mock_stripe.billing_portal.Session.create.return_value = MagicMock(url="https://billing.stripe.com/session/xyz")
     svc = BillingService()
     url = svc.create_portal_session(
         customer_id="cus_test123",
-        return_url="https://app.launchlens.com/billing",
+        return_url="https://app.listingjet.com/billing",
     )
     assert url == "https://billing.stripe.com/session/xyz"
 
@@ -75,7 +75,7 @@ def test_resolve_plan_from_price():
 
 
 @pytest.mark.asyncio
-@patch("launchlens.api.billing.BillingService")
+@patch("listingjet.api.billing.BillingService")
 async def test_checkout_returns_url(MockBilling, async_client: AsyncClient):
     email = f"test-{uuid.uuid4()}@example.com"
     reg = await async_client.post("/auth/register", json={
@@ -125,9 +125,9 @@ async def test_checkout_requires_auth(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@patch("launchlens.api.billing.BillingService")
+@patch("listingjet.api.billing.BillingService")
 async def test_webhook_checkout_completed_updates_plan(MockBilling, async_client: AsyncClient, db_session):
-    from launchlens.models.tenant import Tenant
+    from listingjet.models.tenant import Tenant
 
     tenant = Tenant(
         id=uuid.uuid4(), name="WebhookCo", plan="starter",
@@ -160,9 +160,9 @@ async def test_webhook_checkout_completed_updates_plan(MockBilling, async_client
 
 
 @pytest.mark.asyncio
-@patch("launchlens.api.billing.BillingService")
+@patch("listingjet.api.billing.BillingService")
 async def test_webhook_subscription_deleted_downgrades(MockBilling, async_client: AsyncClient, db_session):
-    from launchlens.models.tenant import Tenant
+    from listingjet.models.tenant import Tenant
 
     tenant = Tenant(
         id=uuid.uuid4(), name="DowngradeCo", plan="pro",

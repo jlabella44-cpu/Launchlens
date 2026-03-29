@@ -1,7 +1,7 @@
 import pytest
 
-from launchlens.providers.base import LLMProvider, TemplateProvider, VisionLabel, VisionProvider
-from launchlens.providers.mock import MockLLMProvider, MockTemplateProvider, MockVisionProvider
+from listingjet.providers.base import LLMProvider, TemplateProvider, VisionLabel, VisionProvider
+from listingjet.providers.mock import MockLLMProvider, MockTemplateProvider, MockVisionProvider
 
 
 def test_vision_label_dataclass():

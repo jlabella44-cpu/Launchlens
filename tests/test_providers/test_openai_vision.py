@@ -3,8 +3,8 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from launchlens.providers.base import VisionLabel
-from launchlens.providers.openai_vision import OpenAIVisionProvider
+from listingjet.providers.base import VisionLabel
+from listingjet.providers.openai_vision import OpenAIVisionProvider
 
 FAKE_GPT_RESPONSE = {
     "choices": [{

@@ -5,12 +5,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.watermark import WatermarkAgent
-from launchlens.models.asset import Asset
-from launchlens.models.brand_kit import BrandKit
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.package_selection import PackageSelection
+from listingjet.agents.base import AgentContext
+from listingjet.agents.watermark import WatermarkAgent
+from listingjet.models.asset import Asset
+from listingjet.models.brand_kit import BrandKit
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.package_selection import PackageSelection
 from tests.test_agents.conftest import make_session_factory
 
 

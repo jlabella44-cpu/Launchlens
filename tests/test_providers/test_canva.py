@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from launchlens.providers.canva import CanvaTemplateProvider as CanvaProvider
+from listingjet.providers.canva import CanvaTemplateProvider as CanvaProvider
 
 
 def _make_mock_llm(design_json: dict) -> MagicMock:
@@ -44,7 +44,7 @@ async def test_render_flyer_calls_claude_then_canva():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("launchlens.providers.canva.httpx.AsyncClient", return_value=mock_client):
+    with patch("listingjet.providers.canva.httpx.AsyncClient", return_value=mock_client):
         provider = CanvaProvider(api_token="test_token", llm_provider=mock_llm)
         url = await provider.render_flyer(
             listing_details={"beds": 3, "baths": 2, "price": 450000},
@@ -104,7 +104,7 @@ async def test_render_with_canva_sends_auth_header():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("launchlens.providers.canva.httpx.AsyncClient", return_value=mock_client):
+    with patch("listingjet.providers.canva.httpx.AsyncClient", return_value=mock_client):
         provider = CanvaProvider(api_token="secret_token")
         await provider._render_with_canva(SAMPLE_DESIGN)
 
@@ -136,7 +136,7 @@ async def test_render_flyer_passes_brand_color_to_llm():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("launchlens.providers.canva.httpx.AsyncClient", return_value=mock_client):
+    with patch("listingjet.providers.canva.httpx.AsyncClient", return_value=mock_client):
         provider = CanvaProvider(api_token="tok", llm_provider=mock_llm)
         await provider.render_flyer(
             listing_details={"beds": 4},

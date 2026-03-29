@@ -6,9 +6,9 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy import select
 
-from launchlens.models.outbox import Outbox
-from launchlens.models.listing import Listing
-from launchlens.services.data_retention import (
+from listingjet.models.outbox import Outbox
+from listingjet.models.listing import Listing
+from listingjet.services.data_retention import (
     EXPORT_RETENTION_DAYS,
     OUTBOX_RETENTION_DAYS,
     cleanup_delivered_outbox,

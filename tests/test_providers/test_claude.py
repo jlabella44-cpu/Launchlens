@@ -2,12 +2,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from launchlens.providers.base import LLMProvider
-from launchlens.providers.claude import ClaudeProvider
+from listingjet.providers.base import LLMProvider
+from listingjet.providers.claude import ClaudeProvider
 
 
 def test_claude_provider_is_llm_provider():
-    with patch("launchlens.providers.claude.anthropic"):
+    with patch("listingjet.providers.claude.anthropic"):
         provider = ClaudeProvider(api_key="test-key")
         assert isinstance(provider, LLMProvider)
 
@@ -20,7 +20,7 @@ async def test_complete_returns_string():
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=mock_message)
 
-    with patch("launchlens.providers.claude.anthropic") as mock_anthropic:
+    with patch("listingjet.providers.claude.anthropic") as mock_anthropic:
         mock_anthropic.AsyncAnthropic.return_value = mock_client
         provider = ClaudeProvider(api_key="test-key")
         result = await provider.complete(
@@ -45,7 +45,7 @@ async def test_complete_includes_context_in_prompt():
 
     mock_client.messages.create = capture
 
-    with patch("launchlens.providers.claude.anthropic") as mock_anthropic:
+    with patch("listingjet.providers.claude.anthropic") as mock_anthropic:
         mock_anthropic.AsyncAnthropic.return_value = mock_client
         provider = ClaudeProvider(api_key="test-key")
         await provider.complete(

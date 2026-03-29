@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.mls_export import MLSExportAgent
-from launchlens.models.asset import Asset
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.outbox import Outbox
-from launchlens.models.package_selection import PackageSelection
-from launchlens.models.social_content import SocialContent
-from launchlens.models.vision_result import VisionResult
+from listingjet.agents.base import AgentContext
+from listingjet.agents.mls_export import MLSExportAgent
+from listingjet.models.asset import Asset
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.outbox import Outbox
+from listingjet.models.package_selection import PackageSelection
+from listingjet.models.social_content import SocialContent
+from listingjet.models.vision_result import VisionResult
 
 from .conftest import make_session_factory
 

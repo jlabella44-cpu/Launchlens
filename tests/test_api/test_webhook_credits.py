@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from launchlens.models.tenant import Tenant
+from listingjet.models.tenant import Tenant
 
 
 def _make_stripe_event(event_type: str, data_object: dict, event_id: str = "evt_test_123"):
@@ -44,7 +44,7 @@ async def _get_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> Tenant:
 
 
 async def _fire_webhook(async_client: AsyncClient, event: MagicMock) -> int:
-    with patch("launchlens.api.billing.BillingService") as MockSvc:
+    with patch("listingjet.api.billing.BillingService") as MockSvc:
         mock_svc = MockSvc.return_value
         mock_svc.construct_webhook_event.return_value = event
         mock_svc.resolve_plan.return_value = "enterprise"

@@ -6,7 +6,7 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
+from listingjet.config import settings
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -25,7 +25,7 @@ def _auth(token: str) -> dict:
 
 async def _fund_account(db_session, tenant_id: str, amount: int = 10):
     """Give tenant credits via the service."""
-    from launchlens.services.credits import CreditService
+    from listingjet.services.credits import CreditService
     svc = CreditService()
     await svc.ensure_account(db_session, uuid.UUID(tenant_id))
     await svc.add_credits(
@@ -40,8 +40,8 @@ async def _fund_account(db_session, tenant_id: str, amount: int = 10):
 def _mock_rate_limiter():
     limiter = MagicMock()
     limiter.acquire.return_value = True
-    with patch("launchlens.middleware.rate_limit._get_limiter", return_value=limiter), \
-         patch("launchlens.services.rate_limiter.RateLimiter", return_value=limiter):
+    with patch("listingjet.middleware.rate_limit._get_limiter", return_value=limiter), \
+         patch("listingjet.services.rate_limiter.RateLimiter", return_value=limiter):
         yield
 
 

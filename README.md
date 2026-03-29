@@ -1,8 +1,8 @@
-# LaunchLens — Listing Media OS
+# ListingJet — Listing Media OS
 
 > From raw listing media to launch-ready marketing in minutes.
 
-LaunchLens is an AI-powered real estate listing media platform. Photographers and agents upload raw photos; a 15-agent AI pipeline automatically curates, scores, packages, and delivers MLS-compliant bundles, branded flyers, listing descriptions, social captions, floor plan visualizations, and cinematic video tours — all in one workflow.
+ListingJet is an AI-powered real estate listing media platform. Photographers and agents upload raw photos; a 15-agent AI pipeline automatically curates, scores, packages, and delivers MLS-compliant bundles, branded flyers, listing descriptions, social captions, floor plan visualizations, and cinematic video tours — all in one workflow.
 
 [![CI](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/test.yml/badge.svg)](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/test.yml)
 [![Lint](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/lint.yml/badge.svg)](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/lint.yml)
@@ -122,10 +122,10 @@ python -m alembic upgrade head
 
 ```bash
 # Terminal 1 — API server
-uvicorn launchlens.main:app --reload --port 8000
+uvicorn listingjet.main:app --reload --port 8000
 
 # Terminal 2 — Temporal worker
-python -m launchlens.workflows.worker
+python -m listingjet.workflows.worker
 ```
 
 ### 5. (Optional) Start the frontend
@@ -204,7 +204,7 @@ See [`.env.example`](.env.example) for all configuration options with comments.
 ## Project Structure
 
 ```
-src/launchlens/
+src/listingjet/
   main.py              FastAPI app factory + lifespan
   config.py            Settings (pydantic-settings, .env)
   database.py          SQLAlchemy engine, sessions, RLS helper

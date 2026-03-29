@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from launchlens.services.feature_tags import extract_features
+from listingjet.services.feature_tags import extract_features
 
 
 def _vr(labels: list[str]):

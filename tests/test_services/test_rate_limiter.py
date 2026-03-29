@@ -1,7 +1,7 @@
 import fakeredis
 import pytest
 
-from launchlens.services.rate_limiter import RateLimiter
+from listingjet.services.rate_limiter import RateLimiter
 
 
 @pytest.fixture

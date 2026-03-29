@@ -1,4 +1,4 @@
-from launchlens.services.pii_filter import sanitize_for_prompt
+from listingjet.services.pii_filter import sanitize_for_prompt
 
 
 def test_strips_pii_fields():

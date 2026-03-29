@@ -5,8 +5,8 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 
 export const metadata: Metadata = {
-  title: "LaunchLens — Listing Media OS",
-  description: "From raw listing media to launch-ready marketing in minutes.",
+  title: "ListingJet — Put Your Listings on Autopilot",
+  description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
 };
 
 export default function RootLayout({

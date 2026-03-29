@@ -4,14 +4,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.social_content import SocialContentAgent
-from launchlens.models.asset import Asset
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.outbox import Outbox
-from launchlens.models.package_selection import PackageSelection
-from launchlens.models.social_content import SocialContent
-from launchlens.models.vision_result import VisionResult
+from listingjet.agents.base import AgentContext
+from listingjet.agents.social_content import SocialContentAgent
+from listingjet.models.asset import Asset
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.outbox import Outbox
+from listingjet.models.package_selection import PackageSelection
+from listingjet.models.social_content import SocialContent
+from listingjet.models.vision_result import VisionResult
 from tests.test_agents.conftest import make_session_factory
 
 _VALID_RESPONSE = json.dumps({
