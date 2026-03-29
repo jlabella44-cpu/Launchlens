@@ -67,19 +67,8 @@ class StorageService:
             ExpiresIn=expires_in,
         )
 
-    def presigned_upload_url(
-        self, key: str, content_type: str = "image/jpeg", expires_in: int = 900,
-    ) -> str:
-        """Generate a presigned PUT URL for direct browser upload."""
-        return self._client.generate_presigned_url(
-            "put_object",
-            Params={
-                "Bucket": self._bucket,
-                "Key": key,
-                "ContentType": content_type,
-            },
-            ExpiresIn=expires_in,
-        )
+    # Removed duplicate presigned_upload_url — use the one above (line 39)
+    # which validates content types and enforces upload size limits.
 
     def download(self, key: str) -> bytes:
         """Download an object from S3 and return its bytes."""

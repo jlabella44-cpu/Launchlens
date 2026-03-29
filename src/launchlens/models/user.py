@@ -10,7 +10,8 @@ from launchlens.database import Base
 
 
 class UserRole(str, enum.Enum):
-    ADMIN = "admin"
+    SUPERADMIN = "superadmin"  # platform-level: can manage all tenants
+    ADMIN = "admin"            # tenant-level: manages own tenant
     OPERATOR = "operator"
     AGENT = "agent"
     VIEWER = "viewer"

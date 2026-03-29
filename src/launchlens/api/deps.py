@@ -32,8 +32,16 @@ async def get_current_user(
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != UserRole.ADMIN:
+    """Tenant admin — manages own tenant."""
+    if user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         raise HTTPException(status_code=403, detail="Admin role required")
+    return user
+
+
+async def require_superadmin(user: User = Depends(get_current_user)) -> User:
+    """Platform superadmin — can manage all tenants."""
+    if user.role != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
     return user
 
 

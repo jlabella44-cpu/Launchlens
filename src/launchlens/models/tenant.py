@@ -14,7 +14,6 @@ class Tenant(Base):
     plan: Mapped[str] = mapped_column(String(50), default="starter")
     plan_tier: Mapped[str] = mapped_column(String(50), default="lite")
     billing_model: Mapped[str] = mapped_column(String(50), default="credit")
-    included_credits: Mapped[int] = mapped_column(Integer, default=0)
     per_listing_credit_cost: Mapped[int] = mapped_column(Integer, default=1)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)

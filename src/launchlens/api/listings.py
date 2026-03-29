@@ -594,21 +594,19 @@ async def reject_listing(
         raise HTTPException(status_code=400, detail=f"Invalid reason. Must be one of: {valid_reasons}")
 
     listing.state = ListingState.FAILED
+
+    # Emit event BEFORE commit — outbox atomicity
+    from launchlens.services.events import emit_event
+    await emit_event(
+        session=db,
+        event_type="listing.rejected",
+        payload={"reason": reason, "detail": body.get("detail", "")},
+        tenant_id=str(current_user.tenant_id),
+        listing_id=str(listing.id),
+    )
+
     await db.commit()
     await db.refresh(listing)
-
-    # Emit audit event
-    try:
-        from launchlens.services.events import emit_event
-        await emit_event(
-            session=db,
-            event_type="listing.rejected",
-            payload={"reason": reason, "detail": body.get("detail", "")},
-            tenant_id=current_user.tenant_id,
-            listing_id=listing.id,
-        )
-    except Exception:
-        logger.exception("Failed to emit rejection event for listing %s", listing.id)
 
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
