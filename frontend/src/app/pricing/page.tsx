@@ -9,65 +9,69 @@ import { Button } from "@/components/ui/button";
 
 const TIERS = [
   {
-    name: "Lite",
-    price: 19,
+    name: "Free",
+    price: 0,
     period: "mo",
-    description: "For occasional listings. Pay per listing, no commitment.",
+    description: "Try LaunchLens risk-free. No subscription required.",
     includedCredits: 0,
-    perListingPrice: 19,
+    perListingPrice: 34,
     features: [
-      "Pay-as-you-go listings",
+      "$34 per listing",
       "MLS + marketing bundles",
       "AI photo analysis",
-      "Branded flyers",
+      "30-day asset hosting",
+      "LaunchLens watermark",
+    ],
+    addons: true,
+  },
+  {
+    name: "Lite",
+    price: 9,
+    period: "mo",
+    description: "For solo agents. Lower per-listing cost, permanent hosting.",
+    includedCredits: 0,
+    perListingPrice: 24,
+    features: [
+      "$24 per listing (save 29%)",
+      "Permanent asset hosting",
+      "Your logo + brand colors",
+      "Priority processing queue",
+      "Credit rollover (cap: 3)",
     ],
     addons: true,
   },
   {
     name: "Active Agent",
-    price: 39,
+    price: 29,
     period: "mo",
     recommended: true,
-    description: "For agents listing 3-5 properties/month.",
+    description: "For busy agents listing 4-8 properties/month.",
     includedCredits: 1,
-    perListingPrice: 14,
+    perListingPrice: 17,
     features: [
-      "1 included listing credit/month",
-      "Lower per-listing price",
-      "Unused credits roll over (cap: 3)",
-      "All Lite features",
-    ],
-    addons: true,
-  },
-  {
-    name: "Team",
-    price: 99,
-    period: "mo",
-    description: "For brokerages and teams. Pooled credits, admin features.",
-    includedCredits: 5,
-    perListingPrice: 10,
-    features: [
-      "5 pooled listing credits/month",
-      "Team member management",
-      "Volume credit pricing",
-      "Priority support",
-      "Rollover cap: 10 credits",
+      "1 included listing/month",
+      "$17 per additional listing",
+      "Full white-label (no watermark)",
+      "Top priority processing",
+      "All integrations (MLS, CRM)",
+      "Credit rollover (cap: 10)",
     ],
     addons: true,
   },
 ];
 
 const CREDIT_BUNDLES = [
-  { size: 5, price: 95, perCredit: 19 },
-  { size: 10, price: 140, perCredit: 14 },
-  { size: 25, price: 300, perCredit: 12 },
-  { size: 50, price: 500, perCredit: 10 },
+  { size: 1, price: 34, perCredit: 34 },
+  { size: 3, price: 72, perCredit: 24 },
+  { size: 5, price: 100, perCredit: 20 },
+  { size: 10, price: 170, perCredit: 17 },
+  { size: 25, price: 375, perCredit: 15 },
 ];
 
 const ADDONS = [
-  { name: "AI Video Tour", cost: "1 credit", description: "AI-generated property tour video" },
-  { name: "3D Floorplan", cost: "1 credit", description: "Interactive 3D floorplan visualization" },
-  { name: "Social Content Pack", cost: "1 credit", description: "Instagram + Facebook captions & hashtags" },
+  { name: "AI Video Tour", cost: "from $24", description: "AI-generated property tour video with voiceover" },
+  { name: "3D Floorplan", cost: "from $24", description: "Interactive 3D floorplan visualization" },
+  { name: "Social Content Pack", cost: "1 credit", description: "5 hook variants per platform (Instagram + Facebook)" },
 ];
 
 export default function PricingPage() {
@@ -211,11 +215,11 @@ export default function PricingPage() {
                   Annual Credit Bank
                 </h3>
                 <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-                  $399/year with 25 listing credits included. Best value for consistent agents.
+                  $349/year with 25 listing credits included. Best value for consistent agents.
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-bold text-[var(--color-text)]">$399</span>
+                <span className="text-2xl font-bold text-[var(--color-text)]">$349</span>
                 <span className="text-sm text-[var(--color-text-secondary)]">/year</span>
                 <p className="text-xs text-[var(--color-success)]">Save vs monthly</p>
               </div>

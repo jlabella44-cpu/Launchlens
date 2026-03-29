@@ -12,9 +12,10 @@ from launchlens.models.credit_transaction import CreditTransaction
 
 # (included_credits_per_month, rollover_cap)
 TIER_CREDITS: dict[str, tuple[int, int]] = {
-    "starter": (5, 0),
-    "pro": (50, 25),
-    "enterprise": (500, 100),
+    "free": (0, 0),
+    "starter": (0, 3),       # Lite tier
+    "pro": (1, 10),          # Active Agent tier
+    "enterprise": (5, 10),   # Team tier
 }
 
 

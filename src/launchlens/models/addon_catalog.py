@@ -14,6 +14,8 @@ class AddonCatalog(Base):
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     credit_cost: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_by_tier: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Example: {"free": 3400, "lite": 2400, "active_agent": 2400, "team": 2400} (cents)
     stripe_price_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     metadata_: Mapped[dict] = mapped_column(JSONB, name="metadata", default=dict)
