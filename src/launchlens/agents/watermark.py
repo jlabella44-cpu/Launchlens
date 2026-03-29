@@ -5,9 +5,12 @@ from sqlalchemy import select
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
+from launchlens.models.brand_kit import BrandKit
 from launchlens.models.listing import Listing
 from launchlens.models.package_selection import PackageSelection
+from launchlens.models.tenant import Tenant
 from launchlens.services.events import emit_event
+from launchlens.services.plan_limits import get_limits
 from launchlens.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -22,6 +25,7 @@ class WatermarkAgent(BaseAgent):
 
     async def execute(self, context: AgentContext) -> dict:
         listing_id = uuid.UUID(context.listing_id)
+        tenant_id = uuid.UUID(context.tenant_id)
         watermarked_count = 0
 
         async with self._session_factory() as session:
@@ -29,6 +33,31 @@ class WatermarkAgent(BaseAgent):
                 listing = await session.get(Listing, listing_id)
                 if listing is None:
                     raise ValueError(f"Listing {listing_id} not found")
+
+                # Determine watermark mode from tenant plan
+                tenant = await session.get(Tenant, tenant_id)
+                plan = tenant.plan if tenant else "free"
+                limits = get_limits(plan)
+                watermark_mode = limits.get("watermark", "launchlens")
+
+                # White-label (Active Agent+): skip watermarking entirely
+                if watermark_mode == "none":
+                    return {"watermarked_count": 0, "listing_id": str(listing_id), "mode": "white_label"}
+
+                # Load brand kit for custom watermarks (Lite tier)
+                watermark_text = "LaunchLens"
+                if watermark_mode == "custom":
+                    brand_kit = (await session.execute(
+                        select(BrandKit).where(BrandKit.tenant_id == tenant_id)
+                    )).scalar_one_or_none()
+                    if brand_kit:
+                        parts = []
+                        if brand_kit.brokerage_name:
+                            parts.append(brand_kit.brokerage_name)
+                        if brand_kit.agent_name:
+                            parts.append(brand_kit.agent_name)
+                        if parts:
+                            watermark_text = " | ".join(parts)
 
                 result = await session.execute(
                     select(PackageSelection, Asset)
@@ -40,7 +69,7 @@ class WatermarkAgent(BaseAgent):
 
                 for ps, asset in rows:
                     image_bytes = self._storage.download(asset.file_path)
-                    watermarked_bytes = self._apply_watermark(image_bytes)
+                    watermarked_bytes = self._apply_watermark(image_bytes, text=watermark_text)
                     filename = asset.file_path.rsplit("/", 1)[-1]
                     upload_key = f"listings/{listing_id}/watermarked/{filename}"
                     self._storage.upload(upload_key, watermarked_bytes, "image/jpeg")

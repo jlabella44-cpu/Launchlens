@@ -13,14 +13,23 @@ class TemporalClient:
             self._client = await Client.connect(settings.temporal_host, namespace=settings.temporal_namespace)
         return self._client
 
+    # Queue priority routing by plan tier
+    _PLAN_TO_QUEUE = {
+        "free": "launchlens-standard",
+        "starter": "launchlens-priority",    # Lite tier
+        "pro": "launchlens-top",             # Active Agent tier
+        "enterprise": "launchlens-top",      # Team tier
+    }
+
     async def start_pipeline(self, listing_id: str, tenant_id: str, plan: str = "starter") -> str:
         client = await self._connect()
         workflow_id = f"listing-pipeline-{listing_id}"
+        task_queue = self._PLAN_TO_QUEUE.get(plan, settings.temporal_task_queue)
         handle = await client.start_workflow(
             ListingPipeline.run,
             ListingPipelineInput(listing_id=listing_id, tenant_id=tenant_id, plan=plan),
             id=workflow_id,
-            task_queue=settings.temporal_task_queue,
+            task_queue=task_queue,
         )
         return handle.id
 

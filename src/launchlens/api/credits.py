@@ -21,11 +21,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Per-listing credit cost by tier (cents)
+PER_LISTING_PRICE_CENTS = {
+    "free": 3400,           # $34/listing
+    "lite": 2400,           # $24/listing
+    "active_agent": 2400,   # $24/listing
+    "team": 1700,           # $17/listing (volume)
+}
+
+# Credit bundles — priced at the agent's tier rate
 CREDIT_BUNDLES = [
-    {"size": 5, "price_cents": 9500, "per_credit_cents": 1900},
-    {"size": 10, "price_cents": 14000, "per_credit_cents": 1400},
-    {"size": 25, "price_cents": 30000, "per_credit_cents": 1200},
-    {"size": 50, "price_cents": 50000, "per_credit_cents": 1000},
+    {"size": 1, "price_cents": 3400, "per_credit_cents": 3400, "label": "Single Listing"},
+    {"size": 3, "price_cents": 7200, "per_credit_cents": 2400, "label": "3-Pack"},
+    {"size": 5, "price_cents": 10000, "per_credit_cents": 2000, "label": "5-Pack"},
+    {"size": 10, "price_cents": 17000, "per_credit_cents": 1700, "label": "10-Pack"},
+    {"size": 25, "price_cents": 37500, "per_credit_cents": 1500, "label": "25-Pack"},
 ]
 
 BUNDLE_SIZE_TO_STRIPE_SETTING = {

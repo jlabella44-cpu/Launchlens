@@ -20,13 +20,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 TIER_DEFAULTS = {
-    "lite": {"included_credits": 0, "rollover_cap": 5, "per_listing_credit_cost": 1},
-    "active_agent": {"included_credits": 1, "rollover_cap": 3, "per_listing_credit_cost": 1},
+    "free": {"included_credits": 0, "rollover_cap": 0, "per_listing_credit_cost": 1},
+    "lite": {"included_credits": 0, "rollover_cap": 3, "per_listing_credit_cost": 1},
+    "active_agent": {"included_credits": 1, "rollover_cap": 10, "per_listing_credit_cost": 1},
     "team": {"included_credits": 5, "rollover_cap": 10, "per_listing_credit_cost": 1},
 }
 
 # Map tier names to plan names for plan_limits compatibility
 _TIER_TO_PLAN = {
+    "free": "free",
     "lite": "starter",
     "active_agent": "pro",
     "team": "enterprise",
