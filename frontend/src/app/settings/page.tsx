@@ -30,8 +30,8 @@ function BrandKitSettings() {
   const [form, setForm] = useState<BrandKitUpsertRequest>({
     brokerage_name: "",
     agent_name: "",
-    primary_color: "#2563EB",
-    secondary_color: "#F97316",
+    primary_color: "#0F1B2D",
+    secondary_color: "#FF6B2C",
     font_primary: "",
     logo_url: null,
   });
@@ -44,8 +44,8 @@ function BrandKitSettings() {
           setForm({
             brokerage_name: kit.brokerage_name || "",
             agent_name: kit.agent_name || "",
-            primary_color: kit.primary_color || "#2563EB",
-            secondary_color: kit.secondary_color || "#F97316",
+            primary_color: kit.primary_color || "#0F1B2D",
+            secondary_color: kit.secondary_color || "#FF6B2C",
             font_primary: kit.font_primary || "",
             logo_url: kit.logo_url,
           });
@@ -129,14 +129,14 @@ function BrandKitSettings() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ColorPicker
                   label="Primary Color"
-                  value={form.primary_color || "#2563EB"}
+                  value={form.primary_color || "#0F1B2D"}
                   onChange={(color) =>
                     setForm((f) => ({ ...f, primary_color: color }))
                   }
                 />
                 <ColorPicker
                   label="Secondary Color"
-                  value={form.secondary_color || "#F97316"}
+                  value={form.secondary_color || "#FF6B2C"}
                   onChange={(color) =>
                     setForm((f) => ({ ...f, secondary_color: color }))
                   }
@@ -200,7 +200,7 @@ function BrandKitSettings() {
               </h2>
               <div
                 className="p-6 rounded-lg border border-white/20"
-                style={{ backgroundColor: form.primary_color || "#2563EB" }}
+                style={{ backgroundColor: form.primary_color || "#0F1B2D" }}
               >
                 <p
                   className="text-white text-xl font-bold"
@@ -213,7 +213,7 @@ function BrandKitSettings() {
                 </p>
                 <div
                   className="mt-3 inline-block px-4 py-1.5 rounded-full text-white text-sm font-medium"
-                  style={{ backgroundColor: form.secondary_color || "#F97316" }}
+                  style={{ backgroundColor: form.secondary_color || "#FF6B2C" }}
                 >
                   Schedule Showing
                 </div>

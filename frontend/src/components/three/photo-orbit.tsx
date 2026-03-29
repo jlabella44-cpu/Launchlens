@@ -27,8 +27,8 @@ export function PhotoOrbit({ photos, heroIndex = 0 }: PhotoOrbitProps) {
       <mesh>
         <sphereGeometry args={[0.3, 16, 16]} />
         <meshStandardMaterial
-          color="#F97316"
-          emissive="#F97316"
+          color="#FF6B2C"
+          emissive="#FF6B2C"
           emissiveIntensity={0.5}
           transparent
           opacity={0.6}
@@ -47,7 +47,7 @@ export function PhotoOrbit({ photos, heroIndex = 0 }: PhotoOrbitProps) {
             <mesh rotation={[0, -angle + Math.PI / 2, 0]}>
               <boxGeometry args={[1.2, 0.8, 0.05]} />
               <meshStandardMaterial
-                color={isHero ? "#F97316" : "#2563EB"}
+                color={isHero ? "#FF6B2C" : "#0F1B2D"}
                 roughness={0.3}
                 metalness={isHero ? 0.3 : 0.1}
               />
@@ -66,7 +66,7 @@ export function PhotoOrbit({ photos, heroIndex = 0 }: PhotoOrbitProps) {
                 position={[0, 0.55, 0]}
                 rotation={[0, -angle + Math.PI / 2, 0]}
                 fontSize={0.14}
-                color="#F97316"
+                color="#FF6B2C"
                 fontWeight="bold"
                 anchorX="center"
               >

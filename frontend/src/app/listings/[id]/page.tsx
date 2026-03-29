@@ -273,11 +273,11 @@ function ListingDetail() {
                 )}
                 {["failed", "pipeline_timeout"].includes(listing.state) && (
                   <div className="w-full bg-red-50 border border-red-200 rounded-xl p-5">
-                    <h4 className="text-red-800 font-semibold mb-1">Pipeline Failed</h4>
+                    <h4 className="text-red-800 font-semibold mb-1">Course Correction Required</h4>
                     <p className="text-sm text-red-600 mb-4">
                       {listing.state === "pipeline_timeout"
-                        ? "Processing timed out. This can happen with large photo sets."
-                        : "Something went wrong while processing your listing photos."}
+                        ? "Flight delayed. Processing timed out — this can happen with large photo sets."
+                        : "Turbulence detected. Something went wrong during processing."}
                     </p>
                     <div className="flex gap-3">
                       <Button onClick={handleRetryPipeline} loading={actionLoading}>
@@ -301,7 +301,7 @@ function ListingDetail() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   <span className="text-sm font-medium">
-                    Package approved! Pipeline is generating your export bundles.
+                    Autopilot engaged. Your marketing assets are being deployed.
                   </span>
                 </motion.div>
               )}

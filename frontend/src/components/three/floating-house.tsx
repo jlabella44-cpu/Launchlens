@@ -61,7 +61,7 @@ function HouseWireframe() {
 
   return (
     <lineSegments ref={ref} geometry={geometry}>
-      <lineBasicMaterial color="#60A5FA" transparent opacity={0.7} linewidth={1} />
+      <lineBasicMaterial color="#1E3A5F" transparent opacity={0.7} linewidth={1} />
     </lineSegments>
   );
 }
@@ -111,7 +111,7 @@ function GlowParticles() {
         />
       </bufferGeometry>
       <pointsMaterial
-        color="#F97316"
+        color="#FF6B2C"
         size={0.035}
         transparent
         opacity={0.8}
@@ -143,7 +143,7 @@ function FloorGrid() {
 
   return (
     <lineSegments ref={ref} geometry={geometry} position={[0, -0.01, 0]}>
-      <lineBasicMaterial color="#2563EB" transparent opacity={0.12} />
+      <lineBasicMaterial color="#0F1B2D" transparent opacity={0.12} />
     </lineSegments>
   );
 }

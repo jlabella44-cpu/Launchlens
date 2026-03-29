@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  /* LaunchLens Design Tokens */
-  --color-primary: #2563EB;
-  --color-secondary: #3B82F6;
-  --color-cta: #F97316;
-  --color-background: #F8FAFC;
-  --color-text: #1E293B;
-  --color-text-secondary: #64748B;
+  /* ListingJet Design Tokens — Mach Navy + Afterburner Orange */
+  --color-primary: #0F1B2D;
+  --color-secondary: #1E3A5F;
+  --color-cta: #FF6B2C;
+  --color-background: #F1F5F9;
+  --color-text: #0F172A;
+  --color-text-secondary: #475569;
   --color-surface: #FFFFFF;
-  --color-border: #E2E8F0;
-  --color-success: #22C55E;
+  --color-border: #CBD5E1;
+  --color-success: #10B981;
   --color-error: #EF4444;
   --color-warning: #F59E0B;
 
-  /* Typography */
-  --font-heading: "Cinzel", serif;
+  /* Typography — Exo 2 for aviation feel, Josefin Sans for body */
+  --font-heading: "Exo 2", sans-serif;
   --font-body: "Josefin Sans", sans-serif;
 
   /* Spacing */
@@ -95,6 +95,6 @@ html, body {
   letter-spacing: 0.05em;
   padding: 2px 8px;
   border-radius: 9999px;
-  background: linear-gradient(135deg, var(--color-primary), #7C3AED);
+  background: linear-gradient(135deg, var(--color-primary), #1E3A5F);
   color: white;
 }

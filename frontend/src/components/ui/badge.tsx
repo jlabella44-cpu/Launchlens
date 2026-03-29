@@ -15,6 +15,21 @@ const STATE_COLORS: Record<string, { bg: string; text: string; dot: string }> = 
   failed: { bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500" },
 };
 
+// Autopilot-themed display labels
+const STATE_LABELS: Record<string, string> = {
+  new: "Pre-Flight",
+  uploading: "Loading Cargo",
+  analyzing: "Ascending",
+  awaiting_review: "Awaiting Clearance",
+  in_review: "Under Review",
+  approved: "Cleared for Takeoff",
+  exporting: "In Transit",
+  delivered: "Mission Complete",
+  demo: "Demo Flight",
+  failed: "Course Correction Required",
+  pipeline_timeout: "Flight Delayed",
+};
+
 interface BadgeProps {
   state: string;
   className?: string;
@@ -22,7 +37,7 @@ interface BadgeProps {
 
 export function Badge({ state, className = "" }: BadgeProps) {
   const colors = STATE_COLORS[state] || STATE_COLORS.new;
-  const label = state.replace(/_/g, " ");
+  const label = STATE_LABELS[state] || state.replace(/_/g, " ");
 
   return (
     <motion.span
