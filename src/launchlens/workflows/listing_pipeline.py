@@ -14,6 +14,7 @@ with workflow.unsafe.imports_passed_through():
         run_distribution,
         run_floorplan,
         run_ingestion,
+        run_learning,
         run_mls_export,
         run_packaging,
         run_social_content,
@@ -174,6 +175,13 @@ class ListingPipeline:
         # Step 4: Distribution (marks DELIVERED)
         await workflow.execute_activity(
             run_distribution, ctx,
+            start_to_close_timeout=_DEFAULT_TIMEOUT,
+            retry_policy=_DEFAULT_RETRY,
+        )
+
+        # Step 5: Learn from human overrides for this listing
+        await workflow.execute_activity(
+            run_learning, ctx,
             start_to_close_timeout=_DEFAULT_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )

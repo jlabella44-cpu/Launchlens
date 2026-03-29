@@ -1,11 +1,13 @@
 # src/launchlens/agents/packaging.py
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from temporalio import activity
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
+from launchlens.models.learning_weight import LearningWeight
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
 from launchlens.models.vision_result import VisionResult
@@ -44,14 +46,34 @@ class PackagingAgent(BaseAgent):
                     if vr.asset_id not in seen:
                         seen[vr.asset_id] = vr
 
+                # Load tenant learning weights
+                tenant_id = uuid.UUID(context.tenant_id)
+                lw_result = await session.execute(
+                    select(LearningWeight).where(LearningWeight.tenant_id == tenant_id)
+                )
+                weight_map = {lw.room_label: lw for lw in lw_result.scalars().all()}
+
                 # Score each asset
+                now = datetime.now(timezone.utc)
                 scored = []
                 for asset_id, vr in seen.items():
+                    room_weight = 1.0
+                    lw = weight_map.get(vr.room_label) if vr.room_label else None
+                    if lw:
+                        room_weight = self._wm.blend(
+                            context.tenant_id, vr.room_label,
+                            lw.labeled_listing_count, lw.weight,
+                        )
+                        # Apply decay for stale weights
+                        if lw.updated_at:
+                            days_stale = (now - lw.updated_at).days
+                            room_weight = self._wm.apply_decay(room_weight, days_stale)
+
                     features = {
                         "quality_score": vr.quality_score or 50,
                         "commercial_score": vr.commercial_score or 50,
                         "hero_candidate": vr.hero_candidate or False,
-                        "room_weight": 1.0,  # TODO: load from LearningWeight
+                        "room_weight": room_weight,
                     }
                     score = self._wm.score(features)
                     scored.append((score, asset_id, vr))

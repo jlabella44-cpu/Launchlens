@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"  # comma-separated allowed origins
 
+    # CORS
+    cors_origins: str = "http://localhost:3000"
+
     # Database
     database_url: str
     database_url_sync: str = ""

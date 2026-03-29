@@ -93,10 +93,16 @@ async def run_photo_compliance(context: AgentContext) -> dict:
     return await PhotoComplianceAgent().instrumented_execute(context)
 
 
+@activity.defn
+async def run_learning(context: AgentContext) -> dict:
+    from launchlens.agents.learning import LearningAgent
+    return await LearningAgent().instrumented_execute(context)
+
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
     run_coverage, run_floorplan, run_packaging, run_content, run_brand,
     run_social_content, run_photo_compliance, run_mls_export, run_distribution,
-    run_video, run_chapters, run_social_cuts,
+    run_video, run_chapters, run_social_cuts, run_learning,
 ]

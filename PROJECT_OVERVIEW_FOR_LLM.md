@@ -1,10 +1,8 @@
-# LaunchLens — Project Overview
+# LaunchLens — Project Overview for LLM Sessions
 
-> AI-powered real estate media automation. Upload listing photos, get marketing-ready assets in minutes.
+**Tagline:** "From raw listing media to launch-ready marketing in minutes."
 
-## What It Does
-
-Real estate agents upload property photos. LaunchLens runs them through a 14-agent AI pipeline to produce: property descriptions, AI-generated tour videos, 3D floorplans, social media content, branded flyers, MLS-compliant export bundles, and watermarked marketing packages — all with human review before delivery.
+LaunchLens is a multi-tenant real estate listing media SaaS. Photographers and agents upload raw photos; a 15-agent AI pipeline curates, scores, packages, and delivers MLS-compliant bundles, branded content, AI descriptions, social captions, floor plan 3D scenes, and cinematic video tours. The frontend is a 3D interactive Next.js app.
 
 ---
 
@@ -12,286 +10,335 @@ Real estate agents upload property photos. LaunchLens runs them through a 14-age
 
 | Layer | Technology |
 |-------|-----------|
-| **Backend** | FastAPI (Python 3.12, fully async) |
-| **Database** | PostgreSQL 16 + SQLAlchemy 2.0 + Alembic (10 migrations) |
-| **Workflow** | Temporal (durable orchestration with human-in-the-loop) |
-| **Cache** | Redis 7 |
-| **Storage** | AWS S3 (presigned upload + download URLs) |
-| **Auth** | JWT + bcrypt, role-based (ADMIN/OPERATOR/AGENT/VIEWER) |
-| **Payments** | Stripe (checkout, subscriptions, webhooks, customer portal) |
-| **AI — Vision** | Google Vision API, OpenAI GPT-4V (fallback chain) |
-| **AI — LLM** | Anthropic Claude |
-| **AI — Video** | Kling AI |
-| **AI — Templates** | Canva Connect API (with Claude for design JSON) |
-| **Monitoring** | Sentry, OpenTelemetry (Jaeger), structured logging, request metrics |
-| **Virus Scanning** | ClamAV |
-| **Frontend** | Next.js 16 + React 19 + TypeScript |
-| **3D** | Three.js, React Three Fiber |
-| **Animation** | Framer Motion |
-| **Styling** | Tailwind CSS 4 |
-| **Testing** | pytest (async), Vitest, Locust (load), chaos tests |
-| **IaC** | AWS CDK (network, database, services, monitoring, CI stacks) |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2.0 async, Alembic, PostgreSQL 16 |
+| Orchestration | Temporal (durable workflow + activities) |
+| Cache | Redis 7 (rate limiting, SSE pub/sub) |
+| Storage | AWS S3 (boto3) |
+| Auth | JWT (PyJWT), bcrypt |
+| Payments | Stripe (checkout, portal, webhooks) |
+| AI Vision | Google Cloud Vision API (tier-1), OpenAI GPT-4V (tier-2) |
+| AI Content | Anthropic Claude 3 |
+| AI Video | Kling AI |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, React Three Fiber |
+| Observability | OpenTelemetry (OTLP), CloudWatch metrics (`services/metrics.py`), Sentry |
+| Testing | pytest-asyncio (270+ tests, all passing) |
+| CI/CD | GitHub Actions (lint, test, docker build) |
 
 ---
 
-## Pipeline Architecture
-
-The core is `ListingPipeline`, a Temporal workflow orchestrating 14 agents across 3 phases:
+## Repository Layout
 
 ```
-Phase 1: Analysis (sequential)
-  1. Ingestion      — Virus scan (ClamAV), dedup (SHA-256 + perceptual hash), normalize
-  2. Vision Tier 1  — Room classification, quality scoring (Google Vision → OpenAI fallback)
-  3. Vision Tier 2  — Deep analysis on hero candidates (GPT-4V)
-  4. Coverage       — Completeness check (exterior, kitchen, bedroom, etc.)
-  5. Floorplan      — 3D floorplan generation from photo analysis
-  6. Packaging      — AI photo curation with Thompson Sampling weights
-  7. Compliance     — GPT-4V scan for people, signage, branding, text overlay
+src/launchlens/
+  main.py                    FastAPI app factory (create_app, lifespan, router mounts)
+  config.py                  Settings (pydantic-settings, .env)
+  database.py                SQLAlchemy engine, AsyncSessionLocal, get_db (sets RLS), get_db_admin
+  temporal_client.py         TemporalClient singleton (start_pipeline, signal_review)
+  telemetry.py               init_tracing() (OTel TracerProvider + OTLP), agent_span() context manager
 
-  [Video generation starts in parallel — 30min timeout, non-blocking]
+  models/
+    base.py                  TenantScopedModel (id UUID, tenant_id UUID, created_at)
+    tenant.py                Tenant (name, plan, stripe_customer_id, stripe_subscription_id, webhook_url, credit_balance)
+    user.py                  User (email, password_hash, name, role: UserRole enum)
+    listing.py               Listing (address, metadata_, state: ListingState, lock_owner_id, mls_bundle_path, marketing_bundle_path, is_demo, demo_expires_at)
+    asset.py                 Asset (listing_id, file_path, file_hash, state, required_for_mls)
+    credit_transaction.py    CreditTransaction (tenant_id, amount, balance_after, transaction_type, reason, metadata_)
+    social_content.py        SocialContent (listing_id, platform, caption, hashtags, cta)
+    vision_result.py         VisionResult (asset_id, tier, room_label, quality_score, commercial_score, hero_candidate)
+    package_selection.py     PackageSelection (listing_id, asset_id, channel, position, composite_score)
+    event.py                 Event (event_type, payload, tenant_id, listing_id)
+    outbox.py                Outbox (event_id, delivered_at)
+    learning_weight.py       LearningWeight (tenant_id, room_label, weight)
+    brand_kit.py             BrandKit (logo_url, primary_color, secondary_color, font)
+    compliance_event.py      ComplianceEvent (asset_id, issue_type, severity)
+    label_mapping.py         LabelMapping (raw_label, canonical_label)
+    performance_event.py     PerformanceEvent (listing_id, metric_name, value)
+    prompt_version.py        PromptVersion (agent_name, version, prompt_text)
+    dollhouse_scene.py       DollhouseScene (listing_id, scene_json)
+    video_asset.py           VideoAsset (listing_id, video_url, duration_seconds, chapter_markers)
+    api_key.py               ApiKey (tenant_id, key_hash, name, last_used_at)
 
-  >>> HUMAN REVIEW GATE (workflow pauses, waits for approval signal) <<<
+  agents/
+    base.py                  BaseAgent ABC: agent_name, execute(), instrumented_execute() [wraps with OTel span + StepTimer]
+    ingestion.py             IngestionAgent: dedup by file_hash, S3 upload
+    vision.py                VisionAgent: run_tier1 (Google Vision), run_tier2 (GPT-4V top 20), cost tracking
+    coverage.py              CoverageAgent: check REQUIRED_SHOTS coverage
+    packaging.py             PackagingAgent: composite score, select top 25, → AWAITING_REVIEW
+    content.py               ContentAgent: dual-tone descriptions (mls_safe + marketing) via Claude, FHA filter
+    brand.py                 BrandAgent: template render → S3 flyer
+    learning.py              LearningAgent: read override events, update per-tenant weights
+    distribution.py          DistributionAgent: → DELIVERED, emit pipeline.completed
+    social_content.py        SocialContentAgent: IG + FB captions via Claude, FHA filtered (Pro+ only)
+    mls_export.py            MLSExportAgent: dual ZIP bundles
+    photo_compliance.py      PhotoComplianceAgent: detect people/signs/branding in photos
+    floorplan.py             FloorplanAgent: GPT-4V → dollhouse JSON
+    video.py                 VideoAgent: Kling AI clips → stitched video
+    chapter.py               ChapterAgent: GPT-4V keyframes → chapter markers
+    social_cuts.py           SocialCutAgent: platform-specific video clips
+    video_prompts.py         Room prompts, camera controls, clip transitions
 
-Phase 2: Content (after approval)
-  8. Content        — Dual-tone descriptions via Claude (MLS-safe + marketing)
-  9. Brand          — Branded flyer PDF (Canva API + Claude design JSON)
-  10. Social Content — Platform-specific captions (Instagram, Facebook) — Pro/Enterprise only
-  11. Chapters      — Video chapter markers
-  12. Social Cuts   — Platform-optimized video clips
-  13. MLS Export    — ZIP bundles (MLS + marketing) with resized photos, metadata CSV
-  14. Distribution  — Mark DELIVERED, trigger notifications
+  activities/
+    pipeline.py              13 @activity.defn wrappers, all call agent.instrumented_execute()
+
+  workflows/
+    listing_pipeline.py      ListingPipeline: Phase 1 (→ AWAITING_REVIEW) → wait signal → Phase 2 (→ DELIVERED)
+    worker.py                Temporal worker, init_tracing(), TracingInterceptor wiring
+
+  services/
+    auth.py                  hash_password, verify_password, create_access_token, decode_token
+    billing.py               BillingService: Stripe customer, checkout, portal, webhook, resolve_plan
+    events.py                emit_event() writes Event + Outbox in caller's transaction
+    fha_filter.py            fha_check(): 8 FHA regex patterns
+    weight_manager.py        WeightManager: blend, score, apply_update
+    plan_limits.py           PLAN_LIMITS dict, check_listing_quota, check_asset_quota
+    storage.py               StorageService: S3 upload/download/presigned URL
+    rate_limiter.py          Redis token bucket rate limiter
+    outbox_poller.py         OutboxPoller: polls outbox, delivers to webhook URLs
+    metrics.py               track_step_duration, record_step_failure, record_provider_call, record_cost, record_review_turnaround, StepTimer, PROVIDER_COSTS
+
+  monitoring/
+    __init__.py              Sentry init (uses settings.sentry_dsn), init_tracing() call
+
+  providers/
+    base.py                  VisionProvider, LLMProvider, TemplateProvider ABCs; VisionLabel dataclass
+    factory.py               get_vision_provider, get_llm_provider, get_template_provider (USE_MOCK_PROVIDERS flag)
+    mock.py                  MockVisionProvider, MockLLMProvider, MockTemplateProvider
+    google_vision.py         GoogleVisionProvider + record_provider_call("google_vision", ...)
+    openai_vision.py         OpenAIVisionProvider (GPT-4V) + record_provider_call("openai_gpt4v", ...)
+    claude.py                ClaudeProvider (Anthropic) + record_provider_call("claude", ...)
+
+  api/
+    auth.py                  POST /auth/register, POST /auth/login, GET /auth/me
+    listings.py              POST/GET /listings, GET/PATCH /listings/{id}, assets, package, review, approve, export, SSE
+    assets.py                GET /assets
+    demo.py                  POST /demo/upload, GET /demo/{id}, POST /demo/{id}/claim
+    billing.py               POST /billing/checkout, GET /billing/status, POST /billing/portal, POST /billing/webhook
+    admin.py                 Tenant CRUD, user management, platform stats, credit management, revenue analytics
+    deps.py                  get_current_user, require_admin, get_current_tenant, get_db, get_db_admin
+    schemas/
+      auth.py                RegisterRequest, LoginRequest, TokenResponse
+      listings.py            CreateListingRequest, ListingResponse, etc.
+      assets.py              AssetInput, CreateAssetsRequest, AssetResponse
+      billing.py             CheckoutRequest/Response, BillingStatusResponse
+      admin.py               TenantResponse, TenantDetailResponse, CreditTransactionResponse, TenantCreditsResponse, AdjustCreditsRequest, CreditSummaryResponse, RevenueBreakdownResponse
+      demo.py                DemoUploadRequest/Response, DemoViewResponse
+
+  middleware/
+    tenant.py                TenantMiddleware: JWT decode → request.state.tenant_id; _PUBLIC_PATHS skip list
+
+alembic/versions/
+  001_initial_schema.py      tables + RLS policies
+  002_outbox_add_tenant_listing_delivered.py
+  003_users_add_password_hash.py
+  004_tenant_stripe_fields.py
+  005_social_content_export_demo.py
+  006_dollhouse_scenes.py
+  007_video_assets.py
+  008_tenant_webhook_url.py
+  009_api_keys.py
+  010_credit_transactions.py credit_transactions table + tenants.credit_balance
+
+tests/
+  conftest.py                test_engine (NullPool, port 5433), db_session, async_client
+  test_agents/               agent unit tests + E2E pipeline smoke
+  test_api/                  auth, billing, listings, assets, admin, plan_limits, admin_credits
+  test_middleware/           tenant middleware
+  test_providers/            mock, factory, storage, rate_limiter, vision providers
+  test_services/             events, outbox, fha_filter, weight_manager
+  test_workflows/            listing_pipeline, activities, worker
+  test_monitoring/           telemetry, pipeline_metrics, instrumented_execute
+
+frontend/src/
+  app/
+    page.tsx                 Landing page (3D FloatingHouse)
+    auth/page.tsx            Login / Register
+    listings/page.tsx        Listings dashboard
+    listings/[id]/page.tsx   Listing detail (PhotoOrbit, pipeline state, review actions)
+    listings/[id]/export/page.tsx  MLS/Marketing ZIP download
+    demo/page.tsx            Demo dropzone (no auth)
+    demo/[id]/page.tsx       Demo result viewer + claim CTA
+    pricing/page.tsx         Plan comparison + upgrade CTAs
+    billing/page.tsx         Current plan, usage bars, Stripe portal, invoices
+    admin/page.tsx           Admin dashboard: stats, tenant table, credit management
+  components/
+    layout/nav.tsx           Responsive nav (hamburger on mobile, links on desktop)
+    layout/protected-route.tsx  Auth guard
+    ui/glass-card.tsx        Glassmorphism card (optional 3D tilt)
+    ui/button.tsx            Spring-animated button (min-h-[44px] for touch)
+    ui/plan-badge.tsx        Inline upgrade badge for gated features
+    listings/listing-card.tsx  3D tilt listing card
+    listings/social-preview.tsx  Social caption preview with plan badge
+    3d/floating-house.tsx    Three.js R3F scene (landing)
+    3d/photo-orbit.tsx       3D photo carousel
+    3d/pipeline-visualizer.tsx  State machine 3D visualization
+  contexts/
+    auth-context.tsx         AuthProvider + useAuth() hook
+    plan-context.tsx         PlanProvider + usePlan() + PLAN_LIMITS + isFeatureGated()
+  lib/
+    api-client.ts            All API calls (auth, listings, billing, admin, demo)
+    types.ts                 TypeScript types for all API responses
 ```
 
-Every activity uses `instrumented_execute()` — wraps `execute()` with OpenTelemetry spans and step-duration metrics automatically.
-
 ---
 
-## Data Model (18 tables)
+## Key Patterns
 
-| Model | Purpose |
-|-------|---------|
-| **Tenant** | Brokerage account (plan, Stripe IDs, webhook URL) |
-| **User** | Agent/admin (email, bcrypt password, role) |
-| **Listing** | Property (address, metadata, 14-state machine) |
-| **Asset** | Photo file (S3 key, SHA-256, perceptual hash, state) |
-| **VisionResult** | AI analysis per photo (room label, quality/commercial scores, hero candidate) |
-| **VideoAsset** | Generated video (chapters, social cuts, thumbnail, branded player config) |
-| **PackageSelection** | Curated photo selection (channel, position, composite score, ai/human) |
-| **DollhouseScene** | 3D floorplan (scene JSON, room count) |
-| **SocialContent** | Platform-specific post (caption, hashtags, CTA) |
-| **BrandKit** | Tenant branding (logo, colors, fonts, agent/brokerage names) |
-| **Event** | Immutable audit trail (event type, payload, tenant, listing) |
-| **Outbox** | Transactional outbox for reliable event delivery |
-| **ComplianceEvent** | Photo compliance issue (resolvable) |
-| **PromptVersion** | Versioned AI prompts per agent with eval scores |
-| **LearningWeight** | Per-tenant photo scoring weights (Thompson Sampling: alpha/beta) |
-| **GlobalBaselineWeight** | Global baseline weights |
-| **PerformanceEvent** | Engagement/feedback signals for weight learning |
-| **APIKey** | Tenant API keys |
-| **NotificationPreference** | Per-user email notification toggles |
+### Tenant Isolation (RLS)
+- PostgreSQL RLS enabled on all tenant-scoped tables (migration 001)
+- `get_db` dependency sets `SET LOCAL app.current_tenant = '{tenant_id}'` — **transaction-scoped only, never session-scoped**
+- `get_db_admin` skips RLS for cross-tenant admin queries
+- `TenantMiddleware` decodes JWT and sets `request.state.tenant_id` on every request
 
-**Listing state machine:**
+### Agent Pattern
+```python
+class MyAgent(BaseAgent):
+    agent_name = "my_agent"
+
+    async def execute(self, context: AgentContext) -> dict:
+        ...
+        return {"result": "ok"}
 ```
-NEW → UPLOADING → ANALYZING → SHADOW_REVIEW → AWAITING_REVIEW → IN_REVIEW → APPROVED → GENERATING → DELIVERING → DELIVERED
-                                                                                                                    ↘ FAILED / PIPELINE_TIMEOUT (retryable)
+- `instrumented_execute(context)` wraps `execute()` with OTel span + `StepTimer`
+- All activity functions in `pipeline.py` call `agent.instrumented_execute(context)`
+- Provider calls record success/failure via `record_provider_call(provider_name, success)`
+- Cost tracking via `record_cost(agent_name, provider_name, call_count)`
+
+### Transaction Pattern
+```python
+async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+    ...
 ```
 
-**Multi-tenancy:** PostgreSQL `SET LOCAL app.current_tenant` for transaction-scoped row-level security.
+### Test DB Override
+`conftest.py` overrides `get_db` and `get_db_admin` to use `test_engine` (NullPool, port 5433).
+
+### Credit System
+- `CreditTransaction` records every credit event with signed `amount` and denormalized `balance_after`
+- `transaction_type`: `purchase` | `usage` | `admin_adjustment` | `expiration` | `bonus`
+- `Tenant.credit_balance` is denormalized for fast balance reads (updated atomically with transaction insert)
+- Negative balance guard enforced in `POST /admin/tenants/{id}/credits/adjust`
+- All adjustments emit a `credits.admin_adjustment` audit event via the outbox
 
 ---
 
-## API Surface
+## Listing State Machine
 
-### Auth (`/auth`)
-- `POST /register` — create tenant + admin user, return JWT
-- `POST /login` — email/password auth with timing-safe comparison
-- `GET /me` — current user profile
-- `GET/PATCH /me/notifications` — notification preferences
-
-### Listings (`/listings`)
-- `POST /` — create listing (enforces monthly quota)
-- `GET /` — list for tenant (filterable by state)
-- `GET /{id}` — detail
-- `PATCH /{id}` — update
-- `POST /{id}/upload-urls` — presigned S3 PUT URLs for browser-direct upload
-- `POST /{id}/assets` — register uploaded assets (triggers pipeline)
-- `GET /{id}/assets` — list assets
-- `GET /{id}/package` — AI-curated photo selections
-- `GET /{id}/dollhouse` — 3D floorplan
-- `GET /{id}/pipeline-status` — per-step progress with completion times
-- `POST /{id}/review` — start review
-- `POST /{id}/approve` — approve (signals Temporal workflow)
-- `POST /{id}/reject` — reject with reason code
-- `POST /{id}/retry` — retry failed pipeline
-- `GET /{id}/export?mode=mls|marketing` — presigned download URL (15-min TTL)
-- `GET /{id}/video` — video asset details
-- `GET /{id}/video/social-cuts` — social clips
-- `POST /{id}/video/upload` — user-submitted video
-- `POST /{id}/compliance` — on-demand compliance scan
-- `GET /{id}/events` — SSE stream for real-time pipeline updates
-
-### Billing (`/billing`)
-- `POST /checkout` — Stripe checkout session
-- `GET /status` — current plan + subscription info
-- `POST /portal` — Stripe customer portal URL
-- `GET /invoices` — invoice history
-- `POST /webhook` — Stripe event handler (resolves plan from price_id)
-- `PATCH /plan` — admin plan change
-
-### Brand Kit (`/brand-kit`)
-- `GET /` — get tenant brand kit
-- `PUT /` — create/update (upsert)
-- `POST /logo-upload-url` — presigned S3 URL for logo
-
-### Admin (`/admin`)
-- `GET /stats` — platform-wide statistics
-- `GET /tenants`, `GET /tenants/{id}` — tenant management
-- `PATCH /tenants/{id}` — update tenant
-- `POST /tenants/{id}/users` — invite user
-- `PATCH /users/{id}/role` — change role
-
-### Analytics (`/analytics`)
-- `GET /usage` — listing/asset counts for current tenant
-
-### Demo (`/demo`)
-- `POST /upload` — demo listing from S3 paths (rate-limited: 3/IP/day)
-
----
-
-## Frontend (12 pages, 29 components)
-
-### Pages
-| Route | Purpose |
-|-------|---------|
-| `/login` | Split layout: 3D hero scene (desktop) + auth form |
-| `/register` | Same layout, registration form |
-| `/listings` | Dashboard grid with listing cards + create dialog + onboarding banner |
-| `/listings/[id]` | Detail: drag-and-drop upload, pipeline progress, package viewer, 3D photo orbit, video, social preview, actions |
-| `/listings/[id]/export` | Download MLS + marketing bundles |
-| `/review` | Review queue: keyboard shortcuts (j/k/a/s), expandable photo grid, reject with reason codes, auto-refresh |
-| `/billing` | Current plan, usage stats, upgrade/portal, invoice history |
-| `/settings` | Brand kit setup: colors, logo upload, fonts, agent/brokerage name |
-| `/pricing` | 3-tier comparison (Starter $29, Pro $99, Enterprise $299) |
-| `/demo` | Public demo upload |
-| `/demo/[id]` | Demo results |
-
-### Key Components
-- **ErrorBoundary** — catches render crashes with retry
-- **OfflineBanner** — network connectivity indicator
-- **Toast** — notification system (success/error/info)
-- **PipelineProgress** — vertical step list with real-time status
-- **PipelineVisualizer** — 3D pipeline visualization (16 steps)
-- **PhotoOrbit** — 3D photo carousel (hidden on mobile)
-- **AssetUploadForm** — drag-and-drop with presigned URLs, progress bars, client-side SHA-256
-- **PackageViewer** — curated photo grid with scores
-- **PlanBadge** — plan-gated feature indicators
-- **ColorPicker** — hex color input for brand kit
-- **SceneErrorBoundary** — graceful Three.js failure handling
-
-### Contexts
-- **AuthContext** — JWT token, user info, login/logout
-- **PlanContext** — current plan, limits, usage, upgrade prompts
-
----
-
-## Infrastructure
-
-### Docker Compose (9 services)
 ```
-postgres       — PostgreSQL 16 (port 5432)
-postgres-test  — Test database (port 5433)
-redis          — Redis 7 (port 6379)
-temporal       — Temporal Server (port 7233)
-temporal-ui    — Workflow monitoring (port 8233)
-clamav         — ClamAV virus scanner (port 3310)
-jaeger         — OpenTelemetry traces (port 16686 UI, 4317 OTLP)
-api            — FastAPI (port 8000, hot-reload)
-worker         — Temporal activity executor
+NEW → UPLOADING → ANALYZING → AWAITING_REVIEW → IN_REVIEW → APPROVED → EXPORTING → DELIVERED
+DEMO → (claimed) → UPLOADING → ... (normal flow)
+DEMO → (expired) → deleted by cleanup cron
 ```
 
-### AWS CDK Stacks (`infra/`)
-- **NetworkStack** — VPC, subnets, security groups
-- **DatabaseStack** — RDS PostgreSQL, ElastiCache Redis
-- **ServicesStack** — ECS Fargate (API + Worker + Temporal)
-- **MonitoringStack** — CloudWatch, alarms, dashboards
-- **CIStack** — CodePipeline, CodeBuild
-
-### Security Middleware
-- **TenantMiddleware** — JWT → tenant isolation via PostgreSQL RLS
-- **RateLimitMiddleware** — per-tenant/per-IP rate limiting (Redis-backed)
-- **SecurityHeadersMiddleware** — HSTS, CSP, X-Frame-Options, etc.
-- **RequestIdMiddleware** — correlation IDs for tracing
-- **RequestMetricsMiddleware** — latency/count/error tracking per endpoint
-
-### Observability
-- **Sentry** — error tracking with release tagging
-- **OpenTelemetry** — distributed tracing (FastAPI → Temporal → agents → providers)
-- **Structured logging** — JSON in production, console in development
-- **Pipeline metrics** — step duration histograms, failure counters, cost tracking, review turnaround
+- `POST /listings/{id}/assets` → UPLOADING, triggers Temporal pipeline
+- Phase 1 finishes → AWAITING_REVIEW
+- `POST /listings/{id}/review` → IN_REVIEW (optimistic lock)
+- `POST /listings/{id}/approve` → APPROVED, signals Temporal to start Phase 2; records review turnaround metric
+- Phase 2: Content → [Brand + Social parallel] → MLS Export → Distribution → DELIVERED
+- `GET /listings/{id}/export?mode=mls|marketing` → presigned S3 URL for ZIP
 
 ---
 
-## Subscription Plans
+## Plan Limits
 
-| Feature | Starter ($29/mo) | Pro ($99/mo) | Enterprise ($299/mo) |
-|---------|:-:|:-:|:-:|
-| Listings/month | 5 | 50 | 500 |
-| Assets/listing | 25 | 50 | 100 |
-| Vision Tier 2 | No | Yes | Yes |
-| Social Content | No | Yes | Yes |
-
----
-
-## Testing (74 test files)
-
-- **Unit/Integration** — pytest-asyncio, factory-boy, moto (S3), fakeredis
-- **API tests** — async HTTP client against FastAPI test app
-- **Agent tests** — each agent tested in isolation with mock providers
-- **Workflow tests** — Temporal WorkflowEnvironment for deterministic testing
-- **Chaos tests** — provider timeout fallback, low-confidence fallback, scanner failure, idempotent crash recovery
-- **Load tests** — Locust targeting 100 concurrent listings
-- **Frontend tests** — Vitest + React Testing Library
+```python
+PLAN_LIMITS = {
+    "starter":    {"max_listings_per_month": 5,   "max_assets_per_listing": 25,  "tier2_vision": False, "social_content": False},
+    "pro":        {"max_listings_per_month": 50,  "max_assets_per_listing": 50,  "tier2_vision": True,  "social_content": True},
+    "enterprise": {"max_listings_per_month": 500, "max_assets_per_listing": 100, "tier2_vision": True,  "social_content": True},
+}
+```
+- SocialContentAgent is skipped in the Temporal workflow for Starter tenants
+- Credit purchases are available as add-ons on all plans
 
 ---
 
-## Design System
+## Admin API (all require `require_admin`)
 
-- **Colors:** Primary #2563EB, CTA #F97316, Background #F8FAFC
-- **Fonts:** Cinzel (headings), Josefin Sans (body)
-- **Breakpoints:** 375px, 768px (md), 1024px (lg), 1440px (xl)
-- **3D disabled on mobile** (< 768px) for performance
-- **Touch targets:** 44x44px minimum, `touch-action: manipulation`
-- **Glass-morphism** cards with tilt effect
-
----
-
-## Key Architecture Decisions
-
-1. **Temporal over Celery** — durable execution, human review gate, long-running video generation, built-in retry
-2. **Multi-tenancy via RLS** — `SET LOCAL` for transaction-scoped isolation, safe for connection pooling
-3. **Agent pattern** — each AI step is a self-contained `BaseAgent` with `execute()` + `instrumented_execute()`
-4. **Provider fallback** — primary → secondary chain with confidence-based failover
-5. **Thompson Sampling** — Beta distribution for photo scoring weights, learns from human overrides
-6. **Outbox pattern** — events written atomically with state changes for reliable distributed delivery
-7. **Presigned uploads** — browser uploads directly to S3, backend only registers metadata
-8. **SSE for real-time** — Server-Sent Events for pipeline progress instead of polling
-9. **PII filtering** — sanitize listing data before sending to external AI providers
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /admin/tenants | List all tenants |
+| GET | /admin/tenants/{id} | Tenant detail (user + listing counts) |
+| PATCH | /admin/tenants/{id} | Update name, plan, webhook_url |
+| POST | /admin/tenants/{id}/test-webhook | Send test event to tenant webhook |
+| GET | /admin/tenants/{id}/users | List users for tenant |
+| POST | /admin/tenants/{id}/users | Invite user to tenant |
+| PATCH | /admin/users/{id}/role | Change user role |
+| GET | /admin/stats | Platform-wide counts |
+| GET | /admin/tenants/{id}/credits | Credit balance + transaction history |
+| POST | /admin/tenants/{id}/credits/adjust | Manual credit adjustment |
+| GET | /admin/credits/summary | Platform credit stats (this month) |
+| GET | /admin/analytics/revenue | Revenue breakdown, top tenants by usage |
 
 ---
 
-## What's Working
+## Observability
 
-Everything above is implemented and on master. The remaining open item is:
-
-- **Issue #10** — Run the full test suite in Python 3.12, verify coverage > 60%, execute load tests, fix any failures from recent refactoring
+- **OTel tracing**: `telemetry.py` — `init_tracing()` sets up `TracerProvider` + OTLP gRPC exporter; `agent_span()` async context manager adds agent_name + listing_id + result fields as span attributes
+- **Pipeline metrics**: `services/metrics.py` — `StepTimer` records step duration; `record_step_failure`, `record_provider_call`, `record_cost`, `record_review_turnaround`
+- **Temporal**: `TracingInterceptor` from `temporalio.contrib.opentelemetry` wired into both client and worker (gracefully skipped if import fails)
+- **Sentry**: initialized in `monitoring/__init__.py` via `settings.sentry_dsn`; `settings.git_sha` used for release tracking
 
 ---
 
-## Questions for Discussion
+## Database Migrations (Alembic)
 
-1. How would you approach integration testing the full pipeline end-to-end with real provider APIs?
-2. What's the best strategy for A/B testing AI prompts at scale using the existing PromptVersion infrastructure?
-3. How should the learning feedback loop (PerformanceEvent → weight updates) be automated?
-4. What's missing for SOC 2 compliance in a multi-tenant SaaS handling real estate data?
-5. How would you optimize the video generation pipeline for cost efficiency at 1000+ listings/month?
-6. What would a mobile-native experience look like for agents photographing properties in the field?
+| Migration | Description |
+|-----------|-------------|
+| 001 | Initial schema (all core tables) + RLS policies |
+| 002 | Outbox: add tenant_id, listing_id, delivered_at |
+| 003 | Users: add password_hash |
+| 004 | Tenants: stripe_customer_id, stripe_subscription_id |
+| 005 | social_content, demo state, export paths |
+| 006 | dollhouse_scenes table |
+| 007 | video_assets table |
+| 008 | tenants.webhook_url |
+| 009 | api_keys table |
+| 010 | credit_transactions table + tenants.credit_balance |
+
+---
+
+## CI/CD
+
+| Workflow | File | Trigger |
+|----------|------|---------|
+| Lint | `.github/workflows/lint.yml` | push / PR |
+| Test | `.github/workflows/test.yml` | push / PR — 2 Postgres service containers |
+| Docker | `.github/workflows/docker.yml` | push to main |
+
+---
+
+## Frontend Architecture
+
+- **Next.js 16** App Router, all pages are server components or `"use client"` client components
+- **Design system**: Cinzel (headings), Josefin Sans (body); Primary `#2563EB`, CTA `#F97316`; glassmorphism cards
+- **3D**: React Three Fiber components wrapped in `hidden lg:block` for desktop-only rendering
+- **Mobile first**: all layouts work at 375px+; hamburger nav at `md:hidden`; `min-h-[44px]` touch targets
+- **Auth**: `AuthContext` stores JWT in memory, `ProtectedRoute` wraps all authenticated pages
+- **Plan gating**: `PlanContext` fetches billing status on mount; `isFeatureGated(feature)` checks plan limits; `PlanBadge` renders inline upgrade prompt
+- **API client**: `frontend/src/lib/api-client.ts` — single export `apiClient` with typed methods for all endpoints
+
+---
+
+## How to Run
+
+```bash
+# Infrastructure
+docker compose up -d postgres postgres-test redis temporal temporal-ui
+
+# Migrations
+python -m alembic upgrade head
+
+# API
+uvicorn launchlens.main:app --reload --port 8000
+
+# Worker
+python -m launchlens.workflows.worker
+
+# Tests
+python -m pytest --tb=short -q
+
+# Frontend
+cd frontend && npm run dev
+```
+
+Services: API http://localhost:8000 · Swagger http://localhost:8000/docs · Temporal UI http://localhost:8233 · Frontend http://localhost:3000

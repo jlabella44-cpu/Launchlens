@@ -84,12 +84,20 @@ class APIRateLimitMiddleware:
             # Redis error — fail open
             return await call_next(request)
 
+        capacity = _TENANT_CAPACITY if tenant_id else _PUBLIC_CAPACITY
+
         if not allowed:
             logger.warning("rate_limit.exceeded key=%s path=%s", key, request.url.path)
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Rate limit exceeded. Please slow down."},
-                headers={"Retry-After": "60"},
+                headers={
+                    "Retry-After": "60",
+                    "X-RateLimit-Limit": str(capacity),
+                    "X-RateLimit-Remaining": "0",
+                },
             )
 
-        return await call_next(request)
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(capacity)
+        return response

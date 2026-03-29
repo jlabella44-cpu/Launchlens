@@ -8,6 +8,10 @@ import type {
   CreateListingRequest,
   CreateAssetsRequest,
   CreateAssetsResponse,
+  AdminStatsResponse,
+  AdminTenantResponse,
+  CreditSummaryResponse,
+  TenantCreditsResponse,
   CreditBalance,
   CreditTransaction,
   CreditBundle,
@@ -62,17 +66,31 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: response.statusText }));
-      throw new Error(error.detail || `Request failed: ${response.status}`);
+      const err = new Error(error.detail || `Request failed: ${response.status}`) as Error & { status: number };
+      err.status = response.status;
+      throw err;
     }
 
     return response.json();
   }
 
   // Auth
-  async register(email: string, password: string, name: string): Promise<TokenResponse> {
+  async register(
+    email: string,
+    password: string,
+    name: string,
+    companyName: string,
+    planTier?: string,
+  ): Promise<TokenResponse> {
     return this.request<TokenResponse>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({
+        email,
+        password,
+        name,
+        company_name: companyName,
+        plan_tier: planTier || undefined,
+      }),
     });
   }
 
@@ -152,6 +170,11 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  // Retry failed listing
+  async retryListing(listingId: string): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/listings/${listingId}/retry`, { method: "POST" });
   }
 
   // Demo (no auth required)
@@ -259,6 +282,11 @@ class ApiClient {
     return this.request("/credits/pricing");
   }
 
+  async getCreditBundles(): Promise<CreditBundle[]> {
+    const data = await this.getCreditPricing();
+    return data.bundles;
+  }
+
   async purchaseCredits(bundleSize: number, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
     return this.request("/credits/purchase", {
       method: "POST",
@@ -284,6 +312,30 @@ class ApiClient {
 
   async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
     return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
+  }
+
+  // Admin
+  async adminStats(): Promise<AdminStatsResponse> {
+    return this.request<AdminStatsResponse>("/admin/stats");
+  }
+
+  async adminTenants(): Promise<AdminTenantResponse[]> {
+    return this.request<AdminTenantResponse[]>("/admin/tenants");
+  }
+
+  async adminCreditsSummary(): Promise<CreditSummaryResponse> {
+    return this.request<CreditSummaryResponse>("/admin/credits/summary");
+  }
+
+  async adminTenantCredits(tenantId: string): Promise<TenantCreditsResponse> {
+    return this.request<TenantCreditsResponse>(`/admin/tenants/${tenantId}/credits`);
+  }
+
+  async adminAdjustCredits(tenantId: string, amount: number, reason: string): Promise<void> {
+    await this.request(`/admin/tenants/${tenantId}/credits/adjust`, {
+      method: "POST",
+      body: JSON.stringify({ amount, reason }),
+    });
   }
 }
 

@@ -11,6 +11,7 @@ class TenantResponse(BaseModel):
     stripe_customer_id: str | None
     stripe_subscription_id: str | None
     webhook_url: str | None
+    credit_balance: int = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -65,3 +66,42 @@ class PlatformStatsResponse(BaseModel):
     total_users: int
     total_listings: int
     listings_by_state: dict[str, int]
+
+
+class CreditTransactionResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    amount: int
+    balance_after: int
+    transaction_type: str
+    reason: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TenantCreditsResponse(BaseModel):
+    tenant_id: uuid.UUID
+    credit_balance: int
+    transactions: list[CreditTransactionResponse]
+
+
+class AdjustCreditsRequest(BaseModel):
+    amount: int
+    reason: str
+
+
+class CreditSummaryResponse(BaseModel):
+    total_credits_outstanding: int
+    credits_purchased_this_month: int
+    credits_used_this_month: int
+    credits_adjusted_this_month: int
+    tenant_count_with_credits: int
+
+
+class RevenueBreakdownResponse(BaseModel):
+    subscription_tenant_count: int
+    credit_purchase_count: int
+    total_credits_purchased: int
+    top_tenants_by_usage: list[dict]
+    avg_credits_per_listing: float | None

@@ -132,9 +132,12 @@ export interface DemoViewResponse {
   photos: { file_path: string; room_label?: string; quality_score?: number }[];
 }
 
+export type BillingStatus = BillingStatusResponse;
+
 export interface BillingStatusResponse {
   plan: string;
   plan_tier: string;
+  tier: string;
   billing_model: string;
   credit_balance: number;
   stripe_customer_id: string | null;
@@ -145,6 +148,8 @@ export interface CreditBalance {
   balance: number;
   rollover_balance: number;
   rollover_cap: number;
+  per_listing_credit_cost: number;
+  tier: string;
   period_start: string;
   period_end: string;
 }
@@ -153,6 +158,7 @@ export interface CreditTransaction {
   id: string;
   amount: number;
   balance_after: number;
+  type: string;
   transaction_type: string;
   reference_type: string | null;
   reference_id: string | null;
@@ -169,7 +175,10 @@ export interface Addon {
 }
 
 export interface CreditBundle {
+  id: string;
   size: number;
+  credits: number;
+  label: string;
   price_cents: number;
   per_credit_cents: number;
 }
@@ -244,4 +253,54 @@ export interface ReviewQueueItem {
 export interface RejectRequest {
   reason: "quality" | "incomplete" | "non_compliant" | "other";
   detail?: string;
+}
+
+export interface AdminStatsResponse {
+  total_tenants: number;
+  total_users: number;
+  total_listings: number;
+  listings_by_state: Record<string, number>;
+}
+
+export interface AdminTenantResponse {
+  id: string;
+  name: string;
+  plan: string;
+  plan_tier: string;
+  credit_balance: number;
+  stripe_customer_id: string | null;
+  user_count: number;
+  listing_count: number;
+  created_at: string;
+}
+
+export interface CreditSummaryResponse {
+  total_outstanding: number;
+  total_credits_outstanding: number;
+  purchased_this_month: number;
+  credits_purchased_this_month: number;
+  used_this_month: number;
+  credits_used_this_month: number;
+  expired_this_month: number;
+  credits_expired_this_month: number;
+  credits_adjusted_this_month: number;
+  tenant_count_with_credits: number;
+}
+
+export interface TenantCreditsResponse {
+  balance: number;
+  credit_balance: number;
+  transactions: CreditTransactionResponse[];
+}
+
+export interface CreditTransactionResponse {
+  id: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  description: string | null;
+  reason: string | null;
+  created_at: string;
 }

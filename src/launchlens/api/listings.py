@@ -13,19 +13,25 @@ from launchlens.api.schemas.assets import (
     CreateAssetsResponse,
 )
 from launchlens.api.schemas.listings import (
+    ActionResponse,
     BundleMetadata,
+    CancelResponse,
     CreateListingRequest,
     ExportMode,
     ExportResponse,
     ListingResponse,
+    PipelineStatusResponse,
+    PipelineStepStatus,
     UpdateListingRequest,
     VideoUploadRequest,
 )
+from launchlens.api.schemas.pagination import PaginatedResponse
 from launchlens.database import get_db
 from launchlens.models.asset import Asset
 from launchlens.models.dollhouse_scene import DollhouseScene
 from launchlens.models.listing import Listing, ListingState
 from launchlens.models.package_selection import PackageSelection
+from launchlens.models.performance_event import PerformanceEvent
 from launchlens.models.tenant import Tenant
 from launchlens.models.user import User
 from launchlens.models.video_asset import VideoAsset
@@ -102,44 +108,60 @@ async def create_listing(
     return ListingResponse.from_orm_listing(listing)
 
 
-@router.get("", response_model=list[ListingResponse])
+@router.get("")
 async def list_listings(
     state: str | None = None,
     search: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    page: int = 1,
+    page_size: int = 50,
     _rl=Depends(rate_limit(60, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    List listings with optional filters.
-    - state: filter by listing state (e.g. "approved", "delivered")
-    - search: search in address fields (street, city)
-    - limit/offset: pagination (default 50, max 200)
+    List listings with optional filters and pagination.
+
+    - **state**: filter by listing state (e.g. "approved", "delivered")
+    - **search**: search in address fields (street, city)
+    - **page**: page number (default 1)
+    - **page_size**: items per page (default 50, max 200)
     """
-    limit = min(limit, 200)
-    query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
+    page_size = min(page_size, 200)
+    offset = (max(page, 1) - 1) * page_size
+
+    base_query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
 
     if state:
         try:
             validated_state = ListingState(state)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid listing state: {state}")
-        query = query.where(Listing.state == validated_state)
+        base_query = base_query.where(Listing.state == validated_state)
 
     if search:
-        # Search in JSONB address field — street or city contains search term
         search_pattern = f"%{search}%"
-        query = query.where(
+        base_query = base_query.where(
             Listing.address["street"].astext.ilike(search_pattern)
             | Listing.address["city"].astext.ilike(search_pattern)
         )
 
-    query = query.order_by(Listing.created_at.desc()).limit(limit).offset(offset)
+    # Count total
+    count_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
+    total = count_result.scalar() or 0
+
+    # Fetch page
+    query = base_query.order_by(Listing.created_at.desc()).limit(page_size).offset(offset)
     result = await db.execute(query)
     listings = result.scalars().all()
-    return [ListingResponse.from_orm_listing(listing) for listing in listings]
+    items = [ListingResponse.from_orm_listing(listing) for listing in listings]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": (offset + page_size) < total,
+    }
 
 
 @router.get("/{listing_id}", response_model=ListingResponse)
@@ -380,7 +402,100 @@ async def get_package(
     ]
 
 
-@router.post("/{listing_id}/review")
+@router.post("/{listing_id}/package/reorder")
+async def reorder_package(
+    listing_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reorder photos in a package. Body: {"swaps": [{"from_position": 0, "to_position": 3}]}."""
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    reviewable = {ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}
+    if listing.state not in reviewable:
+        raise HTTPException(status_code=409, detail="Listing is not in a reviewable state")
+
+    swaps = body.get("swaps", [])
+    if not swaps:
+        raise HTTPException(status_code=422, detail="No swaps provided")
+
+    # Load all selections for this listing
+    result = await db.execute(
+        select(PackageSelection)
+        .where(PackageSelection.listing_id == listing.id)
+        .order_by(PackageSelection.position)
+    )
+    selections = {s.position: s for s in result.scalars().all()}
+
+    # Load vision results for room labels
+    from launchlens.models.vision_result import VisionResult
+    vr_result = await db.execute(
+        select(VisionResult).where(
+            VisionResult.asset_id.in_([s.asset_id for s in selections.values()])
+        )
+    )
+    vr_map = {vr.asset_id: vr for vr in vr_result.scalars().all()}
+
+    swapped = 0
+    for swap in swaps:
+        from_pos = swap.get("from_position")
+        to_pos = swap.get("to_position")
+        if from_pos is None or to_pos is None:
+            continue
+
+        sel_from = selections.get(from_pos)
+        sel_to = selections.get(to_pos)
+        if not sel_from or not sel_to:
+            continue
+
+        # Swap positions
+        sel_from.position, sel_to.position = sel_to.position, sel_from.position
+        sel_from.selected_by = "human"
+        sel_to.selected_by = "human"
+
+        # Emit override events with room_label for learning agent
+        from_vr = vr_map.get(sel_from.asset_id)
+        to_vr = vr_map.get(sel_to.asset_id)
+
+        await emit_event(
+            session=db,
+            event_type="package.override.swap_to",
+            payload={
+                "asset_id": str(sel_from.asset_id),
+                "room_label": from_vr.room_label if from_vr else None,
+                "from_position": to_pos,
+                "to_position": from_pos,
+            },
+            tenant_id=str(current_user.tenant_id),
+            listing_id=str(listing.id),
+        )
+        await emit_event(
+            session=db,
+            event_type="package.override.swap_from",
+            payload={
+                "asset_id": str(sel_to.asset_id),
+                "room_label": to_vr.room_label if to_vr else None,
+                "from_position": from_pos,
+                "to_position": to_pos,
+            },
+            tenant_id=str(current_user.tenant_id),
+            listing_id=str(listing.id),
+        )
+        swapped += 1
+
+    await db.commit()
+    return {"swaps_applied": swapped}
+
+
+@router.post("/{listing_id}/review", response_model=ActionResponse)
 async def start_review(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -411,7 +526,7 @@ async def start_review(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/approve")
+@router.post("/{listing_id}/approve", response_model=ActionResponse)
 async def approve_listing(
     listing_id: uuid.UUID,
     _rl=Depends(rate_limit(5, 60)),
@@ -449,7 +564,7 @@ async def approve_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/reject")
+@router.post("/{listing_id}/reject", response_model=ActionResponse)
 async def reject_listing(
     listing_id: uuid.UUID,
     body: dict,
@@ -538,7 +653,7 @@ async def retry_pipeline(
     return {"listing_id": str(listing.id), "state": "uploading"}
 
 
-@router.post("/{listing_id}/cancel")
+@router.post("/{listing_id}/cancel", response_model=CancelResponse)
 async def cancel_listing(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -573,7 +688,7 @@ async def cancel_listing(
     return {"listing_id": str(listing.id), "state": "cancelled", "credits_refunded": credits_refunded}
 
 
-@router.get("/{listing_id}/pipeline-status")
+@router.get("/{listing_id}/pipeline-status", response_model=PipelineStatusResponse)
 async def get_pipeline_status(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -680,6 +795,16 @@ async def export_listing(
     expires_in = 900  # 15 minutes
     download_url = storage.presigned_url(bundle_path, expires_in=expires_in)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
+    # Record performance event for learning loop
+    db.add(PerformanceEvent(
+        tenant_id=current_user.tenant_id,
+        listing_id=listing.id,
+        signal_type="export_downloaded",
+        value=1.0,
+        source="user",
+    ))
+    await db.commit()
 
     return ExportResponse(
         listing_id=listing.id,
@@ -866,3 +991,6 @@ async def listing_activity(
         }
         for e in events
     ]
+
+
+    # Duplicate retry endpoint removed — use the one at line ~616
