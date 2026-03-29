@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     stripe_price_team: str = ""
     stripe_price_annual: str = ""
 
+    # Canva OAuth2 (Phase 2 — per-tenant access)
+    canva_client_id: str = ""
+    canva_client_secret: str = ""
+
     # Email / Notifications
     smtp_host: str = ""
     smtp_port: int = 587
