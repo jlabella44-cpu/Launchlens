@@ -14,4 +14,5 @@ class BrandKit(TenantScopedModel):
     agent_name: Mapped[str | None]
     brokerage_name: Mapped[str | None]
     canva_template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    voice_samples: Mapped[list] = mapped_column(JSONB, default=list)
     raw_config: Mapped[dict] = mapped_column(JSONB, default=dict)

@@ -6,6 +6,7 @@ from temporalio import activity
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
+from launchlens.models.brand_kit import BrandKit
 from launchlens.models.listing import Listing
 from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_llm_provider
@@ -24,7 +25,7 @@ Property details:
 
 Key features identified from photos:
 {photo_features}
-
+{voice_section}{market_section}
 Return ONLY a JSON object with this exact structure:
 {{
   "mls_safe": "...(2-3 sentences, factual only, no agent promotion, no personality)...",
@@ -36,6 +37,41 @@ _FHA_RETRY_SUFFIX = (
     "Rewrite without referencing families, schools, neighborhood safety, or religion."
 )
 
+_MARKET_PROMPTS = {
+    "buyers_market": "\nMarket context: BUYER'S MARKET. Emphasize investment potential, value, and negotiation flexibility.",
+    "hot_market": "\nMarket context: HOT MARKET. Create urgency. Emphasize demand, multiple offers expected, act fast.",
+    "spring_refresh": "\nMarket context: SPRING REFRESH. Highlight fresh starts, curb appeal, outdoor living, natural light.",
+    "investment": "\nMarket context: INVESTMENT OPPORTUNITY. Focus on ROI, rental potential, cap rate, location fundamentals.",
+}
+
+# Tone intensity maps to system prompt framing + Claude temperature
+_TONE_SYSTEM_PROMPTS = {
+    "utility": (
+        "You are a factual real estate copywriter. Focus strictly on facts and MLS compliance. "
+        "No personality, no flair, no adjectives beyond what the photos show. Be concise."
+    ),
+    "balanced": (
+        "You are a professional real estate copywriter. Use the provided example descriptions "
+        "as a guide for voice and style, but adapt naturally for this property's unique features. "
+        "Be compelling but grounded in the actual photos."
+    ),
+    "high_flair": (
+        "You are a luxury real estate copywriter channeling this agent's signature voice. "
+        "Deeply mimic their vocabulary, rhythm, and cadence from the examples below. "
+        "Be creative, punchy, and bold — make this listing stand out."
+    ),
+}
+
+
+def _tone_to_config(intensity: int) -> tuple[str, float]:
+    """Map tone intensity (0-100) to system prompt key + Claude temperature."""
+    if intensity <= 20:
+        return "utility", 0.1
+    elif intensity <= 60:
+        return "balanced", 0.5
+    else:
+        return "high_flair", 0.8 + (intensity - 60) * 0.005  # 0.8-1.0
+
 
 class ContentAgent(BaseAgent):
     agent_name = "content"
@@ -46,6 +82,7 @@ class ContentAgent(BaseAgent):
 
     async def execute(self, context: AgentContext) -> dict:
         listing_id = uuid.UUID(context.listing_id)
+        tenant_id = uuid.UUID(context.tenant_id)
 
         async with self._session_factory() as session:
             async with (session.begin() if not session.in_transaction() else session.begin_nested()):
@@ -66,14 +103,40 @@ class ContentAgent(BaseAgent):
                     f"{vr.room_label} (q={vr.quality_score})" for vr in vrs if vr.room_label
                 )
 
-                safe_metadata = sanitize_for_prompt(listing.metadata_ or {})
+                # Load brand kit for voice samples
+                brand_kit = (await session.execute(
+                    select(BrandKit).where(BrandKit.tenant_id == tenant_id)
+                )).scalar_one_or_none()
+
+                voice_section = ""
+                if brand_kit and brand_kit.voice_samples:
+                    voice_section = "\n\nMatch the voice and style of these example descriptions from this agent:\n"
+                    for i, sample in enumerate(brand_kit.voice_samples[:3], 1):
+                        voice_section += f"\nExample {i}: {sample}\n"
+
+                # Market context from listing metadata
+                meta = listing.metadata_ or {}
+                market_context = meta.get("market_context", "")
+                market_section = _MARKET_PROMPTS.get(market_context, "")
+
+                # Tone intensity: 0-100 slider controls voice mirroring strength
+                tone_intensity = meta.get("tone_intensity", 50)
+                tone_key, temperature = _tone_to_config(int(tone_intensity))
+                system_prompt = _TONE_SYSTEM_PROMPTS[tone_key]
+
+                safe_metadata = sanitize_for_prompt(meta)
                 prompt = _PROMPT_TEMPLATE.format(
                     metadata=str(safe_metadata),
                     photo_features=features_text or "modern interior",
+                    voice_section=voice_section,
+                    market_section=market_section,
                 )
 
                 raw = await self._llm_provider.complete(
-                    prompt=prompt, context=safe_metadata
+                    prompt=prompt,
+                    context=safe_metadata,
+                    temperature=temperature,
+                    system_prompt=system_prompt,
                 )
                 parsed = json.loads(raw)
                 mls_safe = parsed["mls_safe"]
@@ -82,7 +145,10 @@ class ContentAgent(BaseAgent):
 
                 if not fha_result.passed:
                     raw = await self._llm_provider.complete(
-                        prompt=prompt + _FHA_RETRY_SUFFIX, context=safe_metadata
+                        prompt=prompt + _FHA_RETRY_SUFFIX,
+                        context=safe_metadata,
+                        temperature=max(0.1, temperature - 0.2),  # Lower temp for FHA retry
+                        system_prompt=system_prompt,
                     )
                     parsed = json.loads(raw)
                     mls_safe = parsed["mls_safe"]
@@ -96,6 +162,8 @@ class ContentAgent(BaseAgent):
                         "fha_passed": fha_result.passed,
                         "mls_safe_length": len(mls_safe),
                         "marketing_length": len(marketing),
+                        "has_voice_samples": bool(voice_section),
+                        "market_context": market_context or None,
                     },
                     tenant_id=context.tenant_id,
                     listing_id=context.listing_id,
@@ -108,4 +176,4 @@ class ContentAgent(BaseAgent):
 async def run_content(listing_id: str, tenant_id: str) -> dict:
     agent = ContentAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)
