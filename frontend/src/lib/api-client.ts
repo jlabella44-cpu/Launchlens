@@ -33,7 +33,7 @@ import type {
   RejectRequest,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://brady-decrescent-jordon.ngrok-free.dev";
 
 class ApiClient {
   private token: string | null = null;
