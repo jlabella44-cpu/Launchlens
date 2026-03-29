@@ -44,7 +44,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const status = await apiClient.getBillingStatus();
+      const status = await apiClient.billingStatus();
       setBillingStatus(status);
 
       if (status.billing_model === "credit") {
@@ -64,7 +64,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
 
   const plan = billingStatus?.plan ?? "starter";
   const tier = billingStatus?.tier ?? creditData?.tier ?? plan;
-  const billingModel = billingStatus?.billing_model ?? "legacy";
+  const billingModel = (billingStatus?.billing_model ?? "legacy") as "legacy" | "credit";
   const listingCreditCost = creditData?.per_listing_credit_cost ?? 1;
   const creditBalance = creditData?.balance ?? null;
   const canAffordListing = creditBalance !== null ? creditBalance >= listingCreditCost : true;
