@@ -286,6 +286,14 @@ async def adjust_credits(
 
     tenant.credit_balance = new_balance
 
+    # Sync CreditAccount (source of truth) with Tenant.credit_balance
+    from launchlens.models.credit_account import CreditAccount
+    credit_acct = (await db.execute(
+        select(CreditAccount).where(CreditAccount.tenant_id == tenant_id)
+    )).scalar_one_or_none()
+    if credit_acct:
+        credit_acct.balance = new_balance
+
     txn = CreditTransaction(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
