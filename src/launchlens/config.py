@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     canva_client_id: str = ""
     canva_client_secret: str = ""
 
+    # ElevenLabs (voiceover)
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice_id: str = ""
+
     # Email / Notifications
     smtp_host: str = ""
     smtp_port: int = 587
