@@ -115,7 +115,8 @@ class ApiClient {
   }
 
   async getListings(): Promise<ListingResponse[]> {
-    return this.request<ListingResponse[]>("/listings");
+    const res = await this.request<{ items: ListingResponse[] } | ListingResponse[]>("/listings");
+    return Array.isArray(res) ? res : res.items;
   }
 
   async getListing(id: string): Promise<ListingResponse> {
