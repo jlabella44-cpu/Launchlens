@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from launchlens.providers.canva import CanvaProvider
+from launchlens.providers.canva import CanvaTemplateProvider as CanvaProvider
 
 
 def _make_mock_llm(design_json: dict) -> MagicMock:
