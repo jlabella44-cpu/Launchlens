@@ -1,4 +1,4 @@
-from launchlens.config import Settings
+from listingjet.config import Settings
 
 
 def test_settings_loads_from_env(monkeypatch):

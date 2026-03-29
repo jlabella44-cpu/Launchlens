@@ -5,13 +5,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.video import VideoAgent
-from launchlens.models.asset import Asset
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.package_selection import PackageSelection
-from launchlens.models.video_asset import VideoAsset
-from launchlens.models.vision_result import VisionResult
+from listingjet.agents.base import AgentContext
+from listingjet.agents.video import VideoAgent
+from listingjet.models.asset import Asset
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.package_selection import PackageSelection
+from listingjet.models.video_asset import VideoAsset
+from listingjet.models.vision_result import VisionResult
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -91,7 +91,7 @@ async def test_video_agent_creates_video_asset(db_session, listing_for_video):
         video_stitcher=mock_stitcher,
         session_factory=make_session_factory(db_session),
     )
-    with patch("launchlens.agents.video.httpx.AsyncClient", return_value=mock_http_client):
+    with patch("listingjet.agents.video.httpx.AsyncClient", return_value=mock_http_client):
         result = await agent.execute(ctx)
 
     assert result["status"] == "ready"
@@ -129,10 +129,10 @@ async def test_video_agent_emits_event(db_session, listing_for_video):
         kling_provider=mock_kling, storage_service=mock_storage,
         video_stitcher=mock_stitcher, session_factory=make_session_factory(db_session),
     )
-    with patch("launchlens.agents.video.httpx.AsyncClient", return_value=mock_http_client):
+    with patch("listingjet.agents.video.httpx.AsyncClient", return_value=mock_http_client):
         await agent.execute(ctx)
 
-    from launchlens.models.event import Event
+    from listingjet.models.event import Event
     events = (await db_session.execute(
         select(Event).where(Event.event_type == "video.completed")
     )).scalars().all()

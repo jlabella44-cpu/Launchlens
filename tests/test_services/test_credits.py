@@ -4,8 +4,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from launchlens.models.credit_account import CreditAccount
-from launchlens.services.credits import CreditService, InsufficientCreditsError
+from listingjet.models.credit_account import CreditAccount
+from listingjet.services.credits import CreditService, InsufficientCreditsError
 
 
 async def _create_account(

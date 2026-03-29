@@ -1,7 +1,7 @@
 # tests/test_workflows/test_listing_pipeline.py
 import pytest
 
-from launchlens.workflows.listing_pipeline import ListingPipeline, ListingPipelineInput
+from listingjet.workflows.listing_pipeline import ListingPipeline, ListingPipelineInput
 
 
 def test_pipeline_input_dataclass():
@@ -37,7 +37,7 @@ async def test_human_review_signal_sets_flag():
 
 def test_pipeline_imports_activities():
     """Workflow module must reference all pipeline activities."""
-    from launchlens.workflows import listing_pipeline
+    from listingjet.workflows import listing_pipeline
     source = open(listing_pipeline.__file__).read()
     expected_activities = [
         "run_ingestion", "run_vision_tier1", "run_vision_tier2",
@@ -49,7 +49,7 @@ def test_pipeline_imports_activities():
 
 def test_pipeline_has_retry_policy():
     """Workflow source should contain RetryPolicy configuration."""
-    from launchlens.workflows import listing_pipeline
+    from listingjet.workflows import listing_pipeline
     source = open(listing_pipeline.__file__).read()
     assert "RetryPolicy" in source
     assert "start_to_close_timeout" in source

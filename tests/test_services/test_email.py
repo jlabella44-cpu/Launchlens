@@ -2,10 +2,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from launchlens.services.email import EmailService, NoOpEmailService
+from listingjet.services.email import EmailService, NoOpEmailService
 
 
-@patch("launchlens.services.email.settings")
+@patch("listingjet.services.email.settings")
 def test_send_calls_smtp(mock_settings):
     mock_settings.smtp_host = "mail.test"
     mock_settings.smtp_port = 587
@@ -15,7 +15,7 @@ def test_send_calls_smtp(mock_settings):
 
     svc = EmailService(host="mail.test", port=587, user="user", password="pass", sender="noreply@test.com")
 
-    with patch("launchlens.services.email.smtplib.SMTP") as mock_smtp:
+    with patch("listingjet.services.email.smtplib.SMTP") as mock_smtp:
         mock_server = MagicMock()
         mock_smtp.return_value.__enter__ = MagicMock(return_value=mock_server)
         mock_smtp.return_value.__exit__ = MagicMock(return_value=False)
@@ -28,7 +28,7 @@ def test_send_calls_smtp(mock_settings):
         mock_server.sendmail.assert_called_once()
 
 
-@patch("launchlens.services.email.settings")
+@patch("listingjet.services.email.settings")
 def test_noop_service_does_not_send(mock_settings):
     mock_settings.smtp_host = "mail.test"
     mock_settings.smtp_port = 587
@@ -38,20 +38,20 @@ def test_noop_service_does_not_send(mock_settings):
 
     svc = NoOpEmailService()
 
-    with patch("launchlens.services.email.smtplib.SMTP") as mock_smtp:
+    with patch("listingjet.services.email.smtplib.SMTP") as mock_smtp:
         svc.send("agent@test.com", "Test", "<p>Hi</p>")
         mock_smtp.assert_not_called()
 
 
-@patch("launchlens.services.email.settings")
+@patch("listingjet.services.email.settings")
 def test_get_email_service_returns_noop_when_disabled(mock_settings):
     mock_settings.email_enabled = False
-    from launchlens.services.email import get_email_service
+    from listingjet.services.email import get_email_service
     svc = get_email_service()
     assert isinstance(svc, NoOpEmailService)
 
 
-@patch("launchlens.services.email.settings")
+@patch("listingjet.services.email.settings")
 def test_get_email_service_returns_real_when_enabled(mock_settings):
     mock_settings.email_enabled = True
     mock_settings.smtp_host = "mail.test"
@@ -59,6 +59,6 @@ def test_get_email_service_returns_real_when_enabled(mock_settings):
     mock_settings.smtp_user = "user"
     mock_settings.smtp_password = "pass"
     mock_settings.email_from = "noreply@test.com"
-    from launchlens.services.email import get_email_service
+    from listingjet.services.email import get_email_service
     svc = get_email_service()
     assert type(svc) is EmailService

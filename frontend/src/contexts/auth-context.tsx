@@ -26,14 +26,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("launchlens_token");
+    const token = localStorage.getItem("listingjet_token");
     if (token) {
       apiClient.setToken(token);
       apiClient
         .me()
         .then(setUser)
         .catch(() => {
-          localStorage.removeItem("launchlens_token");
+          localStorage.removeItem("listingjet_token");
           apiClient.setToken(null);
         })
         .finally(() => setLoading(false));
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await apiClient.login(email, password);
-    localStorage.setItem("launchlens_token", res.access_token);
+    localStorage.setItem("listingjet_token", res.access_token);
     apiClient.setToken(res.access_token);
     const me = await apiClient.me();
     setUser(me);
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (email: string, password: string, name: string, companyName: string, planTier?: string) => {
       const res = await apiClient.register(email, password, name, companyName, planTier);
-      localStorage.setItem("launchlens_token", res.access_token);
+      localStorage.setItem("listingjet_token", res.access_token);
       apiClient.setToken(res.access_token);
       const me = await apiClient.me();
       setUser(me);
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    localStorage.removeItem("launchlens_token");
+    localStorage.removeItem("listingjet_token");
     apiClient.setToken(null);
     setUser(null);
   }, []);

@@ -52,7 +52,7 @@ export default function LoginPage() {
             className="text-3xl font-bold mb-2"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            LaunchLens
+            ListingJet
           </h2>
           <p className="text-white/80 text-lg">
             From raw listing media to launch-ready marketing in minutes.
@@ -70,7 +70,7 @@ export default function LoginPage() {
             Welcome Back
           </h1>
           <p className="text-[var(--color-text-secondary)] mb-8">
-            Sign in to your LaunchLens account
+            Sign in to your ListingJet account
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">

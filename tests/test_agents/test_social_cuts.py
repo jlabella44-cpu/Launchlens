@@ -4,10 +4,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.social_cuts import PLATFORM_SPECS, SocialCutAgent
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.video_asset import VideoAsset
+from listingjet.agents.base import AgentContext
+from listingjet.agents.social_cuts import PLATFORM_SPECS, SocialCutAgent
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.video_asset import VideoAsset
 from tests.test_agents.conftest import make_session_factory
 
 

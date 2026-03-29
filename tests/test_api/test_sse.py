@@ -9,7 +9,7 @@ from httpx import AsyncClient
 async def _register(client: AsyncClient) -> tuple[str, str]:
     import jwt as pyjwt
 
-    from launchlens.config import settings
+    from listingjet.config import settings
 
     email = f"sse-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={

@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import AsyncMock
 
-from launchlens.providers.base import LLMProvider, VisionLabel, VisionProvider
-from launchlens.providers.fallback import FallbackLLMProvider, FallbackVisionProvider
+from listingjet.providers.base import LLMProvider, VisionLabel, VisionProvider
+from listingjet.providers.fallback import FallbackLLMProvider, FallbackVisionProvider
 
 
 # ---------------------------------------------------------------------------

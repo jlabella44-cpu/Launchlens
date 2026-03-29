@@ -57,7 +57,7 @@ async def _create_listing(client: AsyncClient, token: str) -> str:
 
 async def _add_credits(client: AsyncClient, db_session, tenant_id: str, amount: int):
     """Directly add credits to a tenant's account (bypasses Stripe)."""
-    from launchlens.services.credits import CreditService
+    from listingjet.services.credits import CreditService
     svc = CreditService()
     await svc.ensure_account(db_session, uuid.UUID(tenant_id))
     await svc.add_credits(
@@ -191,7 +191,7 @@ async def test_webhook_idempotency(async_client: AsyncClient, db_session):
     token, tenant_id = await _register(async_client, plan_tier="lite")
 
     # Ensure credit account exists
-    from launchlens.services.credits import CreditService
+    from listingjet.services.credits import CreditService
     svc = CreditService()
     await svc.ensure_account(db_session, uuid.UUID(tenant_id))
     await db_session.commit()
@@ -215,7 +215,7 @@ async def test_webhook_idempotency(async_client: AsyncClient, db_session):
     }
 
     # Mock Stripe's webhook signature verification
-    with patch("launchlens.api.billing.BillingService") as mock_svc_cls:
+    with patch("listingjet.api.billing.BillingService") as mock_svc_cls:
         mock_svc = MagicMock()
         mock_svc.construct_webhook_event.return_value = type("Event", (), {
             "type": webhook_payload["type"],
@@ -285,14 +285,14 @@ async def test_retry_does_not_rededuct(async_client: AsyncClient, db_session):
     bal_after_create = await async_client.get("/credits/balance", headers=_auth(token))
 
     # Simulate pipeline failure by setting listing state to FAILED directly
-    from launchlens.models.listing import Listing, ListingState
+    from listingjet.models.listing import Listing, ListingState
     listing = await db_session.get(Listing, uuid.UUID(listing_id))
     if listing:
         listing.state = ListingState.FAILED
         await db_session.commit()
 
     # Retry
-    with patch("launchlens.api.listings.get_temporal_client") as mock_temporal:
+    with patch("listingjet.api.listings.get_temporal_client") as mock_temporal:
         mock_client = MagicMock()
         mock_client.start_pipeline = AsyncMock()
         mock_temporal.return_value = mock_client

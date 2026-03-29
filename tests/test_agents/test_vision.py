@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.vision import VisionAgent
-from launchlens.models.vision_result import VisionResult
-from launchlens.providers.base import VisionLabel
+from listingjet.agents.base import AgentContext
+from listingjet.agents.vision import VisionAgent
+from listingjet.models.vision_result import VisionResult
+from listingjet.providers.base import VisionLabel
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -77,7 +77,7 @@ async def test_tier1_emits_event(db_session, listing, assets):
     await agent.run_tier1(ctx)
     await db_session.flush()
 
-    from launchlens.models.outbox import Outbox
+    from listingjet.models.outbox import Outbox
     rows = (await db_session.execute(
         select(Outbox).where(Outbox.event_type == "vision.tier1.completed")
     )).scalars().all()

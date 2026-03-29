@@ -19,7 +19,7 @@ def _reset_scanner():
 @pytest.fixture
 def _mock_settings():
     """Provide dummy ClamAV settings."""
-    with patch("launchlens.services.scanner.settings") as s:
+    with patch("listingjet.services.scanner.settings") as s:
         s.clamav_host = "localhost"
         s.clamav_port = 3310
         yield s
@@ -27,7 +27,7 @@ def _mock_settings():
 
 def test_scan_bytes_clean(_mock_settings):
     """Clean files should return (True, 'OK')."""
-    from launchlens.services.scanner import ClamAVScanner
+    from listingjet.services.scanner import ClamAVScanner
 
     mock_socket = MagicMock()
     mock_socket.instream.return_value = {"stream": ("OK", "No threat")}
@@ -43,7 +43,7 @@ def test_scan_bytes_clean(_mock_settings):
 
 def test_scan_bytes_threat_detected(_mock_settings):
     """Infected files should return (False, <threat name>)."""
-    from launchlens.services.scanner import ClamAVScanner
+    from listingjet.services.scanner import ClamAVScanner
 
     mock_socket = MagicMock()
     mock_socket.instream.return_value = {"stream": ("FOUND", "Eicar-Test-Signature")}
@@ -58,7 +58,7 @@ def test_scan_bytes_threat_detected(_mock_settings):
 
 def test_scan_bytes_raises_on_connection_error(_mock_settings):
     """If ClamAV daemon is unreachable, scan_bytes should propagate the exception."""
-    from launchlens.services.scanner import ClamAVScanner
+    from listingjet.services.scanner import ClamAVScanner
 
     mock_socket = MagicMock()
     mock_socket.instream.side_effect = ConnectionError("daemon unreachable")
@@ -71,7 +71,7 @@ def test_scan_bytes_raises_on_connection_error(_mock_settings):
 
 def test_ping_success(_mock_settings):
     """ping() should return True when ClamAV replies PONG."""
-    from launchlens.services.scanner import ClamAVScanner
+    from listingjet.services.scanner import ClamAVScanner
 
     mock_socket = MagicMock()
     mock_socket.ping.return_value = "PONG"
@@ -83,7 +83,7 @@ def test_ping_success(_mock_settings):
 
 def test_ping_failure(_mock_settings):
     """ping() should return False when ClamAV is unreachable."""
-    from launchlens.services.scanner import ClamAVScanner
+    from listingjet.services.scanner import ClamAVScanner
 
     mock_socket = MagicMock()
     mock_socket.ping.side_effect = ConnectionError("down")

@@ -4,11 +4,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.photo_compliance import PhotoComplianceAgent
-from launchlens.models.asset import Asset
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.package_selection import PackageSelection
+from listingjet.agents.base import AgentContext
+from listingjet.agents.photo_compliance import PhotoComplianceAgent
+from listingjet.models.asset import Asset
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.package_selection import PackageSelection
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -157,7 +157,7 @@ async def test_vision_failure_treated_as_compliant(db_session):
 async def test_compliance_emits_event(db_session):
     from sqlalchemy import select
 
-    from launchlens.models.outbox import Outbox
+    from listingjet.models.outbox import Outbox
 
     listing, tenant_id, assets = await _setup_listing_with_package(db_session, 1)
     vision = _make_vision_provider([_make_compliant_response()])

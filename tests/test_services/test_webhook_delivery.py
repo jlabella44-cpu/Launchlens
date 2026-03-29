@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from launchlens.services.webhook_delivery import _is_url_safe, deliver_webhook
+from listingjet.services.webhook_delivery import _is_url_safe, deliver_webhook
 
-_SSRF_PATCH_TARGET = "launchlens.services.webhook_delivery._is_url_safe"
+_SSRF_PATCH_TARGET = "listingjet.services.webhook_delivery._is_url_safe"
 
 
 @pytest.mark.asyncio
@@ -13,7 +13,7 @@ async def test_successful_delivery():
     mock_response = AsyncMock()
     mock_response.status_code = 200
 
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -40,7 +40,7 @@ async def test_failed_delivery_retries():
     mock_response = AsyncMock()
     mock_response.status_code = 500
 
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -59,7 +59,7 @@ async def test_failed_delivery_retries():
 
 @pytest.mark.asyncio
 async def test_network_error_retries():
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.side_effect = Exception("Connection refused")
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -81,7 +81,7 @@ async def test_signature_header_present():
     mock_response = AsyncMock()
     mock_response.status_code = 200
 
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("launchlens.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
+    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_response
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -96,16 +96,16 @@ async def test_signature_header_present():
 
     call_kwargs = mock_client.post.call_args
     headers = call_kwargs.kwargs.get("headers", {})
-    assert "X-LaunchLens-Signature" in headers
-    assert headers["X-LaunchLens-Signature"].startswith("sha256=")
-    assert headers["X-LaunchLens-Event"] == "test"
+    assert "X-ListingJet-Signature" in headers
+    assert headers["X-ListingJet-Signature"].startswith("sha256=")
+    assert headers["X-ListingJet-Event"] == "test"
 
 
 @pytest.mark.asyncio
 async def test_ssrf_blocks_private_ips():
     """SSRF protection: deliver_webhook must reject URLs that resolve to private IPs."""
     # Mock DNS resolution to return a private IP
-    with patch("launchlens.services.webhook_delivery.socket.getaddrinfo") as mock_dns:
+    with patch("listingjet.services.webhook_delivery.socket.getaddrinfo") as mock_dns:
         mock_dns.return_value = [(2, 1, 0, "", ("127.0.0.1", 0))]
         assert _is_url_safe("https://evil.example.com/webhook") is False
 
@@ -119,7 +119,7 @@ async def test_ssrf_blocks_private_ips():
 @pytest.mark.asyncio
 async def test_ssrf_allows_public_ips():
     """SSRF protection: deliver_webhook must allow URLs that resolve to public IPs."""
-    with patch("launchlens.services.webhook_delivery.socket.getaddrinfo") as mock_dns:
+    with patch("listingjet.services.webhook_delivery.socket.getaddrinfo") as mock_dns:
         mock_dns.return_value = [(2, 1, 0, "", ("93.184.216.34", 0))]
         assert _is_url_safe("https://example.com/webhook") is True
 
@@ -134,7 +134,7 @@ async def test_ssrf_rejects_non_http_schemes():
 @pytest.mark.asyncio
 async def test_ssrf_blocked_url_returns_false():
     """deliver_webhook returns False immediately for SSRF-blocked URLs."""
-    with patch("launchlens.services.webhook_delivery._is_url_safe", return_value=False):
+    with patch("listingjet.services.webhook_delivery._is_url_safe", return_value=False):
         result = await deliver_webhook(
             url="https://127.0.0.1/webhook",
             event_type="test",

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to LaunchLens are documented here.
+All notable changes to ListingJet are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
@@ -133,7 +133,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Docker Compose full dev environment: postgres, postgres-test, redis, temporal, temporal-ui, api, worker
 - `docker/entrypoint.sh`: waits for postgres, runs alembic, dispatches `api`/`worker`/`test`
-- `docker/init-db.sh`: creates `launchlens_test` database
+- `docker/init-db.sh`: creates `listingjet_test` database
 
 ---
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from launchlens.telemetry import agent_span, get_tracer, init_tracing
+from listingjet.telemetry import agent_span, get_tracer, init_tracing
 
 try:
     import opentelemetry  # noqa: F401
@@ -46,7 +46,7 @@ async def test_agent_span_records_exception():
 @pytest.mark.asyncio
 async def test_agent_span_without_tracer():
     """agent_span should yield None when tracer is unavailable."""
-    import launchlens.telemetry as tel
+    import listingjet.telemetry as tel
 
     original = tel._tracer
     tel._tracer = None

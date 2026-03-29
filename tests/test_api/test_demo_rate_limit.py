@@ -5,7 +5,7 @@ import pytest
 
 
 @pytest.mark.asyncio
-@patch("launchlens.api.demo._get_demo_limiter")
+@patch("listingjet.api.demo._get_demo_limiter")
 async def test_demo_upload_rate_limited(mock_limiter_fn, async_client):
     limiter = MagicMock()
     limiter.acquire.return_value = False
@@ -20,7 +20,7 @@ async def test_demo_upload_rate_limited(mock_limiter_fn, async_client):
 
 
 @pytest.mark.asyncio
-@patch("launchlens.api.demo._get_demo_limiter")
+@patch("listingjet.api.demo._get_demo_limiter")
 async def test_demo_upload_allowed_when_under_limit(mock_limiter_fn, async_client):
     limiter = MagicMock()
     limiter.acquire.return_value = True

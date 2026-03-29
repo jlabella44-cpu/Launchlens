@@ -89,7 +89,7 @@ function RegisterForm() {
             className="text-3xl font-bold mb-2"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            LaunchLens
+            ListingJet
           </h2>
           <p className="text-white/80 text-lg">
             The AI-powered listing creation platform.

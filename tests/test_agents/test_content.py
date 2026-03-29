@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.content import ContentAgent
-from launchlens.models.vision_result import VisionResult
+from listingjet.agents.base import AgentContext
+from listingjet.agents.content import ContentAgent
+from listingjet.models.vision_result import VisionResult
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -66,7 +66,7 @@ async def test_content_retries_on_fha_violation(db_session, listing, assets):
 async def test_content_emits_event(db_session, listing, assets):
     from sqlalchemy import select
 
-    from launchlens.models.outbox import Outbox
+    from listingjet.models.outbox import Outbox
 
     for a in assets:
         await _add_vr(db_session, a.id)

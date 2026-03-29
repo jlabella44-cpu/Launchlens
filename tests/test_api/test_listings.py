@@ -5,8 +5,8 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
-from launchlens.models.listing import ListingState
+from listingjet.config import settings
+from listingjet.models.listing import ListingState
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -160,7 +160,7 @@ async def test_start_review(async_client: AsyncClient, db_session):
 
     from sqlalchemy import update
 
-    from launchlens.models.listing import Listing
+    from listingjet.models.listing import Listing
     await db_session.execute(
         update(Listing).where(Listing.id == uuid.UUID(listing_id)).values(state=ListingState.AWAITING_REVIEW)
     )
@@ -181,7 +181,7 @@ async def test_approve_listing(async_client: AsyncClient, db_session):
 
     from sqlalchemy import update
 
-    from launchlens.models.listing import Listing
+    from listingjet.models.listing import Listing
     await db_session.execute(
         update(Listing).where(Listing.id == uuid.UUID(listing_id)).values(state=ListingState.IN_REVIEW)
     )
@@ -228,7 +228,7 @@ async def test_retry_listing_wrong_state_returns_409(async_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_retry_failed_listing(async_client: AsyncClient, db_session):
-    from launchlens.models.listing import Listing
+    from listingjet.models.listing import Listing
 
     token, tenant_id = await _register(async_client)
 

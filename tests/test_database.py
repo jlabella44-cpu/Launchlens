@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from launchlens.database import get_db
+from listingjet.database import get_db
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from launchlens.services.metrics import (
+from listingjet.services.metrics import (
     StepTimer,
     record_cost,
     record_provider_call,
@@ -15,7 +15,7 @@ from launchlens.services.metrics import (
 
 
 def test_track_step_duration_emits_metric():
-    with patch("launchlens.services.metrics.emit_metric") as mock:
+    with patch("listingjet.services.metrics.emit_metric") as mock:
         track_step_duration("ingestion", 150.5)
         mock.assert_called_once_with(
             "AgentStepDuration",
@@ -26,7 +26,7 @@ def test_track_step_duration_emits_metric():
 
 
 def test_record_step_failure_emits_metric():
-    with patch("launchlens.services.metrics.emit_metric") as mock:
+    with patch("listingjet.services.metrics.emit_metric") as mock:
         record_step_failure("vision")
         mock.assert_called_once_with(
             "AgentStepFailure",
@@ -37,7 +37,7 @@ def test_record_step_failure_emits_metric():
 
 
 def test_record_provider_call_emits_metric():
-    with patch("launchlens.services.metrics.emit_metric") as mock:
+    with patch("listingjet.services.metrics.emit_metric") as mock:
         record_provider_call("google_vision", True)
         mock.assert_called_once_with(
             "ProviderCallCount",
@@ -48,7 +48,7 @@ def test_record_provider_call_emits_metric():
 
 
 def test_record_provider_call_failure():
-    with patch("launchlens.services.metrics.emit_metric") as mock:
+    with patch("listingjet.services.metrics.emit_metric") as mock:
         record_provider_call("claude", False)
         mock.assert_called_once_with(
             "ProviderCallCount",
@@ -59,7 +59,7 @@ def test_record_provider_call_failure():
 
 
 def test_record_cost_emits_metric():
-    with patch("launchlens.services.metrics.emit_metric") as mock:
+    with patch("listingjet.services.metrics.emit_metric") as mock:
         record_cost("vision", "google_vision", 10)
         mock.assert_called_once_with(
             "EstimatedCost",
@@ -70,13 +70,13 @@ def test_record_cost_emits_metric():
 
 
 def test_record_cost_unknown_provider():
-    with patch("launchlens.services.metrics.emit_metric") as mock:
+    with patch("listingjet.services.metrics.emit_metric") as mock:
         record_cost("test", "unknown_provider", 1)
         mock.assert_not_called()
 
 
 def test_record_review_turnaround():
-    with patch("launchlens.services.metrics.emit_metric") as mock:
+    with patch("listingjet.services.metrics.emit_metric") as mock:
         record_review_turnaround(3600.0)
         mock.assert_called_once_with(
             "ReviewTurnaround",
@@ -87,7 +87,7 @@ def test_record_review_turnaround():
 
 
 def test_step_timer_records_duration():
-    with patch("launchlens.services.metrics.track_step_duration") as mock_dur:
+    with patch("listingjet.services.metrics.track_step_duration") as mock_dur:
         with StepTimer("test_agent"):
             pass
         mock_dur.assert_called_once()
@@ -96,8 +96,8 @@ def test_step_timer_records_duration():
 
 
 def test_step_timer_records_failure_on_exception():
-    with patch("launchlens.services.metrics.track_step_duration"):
-        with patch("launchlens.services.metrics.record_step_failure") as mock_fail:
+    with patch("listingjet.services.metrics.track_step_duration"):
+        with patch("listingjet.services.metrics.record_step_failure") as mock_fail:
             with pytest.raises(RuntimeError):
                 with StepTimer("test_agent"):
                     raise RuntimeError("boom")

@@ -1,10 +1,10 @@
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.ingestion import IngestionAgent
-from launchlens.models.asset import Asset
-from launchlens.models.listing import ListingState
+from listingjet.agents.base import AgentContext
+from listingjet.agents.ingestion import IngestionAgent
+from listingjet.models.asset import Asset
+from listingjet.models.listing import ListingState
 from tests.test_agents.conftest import make_session_factory
 
 

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from launchlens.services.reso_adapter import RESOAdapter
+from listingjet.services.reso_adapter import RESOAdapter
 
 BASE_URL = "https://reso.example.com/api"
 API_KEY = "test-api-key"

@@ -14,7 +14,7 @@ export function Nav() {
         className="font-[var(--font-heading)] text-xl font-bold text-[var(--color-primary)] tracking-wide"
         style={{ fontFamily: "var(--font-heading)" }}
       >
-        LaunchLens
+        ListingJet
       </Link>
 
       <div className="flex items-center gap-4">

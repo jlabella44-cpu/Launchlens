@@ -3,7 +3,7 @@
 
 def test_all_activities_are_decorated():
     """All pipeline activity functions must have @activity.defn."""
-    from launchlens.activities.pipeline import (
+    from listingjet.activities.pipeline import (
         run_brand,
         run_content,
         run_coverage,
@@ -22,7 +22,7 @@ def test_all_activities_are_decorated():
 
 def test_activity_names():
     """Activity names should match expected convention."""
-    from launchlens.activities.pipeline import (
+    from listingjet.activities.pipeline import (
         run_brand,
         run_content,
         run_coverage,

@@ -11,7 +11,7 @@ def _mock_demo_limiter():
     """All demo tests bypass the Redis rate limiter."""
     limiter = MagicMock()
     limiter.acquire.return_value = True
-    with patch("launchlens.api.demo._get_demo_limiter", return_value=limiter):
+    with patch("listingjet.api.demo._get_demo_limiter", return_value=limiter):
         yield
 
 

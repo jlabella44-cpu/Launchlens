@@ -9,17 +9,17 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.brand import BrandAgent
-from launchlens.agents.content import ContentAgent
-from launchlens.agents.coverage import CoverageAgent
-from launchlens.agents.distribution import DistributionAgent
-from launchlens.agents.ingestion import IngestionAgent
-from launchlens.agents.packaging import PackagingAgent
-from launchlens.agents.vision import VisionAgent
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.vision_result import VisionResult
-from launchlens.providers.base import VisionLabel
+from listingjet.agents.base import AgentContext
+from listingjet.agents.brand import BrandAgent
+from listingjet.agents.content import ContentAgent
+from listingjet.agents.coverage import CoverageAgent
+from listingjet.agents.distribution import DistributionAgent
+from listingjet.agents.ingestion import IngestionAgent
+from listingjet.agents.packaging import PackagingAgent
+from listingjet.agents.vision import VisionAgent
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.vision_result import VisionResult
+from listingjet.providers.base import VisionLabel
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -39,7 +39,7 @@ async def pipeline_listing(db_session):
 
 @pytest.fixture
 async def pipeline_assets(db_session, pipeline_listing):
-    from launchlens.models.asset import Asset
+    from listingjet.models.asset import Asset
     assets = []
     shot_hashes = [("aaa", "exterior"), ("bbb", "living_room"), ("ccc", "kitchen"),
                    ("ddd", "bedroom"), ("eee", "bathroom")]

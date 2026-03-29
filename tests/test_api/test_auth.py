@@ -5,8 +5,8 @@ import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
 
-from launchlens.models.user import User, UserRole
-from launchlens.services.auth import create_access_token, decode_token, hash_password, verify_password
+from listingjet.models.user import User, UserRole
+from listingjet.services.auth import create_access_token, decode_token, hash_password, verify_password
 
 
 def test_user_model_has_password_hash():
@@ -151,8 +151,8 @@ async def test_get_me_returns_current_user(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_admin_only_endpoint_rejects_non_admin(async_client: AsyncClient, db_session):
     """Admin-only route should return 403 for non-admin users."""
-    from launchlens.models.tenant import Tenant
-    from launchlens.services.auth import create_access_token, hash_password
+    from listingjet.models.tenant import Tenant
+    from listingjet.services.auth import create_access_token, hash_password
 
     # Create a viewer user directly in DB
     tenant = Tenant(id=uuid.uuid4(), name="ViewerCo", plan="starter")

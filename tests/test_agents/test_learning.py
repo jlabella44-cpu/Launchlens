@@ -3,10 +3,10 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.learning import LearningAgent
-from launchlens.models.event import Event
-from launchlens.models.learning_weight import LearningWeight
+from listingjet.agents.base import AgentContext
+from listingjet.agents.learning import LearningAgent
+from listingjet.models.event import Event
+from listingjet.models.learning_weight import LearningWeight
 from tests.test_agents.conftest import make_session_factory
 
 

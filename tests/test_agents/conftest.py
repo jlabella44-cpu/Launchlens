@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 
 import pytest
 
-from launchlens.models.asset import Asset
-from launchlens.models.listing import Listing, ListingState
+from listingjet.models.asset import Asset
+from listingjet.models.listing import Listing, ListingState
 
 
 @asynccontextmanager

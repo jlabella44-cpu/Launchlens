@@ -2,9 +2,9 @@
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.coverage import CoverageAgent
-from launchlens.models.vision_result import VisionResult
+from listingjet.agents.base import AgentContext
+from listingjet.agents.coverage import CoverageAgent
+from listingjet.models.vision_result import VisionResult
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -53,7 +53,7 @@ async def test_coverage_returns_empty_if_all_shots_present(db_session, listing, 
 
 @pytest.mark.asyncio
 async def test_coverage_missing_shots_emitted_as_event(db_session, listing, assets):
-    from launchlens.models.outbox import Outbox
+    from listingjet.models.outbox import Outbox
     await _add_vision_result(db_session, assets[0].id, "exterior")
 
     agent = CoverageAgent(session_factory=make_session_factory(db_session))

@@ -4,9 +4,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
-from launchlens.models.asset import Asset
-from launchlens.models.listing import Listing, ListingState
-from launchlens.services.demo_cleanup import cleanup_expired_demos
+from listingjet.models.asset import Asset
+from listingjet.models.listing import Listing, ListingState
+from listingjet.services.demo_cleanup import cleanup_expired_demos
 
 _DEMO_TENANT = uuid.UUID(int=0)
 

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from launchlens.agents.base import AgentContext, BaseAgent
+from listingjet.agents.base import AgentContext, BaseAgent
 
 
 class ConcreteAgent(BaseAgent):
@@ -18,7 +18,7 @@ async def test_handle_failure_emits_event_and_reraises():
     agent = ConcreteAgent()
     ctx = AgentContext(listing_id="abc", tenant_id="tenant-1")
     mock_session = AsyncMock()
-    with patch("launchlens.services.events.emit_event", new_callable=AsyncMock) as mock_emit:
+    with patch("listingjet.services.events.emit_event", new_callable=AsyncMock) as mock_emit:
         with pytest.raises(ValueError, match="simulated failure"):
             await agent.handle_failure(ValueError("simulated failure"), ctx, session=mock_session)
         mock_emit.assert_called_once()

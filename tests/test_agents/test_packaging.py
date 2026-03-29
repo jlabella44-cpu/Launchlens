@@ -2,12 +2,12 @@
 import pytest
 from sqlalchemy import select
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.packaging import PackagingAgent
-from launchlens.models.listing import ListingState
-from launchlens.models.package_selection import PackageSelection
-from launchlens.models.vision_result import VisionResult
-from launchlens.services.weight_manager import WeightManager
+from listingjet.agents.base import AgentContext
+from listingjet.agents.packaging import PackagingAgent
+from listingjet.models.listing import ListingState
+from listingjet.models.package_selection import PackageSelection
+from listingjet.models.vision_result import VisionResult
+from listingjet.services.weight_manager import WeightManager
 from tests.test_agents.conftest import make_session_factory
 
 

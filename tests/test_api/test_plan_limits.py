@@ -5,8 +5,8 @@ import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
 
-from launchlens.config import settings
-from launchlens.services.plan_limits import PLAN_LIMITS, get_limits
+from listingjet.config import settings
+from listingjet.services.plan_limits import PLAN_LIMITS, get_limits
 
 
 def test_plan_limits_has_all_tiers():
@@ -41,22 +41,22 @@ def test_unknown_plan_returns_starter():
 
 
 def test_check_listing_quota_under_limit():
-    from launchlens.services.plan_limits import check_listing_quota
+    from listingjet.services.plan_limits import check_listing_quota
     assert check_listing_quota("starter", current_count=3) is True
 
 
 def test_check_listing_quota_at_limit():
-    from launchlens.services.plan_limits import check_listing_quota
+    from listingjet.services.plan_limits import check_listing_quota
     assert check_listing_quota("starter", current_count=5) is False
 
 
 def test_check_asset_quota_under_limit():
-    from launchlens.services.plan_limits import check_asset_quota
+    from listingjet.services.plan_limits import check_asset_quota
     assert check_asset_quota("starter", existing_count=10, adding_count=10) is True
 
 
 def test_check_asset_quota_over_limit():
-    from launchlens.services.plan_limits import check_asset_quota
+    from listingjet.services.plan_limits import check_asset_quota
     assert check_asset_quota("starter", existing_count=10, adding_count=20) is False
 
 

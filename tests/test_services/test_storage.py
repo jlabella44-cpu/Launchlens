@@ -2,7 +2,7 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from launchlens.services.storage import StorageService
+from listingjet.services.storage import StorageService
 
 
 @pytest.fixture

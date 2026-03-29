@@ -2,8 +2,8 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from launchlens.providers.base import VisionLabel
-from launchlens.providers.google_vision import GoogleVisionProvider
+from listingjet.providers.base import VisionLabel
+from listingjet.providers.google_vision import GoogleVisionProvider
 
 FAKE_RESPONSE = {
     "responses": [{

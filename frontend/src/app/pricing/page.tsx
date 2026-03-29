@@ -12,7 +12,7 @@ const TIERS = [
     name: "Free",
     price: 0,
     period: "mo",
-    description: "Try LaunchLens risk-free. No subscription required.",
+    description: "Try ListingJet risk-free. No subscription required.",
     includedCredits: 0,
     perListingPrice: 34,
     features: [
@@ -20,7 +20,7 @@ const TIERS = [
       "MLS + marketing bundles",
       "AI photo analysis",
       "30-day asset hosting",
-      "LaunchLens watermark",
+      "ListingJet watermark",
     ],
     addons: true,
   },

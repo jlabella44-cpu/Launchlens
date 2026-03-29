@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.brand import BrandAgent
-from launchlens.models.package_selection import PackageSelection
+from listingjet.agents.base import AgentContext
+from listingjet.agents.brand import BrandAgent
+from listingjet.models.package_selection import PackageSelection
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -50,7 +50,7 @@ async def test_brand_renders_and_uploads_flyer(db_session, listing, assets, hero
 async def test_brand_emits_event(db_session, listing, assets, hero_selection):
     from sqlalchemy import select
 
-    from launchlens.models.outbox import Outbox
+    from listingjet.models.outbox import Outbox
 
     mock_template = MagicMock()
     mock_template.render = AsyncMock(return_value=b"%PDF-content")

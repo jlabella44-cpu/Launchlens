@@ -5,13 +5,13 @@ import pytest
 
 
 def test_kling_provider_exists():
-    from launchlens.providers.kling import KlingProvider
+    from listingjet.providers.kling import KlingProvider
     assert hasattr(KlingProvider, "generate_clip")
     assert hasattr(KlingProvider, "poll_task")
 
 
 def test_video_prompts_exist():
-    from launchlens.agents.video_prompts import NEGATIVE_PROMPT, ROOM_CAMERA_CONTROLS, ROOM_PROMPTS
+    from listingjet.agents.video_prompts import NEGATIVE_PROMPT, ROOM_CAMERA_CONTROLS, ROOM_PROMPTS
     assert "kitchen" in ROOM_PROMPTS
     assert "living_room" in ROOM_PROMPTS
     assert "exterior" in ROOM_PROMPTS
@@ -21,7 +21,7 @@ def test_video_prompts_exist():
 
 
 def test_kling_jwt_generation():
-    from launchlens.providers.kling import KlingProvider
+    from listingjet.providers.kling import KlingProvider
     provider = KlingProvider(access_key="test_ak", secret_key="test_sk")
     token = provider._generate_jwt()
     assert isinstance(token, str)
@@ -29,9 +29,9 @@ def test_kling_jwt_generation():
 
 
 @pytest.mark.asyncio
-@patch("launchlens.providers.kling.httpx.AsyncClient")
+@patch("listingjet.providers.kling.httpx.AsyncClient")
 async def test_kling_generate_clip_submits_task(MockClient):
-    from launchlens.providers.kling import KlingProvider
+    from listingjet.providers.kling import KlingProvider
 
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -54,9 +54,9 @@ async def test_kling_generate_clip_submits_task(MockClient):
 
 
 @pytest.mark.asyncio
-@patch("launchlens.providers.kling.httpx.AsyncClient")
+@patch("listingjet.providers.kling.httpx.AsyncClient")
 async def test_kling_poll_task_returns_url(MockClient):
-    from launchlens.providers.kling import KlingProvider
+    from listingjet.providers.kling import KlingProvider
 
     mock_response = MagicMock()
     mock_response.status_code = 200

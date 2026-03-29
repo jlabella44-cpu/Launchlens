@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from launchlens.agents.base import AgentContext
-from launchlens.agents.chapter import ChapterAgent
-from launchlens.models.listing import Listing, ListingState
-from launchlens.models.video_asset import VideoAsset
+from listingjet.agents.base import AgentContext
+from listingjet.agents.chapter import ChapterAgent
+from listingjet.models.listing import Listing, ListingState
+from listingjet.models.video_asset import VideoAsset
 from tests.test_agents.conftest import make_session_factory
 
 MOCK_CHAPTER_RESPONSE = json.dumps({
