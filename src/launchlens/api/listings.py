@@ -753,10 +753,25 @@ async def get_pipeline_status(
                 s["status"] = "in_progress"
             break
 
+    # Engagement prediction score + detected features
+    from launchlens.services.engagement_score import predict_engagement
+    from launchlens.services.feature_tags import extract_features
+
+    vision_results = (await db.execute(
+        select(VisionResult)
+        .join(Asset, VisionResult.asset_id == Asset.id)
+        .where(Asset.listing_id == listing_id, VisionResult.tier == 1)
+    )).scalars().all()
+
+    engagement_score = predict_engagement(vision_results)
+    detected_features = extract_features(vision_results)
+
     return {
         "listing_id": str(listing.id),
         "state": state_val,
         "steps": steps,
+        "engagement_score": engagement_score,
+        "detected_features": detected_features,
     }
 
 
