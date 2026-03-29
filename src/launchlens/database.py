@@ -23,9 +23,11 @@ class Base(DeclarativeBase):
 async def get_db(request: Request = None):
     tenant_id = getattr(request.state, "tenant_id", None) if request else None
     async with AsyncSessionLocal() as session:
-        if tenant_id:
-            # SET LOCAL requires an active transaction and doesn't support parameterized queries.
-            # Use string formatting (safe — tenant_id is a validated UUID from JWT middleware).
-            safe_tid = str(tenant_id).replace("'", "")
-            await session.execute(text(f"SET LOCAL app.current_tenant = '{safe_tid}'"))
-        yield session
+        async with session.begin():
+            if tenant_id:
+                # SET LOCAL is transaction-scoped — parameterized query works inside BEGIN
+                await session.execute(
+                    text("SET LOCAL app.current_tenant = :tid"),
+                    {"tid": str(tenant_id)},
+                )
+            yield session

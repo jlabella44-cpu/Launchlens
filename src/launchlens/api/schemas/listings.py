@@ -87,3 +87,17 @@ class VideoUploadRequest(BaseModel):
     s3_key: str
     video_type: str = "user_raw"
     duration_seconds: int | None = None
+
+
+class RejectRequest(BaseModel):
+    reason: str  # quality, incomplete, non_compliant, other
+    detail: str = ""
+
+
+class ReorderRequest(BaseModel):
+    swaps: list[dict]  # [{"asset_id": "...", "new_position": 0}, ...]
+
+
+class UploadUrlsRequest(BaseModel):
+    filenames: list[str]
+    content_type: str = "image/jpeg"

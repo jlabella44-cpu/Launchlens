@@ -22,6 +22,8 @@ from launchlens.api.schemas.listings import (
     ListingResponse,
     PipelineStatusResponse,
     PipelineStepStatus,
+    RejectRequest,
+    ReorderRequest,
     UpdateListingRequest,
     VideoUploadRequest,
 )
@@ -405,7 +407,7 @@ async def get_package(
 @router.post("/{listing_id}/package/reorder")
 async def reorder_package(
     listing_id: uuid.UUID,
-    body: dict,
+    body: ReorderRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -423,7 +425,7 @@ async def reorder_package(
     if listing.state not in reviewable:
         raise HTTPException(status_code=409, detail="Listing is not in a reviewable state")
 
-    swaps = body.get("swaps", [])
+    swaps = body.swaps
     if not swaps:
         raise HTTPException(status_code=422, detail="No swaps provided")
 
@@ -567,7 +569,7 @@ async def approve_listing(
 @router.post("/{listing_id}/reject", response_model=ActionResponse)
 async def reject_listing(
     listing_id: uuid.UUID,
-    body: dict,
+    body: RejectRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -589,8 +591,7 @@ async def reject_listing(
         )
 
     valid_reasons = {"quality", "incomplete", "non_compliant", "other"}
-    reason = body.get("reason", "")
-    if reason not in valid_reasons:
+    if body.reason not in valid_reasons:
         raise HTTPException(status_code=400, detail=f"Invalid reason. Must be one of: {valid_reasons}")
 
     listing.state = ListingState.FAILED
@@ -600,7 +601,7 @@ async def reject_listing(
     await emit_event(
         session=db,
         event_type="listing.rejected",
-        payload={"reason": reason, "detail": body.get("detail", "")},
+        payload={"reason": body.reason, "detail": body.detail},
         tenant_id=str(current_user.tenant_id),
         listing_id=str(listing.id),
     )
@@ -683,7 +684,7 @@ async def cancel_listing(
     listing.state = ListingState.FAILED  # reuse FAILED state for cancelled
     await db.commit()
 
-    return {"listing_id": str(listing.id), "state": "cancelled", "credits_refunded": credits_refunded}
+    return {"listing_id": str(listing.id), "state": listing.state.value, "credits_refunded": credits_refunded}
 
 
 @router.get("/{listing_id}/pipeline-status", response_model=PipelineStatusResponse)
@@ -1006,4 +1007,3 @@ async def listing_activity(
     ]
 
 
-    # Duplicate retry endpoint removed — use the one at line ~616
