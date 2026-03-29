@@ -8,6 +8,10 @@ import type {
   CreateListingRequest,
   CreateAssetsRequest,
   CreateAssetsResponse,
+  AdminStatsResponse,
+  AdminTenantResponse,
+  CreditSummaryResponse,
+  TenantCreditsResponse,
   CreditBalance,
   CreditTransaction,
   CreditBundle,
@@ -278,6 +282,11 @@ class ApiClient {
     return this.request("/credits/pricing");
   }
 
+  async getCreditBundles(): Promise<CreditBundle[]> {
+    const data = await this.getCreditPricing();
+    return data.bundles;
+  }
+
   async purchaseCredits(bundleSize: number, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
     return this.request("/credits/purchase", {
       method: "POST",
@@ -303,6 +312,30 @@ class ApiClient {
 
   async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
     return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
+  }
+
+  // Admin
+  async adminStats(): Promise<AdminStatsResponse> {
+    return this.request<AdminStatsResponse>("/admin/stats");
+  }
+
+  async adminTenants(): Promise<AdminTenantResponse[]> {
+    return this.request<AdminTenantResponse[]>("/admin/tenants");
+  }
+
+  async adminCreditsSummary(): Promise<CreditSummaryResponse> {
+    return this.request<CreditSummaryResponse>("/admin/credits/summary");
+  }
+
+  async adminTenantCredits(tenantId: string): Promise<TenantCreditsResponse> {
+    return this.request<TenantCreditsResponse>(`/admin/tenants/${tenantId}/credits`);
+  }
+
+  async adminAdjustCredits(tenantId: string, amount: number, reason: string): Promise<void> {
+    await this.request(`/admin/tenants/${tenantId}/credits/adjust`, {
+      method: "POST",
+      body: JSON.stringify({ amount, reason }),
+    });
   }
 }
 

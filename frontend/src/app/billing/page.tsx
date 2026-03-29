@@ -57,7 +57,11 @@ export default function BillingPage() {
   async function handlePurchase(bundleId: string) {
     setPurchasing(bundleId);
     try {
-      const { checkout_url } = await apiClient.purchaseCredits(bundleId);
+      const { checkout_url } = await apiClient.purchaseCredits(
+        parseInt(bundleId, 10),
+        window.location.href,
+        window.location.href,
+      );
       window.location.href = checkout_url;
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : "Purchase failed", "error");
