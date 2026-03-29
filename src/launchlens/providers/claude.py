@@ -2,8 +2,7 @@
 """
 Anthropic Claude provider — used for listing copy generation.
 
-Model: claude-sonnet-4-6 (latest capable model per environment config).
-Context is serialized into the user message so Claude has full listing metadata.
+Supports dynamic temperature and system prompt override for tone intensity control.
 """
 import json
 
@@ -15,7 +14,7 @@ from launchlens.services.metrics import record_provider_call
 from .base import LLMProvider
 
 _MODEL = "claude-sonnet-4-6"
-_SYSTEM_PROMPT = (
+_DEFAULT_SYSTEM_PROMPT = (
     "You are an expert real estate copywriter. "
     "Write compelling, accurate, and legally compliant listing descriptions. "
     "Avoid Fair Housing Act violations. Be specific about features, never generic."
@@ -28,17 +27,27 @@ class ClaudeProvider(LLMProvider):
             api_key=api_key or settings.anthropic_api_key
         )
 
-    async def complete(self, prompt: str, context: dict) -> str:
+    async def complete(
+        self,
+        prompt: str,
+        context: dict,
+        temperature: float | None = None,
+        system_prompt: str | None = None,
+    ) -> str:
         context_str = json.dumps(context, indent=2) if context else ""
         user_content = f"{prompt}\n\nContext:\n{context_str}" if context_str else prompt
 
+        kwargs = {
+            "model": _MODEL,
+            "max_tokens": 1024,
+            "system": system_prompt or _DEFAULT_SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": user_content}],
+        }
+        if temperature is not None:
+            kwargs["temperature"] = max(0.0, min(1.0, temperature))
+
         try:
-            message = await self._client.messages.create(
-                model=_MODEL,
-                max_tokens=1024,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_content}],
-            )
+            message = await self._client.messages.create(**kwargs)
             record_provider_call("claude", True)
             return message.content[0].text
         except Exception:

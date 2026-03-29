@@ -35,8 +35,8 @@ class FallbackLLMProvider(LLMProvider):
         self.primary = primary
         self.fallback = fallback
 
-    async def complete(self, prompt: str, context: dict) -> str:
+    async def complete(self, prompt: str, context: dict, temperature: float | None = None, system_prompt: str | None = None) -> str:
         try:
-            return await self.primary.complete(prompt, context)
+            return await self.primary.complete(prompt, context, temperature=temperature, system_prompt=system_prompt)
         except Exception:
-            return await self.fallback.complete(prompt, context)
+            return await self.fallback.complete(prompt, context, temperature=temperature, system_prompt=system_prompt)

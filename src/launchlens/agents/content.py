@@ -44,6 +44,34 @@ _MARKET_PROMPTS = {
     "investment": "\nMarket context: INVESTMENT OPPORTUNITY. Focus on ROI, rental potential, cap rate, location fundamentals.",
 }
 
+# Tone intensity maps to system prompt framing + Claude temperature
+_TONE_SYSTEM_PROMPTS = {
+    "utility": (
+        "You are a factual real estate copywriter. Focus strictly on facts and MLS compliance. "
+        "No personality, no flair, no adjectives beyond what the photos show. Be concise."
+    ),
+    "balanced": (
+        "You are a professional real estate copywriter. Use the provided example descriptions "
+        "as a guide for voice and style, but adapt naturally for this property's unique features. "
+        "Be compelling but grounded in the actual photos."
+    ),
+    "high_flair": (
+        "You are a luxury real estate copywriter channeling this agent's signature voice. "
+        "Deeply mimic their vocabulary, rhythm, and cadence from the examples below. "
+        "Be creative, punchy, and bold — make this listing stand out."
+    ),
+}
+
+
+def _tone_to_config(intensity: int) -> tuple[str, float]:
+    """Map tone intensity (0-100) to system prompt key + Claude temperature."""
+    if intensity <= 20:
+        return "utility", 0.1
+    elif intensity <= 60:
+        return "balanced", 0.5
+    else:
+        return "high_flair", 0.8 + (intensity - 60) * 0.005  # 0.8-1.0
+
 
 class ContentAgent(BaseAgent):
     agent_name = "content"
@@ -87,10 +115,16 @@ class ContentAgent(BaseAgent):
                         voice_section += f"\nExample {i}: {sample}\n"
 
                 # Market context from listing metadata
-                market_context = (listing.metadata_ or {}).get("market_context", "")
+                meta = listing.metadata_ or {}
+                market_context = meta.get("market_context", "")
                 market_section = _MARKET_PROMPTS.get(market_context, "")
 
-                safe_metadata = sanitize_for_prompt(listing.metadata_ or {})
+                # Tone intensity: 0-100 slider controls voice mirroring strength
+                tone_intensity = meta.get("tone_intensity", 50)
+                tone_key, temperature = _tone_to_config(int(tone_intensity))
+                system_prompt = _TONE_SYSTEM_PROMPTS[tone_key]
+
+                safe_metadata = sanitize_for_prompt(meta)
                 prompt = _PROMPT_TEMPLATE.format(
                     metadata=str(safe_metadata),
                     photo_features=features_text or "modern interior",
@@ -99,7 +133,10 @@ class ContentAgent(BaseAgent):
                 )
 
                 raw = await self._llm_provider.complete(
-                    prompt=prompt, context=safe_metadata
+                    prompt=prompt,
+                    context=safe_metadata,
+                    temperature=temperature,
+                    system_prompt=system_prompt,
                 )
                 parsed = json.loads(raw)
                 mls_safe = parsed["mls_safe"]
@@ -108,7 +145,10 @@ class ContentAgent(BaseAgent):
 
                 if not fha_result.passed:
                     raw = await self._llm_provider.complete(
-                        prompt=prompt + _FHA_RETRY_SUFFIX, context=safe_metadata
+                        prompt=prompt + _FHA_RETRY_SUFFIX,
+                        context=safe_metadata,
+                        temperature=max(0.1, temperature - 0.2),  # Lower temp for FHA retry
+                        system_prompt=system_prompt,
                     )
                     parsed = json.loads(raw)
                     mls_safe = parsed["mls_safe"]

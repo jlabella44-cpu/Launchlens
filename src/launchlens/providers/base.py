@@ -30,8 +30,19 @@ class VisionProvider(ABC):
 
 class LLMProvider(ABC):
     @abstractmethod
-    async def complete(self, prompt: str, context: dict) -> str:
-        """Return a text completion for the given prompt and context."""
+    async def complete(
+        self,
+        prompt: str,
+        context: dict,
+        temperature: float | None = None,
+        system_prompt: str | None = None,
+    ) -> str:
+        """Return a text completion for the given prompt and context.
+
+        Args:
+            temperature: 0.0-1.0, controls creativity. None = provider default.
+            system_prompt: Override the default system prompt. None = provider default.
+        """
         ...
 
 
