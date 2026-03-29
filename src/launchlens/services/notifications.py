@@ -37,49 +37,54 @@ async def _get_preference(session: AsyncSession, user_id: uuid.UUID) -> Notifica
     return result.scalar_one_or_none()
 
 
-async def notify_pipeline_complete(session: AsyncSession, listing: Listing, tenant_id: str) -> None:
-    """Send pipeline-complete email to tenant users who opted in."""
+async def _dispatch_notification(
+    session: AsyncSession,
+    listing: Listing,
+    tenant_id: str,
+    pref_attr: str,
+    send_fn_name: str,
+    extra_args: tuple = (),
+) -> None:
+    """Shared dispatch: send an email to opted-in tenant users."""
     email_svc = get_email_service()
     address = _listing_address_str(listing)
     users = await _get_tenant_users(session, tenant_id)
 
     for user in users:
         pref = await _get_preference(session, user.id)
-        if pref and not pref.email_on_complete:
+        if pref and not getattr(pref, pref_attr, True):
             continue
         try:
-            email_svc.send_pipeline_complete(user.email, address, str(listing.id))
+            getattr(email_svc, send_fn_name)(user.email, address, *extra_args)
         except Exception:
-            logger.exception("notify_pipeline_complete_failed", extra={"user_id": str(user.id)})
+            logger.exception("%s_failed", send_fn_name, extra={"user_id": str(user.id)})
+
+
+async def notify_pipeline_complete(session: AsyncSession, listing: Listing, tenant_id: str) -> None:
+    """Send pipeline-complete email to tenant users who opted in."""
+    await _dispatch_notification(
+        session, listing, tenant_id,
+        pref_attr="email_on_complete",
+        send_fn_name="send_pipeline_complete",
+        extra_args=(str(listing.id),),
+    )
 
 
 async def notify_pipeline_failed(session: AsyncSession, listing: Listing, tenant_id: str, error: str) -> None:
     """Send pipeline-failure email to tenant users who opted in."""
-    email_svc = get_email_service()
-    address = _listing_address_str(listing)
-    users = await _get_tenant_users(session, tenant_id)
-
-    for user in users:
-        pref = await _get_preference(session, user.id)
-        if pref and not pref.email_on_failure:
-            continue
-        try:
-            email_svc.send_pipeline_failed(user.email, address, error)
-        except Exception:
-            logger.exception("notify_pipeline_failed_failed", extra={"user_id": str(user.id)})
+    await _dispatch_notification(
+        session, listing, tenant_id,
+        pref_attr="email_on_failure",
+        send_fn_name="send_pipeline_failed",
+        extra_args=(error,),
+    )
 
 
 async def notify_review_ready(session: AsyncSession, listing: Listing, tenant_id: str) -> None:
     """Send review-ready email to tenant users who opted in."""
-    email_svc = get_email_service()
-    address = _listing_address_str(listing)
-    users = await _get_tenant_users(session, tenant_id)
-
-    for user in users:
-        pref = await _get_preference(session, user.id)
-        if pref and not pref.email_on_review_ready:
-            continue
-        try:
-            email_svc.send_review_ready(user.email, address, str(listing.id))
-        except Exception:
-            logger.exception("notify_review_ready_failed", extra={"user_id": str(user.id)})
+    await _dispatch_notification(
+        session, listing, tenant_id,
+        pref_attr="email_on_review_ready",
+        send_fn_name="send_review_ready",
+        extra_args=(str(listing.id),),
+    )

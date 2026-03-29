@@ -140,11 +140,12 @@ async def change_plan(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    previous_plan = tenant.plan
     tenant.plan = body.plan
     await db.commit()
 
     return {
-        "previous_plan": tenant.plan,
+        "previous_plan": previous_plan,
         "new_plan": body.plan,
         "subscription_id": result["subscription_id"],
         "status": result["status"],
@@ -324,6 +325,5 @@ async def _handle_invoice_paid(
     if tenant.included_credits > 0:
         await credit_svc.process_period_renewal(
             db, tenant.id, tenant.included_credits,
-            reference_id=event_id,
         )
         await db.commit()

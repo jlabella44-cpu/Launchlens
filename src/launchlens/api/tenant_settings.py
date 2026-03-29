@@ -11,6 +11,7 @@ Endpoints:
   DELETE /settings/api-keys/{id} — revoke an API key
 """
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -109,8 +110,6 @@ async def get_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """Current month usage vs plan limits."""
-    from datetime import datetime, timezone
-
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")

@@ -55,8 +55,8 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     credit_account = CreditAccount(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
-        balance=int(tier_config.get("included_credits", 0)),
-        rollover_cap=int(tier_config.get("rollover_cap", 0)),
+        balance=tier_config["included_credits"],
+        rollover_cap=tier_config["rollover_cap"],
     )
     db.add(credit_account)
 

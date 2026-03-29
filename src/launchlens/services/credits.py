@@ -1,7 +1,7 @@
 """Credit system service — atomic deduction, refunds, rollover, balance queries."""
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -198,8 +198,6 @@ class CreditService:
         account.rollover_balance = rollover_amount
         now = datetime.now(timezone.utc)
         account.period_start = now
-        # Approximate next period (Stripe handles exact dates)
-        from datetime import timedelta
         account.period_end = now + timedelta(days=30)
 
     async def get_transactions(

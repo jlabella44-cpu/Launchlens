@@ -106,27 +106,27 @@ async def deliver_webhook(
         "User-Agent": "LaunchLens-Webhook/1.0",
     }
 
-    for attempt in range(_MAX_RETRIES):
-        try:
-            async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient() as client:
+        for attempt in range(_MAX_RETRIES):
+            try:
                 resp = await client.post(
                     url, content=body_bytes, headers=headers, timeout=_TIMEOUT
                 )
-            if 200 <= resp.status_code < 300:
-                logger.info(
-                    "webhook.delivered url=%s event=%s status=%d",
-                    url, event_type, resp.status_code,
+                if 200 <= resp.status_code < 300:
+                    logger.info(
+                        "webhook.delivered url=%s event=%s status=%d",
+                        url, event_type, resp.status_code,
+                    )
+                    return True
+                logger.warning(
+                    "webhook.failed url=%s event=%s status=%d attempt=%d",
+                    url, event_type, resp.status_code, attempt + 1,
                 )
-                return True
-            logger.warning(
-                "webhook.failed url=%s event=%s status=%d attempt=%d",
-                url, event_type, resp.status_code, attempt + 1,
-            )
-        except Exception as exc:
-            logger.warning(
-                "webhook.error url=%s event=%s error=%s attempt=%d",
-                url, event_type, str(exc), attempt + 1,
-            )
+            except Exception as exc:
+                logger.warning(
+                    "webhook.error url=%s event=%s error=%s attempt=%d",
+                    url, event_type, str(exc), attempt + 1,
+                )
 
     logger.error("webhook.exhausted url=%s event=%s after %d attempts", url, event_type, _MAX_RETRIES)
     return False
