@@ -3,9 +3,12 @@ Ported from Juke Marketing Engine with adaptations for LaunchLens pipeline.
 """
 
 import asyncio
+import logging
 import os
 import tempfile
 import uuid
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from sqlalchemy import select
@@ -25,7 +28,9 @@ from launchlens.models.package_selection import PackageSelection
 from launchlens.models.video_asset import VideoAsset
 from launchlens.models.vision_result import VisionResult
 from launchlens.providers.kling import KlingProvider
+from launchlens.services.endcard import ENDCARD_DURATION, generate_endcard
 from launchlens.services.events import emit_event
+from launchlens.providers.elevenlabs import get_voiceover_provider
 from launchlens.services.metrics import record_cost
 from launchlens.services.storage import StorageService
 from launchlens.services.video_stitcher import VideoStitcher
@@ -88,9 +93,33 @@ class VideoAgent(BaseAgent):
                 # Download clips to temp files
                 clip_paths = await self._download_clips([url for _, url in successful])
 
-                # Stitch into final video
+                # Generate branded end-card from tenant's BrandKit
+                from launchlens.models.brand_kit import BrandKit
+                brand_kit = (await session.execute(
+                    select(BrandKit).where(BrandKit.tenant_id == listing.tenant_id)
+                )).scalar_one_or_none()
+
+                endcard_path = None
+                if brand_kit:
+                    endcard_png = generate_endcard(
+                        brokerage_name=brand_kit.brokerage_name or "",
+                        agent_name=brand_kit.agent_name or "",
+                        primary_color=brand_kit.primary_color or "#2563EB",
+                        logo_bytes=self._try_download_logo(brand_kit.logo_url),
+                    )
+                    if endcard_png:
+                        endcard_path = self._endcard_to_video(endcard_png)
+                        if endcard_path:
+                            clip_paths.append(endcard_path)
+
+                # Stitch into final video (includes end-card if generated)
                 transitions = [get_transition(i, len(successful)) for i in range(len(successful))]
+                if endcard_path:
+                    transitions.append("fade")  # Fade into end-card
                 video_bytes = self._stitcher.stitch(clip_paths, transitions)
+
+                # Generate voiceover narration from listing description
+                video_bytes = await self._add_voiceover(video_bytes, listing)
 
                 # Upload to S3
                 s3_key = self._storage.upload_bytes(
@@ -197,3 +226,91 @@ class VideoAgent(BaseAgent):
                     f.write(resp.content)
                 paths.append(path)
         return paths
+
+    async def _add_voiceover(self, video_bytes: bytes, listing) -> bytes:
+        """Generate voiceover from listing description and overlay on video.
+
+        Returns original video bytes if voiceover generation fails or is unavailable.
+        """
+        import subprocess
+
+        voiceover = get_voiceover_provider()
+        description = (listing.metadata_ or {}).get("description", "")
+        if not description:
+            # Try to build a basic description from metadata
+            meta = listing.metadata_ or {}
+            addr = listing.address or {}
+            parts = []
+            if addr.get("street"):
+                parts.append(f"Welcome to {addr['street']}.")
+            if meta.get("beds") and meta.get("baths"):
+                parts.append(f"This {meta['beds']} bedroom, {meta['baths']} bathroom home")
+            if meta.get("sqft"):
+                parts.append(f"offers {meta['sqft']:,} square feet of living space.")
+            description = " ".join(parts) if parts else ""
+
+        if not description:
+            return video_bytes
+
+        try:
+            audio_bytes = await voiceover.synthesize(description)
+            if not audio_bytes:
+                return video_bytes
+
+            # Write video + audio to temp files, merge with ffmpeg
+            video_path = tempfile.mktemp(suffix=".mp4", prefix="launchlens_vo_in_")
+            audio_path = tempfile.mktemp(suffix=".mp3", prefix="launchlens_vo_audio_")
+            output_path = tempfile.mktemp(suffix=".mp4", prefix="launchlens_vo_out_")
+
+            with open(video_path, "wb") as f:
+                f.write(video_bytes)
+            with open(audio_path, "wb") as f:
+                f.write(audio_bytes)
+
+            subprocess.run([
+                "ffmpeg", "-i", video_path, "-i", audio_path,
+                "-c:v", "copy", "-c:a", "aac",
+                "-map", "0:v:0", "-map", "1:a:0",
+                "-shortest",
+                "-y", output_path,
+            ], check=True, capture_output=True)
+
+            with open(output_path, "rb") as f:
+                result = f.read()
+
+            for p in (video_path, audio_path, output_path):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+            return result
+        except Exception:
+            logger.warning("voiceover_failed listing=%s", listing.id, exc_info=True)
+            return video_bytes
+
+    def _try_download_logo(self, logo_url: str | None) -> bytes | None:
+        """Download logo from S3. Returns None on failure."""
+        if not logo_url:
+            return None
+        try:
+            return self._storage.download(logo_url)
+        except Exception:
+            return None
+
+    def _endcard_to_video(self, png_bytes: bytes) -> str | None:
+        """Convert a PNG end-card to a 5-second MP4 clip via ffmpeg."""
+        import subprocess
+        try:
+            png_path = tempfile.mktemp(suffix=".png", prefix="launchlens_endcard_")
+            mp4_path = tempfile.mktemp(suffix=".mp4", prefix="launchlens_endcard_")
+            with open(png_path, "wb") as f:
+                f.write(png_bytes)
+            subprocess.run([
+                "ffmpeg", "-loop", "1", "-i", png_path,
+                "-c:v", "libx264", "-t", str(ENDCARD_DURATION),
+                "-pix_fmt", "yuv420p", "-vf", "scale=1280:720",
+                "-y", mp4_path,
+            ], check=True, capture_output=True)
+            os.unlink(png_path)
+            return mp4_path
+        except Exception:
+            return None
