@@ -1,0 +1,55 @@
+# src/listingjet/providers/claude.py
+"""
+Anthropic Claude provider — used for listing copy generation.
+
+Supports dynamic temperature and system prompt override for tone intensity control.
+"""
+import json
+
+import anthropic
+
+from listingjet.config import settings
+from listingjet.services.metrics import record_provider_call
+
+from .base import LLMProvider
+
+_MODEL = "claude-sonnet-4-6"
+_DEFAULT_SYSTEM_PROMPT = (
+    "You are an expert real estate copywriter. "
+    "Write compelling, accurate, and legally compliant listing descriptions. "
+    "Avoid Fair Housing Act violations. Be specific about features, never generic."
+)
+
+
+class ClaudeProvider(LLMProvider):
+    def __init__(self, api_key: str = None):
+        self._client = anthropic.AsyncAnthropic(
+            api_key=api_key or settings.anthropic_api_key
+        )
+
+    async def complete(
+        self,
+        prompt: str,
+        context: dict,
+        temperature: float | None = None,
+        system_prompt: str | None = None,
+    ) -> str:
+        context_str = json.dumps(context, indent=2) if context else ""
+        user_content = f"{prompt}\n\nContext:\n{context_str}" if context_str else prompt
+
+        kwargs = {
+            "model": _MODEL,
+            "max_tokens": 1024,
+            "system": system_prompt or _DEFAULT_SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": user_content}],
+        }
+        if temperature is not None:
+            kwargs["temperature"] = max(0.0, min(1.0, temperature))
+
+        try:
+            message = await self._client.messages.create(**kwargs)
+            record_provider_call("claude", True)
+            return message.content[0].text
+        except Exception:
+            record_provider_call("claude", False)
+            raise
