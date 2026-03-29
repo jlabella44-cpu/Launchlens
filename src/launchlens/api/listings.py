@@ -752,18 +752,22 @@ async def get_pipeline_status(
                 s["status"] = "in_progress"
             break
 
-    # Engagement prediction score + detected features
-    from launchlens.services.engagement_score import predict_engagement
-    from launchlens.services.feature_tags import extract_features
+    # Engagement prediction + features — only compute for packaged listings (expensive)
+    engagement_score = None
+    detected_features = []
+    packaged_states = {"awaiting_review", "in_review", "approved", "exporting", "delivered"}
+    if state_val in packaged_states:
+        from launchlens.services.engagement_score import predict_engagement
+        from launchlens.services.feature_tags import extract_features
 
-    vision_results = (await db.execute(
-        select(VisionResult)
-        .join(Asset, VisionResult.asset_id == Asset.id)
-        .where(Asset.listing_id == listing_id, VisionResult.tier == 1)
-    )).scalars().all()
+        vision_results = (await db.execute(
+            select(VisionResult)
+            .join(Asset, VisionResult.asset_id == Asset.id)
+            .where(Asset.listing_id == listing_id, VisionResult.tier == 1)
+        )).scalars().all()
 
-    engagement_score = predict_engagement(vision_results)
-    detected_features = extract_features(vision_results)
+        engagement_score = predict_engagement(vision_results)
+        detected_features = extract_features(vision_results)
 
     return {
         "listing_id": str(listing.id),

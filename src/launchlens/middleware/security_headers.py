@@ -24,6 +24,8 @@ class SecurityHeadersMiddleware:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'"
+        # Relaxed CSP for API backend — frontend is served separately by Vercel.
+        # Only restrict frame embedding (clickjacking protection).
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
 
         return response
