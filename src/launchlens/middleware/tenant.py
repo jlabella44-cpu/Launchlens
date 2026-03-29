@@ -10,6 +10,10 @@ _PUBLIC_PATHS = {"/health", "/health/deep", "/auth/register", "/auth/login", "/b
 
 class TenantMiddleware:
     async def __call__(self, request: Request, call_next):
+        # Skip CORS preflight (OPTIONS) — let CORSMiddleware handle it
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         if path in _PUBLIC_PATHS or (path.startswith("/demo/") and request.method == "GET"):
             return await call_next(request)
