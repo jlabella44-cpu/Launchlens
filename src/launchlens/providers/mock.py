@@ -26,7 +26,7 @@ class MockVisionProvider(VisionProvider):
 
 
 class MockLLMProvider(LLMProvider):
-    async def complete(self, prompt: str, context: dict) -> str:
+    async def complete(self, prompt: str, context: dict, temperature: float | None = None, system_prompt: str | None = None) -> str:
         return "Stunning home with modern finishes and abundant natural light."
 
 
