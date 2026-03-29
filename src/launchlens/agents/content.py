@@ -6,6 +6,7 @@ from temporalio import activity
 
 from launchlens.database import AsyncSessionLocal
 from launchlens.models.asset import Asset
+from launchlens.models.brand_kit import BrandKit
 from launchlens.models.listing import Listing
 from launchlens.models.vision_result import VisionResult
 from launchlens.providers import get_llm_provider
@@ -24,7 +25,7 @@ Property details:
 
 Key features identified from photos:
 {photo_features}
-
+{voice_section}{market_section}
 Return ONLY a JSON object with this exact structure:
 {{
   "mls_safe": "...(2-3 sentences, factual only, no agent promotion, no personality)...",
@@ -36,6 +37,13 @@ _FHA_RETRY_SUFFIX = (
     "Rewrite without referencing families, schools, neighborhood safety, or religion."
 )
 
+_MARKET_PROMPTS = {
+    "buyers_market": "\nMarket context: BUYER'S MARKET. Emphasize investment potential, value, and negotiation flexibility.",
+    "hot_market": "\nMarket context: HOT MARKET. Create urgency. Emphasize demand, multiple offers expected, act fast.",
+    "spring_refresh": "\nMarket context: SPRING REFRESH. Highlight fresh starts, curb appeal, outdoor living, natural light.",
+    "investment": "\nMarket context: INVESTMENT OPPORTUNITY. Focus on ROI, rental potential, cap rate, location fundamentals.",
+}
+
 
 class ContentAgent(BaseAgent):
     agent_name = "content"
@@ -46,6 +54,7 @@ class ContentAgent(BaseAgent):
 
     async def execute(self, context: AgentContext) -> dict:
         listing_id = uuid.UUID(context.listing_id)
+        tenant_id = uuid.UUID(context.tenant_id)
 
         async with self._session_factory() as session:
             async with (session.begin() if not session.in_transaction() else session.begin_nested()):
@@ -66,10 +75,27 @@ class ContentAgent(BaseAgent):
                     f"{vr.room_label} (q={vr.quality_score})" for vr in vrs if vr.room_label
                 )
 
+                # Load brand kit for voice samples
+                brand_kit = (await session.execute(
+                    select(BrandKit).where(BrandKit.tenant_id == tenant_id)
+                )).scalar_one_or_none()
+
+                voice_section = ""
+                if brand_kit and brand_kit.voice_samples:
+                    voice_section = "\n\nMatch the voice and style of these example descriptions from this agent:\n"
+                    for i, sample in enumerate(brand_kit.voice_samples[:3], 1):
+                        voice_section += f"\nExample {i}: {sample}\n"
+
+                # Market context from listing metadata
+                market_context = (listing.metadata_ or {}).get("market_context", "")
+                market_section = _MARKET_PROMPTS.get(market_context, "")
+
                 safe_metadata = sanitize_for_prompt(listing.metadata_ or {})
                 prompt = _PROMPT_TEMPLATE.format(
                     metadata=str(safe_metadata),
                     photo_features=features_text or "modern interior",
+                    voice_section=voice_section,
+                    market_section=market_section,
                 )
 
                 raw = await self._llm_provider.complete(
@@ -96,6 +122,8 @@ class ContentAgent(BaseAgent):
                         "fha_passed": fha_result.passed,
                         "mls_safe_length": len(mls_safe),
                         "marketing_length": len(marketing),
+                        "has_voice_samples": bool(voice_section),
+                        "market_context": market_context or None,
                     },
                     tenant_id=context.tenant_id,
                     listing_id=context.listing_id,
@@ -108,4 +136,4 @@ class ContentAgent(BaseAgent):
 async def run_content(listing_id: str, tenant_id: str) -> dict:
     agent = ContentAgent()
     ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.execute(ctx)
+    return await agent.instrumented_execute(ctx)
