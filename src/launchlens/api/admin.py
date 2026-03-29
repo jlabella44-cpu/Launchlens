@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from launchlens.api.deps import get_db_admin, require_admin
+from launchlens.api.deps import get_db_admin, require_admin, require_superadmin
 from launchlens.api.schemas.admin import (
     AdjustCreditsRequest,
     CreditSummaryResponse,
@@ -42,7 +42,7 @@ async def admin_health(admin_user: User = Depends(require_admin)):
 
 @router.get("/tenants", response_model=list[TenantResponse])
 async def list_tenants(
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
@@ -52,7 +52,7 @@ async def list_tenants(
 @router.get("/tenants/{tenant_id}", response_model=TenantDetailResponse)
 async def get_tenant(
     tenant_id: uuid.UUID,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     tenant = await db.get(Tenant, tenant_id)
@@ -85,7 +85,7 @@ async def get_tenant(
 async def update_tenant(
     tenant_id: uuid.UUID,
     body: UpdateTenantRequest,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     tenant = await db.get(Tenant, tenant_id)
@@ -109,7 +109,7 @@ async def update_tenant(
 @router.post("/tenants/{tenant_id}/test-webhook")
 async def test_webhook(
     tenant_id: uuid.UUID,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     """Send a test event to the tenant's webhook URL."""
@@ -142,7 +142,7 @@ VALID_ROLES = {r.value for r in UserRole}
 @router.get("/tenants/{tenant_id}/users", response_model=list[UserResponse])
 async def list_users(
     tenant_id: uuid.UUID,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     tenant = await db.get(Tenant, tenant_id)
@@ -159,7 +159,7 @@ async def list_users(
 async def invite_user(
     tenant_id: uuid.UUID,
     body: InviteUserRequest,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     tenant = await db.get(Tenant, tenant_id)
@@ -191,7 +191,7 @@ async def invite_user(
 async def change_user_role(
     user_id: uuid.UUID,
     body: UpdateUserRoleRequest,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     if body.role not in VALID_ROLES:
@@ -209,7 +209,7 @@ async def change_user_role(
 
 @router.get("/stats", response_model=PlatformStatsResponse)
 async def platform_stats(
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     total_tenants = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
@@ -239,7 +239,7 @@ async def platform_stats(
 async def get_tenant_credits(
     tenant_id: uuid.UUID,
     limit: int = Query(default=50, ge=1, le=200),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     """Credit balance + recent transactions for a tenant."""
@@ -266,7 +266,7 @@ async def get_tenant_credits(
 async def adjust_credits(
     tenant_id: uuid.UUID,
     body: AdjustCreditsRequest,
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     """Manually add or remove credits for a tenant with audit trail."""
@@ -316,7 +316,7 @@ async def adjust_credits(
 
 @router.get("/credits/summary", response_model=CreditSummaryResponse)
 async def credits_summary(
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     """Platform-wide credit statistics."""
@@ -365,7 +365,7 @@ async def credits_summary(
 
 @router.get("/analytics/revenue", response_model=RevenueBreakdownResponse)
 async def revenue_breakdown(
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     """Revenue breakdown — subscriptions vs credit purchases."""

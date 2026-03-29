@@ -30,15 +30,22 @@ class OutboxPoller:
         self._session_factory = session_factory
         self._poll_interval = poll_interval
         self._running = False
-        self._webhook_cache: dict[str, str | None] = {}
+        self._webhook_cache: dict[str, tuple[str | None, float]] = {}  # key → (url, timestamp)
+        self._cache_ttl = 300  # 5 minutes
 
     async def _get_webhook_url(self, session: AsyncSession, tenant_id) -> str | None:
-        """Look up tenant webhook URL, with in-memory cache."""
+        """Look up tenant webhook URL, with TTL-based cache (5 min)."""
+        import time
         key = str(tenant_id)
-        if key not in self._webhook_cache:
-            tenant = await session.get(Tenant, tenant_id)
-            self._webhook_cache[key] = tenant.webhook_url if tenant else None
-        return self._webhook_cache.get(key)
+        now = time.time()
+        if key in self._webhook_cache:
+            url, cached_at = self._webhook_cache[key]
+            if now - cached_at < self._cache_ttl:
+                return url
+        tenant = await session.get(Tenant, tenant_id)
+        url = tenant.webhook_url if tenant else None
+        self._webhook_cache[key] = (url, now)
+        return url
 
     async def _process_batch(self, session: AsyncSession) -> int:
         """Fetch undelivered rows, deliver, mark done. Returns count processed."""
