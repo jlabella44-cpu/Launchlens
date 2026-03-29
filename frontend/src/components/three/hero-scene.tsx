@@ -19,7 +19,7 @@ function FloatingShapes() {
       ] as [number, number, number],
       scale: Math.random() * 0.3 + 0.1,
       speed: Math.random() * 0.5 + 0.3,
-      color: i % 3 === 0 ? "#F97316" : i % 3 === 1 ? "#3B82F6" : "#60A5FA",
+      color: i % 3 === 0 ? "#FF6B2C" : i % 3 === 1 ? "#1E3A5F" : "#2563EB",
     }));
   }, []);
 
@@ -114,7 +114,7 @@ function InteractiveParticles() {
         />
       </bufferGeometry>
       <pointsMaterial
-        color="#93C5FD"
+        color="#1E3A5F"
         size={0.04}
         transparent
         opacity={0.7}
@@ -140,8 +140,8 @@ function CenterOrb() {
     <mesh ref={ref}>
       <sphereGeometry args={[0.5, 32, 32]} />
       <meshStandardMaterial
-        color="#2563EB"
-        emissive="#2563EB"
+        color="#0F1B2D"
+        emissive="#0F1B2D"
         emissiveIntensity={0.4}
         transparent
         opacity={0.3}
@@ -166,8 +166,8 @@ function OrbitRing() {
     <mesh ref={ref}>
       <torusGeometry args={[1.8, 0.01, 8, 64]} />
       <meshStandardMaterial
-        color="#F97316"
-        emissive="#F97316"
+        color="#FF6B2C"
+        emissive="#FF6B2C"
         emissiveIntensity={0.6}
         transparent
         opacity={0.5}

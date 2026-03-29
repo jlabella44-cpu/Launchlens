@@ -80,7 +80,7 @@ function RegisterForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left: 3D Scene */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-gradient-to-br from-[var(--color-primary)] to-[#1E40AF] relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-gradient-to-br from-[var(--color-primary)] to-[#0A1220] relative overflow-hidden">
         <SceneWrapper className="w-full h-[500px]" camera={{ position: [0, 0, 6], fov: 50 }}>
           <HeroScene />
         </SceneWrapper>
