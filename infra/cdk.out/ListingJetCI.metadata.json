@@ -1,0 +1,56 @@
+{
+  "/ListingJetCI/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider": [
+    {
+      "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
+      "data": true
+    }
+  ],
+  "/ListingJetCI/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/ListingJetCI/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/ListingJetCI/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65"
+    }
+  ],
+  "/ListingJetCI/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0"
+    }
+  ],
+  "/ListingJetCI/DeployRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DeployRole885297C3"
+    }
+  ],
+  "/ListingJetCI/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/ListingJetCI/GithubOidc/Resource/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "GithubOidc86785739"
+    }
+  ],
+  "/ListingJetCI/DeployRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DeployRoleDefaultPolicyDC930F96"
+    }
+  ]
+}

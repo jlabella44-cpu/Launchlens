@@ -1,0 +1,68 @@
+{
+  "/ListingJetMonitoring/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/ListingJetMonitoring/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/ListingJetMonitoring/AlertTopic/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlertTopic2720D535"
+    }
+  ],
+  "/ListingJetMonitoring/ApiUnhealthy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiUnhealthyB4BA4085"
+    }
+  ],
+  "/ListingJetMonitoring/HighErrorRate/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "HighErrorRate9827C77C"
+    }
+  ],
+  "/ListingJetMonitoring/HighLatency/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "HighLatencyBDC1CAA1"
+    }
+  ],
+  "/ListingJetMonitoring/RdsStorageLow/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RdsStorageLowDC6D2026"
+    }
+  ],
+  "/ListingJetMonitoring/RdsCpuHigh/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RdsCpuHigh591FF83B"
+    }
+  ],
+  "/ListingJetMonitoring/Dashboard/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Dashboard9E4231ED"
+    }
+  ],
+  "/ListingJetMonitoring/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/ListingJetMonitoring/AlertTopic/ops@listingjet.com/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlertTopicopslistingjetcomEA544740"
+    }
+  ]
+}

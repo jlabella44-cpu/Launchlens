@@ -1,0 +1,36 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50": {
+      "displayName": "ListingJetCI/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider Code",
+      "source": {
+        "path": "asset.d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-us-east-1-c66c05c2": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "d75c48c9f82cde63e9bf414df335e84e8ac24f11eb34889be255b702aec71e50.zip",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    },
+    "3672462eae4c4baee42def809582b571b9355a05522cae61ae3dfd98815c7314": {
+      "displayName": "ListingJetCI Template",
+      "source": {
+        "path": "ListingJetCI.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-d2314332": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "3672462eae4c4baee42def809582b571b9355a05522cae61ae3dfd98815c7314.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

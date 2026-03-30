@@ -1,0 +1,21 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "d67ecf34e114b7809dd8d8417f9ccc163bbba6de8e4f85170713d712df3626fc": {
+      "displayName": "ListingJetDatabase Template",
+      "source": {
+        "path": "ListingJetDatabase.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-d4cb6b41": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "d67ecf34e114b7809dd8d8417f9ccc163bbba6de8e4f85170713d712df3626fc.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
