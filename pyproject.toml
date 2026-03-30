@@ -53,7 +53,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/launchlens"]
+packages = ["src/launchlens", "src/listingjet"]
 
 [tool.coverage.run]
 source = ["src/launchlens"]
