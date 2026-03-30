@@ -294,13 +294,15 @@ async def adjust_credits(
     if credit_acct:
         credit_acct.balance = new_balance
 
+    account_id = credit_acct.id if credit_acct else uuid.uuid4()
     txn = CreditTransaction(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
+        account_id=account_id,
         amount=body.amount,
         balance_after=new_balance,
         transaction_type="admin_adjustment",
-        reason=body.reason,
+        description=body.reason,
         metadata_={"admin_user_id": str(admin_user.id), "admin_email": admin_user.email},
     )
     db.add(txn)

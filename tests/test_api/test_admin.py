@@ -9,12 +9,14 @@ from listingjet.config import settings
 
 
 async def _register_admin(client: AsyncClient) -> tuple[str, str]:
-    """Register an admin user, return (token, tenant_id)."""
+    """Register a superadmin user, return (token, tenant_id)."""
+    from tests.conftest import promote_to_superadmin
     email = f"admin-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
         "email": email, "password": "AdminPass1!", "name": "Admin", "company_name": "AdminCo"
     })
     token = resp.json()["access_token"]
+    await promote_to_superadmin(client, token)
     payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     return token, payload["tenant_id"]
 

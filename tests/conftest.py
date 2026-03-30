@@ -147,6 +147,25 @@ async def async_client(test_engine):
     app.dependency_overrides.clear()
 
 
+async def promote_to_superadmin(client: AsyncClient, token: str):
+    """Promote a registered user to SUPERADMIN by directly updating the DB via internal endpoint."""
+    import jwt as pyjwt
+    payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    user_id = payload["sub"]
+    # Direct DB update via the test engine
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    engine = create_async_engine(TEST_DB_URL, echo=False)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
+        async with session.begin():
+            await session.execute(
+                text("UPDATE users SET role = 'superadmin' WHERE id = :uid"),
+                {"uid": user_id},
+            )
+    await engine.dispose()
+
+
 @pytest.fixture
 async def two_tenants(async_client, db_session):
     """Creates two tenants and a listing belonging to tenant B."""
