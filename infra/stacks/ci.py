@@ -30,7 +30,7 @@ class CIStack(Stack):
         # IAM role for GitHub Actions
         self.deploy_role = iam.Role(
             self, "DeployRole",
-            role_name="launchlens-github-deploy",
+            role_name="listingjet-github-deploy",
             assumed_by=iam.WebIdentityPrincipal(
                 gh_provider.open_id_connect_provider_arn,
                 conditions={

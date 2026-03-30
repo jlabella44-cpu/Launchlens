@@ -31,27 +31,30 @@ class ServicesStack(Stack):
         # ECR repositories
         self.api_repo = ecr.Repository(
             self, "ApiRepo",
-            repository_name="launchlens-api",
+            repository_name="listingjet-api",
             lifecycle_rules=[ecr.LifecycleRule(max_image_count=20)],
         )
         self.worker_repo = ecr.Repository(
             self, "WorkerRepo",
-            repository_name="launchlens-worker",
+            repository_name="listingjet-worker",
             lifecycle_rules=[ecr.LifecycleRule(max_image_count=20)],
         )
 
-        # ECS cluster
+        # ECS cluster with CloudMap namespace for service discovery
         self.cluster = ecs.Cluster(
             self, "Cluster",
-            cluster_name="launchlens",
+            cluster_name="listingjet",
             vpc=vpc,
             container_insights_v2=ecs.ContainerInsights.ENABLED,
+            default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
+                name="listingjet.local",
+            ),
         )
 
         # Shared secrets
         db_secret = db_instance.secret
         app_secrets = sm.Secret.from_secret_name_v2(
-            self, "AppSecrets", "launchlens/app",
+            self, "AppSecrets", "listingjet/app",
         )
 
         # Common environment variables
@@ -107,11 +110,10 @@ class ServicesStack(Stack):
             cluster=self.cluster,
             task_definition=api_task,
             desired_count=1,
-            listener_port=443,
-            protocol=elbv2.ApplicationProtocol.HTTPS,
-            redirect_http=True,
+            listener_port=80,
+            protocol=elbv2.ApplicationProtocol.HTTP,
             assign_public_ip=False,
-            service_name="launchlens-api",
+            service_name="listingjet-api",
         )
 
         self.api_service.target_group.configure_health_check(
@@ -160,7 +162,7 @@ class ServicesStack(Stack):
             cluster=self.cluster,
             task_definition=worker_task,
             desired_count=1,
-            service_name="launchlens-worker",
+            service_name="listingjet-worker",
             assign_public_ip=False,
         )
 
@@ -201,7 +203,7 @@ class ServicesStack(Stack):
             cluster=self.cluster,
             task_definition=temporal_task,
             desired_count=1,
-            service_name="launchlens-temporal",
+            service_name="listingjet-temporal",
             assign_public_ip=False,
             cloud_map_options=ecs.CloudMapOptions(name="temporal"),
         )

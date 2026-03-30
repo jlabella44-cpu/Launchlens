@@ -32,7 +32,7 @@ class MonitoringStack(Stack):
         # SNS topic for all alerts
         self.alert_topic = sns.Topic(
             self, "AlertTopic",
-            topic_name="launchlens-alerts",
+            topic_name="listingjet-alerts",
         )
         self.alert_topic.add_subscription(subs.EmailSubscription(alert_email))
         alarm_action = cw_actions.SnsAction(self.alert_topic)
@@ -64,13 +64,13 @@ class MonitoringStack(Stack):
                 expression="errors / requests * 100",
                 using_metrics={
                     "errors": cw.Metric(
-                        namespace="LaunchLens",
+                        namespace="ListingJet",
                         metric_name="ErrorCount",
                         statistic="Sum",
                         period=Duration.minutes(5),
                     ),
                     "requests": cw.Metric(
-                        namespace="LaunchLens",
+                        namespace="ListingJet",
                         metric_name="RequestCount",
                         statistic="Sum",
                         period=Duration.minutes(5),
@@ -88,7 +88,7 @@ class MonitoringStack(Stack):
         latency_alarm = cw.Alarm(
             self, "HighLatency",
             metric=cw.Metric(
-                namespace="LaunchLens",
+                namespace="ListingJet",
                 metric_name="RequestLatency",
                 statistic="p95",
                 period=Duration.minutes(5),
@@ -125,22 +125,22 @@ class MonitoringStack(Stack):
         # --- CloudWatch Dashboard ---------------------------------------------
         self.dashboard = cw.Dashboard(
             self, "Dashboard",
-            dashboard_name="LaunchLens",
+            dashboard_name="ListingJet",
             widgets=[
                 [
                     cw.GraphWidget(
                         title="Request Latency (p50 / p95 / p99)",
                         left=[
-                            cw.Metric(namespace="LaunchLens", metric_name="RequestLatency", statistic="p50"),
-                            cw.Metric(namespace="LaunchLens", metric_name="RequestLatency", statistic="p95"),
-                            cw.Metric(namespace="LaunchLens", metric_name="RequestLatency", statistic="p99"),
+                            cw.Metric(namespace="ListingJet", metric_name="RequestLatency", statistic="p50"),
+                            cw.Metric(namespace="ListingJet", metric_name="RequestLatency", statistic="p95"),
+                            cw.Metric(namespace="ListingJet", metric_name="RequestLatency", statistic="p99"),
                         ],
                         width=12,
                     ),
                     cw.GraphWidget(
                         title="Requests & Errors",
-                        left=[cw.Metric(namespace="LaunchLens", metric_name="RequestCount", statistic="Sum")],
-                        right=[cw.Metric(namespace="LaunchLens", metric_name="ErrorCount", statistic="Sum")],
+                        left=[cw.Metric(namespace="ListingJet", metric_name="RequestCount", statistic="Sum")],
+                        right=[cw.Metric(namespace="ListingJet", metric_name="ErrorCount", statistic="Sum")],
                         width=12,
                     ),
                 ],
@@ -155,7 +155,7 @@ class MonitoringStack(Stack):
                         title="Pipeline Stage Duration",
                         left=[
                             cw.Metric(
-                                namespace="LaunchLens",
+                                namespace="ListingJet",
                                 metric_name="PipelineStageDuration",
                                 dimensions_map={"stage": stage},
                                 statistic="Average",

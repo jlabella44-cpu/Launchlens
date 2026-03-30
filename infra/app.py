@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LaunchLens CDK application — instantiates all infrastructure stacks."""
+"""ListingJet CDK application — instantiates all infrastructure stacks."""
 
 import aws_cdk as cdk
 
@@ -16,18 +16,18 @@ env = cdk.Environment(
     region=app.node.try_get_context("region") or "us-east-1",
 )
 
-alert_email = app.node.try_get_context("alert_email") or "ops@launchlens.com"
+alert_email = app.node.try_get_context("alert_email") or "ops@listingjet.com"
 
-network = NetworkStack(app, "LaunchLensNetwork", env=env)
+network = NetworkStack(app, "ListingJetNetwork", env=env)
 
 database = DatabaseStack(
-    app, "LaunchLensDatabase",
+    app, "ListingJetDatabase",
     vpc=network.vpc,
     env=env,
 )
 
 services = ServicesStack(
-    app, "LaunchLensServices",
+    app, "ListingJetServices",
     vpc=network.vpc,
     db_instance=database.db_instance,
     redis_cluster=database.redis_cluster,
@@ -35,7 +35,7 @@ services = ServicesStack(
 )
 
 monitoring = MonitoringStack(
-    app, "LaunchLensMonitoring",
+    app, "ListingJetMonitoring",
     cluster=services.cluster,
     api_service=services.api_service,
     alb=services.alb,
@@ -45,7 +45,7 @@ monitoring = MonitoringStack(
 )
 
 ci = CIStack(
-    app, "LaunchLensCI",
+    app, "ListingJetCI",
     api_repo=services.api_repo,
     cluster=services.cluster,
     env=env,
