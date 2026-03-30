@@ -69,12 +69,24 @@ class EmailService:
         html = _load_template("welcome.html", name=name)
         self.send(to, "Welcome to ListingJet", html)
 
+    async def send_template(self, to: str, template_name: str, context: dict) -> None:
+        """Send a named template with context variables. Async for fire-and-forget."""
+        template_file = f"{template_name}.html"
+        try:
+            html = _load_template(template_file, **{k: str(v) for k, v in context.items()})
+            self.send(to, f"ListingJet — {template_name.replace('_', ' ').title()}", html)
+        except FileNotFoundError:
+            logger.warning("email_template_missing template=%s", template_name)
+
 
 class NoOpEmailService(EmailService):
     """Does nothing — used in dev/test."""
 
     def send(self, to: str, subject: str, html_body: str) -> None:
         logger.debug("noop_email", extra={"to": to, "subject": subject})
+
+    async def send_template(self, to: str, template_name: str, context: dict) -> None:
+        logger.debug("noop_email_template", extra={"to": to, "template": template_name})
 
 
 def get_email_service() -> EmailService:

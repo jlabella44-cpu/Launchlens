@@ -124,10 +124,24 @@ async def async_client(test_engine):
     original_engine = health_module.engine
     health_module.engine = test_engine
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        yield client
+    # Mock both rate limiters globally for all tests (no Redis needed)
+    mock_limiter = MagicMock()
+    mock_limiter.acquire.return_value = True
+    mock_limiter.check.return_value = True
+
+    # Mock credit deduction to always succeed (tests don't need real credit enforcement)
+    async def _noop_deduct(*args, **kwargs):
+        return MagicMock(amount=1)
+
+    with (
+        patch("listingjet.middleware.rate_limit._get_limiter", return_value=mock_limiter),
+        patch("listingjet.services.rate_limiter.RateLimiter", return_value=mock_limiter),
+        patch("listingjet.services.credits.CreditService.deduct_credits", side_effect=_noop_deduct),
+    ):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            yield client
 
     health_module.engine = original_engine
     app.dependency_overrides.clear()
