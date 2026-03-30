@@ -33,7 +33,7 @@ import type {
   RejectRequest,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://launchlens-production.up.railway.app";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://Listin-ApiSe-Ly4m06X1ArNQ-22089779.us-east-1.elb.amazonaws.com";
 
 class ApiClient {
   private token: string | null = null;

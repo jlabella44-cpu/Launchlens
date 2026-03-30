@@ -5,6 +5,6 @@
   "installCommand": "npm ci",
   "devCommand": "next dev",
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://brady-decrescent-jordon.ngrok-free.dev"
+    "NEXT_PUBLIC_API_URL": "http://Listin-ApiSe-Ly4m06X1ArNQ-22089779.us-east-1.elb.amazonaws.com"
   }
 }
