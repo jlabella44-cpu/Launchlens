@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -35,15 +36,22 @@ setup_logging(app_env=settings.app_env, log_level=settings.log_level)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    poller = OutboxPoller(session_factory=AsyncSessionLocal)
-    task = asyncio.create_task(poller.run())
-    yield
-    poller.stop()
-    task.cancel()
+    task = None
     try:
-        await task
-    except asyncio.CancelledError:
-        pass
+        poller = OutboxPoller(session_factory=AsyncSessionLocal)
+        task = asyncio.create_task(poller.run())
+    except Exception:
+        logging.getLogger(__name__).warning("Outbox poller failed to start — running without it")
+
+    yield
+
+    if task:
+        try:
+            poller.stop()
+            task.cancel()
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
 
 
 _TAG_METADATA = [
