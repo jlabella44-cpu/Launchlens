@@ -32,10 +32,7 @@ COPY alembic/ alembic/
 COPY alembic.ini ./
 COPY docker/entrypoint.sh ./entrypoint.sh
 
-EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+EXPOSE ${PORT:-8000}
 
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["api"]
