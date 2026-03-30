@@ -19,12 +19,12 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    sync_url = os.getenv(
-        "DATABASE_URL_SYNC",
-        "postgresql://launchlens:password@localhost/launchlens",
-    )
-    # Convert sync URL to asyncpg URL for async engine
-    return sync_url.replace("postgresql://", "postgresql+asyncpg://")
+    # Try DATABASE_URL_SYNC first, then DATABASE_URL, then fallback
+    url = os.getenv("DATABASE_URL_SYNC") or os.getenv("DATABASE_URL") or "postgresql://launchlens:password@localhost/launchlens"
+    # Ensure it's an asyncpg URL for the async engine
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
 
 
 def run_migrations_offline() -> None:
