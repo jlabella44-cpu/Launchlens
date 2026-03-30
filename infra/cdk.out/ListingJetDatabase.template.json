@@ -3,7 +3,7 @@
   "DbSg495F8305": {
    "Type": "AWS::EC2::SecurityGroup",
    "Properties": {
-    "GroupDescription": "RDS + Redis — accepts from private subnets",
+    "GroupDescription": "RDS + Redis - accepts from private subnets",
     "SecurityGroupEgress": [
      {
       "CidrIp": "255.255.255.255/32",
@@ -18,7 +18,7 @@
       "CidrIp": {
        "Fn::ImportValue": "ListingJetNetwork:ExportsOutputFnGetAttVpc8378EB38CidrBlock14DD2396"
       },
-      "Description": "Private subnets → PostgreSQL",
+      "Description": "Private subnets to PostgreSQL",
       "FromPort": 5432,
       "IpProtocol": "tcp",
       "ToPort": 5432
@@ -27,7 +27,7 @@
       "CidrIp": {
        "Fn::ImportValue": "ListingJetNetwork:ExportsOutputFnGetAttVpc8378EB38CidrBlock14DD2396"
       },
-      "Description": "Private subnets → Redis",
+      "Description": "Private subnets to Redis",
       "FromPort": 6379,
       "IpProtocol": "tcp",
       "ToPort": 6379
@@ -104,7 +104,7 @@
    "Type": "AWS::RDS::DBInstance",
    "Properties": {
     "AllocatedStorage": "20",
-    "BackupRetentionPeriod": 7,
+    "BackupRetentionPeriod": 1,
     "CopyTagsToSnapshot": true,
     "DBInstanceClass": "db.t4g.micro",
     "DBName": "listingjet",
@@ -166,7 +166,7 @@
   "RedisSgFB48DCCD": {
    "Type": "AWS::EC2::SecurityGroup",
    "Properties": {
-    "GroupDescription": "Redis — accepts from private subnets",
+    "GroupDescription": "Redis - accepts from private subnets",
     "SecurityGroupEgress": [
      {
       "CidrIp": "255.255.255.255/32",
@@ -181,7 +181,7 @@
       "CidrIp": {
        "Fn::ImportValue": "ListingJetNetwork:ExportsOutputFnGetAttVpc8378EB38CidrBlock14DD2396"
       },
-      "Description": "Private subnets → PostgreSQL",
+      "Description": "Private subnets to PostgreSQL",
       "FromPort": 5432,
       "IpProtocol": "tcp",
       "ToPort": 5432
@@ -190,7 +190,7 @@
       "CidrIp": {
        "Fn::ImportValue": "ListingJetNetwork:ExportsOutputFnGetAttVpc8378EB38CidrBlock14DD2396"
       },
-      "Description": "Private subnets → Redis",
+      "Description": "Private subnets to Redis",
       "FromPort": 6379,
       "IpProtocol": "tcp",
       "ToPort": 6379

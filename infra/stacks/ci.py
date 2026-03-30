@@ -1,4 +1,4 @@
-"""IAM role for GitHub Actions OIDC — allows CI/CD to push to ECR and deploy to ECS."""
+"""IAM role for GitHub Actions OIDC - allows CI/CD to push to ECR and deploy to ECS."""
 
 from aws_cdk import (
     Stack,

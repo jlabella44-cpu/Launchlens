@@ -33,7 +33,7 @@ class NetworkStack(Stack):
         self.alb_sg = ec2.SecurityGroup(
             self, "AlbSg",
             vpc=self.vpc,
-            description="ALB — accepts HTTPS from internet",
+            description="ALB - accepts HTTPS from internet",
             allow_all_outbound=True,
         )
         self.alb_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(443), "HTTPS")
@@ -43,18 +43,18 @@ class NetworkStack(Stack):
         self.svc_sg = ec2.SecurityGroup(
             self, "SvcSg",
             vpc=self.vpc,
-            description="ECS services — accepts traffic from ALB",
+            description="ECS services - accepts traffic from ALB",
             allow_all_outbound=True,
         )
-        self.svc_sg.add_ingress_rule(self.alb_sg, ec2.Port.tcp(8000), "ALB → API")
+        self.svc_sg.add_ingress_rule(self.alb_sg, ec2.Port.tcp(8000), "ALB to API")
 
         # Security group: databases
         self.db_sg = ec2.SecurityGroup(
             self, "DbSg",
             vpc=self.vpc,
-            description="Databases — accepts from ECS services",
+            description="Databases - accepts from ECS services",
             allow_all_outbound=False,
         )
-        self.db_sg.add_ingress_rule(self.svc_sg, ec2.Port.tcp(5432), "ECS → PostgreSQL")
-        self.db_sg.add_ingress_rule(self.svc_sg, ec2.Port.tcp(6379), "ECS → Redis")
-        self.db_sg.add_ingress_rule(self.svc_sg, ec2.Port.tcp(7233), "ECS → Temporal")
+        self.db_sg.add_ingress_rule(self.svc_sg, ec2.Port.tcp(5432), "ECS to PostgreSQL")
+        self.db_sg.add_ingress_rule(self.svc_sg, ec2.Port.tcp(6379), "ECS to Redis")
+        self.db_sg.add_ingress_rule(self.svc_sg, ec2.Port.tcp(7233), "ECS to Temporal")

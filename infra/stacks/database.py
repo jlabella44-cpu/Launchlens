@@ -26,7 +26,7 @@ class DatabaseStack(Stack):
         self.db_sg = ec2.SecurityGroup(
             self, "DbSg",
             vpc=vpc,
-            description="RDS + Redis — accepts from private subnets",
+            description="RDS + Redis - accepts from private subnets",
             allow_all_outbound=False,
         )
 
@@ -47,8 +47,8 @@ class DatabaseStack(Stack):
             allocated_storage=20,
             max_allocated_storage=50,
             multi_az=False,
-            backup_retention=Duration.days(7),
-            deletion_protection=False,  # beta — flip for production
+            backup_retention=Duration.days(1),
+            deletion_protection=False,  # beta - flip for production
             removal_policy=RemovalPolicy.SNAPSHOT,
         )
 
@@ -62,7 +62,7 @@ class DatabaseStack(Stack):
         redis_sg = ec2.SecurityGroup(
             self, "RedisSg",
             vpc=vpc,
-            description="Redis — accepts from private subnets",
+            description="Redis - accepts from private subnets",
             allow_all_outbound=False,
         )
 
@@ -76,15 +76,15 @@ class DatabaseStack(Stack):
             vpc_security_group_ids=[redis_sg.security_group_id],
         )
 
-        # Allow ECS services → RDS and Redis
+        # Allow ECS services -> RDS and Redis
         for port, desc in [(5432, "PostgreSQL"), (6379, "Redis")]:
             self.db_sg.add_ingress_rule(
                 ec2.Peer.ipv4(vpc.vpc_cidr_block),
                 ec2.Port.tcp(port),
-                f"Private subnets → {desc}",
+                f"Private subnets to {desc}",
             )
             redis_sg.add_ingress_rule(
                 ec2.Peer.ipv4(vpc.vpc_cidr_block),
                 ec2.Port.tcp(port),
-                f"Private subnets → {desc}",
+                f"Private subnets to {desc}",
             )

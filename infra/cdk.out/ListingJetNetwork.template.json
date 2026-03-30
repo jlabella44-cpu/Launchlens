@@ -421,7 +421,7 @@
   "AlbSg1155C1BE": {
    "Type": "AWS::EC2::SecurityGroup",
    "Properties": {
-    "GroupDescription": "ALB — accepts HTTPS from internet",
+    "GroupDescription": "ALB - accepts HTTPS from internet",
     "SecurityGroupEgress": [
      {
       "CidrIp": "0.0.0.0/0",
@@ -456,7 +456,7 @@
   "SvcSgFDC59615": {
    "Type": "AWS::EC2::SecurityGroup",
    "Properties": {
-    "GroupDescription": "ECS services — accepts traffic from ALB",
+    "GroupDescription": "ECS services - accepts traffic from ALB",
     "SecurityGroupEgress": [
      {
       "CidrIp": "0.0.0.0/0",
@@ -475,7 +475,7 @@
   "SvcSgfromListingJetNetworkAlbSgA59DDD3F80003C3E8A5F": {
    "Type": "AWS::EC2::SecurityGroupIngress",
    "Properties": {
-    "Description": "ALB → API",
+    "Description": "ALB to API",
     "FromPort": 8000,
     "GroupId": {
      "Fn::GetAtt": [
@@ -499,7 +499,7 @@
   "DbSg495F8305": {
    "Type": "AWS::EC2::SecurityGroup",
    "Properties": {
-    "GroupDescription": "Databases — accepts from ECS services",
+    "GroupDescription": "Databases - accepts from ECS services",
     "SecurityGroupEgress": [
      {
       "CidrIp": "255.255.255.255/32",
@@ -520,7 +520,7 @@
   "DbSgfromListingJetNetworkSvcSg59A41FA45432DC57F154": {
    "Type": "AWS::EC2::SecurityGroupIngress",
    "Properties": {
-    "Description": "ECS → PostgreSQL",
+    "Description": "ECS to PostgreSQL",
     "FromPort": 5432,
     "GroupId": {
      "Fn::GetAtt": [
@@ -544,7 +544,7 @@
   "DbSgfromListingJetNetworkSvcSg59A41FA4637915423E4C": {
    "Type": "AWS::EC2::SecurityGroupIngress",
    "Properties": {
-    "Description": "ECS → Redis",
+    "Description": "ECS to Redis",
     "FromPort": 6379,
     "GroupId": {
      "Fn::GetAtt": [
@@ -568,7 +568,7 @@
   "DbSgfromListingJetNetworkSvcSg59A41FA4723327FF97B5": {
    "Type": "AWS::EC2::SecurityGroupIngress",
    "Properties": {
-    "Description": "ECS → Temporal",
+    "Description": "ECS to Temporal",
     "FromPort": 7233,
     "GroupId": {
      "Fn::GetAtt": [
