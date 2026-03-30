@@ -49,12 +49,12 @@ async def test_filter_by_state(_mock_rate_limiter, async_client):
     # Both are "new" state
     resp = await async_client.get("/listings?state=new", headers=_auth(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert len(resp.json()["items"]) == 2
 
     # No "approved" listings
     resp = await async_client.get("/listings?state=approved", headers=_auth(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 0
+    assert len(resp.json()["items"]) == 0
 
 
 @pytest.mark.asyncio
@@ -66,7 +66,7 @@ async def test_search_by_city(_mock_rate_limiter, async_client):
 
     resp = await async_client.get("/listings?search=Austin", headers=_auth(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert len(resp.json()["items"]) == 2
 
 
 @pytest.mark.asyncio
@@ -77,7 +77,7 @@ async def test_search_by_street(_mock_rate_limiter, async_client):
 
     resp = await async_client.get("/listings?search=Oak", headers=_auth(token))
     assert resp.status_code == 200
-    data = resp.json()
+    data = resp.json()["items"]
     assert len(data) == 1
     assert "Oak" in data[0]["address"]["street"]
 
@@ -88,13 +88,13 @@ async def test_pagination(_mock_rate_limiter, async_client):
     for i in range(5):
         await _create_listing(async_client, token, f"{i}00 Test St", "City", "TX")
 
-    resp = await async_client.get("/listings?limit=2&offset=0", headers=_auth(token))
+    resp = await async_client.get("/listings?page_size=2&page=1", headers=_auth(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert len(resp.json()["items"]) == 2
 
-    resp2 = await async_client.get("/listings?limit=2&offset=3", headers=_auth(token))
+    resp2 = await async_client.get("/listings?page_size=2&page=2", headers=_auth(token))
     assert resp2.status_code == 200
-    assert len(resp2.json()) == 2
+    assert len(resp2.json()["items"]) == 2
 
 
 @pytest.mark.asyncio
@@ -106,9 +106,9 @@ async def test_combined_filters(_mock_rate_limiter, async_client):
     # Both are "new" and in Austin
     resp = await async_client.get("/listings?state=new&search=Austin", headers=_auth(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert len(resp.json()["items"]) == 2
 
     # Search for Oak + new state
     resp = await async_client.get("/listings?state=new&search=Oak", headers=_auth(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 1
+    assert len(resp.json()["items"]) == 1
