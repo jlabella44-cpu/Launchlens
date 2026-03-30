@@ -31,7 +31,7 @@ const STEPS: Step[] = [
   {
     id: "listing",
     title: "Upload your first listing",
-    description: "Create a listing and upload photos. Our AI pipeline will curate, score, and package them into launch-ready materials.",
+    description: "Create a listing and upload photos. ListingJet's AI autopilot will curate, score, and package them into marketing-ready assets.",
     actionLabel: "Create Listing",
     actionHref: "/listings?create=true",
     skipLabel: "Skip for now",

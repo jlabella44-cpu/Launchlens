@@ -55,7 +55,7 @@ export default function LoginPage() {
             ListingJet
           </h2>
           <p className="text-white/80 text-lg">
-            From raw listing media to launch-ready marketing in minutes.
+            Put your listings on autopilot. From raw photos to marketing-ready assets in minutes.
           </p>
         </div>
       </div>
