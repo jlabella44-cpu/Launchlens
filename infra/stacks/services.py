@@ -63,6 +63,7 @@ class ServicesStack(Stack):
             "ENVIRONMENT": "production",
             "AWS_REGION": Stack.of(self).region,
             "REDIS_URL": f"redis://{redis_cluster.attr_redis_endpoint_address}:{redis_cluster.attr_redis_endpoint_port}/0",
+            "CORS_ORIGINS": "http://localhost:3000,https://launchlens-7bvngk56b-jlabella44-5360s-projects.vercel.app",
             "TEMPORAL_HOST": "temporal:7233",
         }
 
@@ -202,7 +203,7 @@ class ServicesStack(Stack):
             self, "TemporalService",
             cluster=self.cluster,
             task_definition=temporal_task,
-            desired_count=1,
+            desired_count=0,  # Start at 0, scale up after verifying DB connectivity
             service_name="listingjet-temporal",
             assign_public_ip=False,
             cloud_map_options=ecs.CloudMapOptions(name="temporal"),
