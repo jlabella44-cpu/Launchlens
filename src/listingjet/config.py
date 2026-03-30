@@ -9,9 +9,22 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"  # comma-separated allowed origins
 
-    # Database
+    # Database — auto-converts postgresql:// to postgresql+asyncpg:// if needed
     database_url: str
     database_url_sync: str = ""
+
+    @property
+    def async_database_url(self) -> str:
+        url = self.database_url
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
+    @property
+    def sync_database_url(self) -> str:
+        if self.database_url_sync:
+            return self.database_url_sync
+        return self.database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
     # Auth
     jwt_secret: str
