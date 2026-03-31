@@ -114,7 +114,7 @@ def create_app() -> FastAPI:
     app.include_router(brand_kit.router, prefix="/brand-kit", tags=["brand-kit"])
     app.include_router(credits.router, prefix="/credits", tags=["credits"])
     app.include_router(addons.router, prefix="/addons", tags=["addons"])
-    app.include_router(sse.router, prefix="/sse", tags=["sse"])
+    app.include_router(sse.router, tags=["sse"])
     app.include_router(health.router)
 
     # Debug error handler — returns tracebacks in response (remove for real production)

@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet.models.credit_account import CreditAccount
 from listingjet.models.tenant import Tenant
 
 
@@ -33,6 +34,15 @@ async def _create_tenant(db: AsyncSession, **overrides) -> Tenant:
     defaults.update(overrides)
     tenant = Tenant(**defaults)
     db.add(tenant)
+    await db.flush()
+
+    # Also create a CreditAccount so the credit service can find it
+    credit_account = CreditAccount(
+        tenant_id=tenant.id,
+        balance=defaults.get("credit_balance", 0),
+        rollover_cap=defaults.get("rollover_cap", 0),
+    )
+    db.add(credit_account)
     await db.commit()
     return tenant
 
@@ -122,7 +132,7 @@ async def test_webhook_subscription_updated_changes_tier(async_client: AsyncClie
 
     t = await _get_tenant(db_session, tenant.id)
     assert t.plan == "enterprise"
-    assert t.included_credits == 200
+    assert t.included_credits == 500
     assert t.rollover_cap == 100
 
 

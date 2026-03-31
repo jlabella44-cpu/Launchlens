@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -22,6 +23,7 @@ async def test_poller_marks_rows_delivered(db_session):
     await db_session.flush()
 
     poller = OutboxPoller(session_factory=None)
+    poller._get_webhook_url = AsyncMock(return_value=None)
     await poller._process_batch(db_session)
 
     await db_session.refresh(outbox)
@@ -44,6 +46,7 @@ async def test_poller_skips_already_delivered_rows(db_session):
     await db_session.flush()
 
     poller = OutboxPoller(session_factory=None)
+    poller._get_webhook_url = AsyncMock(return_value=None)
     count = await poller._process_batch(db_session)
     assert count == 0
 
@@ -63,5 +66,6 @@ async def test_poller_processes_multiple_rows(db_session):
     await db_session.flush()
 
     poller = OutboxPoller(session_factory=None)
+    poller._get_webhook_url = AsyncMock(return_value=None)
     count = await poller._process_batch(db_session)
     assert count == 3

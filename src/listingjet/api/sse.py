@@ -43,9 +43,10 @@ async def listing_events(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     if listing.tenant_id != current_user.tenant_id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        raise HTTPException(status_code=404, detail="Listing not found")
 
     async def event_stream():
+        yield "retry: 5000\n\n"
         last_seen_id = None
         while True:
             if await request.is_disconnected():
