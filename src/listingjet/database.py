@@ -23,12 +23,16 @@ class Base(DeclarativeBase):
 async def get_db(request: Request = None):
     tenant_id = getattr(request.state, "tenant_id", None) if request else None
     async with AsyncSessionLocal() as session:
-        async with session.begin():
-            if tenant_id:
-                # SET LOCAL doesn't support parameterized values in PostgreSQL.
-                # Safe: tenant_id is a validated UUID from our JWT, not user input.
-                tid = str(tenant_id).replace("'", "")
-                await session.execute(
-                    text(f"SET LOCAL app.current_tenant = '{tid}'"),
-                )
+        if tenant_id:
+            # SET LOCAL is transaction-scoped, so start one explicitly for it.
+            # Safe: tenant_id is a validated UUID from our JWT, not user input.
+            tid = str(tenant_id).replace("'", "")
+            await session.execute(
+                text(f"SET LOCAL app.current_tenant = '{tid}'"),
+            )
+        try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
