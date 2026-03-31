@@ -1,9 +1,9 @@
 import asyncio
-import logging
-from .zillow import ZillowScraper
-from .redfin import RedfinScraper
-from .realtor import RealtorScraper
+
 from .homes import HomesScraper
+from .realtor import RealtorScraper
+from .redfin import RedfinScraper
+from .zillow import ZillowScraper
 
 _SCRAPERS = [ZillowScraper(), RedfinScraper(), RealtorScraper(), HomesScraper()]
 

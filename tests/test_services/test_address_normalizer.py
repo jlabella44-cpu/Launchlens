@@ -1,7 +1,7 @@
 from listingjet.services.address_normalizer import (
-    normalize_address,
     address_hash,
     generate_alternates,
+    normalize_address,
 )
 
 

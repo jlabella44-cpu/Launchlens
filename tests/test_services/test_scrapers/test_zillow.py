@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
+
 from listingjet.services.property_scraper.zillow import ZillowScraper
 
 

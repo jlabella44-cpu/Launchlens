@@ -1,10 +1,11 @@
 """Tests for PropertyLookupService."""
 
-import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
-from listingjet.services.property_lookup import PropertyLookupService
+import pytest
+
 from listingjet.api.schemas.properties import PropertyLookupResponse
+from listingjet.services.property_lookup import PropertyLookupService
 
 
 @pytest.fixture

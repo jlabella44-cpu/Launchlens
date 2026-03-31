@@ -2,7 +2,6 @@
 Tests for the cross-reference consensus logic.
 """
 
-import pytest
 from listingjet.services.property_scraper.cross_reference import cross_reference
 
 

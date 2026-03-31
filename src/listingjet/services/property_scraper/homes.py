@@ -3,6 +3,7 @@ Homes.com site-specific property scraper.
 """
 
 from urllib.parse import quote_plus
+
 from .base import BaseScraper
 
 

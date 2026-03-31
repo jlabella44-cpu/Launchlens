@@ -7,13 +7,12 @@ from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.brand_kit import BrandKit
 from listingjet.models.listing import Listing
+from listingjet.models.property_data import PropertyData
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_llm_provider
 from listingjet.services.events import emit_event
 from listingjet.services.fha_filter import fha_check
 from listingjet.services.pii_filter import sanitize_for_prompt
-
-from listingjet.models.property_data import PropertyData
 
 from .base import AgentContext, BaseAgent
 

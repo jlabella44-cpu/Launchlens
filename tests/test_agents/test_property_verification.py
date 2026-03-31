@@ -1,11 +1,9 @@
-import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from listingjet.agents.base import AgentContext
 from listingjet.agents.property_verification import PropertyVerificationAgent
-from listingjet.models.listing import Listing, ListingState
 from listingjet.models.property_data import PropertyData
 from tests.test_agents.conftest import make_session_factory
 

@@ -5,19 +5,19 @@ Fetches property details and neighborhood scores for a given address,
 with in-memory caching and automatic retry using alternate address forms.
 """
 
-import time
 import logging
+import time
 
 import httpx
 
-from listingjet.config import settings
-from listingjet.services.address_normalizer import address_hash, generate_alternates
 from listingjet.api.schemas.properties import (
     CoreFields,
     DetailFields,
     NeighborhoodFields,
     PropertyLookupResponse,
 )
+from listingjet.config import settings
+from listingjet.services.address_normalizer import address_hash, generate_alternates
 
 logger = logging.getLogger(__name__)
 
