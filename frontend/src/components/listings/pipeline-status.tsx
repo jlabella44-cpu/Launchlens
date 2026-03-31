@@ -4,11 +4,21 @@ import dynamic from "next/dynamic";
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-secondary)]/5 animate-pulse" />
+    ),
+  }
 );
 const PipelineVisualizer = dynamic(
   () => import("@/components/three/pipeline-visualizer").then((m) => ({ default: m.PipelineVisualizer })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-secondary)]/5 animate-pulse" />
+    ),
+  }
 );
 
 interface PipelineStatusProps {
