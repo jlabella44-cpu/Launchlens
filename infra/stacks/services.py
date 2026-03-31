@@ -113,6 +113,13 @@ class ServicesStack(Stack):
                 "OPENAI_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "OPENAI_API_KEY"),
                 "ANTHROPIC_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "ANTHROPIC_API_KEY"),
                 "GOOGLE_VISION_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "GOOGLE_VISION_API_KEY"),
+                "STRIPE_PRICE_STARTER": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_PRICE_STARTER"),
+                "STRIPE_PRICE_PRO": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_PRICE_PRO"),
+                "STRIPE_PRICE_ENTERPRISE": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_PRICE_ENTERPRISE"),
+                "STRIPE_PRICE_LITE": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_PRICE_LITE"),
+                "STRIPE_PRICE_ACTIVE_AGENT": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_PRICE_ACTIVE_AGENT"),
+                "STRIPE_PRICE_TEAM": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_PRICE_TEAM"),
+                "STRIPE_PRICE_ANNUAL": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_PRICE_ANNUAL"),
             },
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
@@ -172,6 +179,8 @@ class ServicesStack(Stack):
                 "GOOGLE_VISION_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "GOOGLE_VISION_API_KEY"),
                 "KLING_ACCESS_KEY": ecs.Secret.from_secrets_manager(app_secrets, "KLING_ACCESS_KEY"),
                 "KLING_SECRET_KEY": ecs.Secret.from_secrets_manager(app_secrets, "KLING_SECRET_KEY"),
+                "STRIPE_SECRET_KEY": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_SECRET_KEY"),
+                "STRIPE_WEBHOOK_SECRET": ecs.Secret.from_secrets_manager(app_secrets, "STRIPE_WEBHOOK_SECRET"),
             },
             command=["worker"],
         )

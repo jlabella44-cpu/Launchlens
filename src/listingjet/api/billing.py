@@ -118,8 +118,9 @@ async def change_plan(
     db: AsyncSession = Depends(get_db),
 ):
     """Upgrade or downgrade subscription plan."""
-    if body.plan not in ("starter", "pro", "enterprise"):
-        raise HTTPException(status_code=400, detail="Invalid plan. Must be: starter, pro, enterprise")
+    valid_plans = ("starter", "pro", "enterprise", "lite", "active_agent", "team", "annual")
+    if body.plan not in valid_plans:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {', '.join(valid_plans)}")
 
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:

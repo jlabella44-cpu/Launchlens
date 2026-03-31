@@ -21,6 +21,18 @@ def _init_price_map():
         if settings.stripe_price_enterprise:
             PRICE_TO_PLAN[settings.stripe_price_enterprise] = "enterprise"
             PLAN_TO_PRICE["enterprise"] = settings.stripe_price_enterprise
+        if settings.stripe_price_lite:
+            PRICE_TO_PLAN[settings.stripe_price_lite] = "lite"
+            PLAN_TO_PRICE["lite"] = settings.stripe_price_lite
+        if settings.stripe_price_active_agent:
+            PRICE_TO_PLAN[settings.stripe_price_active_agent] = "active_agent"
+            PLAN_TO_PRICE["active_agent"] = settings.stripe_price_active_agent
+        if settings.stripe_price_team:
+            PRICE_TO_PLAN[settings.stripe_price_team] = "team"
+            PLAN_TO_PRICE["team"] = settings.stripe_price_team
+        if settings.stripe_price_annual:
+            PRICE_TO_PLAN[settings.stripe_price_annual] = "annual"
+            PLAN_TO_PRICE["annual"] = settings.stripe_price_annual
 
 
 class BillingService:

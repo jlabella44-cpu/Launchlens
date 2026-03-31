@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
+import apiClient from "@/lib/api-client";
+
+const PRICE_IDS: Record<string, string> = {
+  lite: "price_1TH4J9RZ4TuRrBpyUHm6Eg5p",
+  active_agent: "price_1TH4JARZ4TuRrBpywg1XdkoE",
+  team: "price_1TH4JBRZ4TuRrBpyAVqQKwTd",
+  annual: "price_1TH4JCRZ4TuRrBpyUyF9K4dl",
+};
 
 const TIERS = [
   {
@@ -69,7 +77,88 @@ const ADDONS = [
 ];
 
 export default function PricingPage() {
+  const router = useRouter();
   const [listingsPerMonth, setListingsPerMonth] = useState(3);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+  async function handleTierCheckout(tier: (typeof TIERS)[number]) {
+    const planKey = tier.name.toLowerCase().replace(" ", "_");
+    const priceId = PRICE_IDS[planKey];
+
+    // Free tier always goes to register
+    if (!priceId) {
+      router.push(`/register?plan=${planKey}`);
+      return;
+    }
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      router.push(`/register?plan=${planKey}`);
+      return;
+    }
+
+    try {
+      setCheckoutLoading(planKey);
+      apiClient.setToken(token);
+      const { checkout_url } = await apiClient.billingCheckout(
+        priceId,
+        `${window.location.origin}/billing?success=true`,
+        `${window.location.origin}/pricing`,
+      );
+      window.location.href = checkout_url;
+    } catch {
+      // If checkout fails (e.g. expired token), fall back to register
+      router.push(`/register?plan=${planKey}`);
+    } finally {
+      setCheckoutLoading(null);
+    }
+  }
+
+  async function handleAnnualCheckout() {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      router.push("/register?plan=annual");
+      return;
+    }
+
+    try {
+      setCheckoutLoading("annual");
+      apiClient.setToken(token);
+      const { checkout_url } = await apiClient.billingCheckout(
+        PRICE_IDS.annual,
+        `${window.location.origin}/billing?success=true`,
+        `${window.location.origin}/pricing`,
+      );
+      window.location.href = checkout_url;
+    } catch {
+      router.push("/register?plan=annual");
+    } finally {
+      setCheckoutLoading(null);
+    }
+  }
+
+  async function handleCreditPurchase(bundleSize: number) {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      router.push("/register");
+      return;
+    }
+
+    try {
+      setCheckoutLoading(`credits_${bundleSize}`);
+      apiClient.setToken(token);
+      const { checkout_url } = await apiClient.purchaseCredits(
+        bundleSize,
+        `${window.location.origin}/billing?success=true`,
+        `${window.location.origin}/pricing`,
+      );
+      window.location.href = checkout_url;
+    } catch {
+      // Silently fail — user stays on pricing page
+    } finally {
+      setCheckoutLoading(null);
+    }
+  }
 
   function calculateCost(tier: (typeof TIERS)[number]) {
     const listingCreditsNeeded = Math.max(0, listingsPerMonth - tier.includedCredits);
@@ -204,15 +293,17 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Link href={`/register?plan=${tier.name.toLowerCase().replace(" ", "_")}`}>
-                  <button className={`w-full py-3 rounded-full font-semibold text-sm transition-colors ${
+                <button
+                  onClick={() => handleTierCheckout(tier)}
+                  disabled={checkoutLoading === tier.name.toLowerCase().replace(" ", "_")}
+                  className={`w-full py-3 rounded-full font-semibold text-sm transition-colors ${
                     tier.recommended
                       ? "bg-[#F97316] hover:bg-[#ea580c] text-white shadow-lg shadow-orange-500/30"
                       : "border border-slate-200 text-slate-600 hover:border-slate-300"
-                  }`}>
-                    Get Started
-                  </button>
-                </Link>
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {checkoutLoading === tier.name.toLowerCase().replace(" ", "_") ? "Redirecting..." : "Get Started"}
+                </button>
               </motion.div>
             );
           })}
@@ -238,11 +329,20 @@ export default function PricingPage() {
                 Prep for the year and clear the runway for maximum ROI.
               </p>
             </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-3xl font-bold text-white">
-                $349<span className="text-sm font-normal text-white/50">/yr</span>
-              </p>
-              <p className="text-xs text-white/40">Includes 25 Credits</p>
+            <div className="text-right flex-shrink-0 flex flex-col items-end gap-3">
+              <div>
+                <p className="text-3xl font-bold text-white">
+                  $349<span className="text-sm font-normal text-white/50">/yr</span>
+                </p>
+                <p className="text-xs text-white/40">Includes 25 Credits</p>
+              </div>
+              <button
+                onClick={handleAnnualCheckout}
+                disabled={checkoutLoading === "annual"}
+                className="bg-[#F97316] hover:bg-[#ea580c] text-white px-6 py-2.5 rounded-full font-semibold text-sm shadow-lg shadow-orange-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {checkoutLoading === "annual" ? "Redirecting..." : "Get Started"}
+              </button>
             </div>
           </div>
         </motion.div>
@@ -269,7 +369,14 @@ export default function PricingPage() {
               >
                 <p className="text-2xl font-bold text-[var(--color-text)]">{bundle.size} <span className="text-sm font-normal text-slate-400">Credits</span></p>
                 <p className="text-lg font-bold text-[var(--color-text)] mt-1">${bundle.price}</p>
-                <p className="text-xs text-slate-400">${bundle.perCredit}/credit</p>
+                <p className="text-xs text-slate-400 mb-3">${bundle.perCredit}/credit</p>
+                <button
+                  onClick={() => handleCreditPurchase(bundle.size)}
+                  disabled={checkoutLoading === `credits_${bundle.size}`}
+                  className="w-full py-2 rounded-full text-sm font-semibold border border-slate-200 text-slate-600 hover:border-[#F97316] hover:text-[#F97316] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {checkoutLoading === `credits_${bundle.size}` ? "Redirecting..." : "Buy"}
+                </button>
               </div>
             ))}
           </div>
