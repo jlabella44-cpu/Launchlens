@@ -60,7 +60,7 @@ function BrandKitSettings() {
 
   const handleLogoUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
-    // Show local preview immediately
+    // Show local preview immediately and keep it
     const localUrl = URL.createObjectURL(file);
     setForm((f) => ({ ...f, logo_url: localUrl }));
     setUploading(true);
@@ -70,15 +70,19 @@ function BrandKitSettings() {
       const fd = new FormData();
       Object.entries(presigned.fields).forEach(([k, v]) => fd.append(k, v));
       fd.append("file", file);
-      await fetch(presigned.url, { method: "POST", body: fd });
+      const resp = await fetch(presigned.url, { method: "POST", body: fd });
+      if (!resp.ok) {
+        console.error("S3 upload failed:", resp.status, await resp.text().catch(() => ""));
+        // Keep local preview — user can still save manually later
+        return;
+      }
       // Construct the final S3 URL
       const s3Url = `${presigned.url}/${key}`;
       setForm((f) => ({ ...f, logo_url: s3Url }));
       URL.revokeObjectURL(localUrl);
     } catch (err) {
       console.error("Logo upload failed:", err);
-      setForm((f) => ({ ...f, logo_url: null }));
-      URL.revokeObjectURL(localUrl);
+      // Keep the local preview — don't clear it
     } finally {
       setUploading(false);
     }
