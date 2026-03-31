@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
 from listingjet.api.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from listingjet.config.tiers import TIER_DEFAULTS
+from listingjet.config.tiers import TIER_TO_PLAN as _TIER_TO_PLAN
 from listingjet.database import get_db
 from listingjet.models.credit_account import CreditAccount
 from listingjet.models.tenant import Tenant
@@ -18,7 +20,6 @@ from listingjet.services.auth import (
     hash_password,
     verify_password_constant_time,
 )
-from listingjet.config.tiers import TIER_DEFAULTS, TIER_TO_PLAN as _TIER_TO_PLAN
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 
