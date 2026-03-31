@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    jwt_expiry_hours: int = 24
+    jwt_expiry_hours: int = 1
+    jwt_refresh_expiry_days: int = 7
 
     @field_validator("jwt_secret")
     @classmethod

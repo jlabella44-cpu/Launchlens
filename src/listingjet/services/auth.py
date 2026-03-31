@@ -31,7 +31,18 @@ def create_access_token(user: User) -> str:
         "sub": str(user.id),
         "tenant_id": str(user.tenant_id),
         "role": user.role.value,
+        "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def create_refresh_token(user: User) -> str:
+    payload = {
+        "sub": str(user.id),
+        "tenant_id": str(user.tenant_id),
+        "type": "refresh",
+        "exp": datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_expiry_days),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/ui/glass-card";
 import apiClient from "@/lib/api-client";
@@ -14,44 +14,31 @@ const STATUS_ICON: Record<string, { icon: string; color: string; bg: string }> =
   skipped: { icon: "–", color: "text-slate-400", bg: "bg-slate-50" },
 };
 
-const POLLING_STATES = ["uploading", "analyzing", "generating", "exporting"];
-const POLL_INTERVAL = 10_000;
-
 interface PipelineProgressProps {
   listingId: string;
   listingState: string;
 }
 
-export function PipelineProgress({ listingId, listingState }: PipelineProgressProps) {
+// Memoized to prevent unnecessary re-renders from parent polling
+function PipelineProgressInner({ listingId, listingState }: PipelineProgressProps) {
   const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [loading, setLoading] = useState(true);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await apiClient.getPipelineStatus(listingId);
+      setSteps(res.steps);
+    } catch {
+      // Endpoint may not exist yet — silently ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [listingId]);
+
+  // Fetch once on mount and when listingState changes (parent handles polling)
   useEffect(() => {
-    let cancelled = false;
-
-    async function fetchStatus() {
-      try {
-        const res = await apiClient.getPipelineStatus(listingId);
-        if (!cancelled) setSteps(res.steps);
-      } catch {
-        // Endpoint may not exist yet — silently ignore
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
     fetchStatus();
-
-    if (POLLING_STATES.includes(listingState)) {
-      intervalRef.current = setInterval(fetchStatus, POLL_INTERVAL);
-    }
-
-    return () => {
-      cancelled = true;
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [listingId, listingState]);
+  }, [fetchStatus, listingState]);
 
   if (loading || steps.length === 0) return null;
 
@@ -109,3 +96,5 @@ export function PipelineProgress({ listingId, listingState }: PipelineProgressPr
     </GlassCard>
   );
 }
+
+export const PipelineProgress = memo(PipelineProgressInner);

@@ -85,8 +85,8 @@ class VideoAgent(BaseAgent):
                 # Generate clips via Kling
                 clip_urls = await self._generate_clips(selected, listing.metadata_)
 
-                # Filter out failed clips
-                successful = [(s, url) for s, url in zip(selected, clip_urls) if url]
+                # Filter out failed clips (None or Exception from gather)
+                successful = [(s, url) for s, url in zip(selected, clip_urls) if url and not isinstance(url, BaseException)]
                 if not successful:
                     return {"status": "failed", "reason": "All clips failed to generate"}
 
@@ -213,7 +213,7 @@ class VideoAgent(BaseAgent):
                     return None
 
         tasks = [generate_one(i, ps, asset, vr) for i, (ps, asset, vr) in enumerate(selected)]
-        return await asyncio.gather(*tasks)
+        return await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _download_clips(self, urls: list[str]) -> list[str]:
         """Download clip URLs to temporary files."""

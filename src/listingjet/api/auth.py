@@ -11,7 +11,7 @@ from listingjet.database import get_db
 from listingjet.models.credit_account import CreditAccount
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
-from listingjet.services.auth import create_access_token, hash_password, verify_password_constant_time
+from listingjet.services.auth import create_access_token, create_refresh_token, decode_token, hash_password, verify_password_constant_time
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 
@@ -91,7 +91,10 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         logger.exception("welcome email failed for %s", email)
 
     logger.info("auth.register email=%s tenant=%s tier=%s", email, tenant.id, tier)
-    return TokenResponse(access_token=create_access_token(user))
+    return TokenResponse(
+        access_token=create_access_token(user),
+        refresh_token=create_refresh_token(user),
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -103,7 +106,9 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
         body.password, user.password_hash if user else None
     )
     if not user or not password_valid:
-        logger.warning("auth.login_failed email=%s", email)
+        import hashlib
+        email_hash = hashlib.sha256(email.encode()).hexdigest()[:12]
+        logger.warning("auth.login_failed email_hash=%s", email_hash)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     ip = request.client.host if request.client else "unknown"
@@ -116,9 +121,48 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
     await db.commit()
 
     logger.info("auth.login_success email=%s user=%s", email, user.id)
-    return TokenResponse(access_token=create_access_token(user))
+    return TokenResponse(
+        access_token=create_access_token(user),
+        refresh_token=create_refresh_token(user),
+    )
 
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
+    """Exchange a valid refresh token for a new access + refresh token pair."""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+
+    token = auth_header.split(" ", 1)[1]
+    payload = decode_token(token)
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Not a refresh token")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = await db.get(User, uuid.UUID(user_id))
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return TokenResponse(
+        access_token=create_access_token(user),
+        refresh_token=create_refresh_token(user),
+    )
+
+
+@router.post("/logout")
+async def logout():
+    """Logout endpoint. Client should discard tokens.
+
+    Note: Full server-side token revocation requires a Redis-backed
+    blocklist. For now, short-lived access tokens (1hr) limit exposure.
+    """
+    return {"status": "ok"}
