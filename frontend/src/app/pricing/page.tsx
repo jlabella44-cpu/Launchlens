@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
-import { GlassCard } from "@/components/ui/glass-card";
-import { Button } from "@/components/ui/button";
 
 const TIERS = [
   {
@@ -22,7 +20,6 @@ const TIERS = [
       "30-day asset hosting",
       "ListingJet watermark",
     ],
-    addons: true,
   },
   {
     name: "Lite",
@@ -38,7 +35,6 @@ const TIERS = [
       "Priority processing queue",
       "Credit rollover (cap: 3)",
     ],
-    addons: true,
   },
   {
     name: "Active Agent",
@@ -56,28 +52,26 @@ const TIERS = [
       "All integrations (MLS, CRM)",
       "Credit rollover (cap: 10)",
     ],
-    addons: true,
   },
 ];
 
 const CREDIT_BUNDLES = [
-  { size: 1, price: 34, perCredit: 34 },
-  { size: 3, price: 72, perCredit: 24 },
   { size: 5, price: 100, perCredit: 20 },
   { size: 10, price: 170, perCredit: 17 },
   { size: 25, price: 375, perCredit: 15 },
+  { size: 50, price: 650, perCredit: 13 },
 ];
 
 const ADDONS = [
-  { name: "AI Video Tour", cost: "from $24", description: "AI-generated property tour video with voiceover" },
-  { name: "3D Floorplan", cost: "from $24", description: "Interactive 3D floorplan visualization" },
-  { name: "Social Content Pack", cost: "1 credit", description: "5 hook variants per platform (Instagram + Facebook)" },
+  { name: "AI Video Tour", cost: "from $24", icon: "🎬" },
+  { name: "3D Floorplan", cost: "from $24", icon: "🏠" },
+  { name: "Social Content Pack", cost: "1 credit", icon: "📱" },
 ];
 
 export default function PricingPage() {
   const [listingsPerMonth, setListingsPerMonth] = useState(3);
 
-  function calculateCost(tier: typeof TIERS[number]) {
+  function calculateCost(tier: (typeof TIERS)[number]) {
     const listingCreditsNeeded = Math.max(0, listingsPerMonth - tier.includedCredits);
     return tier.price + listingCreditsNeeded * tier.perListingPrice;
   }
@@ -85,50 +79,65 @@ export default function PricingPage() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-12">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-12">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-10"
         >
           <h1
             className="text-4xl font-bold text-[var(--color-text)]"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Pay for what you use
+            Simple, Transparent Pricing
           </h1>
-          <p className="text-lg text-[var(--color-text-secondary)] mt-3 max-w-2xl mx-auto">
-            Base account fee + per-listing credits. No wasted capacity in slow months.
+          <p className="text-sm text-slate-400 mt-2 uppercase tracking-wider">
+            Atmospheric clarity for your real estate portfolio
           </p>
         </motion.div>
 
-        {/* Cost calculator */}
+        {/* Volume Calculator */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="mb-10"
+          className="bg-white rounded-2xl border border-slate-100 p-6 mb-10"
         >
-          <GlassCard tilt={false}>
-            <div className="flex items-center justify-center gap-4 flex-wrap">
-              <span className="text-sm text-[var(--color-text-secondary)]">I list about</span>
-              <input
-                type="range"
-                min={1}
-                max={20}
-                value={listingsPerMonth}
-                onChange={(e) => setListingsPerMonth(Number(e.target.value))}
-                className="w-40 accent-[var(--color-cta)]"
-              />
-              <span className="text-lg font-bold text-[var(--color-text)] min-w-[3ch] text-center">
-                {listingsPerMonth}
-              </span>
-              <span className="text-sm text-[var(--color-text-secondary)]">properties/month</span>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                Volume Calculator
+              </p>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500">I list about</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={20}
+                  value={listingsPerMonth}
+                  onChange={(e) => setListingsPerMonth(Number(e.target.value))}
+                  className="w-32 accent-[#F97316]"
+                />
+                <span className="text-lg font-bold text-[var(--color-text)] min-w-[3ch] text-center">
+                  {listingsPerMonth}
+                </span>
+                <span className="text-sm text-slate-500">properties/month</span>
+              </div>
             </div>
-          </GlassCard>
+            <div className="text-right">
+              <p className="text-3xl font-bold text-[var(--color-text)]">
+                ${calculateCost(TIERS[2])}
+                <span className="text-sm font-normal text-slate-400">/mo</span>
+              </p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                Estimated at Active Agent
+              </p>
+            </div>
+          </div>
         </motion.div>
 
-        {/* Plan cards */}
+        {/* Tier Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           {TIERS.map((tier, i) => {
             const monthlyCost = calculateCost(tier);
@@ -139,98 +148,106 @@ export default function PricingPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 + i * 0.1 }}
+                className={`rounded-2xl p-6 flex flex-col ${
+                  tier.recommended
+                    ? "bg-[#0B1120] text-white ring-2 ring-[#F97316]"
+                    : "bg-white border border-slate-100"
+                }`}
               >
-                <GlassCard
-                  tilt={false}
-                  className={`h-full flex flex-col ${
-                    tier.recommended
-                      ? "border-2 border-[var(--color-cta)] shadow-[0_0_30px_rgba(249,115,22,0.15)]"
-                      : ""
-                  }`}
+                {tier.recommended && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#F97316] mb-2">
+                    Recommended
+                  </span>
+                )}
+                <h3
+                  className={`text-lg font-bold ${tier.recommended ? "text-white" : "text-[var(--color-text)]"}`}
+                  style={{ fontFamily: "var(--font-heading)" }}
                 >
-                  {tier.recommended && (
-                    <span className="text-xs font-bold text-[var(--color-cta)] uppercase tracking-wider mb-2">
-                      Most Popular
-                    </span>
-                  )}
-                  <h3
-                    className="text-xl font-bold text-[var(--color-text)]"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {tier.name}
-                  </h3>
-                  <div className="mt-2 mb-1">
-                    <span className="text-3xl font-bold text-[var(--color-text)]">${tier.price}</span>
-                    <span className="text-sm text-[var(--color-text-secondary)]">/{tier.period}</span>
-                  </div>
-                  <p className="text-xs text-[var(--color-text-secondary)] mb-1">
-                    + ${tier.perListingPrice}/listing credit
+                  {tier.name}
+                </h3>
+                <div className="mt-3 mb-1">
+                  <span className={`text-4xl font-bold ${tier.recommended ? "text-white" : "text-[var(--color-text)]"}`}>
+                    ${tier.price}
+                  </span>
+                  <span className={`text-sm ${tier.recommended ? "text-white/60" : "text-slate-400"}`}>
+                    /{tier.period}
+                  </span>
+                </div>
+                <p className={`text-xs mb-4 ${tier.recommended ? "text-white/50" : "text-slate-400"}`}>
+                  + ${tier.perListingPrice}/listing
+                </p>
+
+                {/* Estimated Cost */}
+                <div className={`rounded-xl px-4 py-3 mb-4 text-center ${
+                  tier.recommended ? "bg-white/10" : "bg-slate-50"
+                }`}>
+                  <p className={`text-sm font-semibold ${tier.recommended ? "text-white" : "text-[var(--color-text)]"}`}>
+                    ~${monthlyCost}/mo
                   </p>
-                  <div className="bg-[var(--color-background)] rounded-lg px-3 py-2 mb-4 text-center">
-                    <span className="text-sm font-medium text-[var(--color-text)]">
-                      ~${monthlyCost}/mo
-                    </span>
-                    <span className="text-xs text-[var(--color-text-secondary)] ml-1">
-                      at {listingsPerMonth} listings
-                    </span>
-                  </div>
-                  <p className="text-sm text-[var(--color-text-secondary)] mb-4">
-                    {tier.description}
+                  <p className={`text-[10px] ${tier.recommended ? "text-white/50" : "text-slate-400"}`}>
+                    at {listingsPerMonth} listings
                   </p>
-                  <ul className="space-y-2 mb-6 flex-1">
-                    {tier.features.map((f) => (
-                      <li key={f} className="text-sm text-[var(--color-text)] flex items-start gap-2">
-                        <svg className="w-4 h-4 text-[var(--color-success)] mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href={`/register?plan=${tier.name.toLowerCase().replace(" ", "_")}`}>
-                    <Button variant={tier.recommended ? "primary" : "secondary"} className="w-full">
-                      Get Started
-                    </Button>
-                  </Link>
-                </GlassCard>
+                </div>
+
+                <p className={`text-sm mb-4 ${tier.recommended ? "text-white/70" : "text-slate-500"}`}>
+                  {tier.description}
+                </p>
+
+                <ul className="space-y-2.5 mb-6 flex-1">
+                  {tier.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm">
+                      <svg className={`w-4 h-4 mt-0.5 flex-shrink-0 ${tier.recommended ? "text-[#F97316]" : "text-green-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className={tier.recommended ? "text-white/80" : "text-[var(--color-text)]"}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Link href={`/register?plan=${tier.name.toLowerCase().replace(" ", "_")}`}>
+                  <button className={`w-full py-3 rounded-full font-semibold text-sm transition-colors ${
+                    tier.recommended
+                      ? "bg-[#F97316] hover:bg-[#ea580c] text-white shadow-lg shadow-orange-500/30"
+                      : "border border-slate-200 text-slate-600 hover:border-slate-300"
+                  }`}>
+                    Get Started
+                  </button>
+                </Link>
               </motion.div>
             );
           })}
         </div>
 
-        {/* Annual option */}
+        {/* Annual Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
           className="mb-16"
         >
-          <GlassCard tilt={false}>
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <h3
-                  className="text-xl font-bold text-[var(--color-text)]"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  Annual Credit Bank
-                </h3>
-                <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-                  $349/year with 25 listing credits included. Best value for consistent agents.
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="text-2xl font-bold text-[var(--color-text)]">$349</span>
-                <span className="text-sm text-[var(--color-text-secondary)]">/year</span>
-                <p className="text-xs text-[var(--color-success)]">Save vs monthly</p>
-              </div>
-              <Link href="/register?plan=annual">
-                <Button>Get Annual Plan</Button>
-              </Link>
+          <div className="bg-[#0B1120] rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[#F97316] font-bold mb-1">Annual Pass</p>
+              <h3
+                className="text-2xl font-bold text-white"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                High Altitude Savings
+              </h3>
+              <p className="text-sm text-white/50 mt-1">
+                Prep for the year and clear the runway for maximum ROI.
+              </p>
             </div>
-          </GlassCard>
+            <div className="text-right flex-shrink-0">
+              <p className="text-3xl font-bold text-white">
+                $349<span className="text-sm font-normal text-white/50">/yr</span>
+              </p>
+              <p className="text-xs text-white/40">Includes 25 Credits</p>
+            </div>
+          </div>
         </motion.div>
 
-        {/* Credit bundles */}
+        {/* Credit Bundles */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -238,19 +255,22 @@ export default function PricingPage() {
           className="mb-16"
         >
           <h2
-            className="text-2xl font-bold text-[var(--color-text)] mb-6 text-center"
+            className="text-2xl font-bold text-[var(--color-text)] mb-2 text-center"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Credit Bundles
+            Fuel Your Fleet: Credit Bundles
           </h2>
+          <p className="text-sm text-slate-400 text-center mb-6">Buy credits in bulk for better per-listing rates.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {CREDIT_BUNDLES.map((bundle) => (
-              <GlassCard key={bundle.size} tilt={false} className="text-center">
-                <p className="text-2xl font-bold text-[var(--color-text)]">{bundle.size}</p>
-                <p className="text-xs text-[var(--color-text-secondary)] mb-2">credits</p>
-                <p className="text-lg font-semibold text-[var(--color-text)]">${bundle.price}</p>
-                <p className="text-xs text-[var(--color-text-secondary)]">${bundle.perCredit}/credit</p>
-              </GlassCard>
+              <div
+                key={bundle.size}
+                className="bg-white rounded-2xl border border-slate-100 p-5 text-center hover:border-[#F97316]/30 transition-colors"
+              >
+                <p className="text-2xl font-bold text-[var(--color-text)]">{bundle.size} <span className="text-sm font-normal text-slate-400">Credits</span></p>
+                <p className="text-lg font-bold text-[var(--color-text)] mt-1">${bundle.price}</p>
+                <p className="text-xs text-slate-400">${bundle.perCredit}/credit</p>
+              </div>
             ))}
           </div>
         </motion.div>
@@ -260,23 +280,37 @@ export default function PricingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
+          className="mb-16"
         >
           <h2
-            className="text-2xl font-bold text-[var(--color-text)] mb-6 text-center"
+            className="text-2xl font-bold text-[var(--color-text)] mb-2 text-center"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Premium Add-Ons
+            Mission Augments
           </h2>
+          <p className="text-sm text-slate-400 text-center mb-6">Enhance your listings with premium capabilities.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {ADDONS.map((addon) => (
-              <GlassCard key={addon.name} tilt={false}>
-                <h4 className="font-semibold text-[var(--color-text)]">{addon.name}</h4>
-                <p className="text-sm text-[var(--color-text-secondary)] mt-1">{addon.description}</p>
-                <p className="text-sm font-medium text-[var(--color-cta)] mt-2">{addon.cost}</p>
-              </GlassCard>
+              <div key={addon.name} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-start gap-3">
+                <span className="text-2xl">{addon.icon}</span>
+                <div>
+                  <h4 className="font-semibold text-[var(--color-text)]">{addon.name}</h4>
+                  <p className="text-sm text-[#F97316] font-medium mt-0.5">{addon.cost}</p>
+                </div>
+              </div>
             ))}
           </div>
         </motion.div>
+
+        {/* Footer */}
+        <footer className="pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-300">
+          <span>ListingJet</span>
+          <div className="flex items-center gap-6">
+            <span className="hover:text-slate-400 cursor-pointer">Support</span>
+            <span className="hover:text-slate-400 cursor-pointer">Privacy</span>
+            <span className="hover:text-slate-400 cursor-pointer">Terms</span>
+          </div>
+        </footer>
       </main>
     </>
   );

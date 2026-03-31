@@ -133,7 +133,7 @@ async def test_change_role_invalid_returns_400(async_client: AsyncClient):
     }, headers=_auth(token))
     user_id = invite_resp.json()["id"]
     resp = await async_client.patch(f"/admin/users/{user_id}/role", json={
-        "role": "superadmin"
+        "role": "megaboss"
     }, headers=_auth(token))
     assert resp.status_code == 400
 

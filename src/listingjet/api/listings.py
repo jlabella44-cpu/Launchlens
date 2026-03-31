@@ -23,13 +23,11 @@ from listingjet.api.schemas.listings import (
     ExportResponse,
     ListingResponse,
     PipelineStatusResponse,
-    PipelineStepStatus,
     RejectRequest,
     ReorderRequest,
     UpdateListingRequest,
     VideoUploadRequest,
 )
-from listingjet.api.schemas.pagination import PaginatedResponse
 from listingjet.database import get_db
 from listingjet.models.asset import Asset
 from listingjet.models.dollhouse_scene import DollhouseScene
@@ -759,6 +757,7 @@ async def get_pipeline_status(
     detected_features = []
     packaged_states = {"awaiting_review", "in_review", "approved", "exporting", "delivered"}
     if state_val in packaged_states:
+        from listingjet.models.vision_result import VisionResult
         from listingjet.services.engagement_score import predict_engagement
         from listingjet.services.feature_tags import extract_features
 

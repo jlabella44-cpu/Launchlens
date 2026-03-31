@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export function Nav() {
   const { user, logout } = useAuth();
@@ -48,6 +49,7 @@ export function Nav() {
             Settings
           </Link>
         )}
+        <ThemeToggle />
         {user && (
           <>
             <span className="text-sm text-[var(--color-text-secondary)]">

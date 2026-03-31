@@ -4,10 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
-import { GlassCard } from "@/components/ui/glass-card";
-import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/api-client";
 
 interface Step {
@@ -16,33 +13,48 @@ interface Step {
   description: string;
   actionLabel: string;
   actionHref: string;
-  skipLabel: string;
+  icon: React.ReactNode;
 }
 
 const STEPS: Step[] = [
   {
     id: "brand",
-    title: "Set up your branding",
-    description: "Add your logo, brand colors, and brokerage info. This personalizes your flyers, watermarks, and marketing exports.",
-    actionLabel: "Go to Settings",
+    title: "Brand Setup",
+    description:
+      "Define your visual identity, voice, and assets to ensure every generated listing feels uniquely yours.",
+    actionLabel: "Set Up Brand Kit",
     actionHref: "/settings",
-    skipLabel: "Skip for now",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    ),
   },
   {
     id: "listing",
-    title: "Upload your first listing",
-    description: "Create a listing and upload photos. ListingJet's AI autopilot will curate, score, and package them into marketing-ready assets.",
+    title: "First Listing",
+    description:
+      "Launch your first property listing. Our AI will handle the copy, SEO, and formatting in seconds.",
     actionLabel: "Create Listing",
     actionHref: "/listings?create=true",
-    skipLabel: "Skip for now",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
   },
   {
     id: "credits",
-    title: "Get credits to start processing",
-    description: "Each listing costs 1 credit to process through the AI pipeline. Your plan may include free credits — or you can buy more anytime.",
-    actionLabel: "View Plans",
+    title: "Get Credits",
+    description:
+      "Fuel your growth with listing credits. Choose a plan that scales with your real estate portfolio.",
+    actionLabel: "View Pricing",
     actionHref: "/pricing",
-    skipLabel: "I have credits",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
   },
 ];
 
@@ -50,136 +62,211 @@ function OnboardingFlow() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
-  const [hasBrandKit, setHasBrandKit] = useState<boolean | null>(null);
+  const [hasBrandKit, setHasBrandKit] = useState(false);
 
   useEffect(() => {
-    // Check if brand kit already exists
     apiClient
       .getBrandKit()
       .then((kit) => {
         if (kit) {
           setHasBrandKit(true);
           setCompletedSteps((prev) => new Set([...prev, "brand"]));
-        } else {
-          setHasBrandKit(false);
         }
       })
-      .catch(() => setHasBrandKit(false));
+      .catch(() => {});
 
-    // Load completed steps from localStorage
     const saved = localStorage.getItem("listingjet_onboarding_done");
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setCompletedSteps(new Set(parsed));
-      } catch {
-        // ignore
-      }
+        setCompletedSteps(new Set(JSON.parse(saved)));
+      } catch {}
     }
   }, []);
 
-  function handleSkip() {
-    const step = STEPS[currentStep];
-    const updated = new Set([...completedSteps, step.id]);
-    setCompletedSteps(updated);
-    localStorage.setItem("listingjet_onboarding_done", JSON.stringify([...updated]));
+  function handleStepAction(stepIndex: number) {
+    setCurrentStep(stepIndex);
+  }
 
-    if (currentStep < STEPS.length - 1) {
-      setCurrentStep(currentStep + 1);
+  function handleSkipAll() {
+    localStorage.setItem(
+      "listingjet_onboarding_done",
+      JSON.stringify(STEPS.map((s) => s.id))
+    );
+    router.push("/dashboard");
+  }
+
+  function markComplete(stepId: string) {
+    const updated = new Set([...completedSteps, stepId]);
+    setCompletedSteps(updated);
+    localStorage.setItem(
+      "listingjet_onboarding_done",
+      JSON.stringify([...updated])
+    );
+    // Advance to next incomplete step
+    const nextIndex = STEPS.findIndex((s) => !updated.has(s.id));
+    if (nextIndex >= 0) {
+      setCurrentStep(nextIndex);
     } else {
-      router.push("/listings");
+      router.push("/dashboard");
     }
   }
 
-  function handleFinish() {
-    localStorage.setItem("listingjet_onboarding_done", JSON.stringify([...completedSteps, STEPS[currentStep].id]));
-    router.push("/listings");
-  }
-
-  const step = STEPS[currentStep];
-  const isLast = currentStep === STEPS.length - 1;
+  const progressPercent = ((currentStep + 1) / STEPS.length) * 100;
 
   return (
-    <>
-      <Nav />
-      <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-12">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1
-            className="text-3xl font-bold text-[var(--color-text)] mb-2"
+    <div className="min-h-screen bg-[#F5F7FA] flex flex-col">
+      {/* Header */}
+      <header className="pt-10 pb-6 text-center">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <svg className="w-6 h-6 text-[#F97316]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3.5 18.5L9.5 12.5L13 16L22 6L20.5 4.5L13 12L9.5 8.5L2 16L3.5 18.5Z" />
+          </svg>
+          <span
+            className="text-xl font-bold text-[var(--color-text)]"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Welcome to ListingJet
-          </h1>
-          <p className="text-[var(--color-text-secondary)] mb-8">
-            Let&apos;s get you set up in a few quick steps.
-          </p>
+            ListingJet
+          </span>
+        </div>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-medium">
+          Pre-Flight Checklist
+        </p>
+      </header>
 
-          {/* Progress */}
-          <div className="flex gap-2 mb-8">
-            {STEPS.map((s, i) => (
-              <div
-                key={s.id}
-                className={`flex-1 h-1.5 rounded-full transition-colors ${
-                  i <= currentStep
-                    ? "bg-[var(--color-primary)]"
-                    : "bg-white/30"
-                }`}
-              />
-            ))}
-          </div>
-
-          {/* Step indicator */}
-          <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+      {/* Progress Bar */}
+      <div className="max-w-md mx-auto w-full px-6 mb-10">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-[#F97316] border-b-2 border-[#F97316] pb-0.5">
+            Mission Status
+          </span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-400">
             Step {currentStep + 1} of {STEPS.length}
-          </p>
-
-          {/* Current step card */}
+          </span>
+        </div>
+        <div className="h-0.5 bg-slate-200 rounded-full">
           <motion.div
-            key={step.id}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <GlassCard>
-              <h2 className="text-xl font-semibold text-[var(--color-text)] mb-2">
-                {step.title}
-              </h2>
-              <p className="text-[var(--color-text-secondary)] mb-6">
-                {step.description}
-              </p>
+            className="h-full bg-[#F97316] rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPercent}%` }}
+            transition={{ duration: 0.4 }}
+          />
+        </div>
+      </div>
 
-              {step.id === "brand" && hasBrandKit && (
-                <p className="text-sm text-green-600 mb-4 font-medium">
-                  Brand kit already configured!
-                </p>
-              )}
+      {/* Steps */}
+      <div className="max-w-md mx-auto w-full px-6 space-y-4 flex-1">
+        {STEPS.map((step, i) => {
+          const isActive = i === currentStep;
+          const isCompleted = completedSteps.has(step.id);
 
-              <div className="flex items-center gap-3">
-                <Link href={step.actionHref}>
-                  <Button>{step.actionLabel}</Button>
-                </Link>
-                <button
-                  onClick={isLast ? handleFinish : handleSkip}
-                  className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-                >
-                  {isLast ? "Go to Dashboard" : step.skipLabel}
-                </button>
-              </div>
-            </GlassCard>
-          </motion.div>
-
-          {/* Skip all */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={handleFinish}
-              className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors underline"
+          return (
+            <motion.div
+              key={step.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className={`rounded-xl transition-all ${
+                isActive
+                  ? "bg-white shadow-lg border border-slate-100 p-6"
+                  : "px-6 py-4"
+              }`}
             >
-              Skip onboarding and go to dashboard
-            </button>
-          </div>
-        </motion.div>
-      </main>
-    </>
+              <div className="flex items-start gap-4">
+                {/* Icon */}
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    isActive
+                      ? "bg-[#0B1120] text-white"
+                      : isCompleted
+                      ? "bg-green-100 text-green-600"
+                      : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  {isCompleted ? (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    step.icon
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3
+                      className={`font-semibold ${
+                        isActive
+                          ? "text-[var(--color-text)]"
+                          : "text-slate-400"
+                      }`}
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      {step.title}
+                    </h3>
+                    {isActive && !isCompleted && (
+                      <span className="text-[9px] uppercase tracking-wider font-bold bg-[#F97316] text-white px-2 py-0.5 rounded">
+                        Current
+                      </span>
+                    )}
+                    {isCompleted && (
+                      <span className="text-[9px] uppercase tracking-wider font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                        Complete
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className={`text-sm leading-relaxed ${
+                      isActive ? "text-slate-500" : "text-slate-400"
+                    }`}
+                  >
+                    {step.description}
+                  </p>
+
+                  {/* Action button */}
+                  {isActive && !isCompleted ? (
+                    <Link href={step.actionHref}>
+                      <button className="mt-4 px-5 py-2 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shadow-md shadow-orange-200">
+                        {step.actionLabel}
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                        </svg>
+                      </button>
+                    </Link>
+                  ) : !isActive && !isCompleted ? (
+                    <button
+                      onClick={() => handleStepAction(i)}
+                      className="mt-3 px-4 py-1.5 rounded-full border border-slate-200 text-slate-400 text-sm hover:border-slate-300 hover:text-slate-500 transition-colors"
+                    >
+                      {step.actionLabel}
+                    </button>
+                  ) : null}
+
+                  {step.id === "brand" && hasBrandKit && isActive && (
+                    <button
+                      onClick={() => markComplete("brand")}
+                      className="mt-2 text-xs text-green-600 hover:underline"
+                    >
+                      Already configured — mark complete
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Skip All Footer */}
+      <div className="py-8 text-center">
+        <button
+          onClick={handleSkipAll}
+          className="text-xs uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors font-medium"
+        >
+          Skip All → Go to Dashboard →
+        </button>
+      </div>
+    </div>
   );
 }
 

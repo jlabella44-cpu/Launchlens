@@ -1,9 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from listingjet.providers.base import LLMProvider, VisionLabel, VisionProvider
 from listingjet.providers.fallback import FallbackLLMProvider, FallbackVisionProvider
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -112,7 +112,7 @@ async def test_fallback_llm_uses_primary_when_healthy():
 
     assert result == "Generated listing copy."
 
-    primary.complete.assert_awaited_once_with("Write a listing", {"beds": 3})
+    primary.complete.assert_awaited_once_with("Write a listing", {"beds": 3}, temperature=None, system_prompt=None)
     fallback.complete.assert_not_awaited()
 
 
@@ -127,7 +127,7 @@ async def test_fallback_llm_uses_fallback_on_primary_failure():
     assert result == "Generated listing copy."
 
     primary.complete.assert_awaited_once()
-    fallback.complete.assert_awaited_once_with("Write a listing", {"beds": 3})
+    fallback.complete.assert_awaited_once_with("Write a listing", {"beds": 3}, temperature=None, system_prompt=None)
 
 
 @pytest.mark.asyncio

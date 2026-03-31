@@ -3,14 +3,32 @@
 from aws_cdk import (
     Duration,
     Stack,
+)
+from aws_cdk import (
     aws_ec2 as ec2,
+)
+from aws_cdk import (
     aws_ecr as ecr,
+)
+from aws_cdk import (
     aws_ecs as ecs,
+)
+from aws_cdk import (
     aws_ecs_patterns as ecs_patterns,
-    aws_elasticloadbalancingv2 as elbv2,
-    aws_logs as logs,
-    aws_rds as rds,
+)
+from aws_cdk import (
     aws_elasticache as elasticache,
+)
+from aws_cdk import (
+    aws_elasticloadbalancingv2 as elbv2,
+)
+from aws_cdk import (
+    aws_logs as logs,
+)
+from aws_cdk import (
+    aws_rds as rds,
+)
+from aws_cdk import (
     aws_secretsmanager as sm,
 )
 from constructs import Construct

@@ -131,7 +131,10 @@ async def async_client(test_engine):
 
     # Mock credit deduction to always succeed (tests don't need real credit enforcement)
     async def _noop_deduct(*args, **kwargs):
-        return MagicMock(amount=1)
+        import uuid as _uuid
+        mock_txn = MagicMock(amount=1)
+        mock_txn.id = _uuid.uuid4()
+        return mock_txn
 
     with (
         patch("listingjet.middleware.rate_limit._get_limiter", return_value=mock_limiter),

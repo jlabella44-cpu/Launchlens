@@ -118,7 +118,6 @@ async def run_learning(context: AgentContext) -> dict:
 @activity.defn
 async def run_link_import(params: LinkImportParams) -> dict:
     """Download photos from a third-party link and create Asset records."""
-    from sqlalchemy import select
 
     from listingjet.database import AsyncSessionLocal
     from listingjet.models.asset import Asset
