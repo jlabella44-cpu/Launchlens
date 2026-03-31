@@ -91,8 +91,8 @@ def create_app() -> FastAPI:
         allow_origins=origins,
         allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
 
     # Middleware order: security headers → request ID → rate limit → tenant auth

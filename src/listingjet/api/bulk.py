@@ -45,14 +45,19 @@ async def bulk_approve(
     if len(body.listing_ids) > 50:
         raise HTTPException(status_code=400, detail="Max 50 listings per bulk approve")
 
+    # Batch fetch all listings in a single query
+    listings_result = await db.execute(
+        select(Listing).where(
+            Listing.id.in_(body.listing_ids),
+            Listing.tenant_id == current_user.tenant_id,
+        ).with_for_update()
+    )
+    listings_by_id = {l.id: l for l in listings_result.scalars().all()}
+
     results = []
+    approved_ids = []
     for lid in body.listing_ids:
-        listing = (await db.execute(
-            select(Listing).where(
-                Listing.id == lid,
-                Listing.tenant_id == current_user.tenant_id,
-            )
-        )).scalar_one_or_none()
+        listing = listings_by_id.get(lid)
 
         if not listing:
             results.append({"listing_id": str(lid), "status": "not_found"})
@@ -68,15 +73,17 @@ async def bulk_approve(
 
         listing.state = ListingState.APPROVED
         results.append({"listing_id": str(lid), "status": "approved"})
-
-        # Signal Temporal workflow
-        try:
-            client = get_temporal_client()
-            await client.signal_review_completed(listing_id=str(lid))
-        except Exception:
-            logger.exception("Review signal failed for listing %s", lid)
+        approved_ids.append(str(lid))
 
     await db.commit()
+
+    # Signal Temporal workflows after commit
+    for lid_str in approved_ids:
+        try:
+            client = get_temporal_client()
+            await client.signal_review_completed(listing_id=lid_str)
+        except Exception:
+            logger.exception("Review signal failed for listing %s", lid_str)
 
     approved_count = sum(1 for r in results if r["status"] == "approved")
     return {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,14 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
   const [dragOver, setDragOver] = useState(false);
   const [quotaError, setQuotaError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Revoke ObjectURLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      files.forEach((f) => URL.revokeObjectURL(f.preview));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const toAdd: FileEntry[] = [];

@@ -25,6 +25,7 @@ from listingjet.api.schemas.listings import (
     RejectRequest,
     ReorderRequest,
     UpdateListingRequest,
+    UploadUrlsRequest,
     VideoUploadRequest,
 )
 from listingjet.api.schemas.pagination import PaginatedResponse
@@ -240,7 +241,7 @@ async def get_dollhouse(
 @router.post("/{listing_id}/upload-urls")
 async def get_upload_urls(
     listing_id: uuid.UUID,
-    body: dict,
+    body: UploadUrlsRequest,
     _rl=Depends(rate_limit(10, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -255,9 +256,14 @@ async def get_upload_urls(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    files = body.get("files", body.get("filenames", []))
-    if isinstance(files, list) and all(isinstance(f, str) for f in files):
-        files = [{"filename": f} for f in files]
+    # Normalize input: accept either filenames list or files list
+    raw_files = body.files or (body.filenames or [])
+    files = []
+    for f in raw_files:
+        if isinstance(f, str):
+            files.append({"filename": f, "content_type": body.content_type})
+        else:
+            files.append({"filename": f.filename, "content_type": f.content_type or body.content_type})
     if not files or len(files) > 50:
         raise HTTPException(status_code=400, detail="Provide 1-50 files")
 
