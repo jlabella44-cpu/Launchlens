@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from listingjet.services.email import EmailService, NoOpEmailService
 
 

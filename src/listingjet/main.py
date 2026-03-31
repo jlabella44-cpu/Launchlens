@@ -118,8 +118,9 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
 
     # Debug error handler — returns tracebacks in response (remove for real production)
-    from fastapi.responses import JSONResponse
     import traceback as tb
+
+    from fastapi.responses import JSONResponse
 
     @app.exception_handler(Exception)
     async def debug_exception_handler(request, exc):

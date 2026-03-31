@@ -27,10 +27,10 @@ from listingjet.models.listing import Listing
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
+from listingjet.providers.elevenlabs import get_voiceover_provider
 from listingjet.providers.kling import KlingProvider
 from listingjet.services.endcard import ENDCARD_DURATION, generate_endcard
 from listingjet.services.events import emit_event
-from listingjet.providers.elevenlabs import get_voiceover_provider
 from listingjet.services.metrics import record_cost
 from listingjet.services.storage import StorageService
 from listingjet.services.video_stitcher import VideoStitcher

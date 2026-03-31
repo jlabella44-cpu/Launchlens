@@ -4,10 +4,15 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+)
+from aws_cdk import (
     aws_ec2 as ec2,
-    aws_rds as rds,
+)
+from aws_cdk import (
     aws_elasticache as elasticache,
-    aws_secretsmanager as sm,
+)
+from aws_cdk import (
+    aws_rds as rds,
 )
 from constructs import Construct
 

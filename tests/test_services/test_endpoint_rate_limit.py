@@ -1,7 +1,7 @@
 """Tests for the per-endpoint rate limiting dependency."""
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi import HTTPException
 
 # The RateLimiter is imported *inside* the dependency function from

@@ -10,7 +10,6 @@ import logging
 import re
 import uuid
 from collections.abc import Callable
-from typing import Awaitable
 
 import httpx
 

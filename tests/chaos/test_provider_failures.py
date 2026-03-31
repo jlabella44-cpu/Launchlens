@@ -16,7 +16,6 @@ from listingjet.agents.content import ContentAgent
 from listingjet.agents.ingestion import IngestionAgent
 from listingjet.agents.photo_compliance import PhotoComplianceAgent
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

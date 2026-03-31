@@ -1,9 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from listingjet.providers.base import LLMProvider, VisionLabel, VisionProvider
 from listingjet.providers.fallback import FallbackLLMProvider, FallbackVisionProvider
-
 
 # ---------------------------------------------------------------------------
 # Helpers
