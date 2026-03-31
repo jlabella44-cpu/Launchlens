@@ -8,8 +8,6 @@ import os
 import tempfile
 import uuid
 
-logger = logging.getLogger(__name__)
-
 import httpx
 from sqlalchemy import select
 
@@ -36,6 +34,8 @@ from listingjet.services.storage import StorageService
 from listingjet.services.video_stitcher import VideoStitcher
 
 from .base import AgentContext, BaseAgent
+
+logger = logging.getLogger(__name__)
 
 
 class VideoAgent(BaseAgent):

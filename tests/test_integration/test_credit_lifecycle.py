@@ -91,9 +91,7 @@ async def test_full_credit_lifecycle(async_client: AsyncClient, db_session):
     # Check balance — should have initial grant (1 for active_agent) + 5 purchased
     balance_resp = await async_client.get("/credits/balance", headers=_auth(token))
     if balance_resp.status_code == 200:
-        initial_balance = balance_resp.json().get("balance", 0)
-    else:
-        initial_balance = 6  # Expected: 1 included + 5 purchased
+        balance_resp.json().get("balance", 0)  # verify endpoint works
 
     # Create first listing — should deduct 1 credit
     listing1_id = await _create_listing(async_client, token)
@@ -257,7 +255,7 @@ async def test_cancel_refunds_credits(async_client: AsyncClient, db_session):
     # Cancel listing (refunds 1)
     cancel = await async_client.post(f"/listings/{listing_id}/cancel", headers=_auth(token))
     if cancel.status_code == 200:
-        refunded = cancel.json().get("credits_refunded", 0)
+        cancel.json().get("credits_refunded", 0)  # verify field exists
 
         # Check balance restored
         bal_after = await async_client.get("/credits/balance", headers=_auth(token))
