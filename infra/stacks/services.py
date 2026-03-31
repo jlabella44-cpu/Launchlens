@@ -1,8 +1,12 @@
-"""ECS Fargate cluster, task definitions, ALB, and ECR repositories."""
+"""ECS Fargate cluster, task definitions, ALB, ECR repositories, and S3 media bucket."""
 
 from aws_cdk import (
+    CfnOutput,
     Duration,
     Stack,
+)
+from aws_cdk import (
+    aws_certificatemanager as acm,
 )
 from aws_cdk import (
     aws_ec2 as ec2,
@@ -27,6 +31,9 @@ from aws_cdk import (
 )
 from aws_cdk import (
     aws_rds as rds,
+)
+from aws_cdk import (
+    aws_s3 as s3,
 )
 from aws_cdk import (
     aws_secretsmanager as sm,
@@ -144,6 +151,34 @@ class ServicesStack(Stack):
 
         self.alb = self.api_service.load_balancer
 
+        # --- HTTPS on ALB (optional, requires domain_name context) -----------
+        domain_name = self.node.try_get_context("domain_name")
+        if domain_name:
+            certificate = acm.Certificate(
+                self, "ApiCertificate",
+                domain_name=domain_name,
+                validation=acm.CertificateValidation.from_dns(),
+            )
+
+            # Add HTTPS listener forwarding to the existing target group
+            self.alb.add_listener(
+                "HttpsListener",
+                port=443,
+                protocol=elbv2.ApplicationProtocol.HTTPS,
+                certificates=[certificate],
+                default_target_groups=[self.api_service.target_group],
+            )
+
+            # Redirect HTTP → HTTPS on the existing port-80 listener
+            self.api_service.listener.add_action(
+                "HttpRedirect",
+                action=elbv2.ListenerAction.redirect(
+                    protocol="HTTPS",
+                    port="443",
+                    permanent=True,
+                ),
+            )
+
         # Auto-scaling for API service
         api_scaling = self.api_service.service.auto_scale_task_count(
             min_capacity=1,
@@ -154,6 +189,15 @@ class ServicesStack(Stack):
             target_utilization_percent=70,
             scale_in_cooldown=Duration.seconds(300),
             scale_out_cooldown=Duration.seconds(60),
+        )
+
+        # --- S3 media bucket -------------------------------------------------
+        self.media_bucket = s3.Bucket(
+            self, "MediaBucket",
+            bucket_name=f"listingjet-media-{Stack.of(self).account}-{Stack.of(self).region}",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            versioned=True,
         )
 
         # --- Worker Service (Fargate, no ALB) --------------------------------
