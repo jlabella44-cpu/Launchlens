@@ -47,7 +47,7 @@ async def create_worker() -> Worker:
 
 async def _ensure_schedules(client: Client) -> None:
     """Create cron schedules if they don't already exist."""
-    from temporalio.client import Schedule, ScheduleActionStartWorkflow, ScheduleSpec, ScheduleIntervalSpec
+    from temporalio.client import Schedule, ScheduleActionStartWorkflow, ScheduleIntervalSpec, ScheduleSpec
 
     schedules = [
         (

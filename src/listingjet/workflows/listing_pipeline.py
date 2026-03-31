@@ -118,7 +118,7 @@ class ListingPipeline:
             try:
                 await video_task
             except Exception as exc:
-                workflow.logger.warning("video_task_failed listing=%s error=%s", inp.listing_id, exc)
+                workflow.logger.warning("video_task_failed listing=%s error=%s", input.listing_id, exc)
 
         # Phase 2: Post-approval pipeline
         # Step 1: Content (dual-tone)

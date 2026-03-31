@@ -2,6 +2,7 @@
 import uuid
 
 from sqlalchemy import select
+
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.vision_result import VisionResult
