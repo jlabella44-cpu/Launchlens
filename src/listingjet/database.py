@@ -25,9 +25,10 @@ async def get_db(request: Request = None):
     async with AsyncSessionLocal() as session:
         async with session.begin():
             if tenant_id:
-                # SET LOCAL is transaction-scoped — parameterized query works inside BEGIN
+                # SET LOCAL doesn't support parameterized values in PostgreSQL.
+                # Safe: tenant_id is a validated UUID from our JWT, not user input.
+                tid = str(tenant_id).replace("'", "")
                 await session.execute(
-                    text("SET LOCAL app.current_tenant = :tid"),
-                    {"tid": str(tenant_id)},
+                    text(f"SET LOCAL app.current_tenant = '{tid}'"),
                 )
             yield session
