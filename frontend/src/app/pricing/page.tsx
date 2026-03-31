@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
+import apiClient from "@/lib/api-client";
+
+const PRICE_IDS: Record<string, string> = {
+  lite: "price_1TH4J9RZ4TuRrBpyUHm6Eg5p",
+  active_agent: "price_1TH4JARZ4TuRrBpywg1XdkoE",
+};
 
 const TIERS = [
   {
@@ -70,6 +76,55 @@ const ADDONS = [
 
 export default function PricingPage() {
   const [listingsPerMonth, setListingsPerMonth] = useState(3);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const router = useRouter();
+
+  async function handleTierCheckout(tierName: string) {
+    const key = tierName.toLowerCase().replace(" ", "_");
+    const token = localStorage.getItem("listingjet_token");
+    if (!token) {
+      router.push(`/register?plan=${key}`);
+      return;
+    }
+    if (key === "free") {
+      router.push("/register?plan=free");
+      return;
+    }
+    const priceId = PRICE_IDS[key];
+    if (!priceId) return;
+    setCheckoutLoading(key);
+    try {
+      const res = await apiClient.billingCheckout(
+        priceId,
+        `${window.location.origin}/billing?success=true`,
+        `${window.location.origin}/pricing`,
+      );
+      window.location.href = res.checkout_url;
+    } catch (err) {
+      console.error("Checkout failed:", err);
+      setCheckoutLoading(null);
+    }
+  }
+
+  async function handleCreditPurchase(bundleSize: number) {
+    const token = localStorage.getItem("listingjet_token");
+    if (!token) {
+      router.push("/register");
+      return;
+    }
+    setCheckoutLoading(`bundle_${bundleSize}`);
+    try {
+      const res = await apiClient.purchaseCredits(
+        bundleSize,
+        `${window.location.origin}/billing?success=true`,
+        `${window.location.origin}/pricing`,
+      );
+      window.location.href = res.checkout_url;
+    } catch (err) {
+      console.error("Purchase failed:", err);
+      setCheckoutLoading(null);
+    }
+  }
 
   function calculateCost(tier: (typeof TIERS)[number]) {
     const listingCreditsNeeded = Math.max(0, listingsPerMonth - tier.includedCredits);
@@ -204,15 +259,16 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Link href={`/register?plan=${tier.name.toLowerCase().replace(" ", "_")}`}>
-                  <button className={`w-full py-3 rounded-full font-semibold text-sm transition-colors ${
+                <button
+                  onClick={() => handleTierCheckout(tier.name)}
+                  disabled={checkoutLoading === tier.name.toLowerCase().replace(" ", "_")}
+                  className={`w-full py-3 rounded-full font-semibold text-sm transition-colors disabled:opacity-50 ${
                     tier.recommended
                       ? "bg-[#F97316] hover:bg-[#ea580c] text-white shadow-lg shadow-orange-500/30"
                       : "border border-slate-200 text-slate-600 hover:border-slate-300"
                   }`}>
-                    Get Started
-                  </button>
-                </Link>
+                  {checkoutLoading === tier.name.toLowerCase().replace(" ", "_") ? "Redirecting..." : "Get Started"}
+                </button>
               </motion.div>
             );
           })}
