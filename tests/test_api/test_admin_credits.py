@@ -135,9 +135,9 @@ async def test_tenant_credits_shows_transactions(async_client: AsyncClient):
     body = resp.json()
     assert body["credit_balance"] == 15
     assert len(body["transactions"]) == 2
-    # Most recent first
-    assert body["transactions"][0]["reason"] == "Second"
-    assert body["transactions"][1]["reason"] == "First"
+    # Most recent first — the admin schema uses "description" not "reason"
+    assert body["transactions"][0]["description"] == "Second"
+    assert body["transactions"][1]["description"] == "First"
 
 
 @pytest.mark.asyncio

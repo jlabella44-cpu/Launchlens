@@ -47,6 +47,13 @@ async def _create_tenant(db: AsyncSession, **overrides) -> Tenant:
     return tenant
 
 
+async def _get_credit_account(db: AsyncSession, tenant_id: uuid.UUID) -> CreditAccount:
+    """Get the CreditAccount (source of truth for balance) instead of Tenant."""
+    db.expire_all()
+    result = await db.execute(select(CreditAccount).where(CreditAccount.tenant_id == tenant_id))
+    return result.scalar_one()
+
+
 async def _get_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> Tenant:
     db.expire_all()
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
@@ -81,8 +88,9 @@ async def test_webhook_credit_bundle_checkout(async_client: AsyncClient, db_sess
     status = await _fire_webhook(async_client, event)
     assert status == 200
 
-    t = await _get_tenant(db_session, tenant.id)
-    assert t.credit_balance == 120  # 20 + 100
+    # CreditService.add_credits updates CreditAccount.balance, not Tenant.credit_balance
+    acct = await _get_credit_account(db_session, tenant.id)
+    assert acct.balance == 120  # 20 + 100
 
 
 @pytest.mark.asyncio
@@ -96,11 +104,14 @@ async def test_webhook_credit_bundle_idempotent(async_client: AsyncClient, db_se
         },
     }, event_id="evt_idem_bundle")
 
-    await _fire_webhook(async_client, event)
+    status1 = await _fire_webhook(async_client, event)
+    assert status1 == 200
+    # Second call with same event_id — idempotency raises ValueError inside the
+    # webhook handler which results in a 500. The credits should only be granted once.
     await _fire_webhook(async_client, event)
 
-    t = await _get_tenant(db_session, tenant.id)
-    assert t.credit_balance == 120  # only granted once
+    acct = await _get_credit_account(db_session, tenant.id)
+    assert acct.balance == 120  # only granted once
 
 
 @pytest.mark.asyncio
@@ -139,7 +150,10 @@ async def test_webhook_subscription_updated_changes_tier(async_client: AsyncClie
 @pytest.mark.asyncio
 async def test_webhook_invoice_paid_grants_renewal_credits(async_client: AsyncClient, db_session):
     tenant = await _create_tenant(db_session)
-    assert tenant.credit_balance == 20
+
+    # Verify initial CreditAccount balance
+    acct = await _get_credit_account(db_session, tenant.id)
+    assert acct.balance == 20
 
     event = _make_stripe_event("invoice.paid", {
         "customer": tenant.stripe_customer_id,
@@ -150,6 +164,7 @@ async def test_webhook_invoice_paid_grants_renewal_credits(async_client: AsyncCl
     status = await _fire_webhook(async_client, event)
     assert status == 200
 
-    t = await _get_tenant(db_session, tenant.id)
+    # process_period_renewal updates CreditAccount.balance, not Tenant.credit_balance
+    acct = await _get_credit_account(db_session, tenant.id)
     # 20 balance, rollover_cap=25, so all 20 roll over, then +50 included
-    assert t.credit_balance == 70  # 20 + 50
+    assert acct.balance == 70  # 20 + 50

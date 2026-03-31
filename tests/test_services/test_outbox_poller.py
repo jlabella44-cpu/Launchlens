@@ -24,7 +24,11 @@ async def test_poller_marks_rows_delivered(db_session):
 
     poller = OutboxPoller(session_factory=None)
     poller._get_webhook_url = AsyncMock(return_value=None)
-    await poller._process_batch(db_session)
+
+    # Use a savepoint so the FOR UPDATE SKIP LOCKED fallback doesn't
+    # leave the transaction in an aborted state.
+    async with db_session.begin_nested():
+        await poller._process_batch(db_session)
 
     await db_session.refresh(outbox)
     assert outbox.delivered_at is not None
@@ -47,7 +51,9 @@ async def test_poller_skips_already_delivered_rows(db_session):
 
     poller = OutboxPoller(session_factory=None)
     poller._get_webhook_url = AsyncMock(return_value=None)
-    count = await poller._process_batch(db_session)
+
+    async with db_session.begin_nested():
+        count = await poller._process_batch(db_session)
     assert count == 0
 
 
@@ -67,5 +73,7 @@ async def test_poller_processes_multiple_rows(db_session):
 
     poller = OutboxPoller(session_factory=None)
     poller._get_webhook_url = AsyncMock(return_value=None)
-    count = await poller._process_batch(db_session)
+
+    async with db_session.begin_nested():
+        count = await poller._process_batch(db_session)
     assert count == 3
