@@ -6,15 +6,9 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet.config.tiers import TIER_CREDITS
 from listingjet.models.credit_account import CreditAccount
 from listingjet.models.credit_transaction import CreditTransaction
-
-# (included_credits_per_month, rollover_cap)
-TIER_CREDITS: dict[str, tuple[int, int]] = {
-    "starter": (5, 0),
-    "pro": (50, 25),
-    "enterprise": (500, 100),
-}
 
 
 class InsufficientCreditsError(Exception):

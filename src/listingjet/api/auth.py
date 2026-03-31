@@ -18,25 +18,13 @@ from listingjet.services.auth import (
     hash_password,
     verify_password_constant_time,
 )
+from listingjet.config.tiers import TIER_DEFAULTS, TIER_TO_PLAN as _TIER_TO_PLAN
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-TIER_DEFAULTS = {
-    "lite": {"included_credits": 0, "rollover_cap": 5, "per_listing_credit_cost": 1},
-    "active_agent": {"included_credits": 1, "rollover_cap": 3, "per_listing_credit_cost": 1},
-    "team": {"included_credits": 5, "rollover_cap": 10, "per_listing_credit_cost": 1},
-}
-
-# Map tier names to plan names for plan_limits compatibility
-_TIER_TO_PLAN = {
-    "lite": "starter",
-    "active_agent": "pro",
-    "team": "enterprise",
-}
 
 
 @router.post("/register", response_model=TokenResponse)

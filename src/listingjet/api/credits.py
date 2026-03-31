@@ -14,19 +14,13 @@ from listingjet.api.schemas.credits import (
 )
 from listingjet.database import get_db
 from listingjet.models.user import User
+from listingjet.config.tiers import CREDIT_BUNDLES
 from listingjet.services.billing import BillingService
 from listingjet.services.credits import CreditService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-CREDIT_BUNDLES = [
-    {"size": 5, "price_cents": 9500, "per_credit_cents": 1900},
-    {"size": 10, "price_cents": 14000, "per_credit_cents": 1400},
-    {"size": 25, "price_cents": 30000, "per_credit_cents": 1200},
-    {"size": 50, "price_cents": 50000, "per_credit_cents": 1000},
-]
 
 BUNDLE_SIZE_TO_STRIPE_SETTING = {
     5: "stripe_price_credit_bundle_5",

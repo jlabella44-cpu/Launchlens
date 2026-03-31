@@ -21,11 +21,21 @@ import { SocialPreview } from "@/components/listings/social-preview";
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-secondary)]/5 animate-pulse" />
+    ),
+  }
 );
 const PhotoOrbit = dynamic(
   () => import("@/components/three/photo-orbit").then((m) => ({ default: m.PhotoOrbit })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-secondary)]/5 animate-pulse" />
+    ),
+  }
 );
 
 function ListingDetail() {
@@ -66,6 +76,8 @@ function ListingDetail() {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => { document.title = "Listing Detail | ListingJet"; }, []);
 
   useEffect(() => {
     fetchData();
