@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
+    google_drive_api_key: str = ""
     use_mock_providers: bool = False
 
     # ClamAV
@@ -89,6 +90,9 @@ class Settings(BaseSettings):
     stripe_price_active_agent: str = ""
     stripe_price_team: str = ""
     stripe_price_annual: str = ""
+
+    # Google OAuth
+    google_oauth_client_id: str = ""
 
     # Canva OAuth2 (Phase 2 — per-tenant access)
     canva_client_id: str = ""

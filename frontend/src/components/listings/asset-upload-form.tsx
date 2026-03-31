@@ -34,6 +34,10 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
   const [dragOver, setDragOver] = useState(false);
   const [quotaError, setQuotaError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ total: number; completed: number; status: string } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const toAdd: FileEntry[] = [];
@@ -184,6 +188,41 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
     }
   }
 
+  async function handleImportLink() {
+    if (!importUrl.trim() || !listingId) return;
+    setImporting(true);
+    setImportError(null);
+    setImportProgress(null);
+    try {
+      const result = await apiClient.importFromLink(listingId, importUrl.trim());
+      // Poll for progress
+      const pollId = setInterval(async () => {
+        try {
+          const status = await apiClient.getImportStatus(listingId, result.import_id);
+          setImportProgress({ total: status.total_files, completed: status.completed_files, status: status.status });
+          if (status.status === "completed" || status.status === "failed") {
+            clearInterval(pollId);
+            setImporting(false);
+            if (status.status === "failed") {
+              setImportError(status.error_message || "Import failed");
+            } else {
+              setImportUrl("");
+              setImportProgress(null);
+              onUploaded();
+            }
+          }
+        } catch {
+          clearInterval(pollId);
+          setImporting(false);
+          setImportError("Failed to check import status");
+        }
+      }, 2000);
+    } catch (err) {
+      setImporting(false);
+      setImportError(err instanceof Error ? err.message : "Import failed");
+    }
+  }
+
   return (
     <GlassCard tilt={false}>
       <h3
@@ -315,6 +354,50 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Import from Link */}
+      <div className="mt-6 pt-6 border-t border-white/10">
+        <p className="text-sm text-[var(--color-text-secondary)] mb-3">
+          Or import directly from a delivery link
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Paste Google Drive or Show & Tour link..."
+            value={importUrl}
+            onChange={(e) => setImportUrl(e.target.value)}
+            disabled={importing}
+            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 text-sm focus:outline-none focus:border-[var(--color-accent)]"
+          />
+          <button
+            onClick={handleImportLink}
+            disabled={importing || !importUrl.trim()}
+            className="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {importing ? "Importing..." : "Import"}
+          </button>
+        </div>
+        {importProgress && (
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-[var(--color-text-secondary)] mb-1">
+              <span>{importProgress.status === "downloading" ? "Downloading photos..." : importProgress.status}</span>
+              <span>{importProgress.completed}/{importProgress.total}</span>
+            </div>
+            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[var(--color-accent)] rounded-full transition-all duration-300"
+                style={{ width: importProgress.total > 0 ? `${(importProgress.completed / importProgress.total) * 100}%` : '0%' }}
+              />
+            </div>
+          </div>
+        )}
+        {importError && (
+          <p className="mt-2 text-sm text-red-400">{importError}</p>
+        )}
+        <p className="mt-2 text-xs text-[var(--color-text-secondary)]/60">
+          Supports Google Drive shared folders and Show &amp; Tour delivery links
+        </p>
+      </div>
     </GlassCard>
   );
 }

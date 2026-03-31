@@ -1,11 +1,17 @@
+import logging
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
+import httpx
 import jwt
 from fastapi import HTTPException
 
 from listingjet.config import settings
 from listingjet.models.user import User
+
+logger = logging.getLogger(__name__)
+
+GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 # Pre-computed dummy hash for constant-time comparison when user not found.
 # Prevents timing-based user enumeration attacks.
@@ -41,3 +47,28 @@ def decode_token(token: str) -> dict:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+async def verify_google_id_token(id_token: str) -> dict:
+    """Verify a Google ID token and return the user's email, name, and sub."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(GOOGLE_TOKEN_INFO_URL, params={"id_token": id_token})
+    if resp.status_code != 200:
+        logger.warning("google token verification failed: %s", resp.text)
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
+    payload = resp.json()
+
+    # Verify the token was issued for our app
+    if payload.get("aud") != settings.google_oauth_client_id:
+        logger.warning("google token audience mismatch: %s", payload.get("aud"))
+        raise HTTPException(status_code=401, detail="Invalid Google token audience")
+
+    if payload.get("email_verified") != "true":
+        raise HTTPException(status_code=401, detail="Google email not verified")
+
+    return {
+        "email": payload["email"].strip().lower(),
+        "name": payload.get("name"),
+        "google_sub": payload["sub"],
+    }

@@ -106,6 +106,13 @@ class ApiClient {
     return this.request<UserResponse>("/auth/me");
   }
 
+  async googleLogin(idToken: string): Promise<TokenResponse> {
+    return this.request<TokenResponse>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken }),
+    });
+  }
+
   // Listings
   async createListing(data: CreateListingRequest): Promise<ListingResponse> {
     return this.request<ListingResponse>("/listings", {
@@ -314,6 +321,18 @@ class ApiClient {
 
   async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
     return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
+  }
+
+  // Import from link
+  async importFromLink(listingId: string, url: string): Promise<{ import_id: string; platform: string; status: string }> {
+    return this.request(`/listings/${listingId}/import-link`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  }
+
+  async getImportStatus(listingId: string, importId: string): Promise<{ import_id: string; status: string; platform: string; total_files: number; completed_files: number; error_message: string | null }> {
+    return this.request(`/listings/${listingId}/import-status/${importId}`);
   }
 
   // Admin

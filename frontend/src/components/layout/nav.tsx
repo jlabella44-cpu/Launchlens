@@ -10,7 +10,7 @@ export function Nav() {
   return (
     <nav className="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
       <Link
-        href="/listings"
+        href="/dashboard"
         className="font-[var(--font-heading)] text-xl font-bold text-[var(--color-primary)] tracking-wide"
         style={{ fontFamily: "var(--font-heading)" }}
       >
@@ -18,6 +18,14 @@ export function Nav() {
       </Link>
 
       <div className="flex items-center gap-4">
+        {user && (
+          <Link
+            href="/dashboard"
+            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            Dashboard
+          </Link>
+        )}
         {user && (
           <Link
             href="/review"
