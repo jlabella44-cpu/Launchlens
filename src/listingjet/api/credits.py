@@ -97,7 +97,7 @@ async def purchase_credits(
         await db.commit()
 
     import stripe
-    session = stripe.checkout.Session.create(
+    create_kwargs = dict(
         customer=tenant.stripe_customer_id,
         line_items=[{"price": price_id, "quantity": 1}],
         mode="payment",
@@ -105,4 +105,11 @@ async def purchase_credits(
         cancel_url=body.cancel_url,
         metadata={"tenant_id": str(tenant.id), "bundle_size": str(body.bundle_size), "type": "credit_bundle"},
     )
+    if body.idempotency_key:
+        session = stripe.checkout.Session.create(
+            **create_kwargs,
+            idempotency_key=body.idempotency_key,
+        )
+    else:
+        session = stripe.checkout.Session.create(**create_kwargs)
     return CreditPurchaseResponse(checkout_url=session.url)

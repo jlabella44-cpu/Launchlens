@@ -91,8 +91,8 @@ def create_app() -> FastAPI:
         allow_origins=origins,
         allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
 
     # Middleware order: security headers → request ID → rate limit → tenant auth
@@ -117,17 +117,25 @@ def create_app() -> FastAPI:
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(health.router)
 
-    # Debug error handler — returns tracebacks in response (remove for real production)
     import traceback as tb
 
     from fastapi.responses import JSONResponse
 
-    @app.exception_handler(Exception)
-    async def debug_exception_handler(request, exc):
-        return JSONResponse(
-            status_code=500,
-            content={"detail": str(exc), "traceback": tb.format_exc()},
-        )
+    if settings.app_env == "development":
+        @app.exception_handler(Exception)
+        async def debug_exception_handler(request, exc):
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(exc), "traceback": tb.format_exc()},
+            )
+    else:
+        @app.exception_handler(Exception)
+        async def production_exception_handler(request, exc):
+            logging.getLogger(__name__).exception("Unhandled exception")
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
 
     return app
 

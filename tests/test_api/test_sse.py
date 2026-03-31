@@ -75,8 +75,8 @@ async def test_sse_returns_404_for_missing_listing(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_sse_returns_404_for_other_tenant_listing(async_client: AsyncClient):
-    """A listing owned by another tenant returns 404 (not 403) to avoid enumeration."""
+async def test_sse_returns_403_for_other_tenant_listing(async_client: AsyncClient):
+    """A listing owned by another tenant returns 403."""
     token_a, _ = await _register(async_client)
     token_b, _ = await _register(async_client)
     listing_id = await _create_listing(async_client, token_a)
@@ -86,7 +86,7 @@ async def test_sse_returns_404_for_other_tenant_listing(async_client: AsyncClien
         headers={"Authorization": f"Bearer {token_b}"},
         timeout=3.0,
     )
-    assert resp.status_code == 404
+    assert resp.status_code == 403
 
 
 @pytest.mark.skip(reason="SSE streaming hangs in CI — no real disconnect detection")

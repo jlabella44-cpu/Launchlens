@@ -111,7 +111,8 @@ async def test_billing_status_returns_plan(async_client: AsyncClient):
     assert resp.status_code == 200
     body = resp.json()
     assert body["plan"] == "starter"
-    assert body["stripe_customer_id"] is None
+    assert body["has_payment_method"] is False
+    assert body["has_subscription"] is False
 
 
 @pytest.mark.asyncio

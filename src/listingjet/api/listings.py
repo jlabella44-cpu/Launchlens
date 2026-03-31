@@ -26,6 +26,7 @@ from listingjet.api.schemas.listings import (
     RejectRequest,
     ReorderRequest,
     UpdateListingRequest,
+    UploadUrlsRequest,
     VideoUploadRequest,
 )
 from listingjet.database import get_db
@@ -240,7 +241,7 @@ async def get_dollhouse(
 @router.post("/{listing_id}/upload-urls")
 async def get_upload_urls(
     listing_id: uuid.UUID,
-    body: dict,
+    body: UploadUrlsRequest,
     _rl=Depends(rate_limit(10, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -255,9 +256,14 @@ async def get_upload_urls(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    files = body.get("files", body.get("filenames", []))
-    if isinstance(files, list) and all(isinstance(f, str) for f in files):
-        files = [{"filename": f} for f in files]
+    # Normalize input: accept either filenames list or files list
+    raw_files = body.files or (body.filenames or [])
+    files = []
+    for f in raw_files:
+        if isinstance(f, str):
+            files.append({"filename": f, "content_type": body.content_type})
+        else:
+            files.append({"filename": f.filename, "content_type": f.content_type or body.content_type})
     if not files or len(files) > 50:
         raise HTTPException(status_code=400, detail="Provide 1-50 files")
 
@@ -343,6 +349,8 @@ async def register_assets(
             )
         except Exception:
             logger.exception("Pipeline trigger failed for listing %s", listing.id)
+            listing.state = ListingState.FAILED
+            await db.commit()
 
     return CreateAssetsResponse(
         count=len(body.assets),
@@ -507,7 +515,7 @@ async def start_review(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -539,7 +547,7 @@ async def approve_listing(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -578,7 +586,7 @@ async def reject_listing(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -623,7 +631,7 @@ async def retry_pipeline(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -663,7 +671,7 @@ async def cancel_listing(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -709,6 +717,7 @@ async def get_pipeline_status(
         select(Event)
         .where(Event.listing_id == listing_id)
         .order_by(Event.created_at)
+        .limit(500)
     )
     events = result.scalars().all()
 

@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,21 @@ class TenantSettingsResponse(BaseModel):
 
 class UpdateSettingsRequest(BaseModel):
     webhook_url: str | None = None
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_webhook_url(cls, v: str | None) -> str | None:
+        if v:
+            from urllib.parse import urlparse
+            parsed = urlparse(v)
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError("Webhook URL must use http or https")
+            if not parsed.hostname:
+                raise ValueError("Webhook URL must have a valid hostname")
+            from listingjet.services.webhook_delivery import _is_url_safe
+            if not _is_url_safe(v):
+                raise ValueError("Webhook URL must not target private/internal IP ranges")
+        return v
 
 
 @router.get("", response_model=TenantSettingsResponse)

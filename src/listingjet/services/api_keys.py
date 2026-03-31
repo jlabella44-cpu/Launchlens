@@ -1,10 +1,11 @@
 """
 API key management service.
 
-Keys are generated as `ll_` + 32 random hex chars. Only the SHA-256 hash
+Keys are generated as `ll_` + 32 random hex chars. Only an HMAC-SHA256 hash
 is stored; the plaintext is returned once at creation time.
 """
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timezone
 
@@ -22,8 +23,9 @@ def generate_key() -> str:
 
 
 def hash_key(key: str) -> str:
-    """SHA-256 hash of the key for storage."""
-    return hashlib.sha256(key.encode()).hexdigest()
+    """HMAC-SHA256 hash of the key for storage."""
+    from listingjet.config import settings
+    return hmac.new(settings.jwt_secret.encode(), key.encode(), hashlib.sha256).hexdigest()
 
 
 async def create_api_key(session: AsyncSession, tenant_id, name: str) -> tuple[APIKey, str]:

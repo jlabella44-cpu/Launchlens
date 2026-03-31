@@ -20,6 +20,7 @@ from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.billing import BillingService
 from listingjet.services.credits import TIER_CREDITS, CreditService
+from listingjet.services.endpoint_rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +69,8 @@ async def billing_status(
 
     return BillingStatusResponse(
         plan=tenant.plan,
-        stripe_customer_id=tenant.stripe_customer_id,
-        stripe_subscription_id=tenant.stripe_subscription_id,
+        has_payment_method=bool(tenant.stripe_customer_id),
+        has_subscription=bool(tenant.stripe_subscription_id),
     )
 
 
@@ -163,7 +164,7 @@ async def _find_tenant_by_customer(db: AsyncSession, customer_id: str) -> Tenant
     return result.scalar_one_or_none()
 
 
-@router.post("/webhook")
+@router.post("/webhook", dependencies=[Depends(rate_limit(30, 60))])
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")

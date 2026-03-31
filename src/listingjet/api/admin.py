@@ -24,6 +24,7 @@ from listingjet.models.credit_transaction import CreditTransaction
 from listingjet.models.listing import Listing
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
+from listingjet.services.audit import audit_log
 from listingjet.services.auth import hash_password
 from listingjet.services.events import emit_event
 
@@ -92,15 +93,20 @@ async def update_tenant(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    changes = {}
     if body.name is not None:
+        changes["name"] = {"old": tenant.name, "new": body.name}
         tenant.name = body.name
     if body.plan is not None:
         if body.plan not in ("starter", "pro", "enterprise"):
             raise HTTPException(status_code=400, detail="Invalid plan. Must be: starter, pro, enterprise")
+        changes["plan"] = {"old": tenant.plan, "new": body.plan}
         tenant.plan = body.plan
     if body.webhook_url is not None:
         tenant.webhook_url = body.webhook_url or None  # empty string → None
+        changes["webhook_url"] = "updated"
 
+    await audit_log(db, admin_user.id, "update", "tenant", str(tenant_id), tenant_id=tenant_id, details=changes)
     await db.commit()
     await db.refresh(tenant)
     return tenant
@@ -182,6 +188,11 @@ async def invite_user(
         role=UserRole(body.role),
     )
     db.add(user)
+    await audit_log(
+        db, admin_user.id, "invite_user", "user", str(user.id),
+        tenant_id=tenant_id,
+        details={"email": body.email, "role": body.role},
+    )
     await db.commit()
     await db.refresh(user)
     return UserResponse.from_orm_user(user)
@@ -306,6 +317,11 @@ async def adjust_credits(
         metadata_={"admin_user_id": str(admin_user.id), "admin_email": admin_user.email},
     )
     db.add(txn)
+    await audit_log(
+        db, admin_user.id, "adjust_credits", "tenant", str(tenant_id),
+        tenant_id=tenant_id,
+        details={"amount": body.amount, "new_balance": new_balance, "reason": body.reason},
+    )
 
     await emit_event(
         session=db,
@@ -412,7 +428,7 @@ async def revenue_breakdown(
         .limit(10)
     )).all()
     top_tenants = [
-        {"tenant_id": str(row[0]), "name": row[1], "credits_used": int(row[2])}
+        {"tenant_id": str(row[0]), "credits_used": int(row[2])}
         for row in usage_rows
     ]
 
