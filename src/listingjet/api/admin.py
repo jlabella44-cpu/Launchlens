@@ -412,7 +412,7 @@ async def revenue_breakdown(
         .limit(10)
     )).all()
     top_tenants = [
-        {"tenant_id": str(row[0]), "name": row[1], "credits_used": int(row[2])}
+        {"tenant_id": str(row[0]), "credits_used": int(row[2])}
         for row in usage_rows
     ]
 

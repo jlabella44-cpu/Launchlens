@@ -343,6 +343,8 @@ async def register_assets(
             )
         except Exception:
             logger.exception("Pipeline trigger failed for listing %s", listing.id)
+            listing.state = ListingState.FAILED
+            await db.commit()
 
     return CreateAssetsResponse(
         count=len(body.assets),
@@ -709,6 +711,7 @@ async def get_pipeline_status(
         select(Event)
         .where(Event.listing_id == listing_id)
         .order_by(Event.created_at)
+        .limit(500)
     )
     events = result.scalars().all()
 
