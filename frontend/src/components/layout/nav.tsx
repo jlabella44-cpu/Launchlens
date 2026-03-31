@@ -29,10 +29,26 @@ export function Nav() {
         )}
         {user && (
           <Link
+            href="/listings"
+            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            Listings
+          </Link>
+        )}
+        {user && (
+          <Link
             href="/review"
             className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
           >
-            Review Queue
+            Review
+          </Link>
+        )}
+        {user && (
+          <Link
+            href="/billing"
+            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            Billing
           </Link>
         )}
         <Link
@@ -40,6 +56,12 @@ export function Nav() {
           className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
         >
           Pricing
+        </Link>
+        <Link
+          href="/demo"
+          className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+        >
+          Demo
         </Link>
         {user && (
           <Link
