@@ -13,6 +13,8 @@ from listingjet.services.events import emit_event
 from listingjet.services.fha_filter import fha_check
 from listingjet.services.pii_filter import sanitize_for_prompt
 
+from listingjet.models.property_data import PropertyData
+
 from .base import AgentContext, BaseAgent
 
 _PROMPT_TEMPLATE = """\
@@ -130,6 +132,36 @@ class ContentAgent(BaseAgent):
                     voice_section=voice_section,
                     market_section=market_section,
                 )
+
+                prop_result = await session.execute(
+                    select(PropertyData).where(PropertyData.listing_id == listing_id)
+                )
+                prop_data = prop_result.scalar_one_or_none()
+
+                neighborhood_context = ""
+                if prop_data:
+                    parts = []
+                    if prop_data.walk_score and prop_data.walk_score >= 70:
+                        parts.append(f"Walk Score: {prop_data.walk_score}/100 (very walkable)")
+                    if prop_data.lifestyle_tags:
+                        parts.append(f"Neighborhood: {', '.join(prop_data.lifestyle_tags)}")
+                    if prop_data.nearby_amenities:
+                        top_amenities = prop_data.nearby_amenities[:3]
+                        names = [a["name"] for a in top_amenities if isinstance(a, dict)]
+                        if names:
+                            parts.append(f"Nearby: {', '.join(names)}")
+                    if prop_data.school_ratings:
+                        ratings = prop_data.school_ratings
+                        if isinstance(ratings, dict):
+                            for level in ["elementary", "middle", "high"]:
+                                school = ratings.get(level)
+                                if isinstance(school, dict) and school.get("rating"):
+                                    parts.append(f"{school['name']} ({school['rating']}/10)")
+                                    break
+                    if parts:
+                        neighborhood_context = "\n\nNeighborhood context:\n" + "\n".join(f"- {p}" for p in parts)
+
+                prompt += neighborhood_context
 
                 raw = await self._llm_provider.complete(
                     prompt=prompt,
