@@ -1,7 +1,5 @@
 import uuid
 
-from temporalio import activity
-
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.performance_event import PerformanceEvent
@@ -46,10 +44,3 @@ class DistributionAgent(BaseAgent):
                 await notify_pipeline_complete(session, listing, context.tenant_id)
 
         return {"status": "delivered"}
-
-
-@activity.defn
-async def run_distribution(listing_id: str, tenant_id: str) -> dict:
-    agent = DistributionAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

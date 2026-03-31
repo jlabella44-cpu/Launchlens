@@ -1,7 +1,6 @@
 import uuid
 
 from sqlalchemy import select
-from temporalio import activity
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.event import Event
@@ -81,10 +80,3 @@ class LearningAgent(BaseAgent):
                     )
 
         return {"weights_updated": weights_updated}
-
-
-@activity.defn
-async def run_learning(listing_id: str, tenant_id: str) -> dict:
-    agent = LearningAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

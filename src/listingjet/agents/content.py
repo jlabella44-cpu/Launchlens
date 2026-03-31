@@ -2,7 +2,6 @@ import json
 import uuid
 
 from sqlalchemy import select
-from temporalio import activity
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
@@ -170,10 +169,3 @@ class ContentAgent(BaseAgent):
                 )
 
         return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed}
-
-
-@activity.defn
-async def run_content(listing_id: str, tenant_id: str) -> dict:
-    agent = ContentAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

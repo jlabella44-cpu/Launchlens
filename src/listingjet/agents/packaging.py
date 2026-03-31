@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from temporalio import activity
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
@@ -113,10 +112,3 @@ class PackagingAgent(BaseAgent):
                 await notify_review_ready(session, listing, context.tenant_id)
 
         return {"hero_asset_id": hero_asset_id, "total_selected": len(top)}
-
-
-@activity.defn
-async def run_packaging(listing_id: str, tenant_id: str) -> dict:
-    agent = PackagingAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

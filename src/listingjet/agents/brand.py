@@ -1,7 +1,6 @@
 import uuid
 
 from sqlalchemy import select
-from temporalio import activity
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
@@ -90,10 +89,3 @@ class BrandAgent(BaseAgent):
                 )
 
         return {"flyer_s3_key": s3_key}
-
-
-@activity.defn
-async def run_brand(listing_id: str, tenant_id: str) -> dict:
-    agent = BrandAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)
