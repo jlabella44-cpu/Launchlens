@@ -41,7 +41,7 @@ class ServicesStack(Stack):
         id: str,
         vpc: ec2.IVpc,
         db_instance: rds.DatabaseInstance,
-        redis_cluster: elasticache.CfnCacheCluster,
+        redis_cluster: elasticache.CfnReplicationGroup,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -80,7 +80,7 @@ class ServicesStack(Stack):
             "APP_ENV": "production",
             "ENVIRONMENT": "production",
             "AWS_REGION": Stack.of(self).region,
-            "REDIS_URL": f"redis://{redis_cluster.attr_redis_endpoint_address}:{redis_cluster.attr_redis_endpoint_port}/0",
+            "REDIS_URL": f"redis://{redis_cluster.attr_primary_end_point_address}:{redis_cluster.attr_primary_end_point_port}/0",
             "CORS_ORIGINS": "http://localhost:3000,https://launchlens-7bvngk56b-jlabella44-5360s-projects.vercel.app",
             "TEMPORAL_HOST": "temporal:7233",
         }
@@ -88,8 +88,8 @@ class ServicesStack(Stack):
         # --- API Service (Fargate + ALB) ------------------------------------
         api_task = ecs.FargateTaskDefinition(
             self, "ApiTask",
-            cpu=512,
-            memory_limit_mib=1024,
+            cpu=1024,
+            memory_limit_mib=2048,
         )
 
         api_container = api_task.add_container(
@@ -144,11 +144,23 @@ class ServicesStack(Stack):
 
         self.alb = self.api_service.load_balancer
 
+        # Auto-scaling for API service
+        api_scaling = self.api_service.service.auto_scale_task_count(
+            min_capacity=1,
+            max_capacity=4,
+        )
+        api_scaling.scale_on_cpu_utilization(
+            "CpuScaling",
+            target_utilization_percent=70,
+            scale_in_cooldown=Duration.seconds(300),
+            scale_out_cooldown=Duration.seconds(60),
+        )
+
         # --- Worker Service (Fargate, no ALB) --------------------------------
         worker_task = ecs.FargateTaskDefinition(
             self, "WorkerTask",
-            cpu=512,
-            memory_limit_mib=1024,
+            cpu=2048,
+            memory_limit_mib=4096,
         )
 
         worker_task.add_container(
