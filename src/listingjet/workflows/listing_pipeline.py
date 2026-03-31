@@ -17,6 +17,7 @@ with workflow.unsafe.imports_passed_through():
         run_learning,
         run_mls_export,
         run_packaging,
+        run_property_verification,
         run_social_content,
         run_social_cuts,
         run_video,
@@ -69,10 +70,17 @@ class ListingPipeline:
             start_to_close_timeout=_DEFAULT_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
-        await workflow.execute_activity(
-            run_vision_tier1, ctx,
-            start_to_close_timeout=_DEFAULT_TIMEOUT,
-            retry_policy=_DEFAULT_RETRY,
+        await asyncio.gather(
+            workflow.execute_activity(
+                run_vision_tier1, ctx,
+                start_to_close_timeout=_DEFAULT_TIMEOUT,
+                retry_policy=_DEFAULT_RETRY,
+            ),
+            workflow.execute_activity(
+                run_property_verification, ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_DEFAULT_RETRY,
+            ),
         )
         await workflow.execute_activity(
             run_vision_tier2, ctx,
