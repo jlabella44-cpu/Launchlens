@@ -58,11 +58,13 @@ function BrandKitSettings() {
       .finally(() => setLoading(false));
   }, []);
 
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
   const handleLogoUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
-    // Show local preview immediately and keep it
+    // Show local preview immediately
     const localUrl = URL.createObjectURL(file);
-    setForm((f) => ({ ...f, logo_url: localUrl }));
+    setLogoPreview(localUrl);
     setUploading(true);
     try {
       const { key, upload } = await apiClient.getLogoUploadUrl();
@@ -73,16 +75,14 @@ function BrandKitSettings() {
       const resp = await fetch(presigned.url, { method: "POST", body: fd });
       if (!resp.ok) {
         console.error("S3 upload failed:", resp.status, await resp.text().catch(() => ""));
-        // Keep local preview — user can still save manually later
-        return;
       }
-      // Construct the final S3 URL
-      const s3Url = `${presigned.url}/${key}`;
-      setForm((f) => ({ ...f, logo_url: s3Url }));
-      URL.revokeObjectURL(localUrl);
+      // Store the S3 key as the logo_url for the backend
+      const s3Key = `s3://${key}`;
+      setForm((f) => ({ ...f, logo_url: s3Key }));
     } catch (err) {
       console.error("Logo upload failed:", err);
-      // Keep the local preview — don't clear it
+      // Still keep preview and set a placeholder so the UI shows the image
+      setForm((f) => ({ ...f, logo_url: "pending-upload" }));
     } finally {
       setUploading(false);
     }
@@ -197,19 +197,23 @@ function BrandKitSettings() {
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
                 Logo
               </h2>
-              {form.logo_url ? (
+              {form.logo_url || logoPreview ? (
                 <div className="flex items-center gap-4 mb-4">
                   <img
-                    src={form.logo_url}
+                    src={logoPreview || form.logo_url || ""}
                     alt="Brand logo"
                     className="w-16 h-16 object-contain rounded-lg border border-white/20"
                   />
                   <Button
                     variant="secondary"
-                    onClick={() => setForm((f) => ({ ...f, logo_url: null }))}
+                    onClick={() => {
+                      setForm((f) => ({ ...f, logo_url: null }));
+                      setLogoPreview(null);
+                    }}
                   >
                     Remove
                   </Button>
+                  {uploading && <span className="text-sm text-[var(--color-text-secondary)]">Uploading...</span>}
                 </div>
               ) : (
                 <div
