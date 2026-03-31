@@ -142,7 +142,11 @@ async def test_purchase_creates_checkout(async_client: AsyncClient, monkeypatch)
     # Monkeypatch the settings attribute so getattr(settings, ...) returns a real price ID
     monkeypatch.setattr(settings, "stripe_price_credit_bundle_5", "price_test_5")
 
-    with patch("stripe.checkout.Session.create", return_value=mock_session):
+    with (
+        patch("stripe.checkout.Session.create", return_value=mock_session),
+        patch("listingjet.api.credits.BillingService") as mock_billing_cls,
+    ):
+        mock_billing_cls.return_value.create_customer.return_value = "cus_test_123"
         resp = await async_client.post("/credits/purchase", json={
             "bundle_size": 5,
             "success_url": "https://example.com/ok",
