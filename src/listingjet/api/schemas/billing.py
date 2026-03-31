@@ -21,8 +21,8 @@ class PortalResponse(BaseModel):
 
 class BillingStatusResponse(BaseModel):
     plan: str
-    stripe_customer_id: str | None
-    stripe_subscription_id: str | None
+    has_payment_method: bool = False
+    has_subscription: bool = False
 
 
 class ChangePlanRequest(BaseModel):

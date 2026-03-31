@@ -26,6 +26,6 @@ class SecurityHeadersMiddleware:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         # Relaxed CSP for API backend — frontend is served separately by Vercel.
         # Only restrict frame embedding (clickjacking protection).
-        response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
 
         return response

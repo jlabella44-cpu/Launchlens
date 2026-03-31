@@ -25,10 +25,11 @@ def _init_price_map():
 
 class BillingService:
     def __init__(self):
-        stripe.api_key = settings.stripe_secret_key
+        self._api_key = settings.stripe_secret_key
 
     def create_customer(self, email: str, name: str, tenant_id: str) -> str:
         customer = stripe.Customer.create(
+            api_key=self._api_key,
             email=email,
             name=name,
             metadata={"tenant_id": tenant_id},
@@ -43,6 +44,7 @@ class BillingService:
         cancel_url: str,
     ) -> str:
         session = stripe.checkout.Session.create(
+            api_key=self._api_key,
             customer=customer_id,
             payment_method_types=["card"],
             line_items=[{"price": price_id, "quantity": 1}],
@@ -54,6 +56,7 @@ class BillingService:
 
     def create_portal_session(self, customer_id: str, return_url: str) -> str:
         session = stripe.billing_portal.Session.create(
+            api_key=self._api_key,
             customer=customer_id,
             return_url=return_url,
         )
@@ -74,7 +77,7 @@ class BillingService:
 
     def list_invoices(self, customer_id: str, limit: int = 10) -> list[dict]:
         """List recent invoices for a customer."""
-        invoices = stripe.Invoice.list(customer=customer_id, limit=limit)
+        invoices = stripe.Invoice.list(api_key=self._api_key, customer=customer_id, limit=limit)
         return [
             {
                 "id": inv.id,
@@ -98,7 +101,7 @@ class BillingService:
         if not new_price_id:
             raise ValueError(f"No price configured for plan: {new_plan}")
 
-        subscription = stripe.Subscription.retrieve(subscription_id)
+        subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
         if not subscription.get("items", {}).get("data"):
             raise ValueError("Subscription has no items")
 
@@ -106,6 +109,7 @@ class BillingService:
 
         updated = stripe.Subscription.modify(
             subscription_id,
+            api_key=self._api_key,
             items=[{"id": item_id, "price": new_price_id}],
             proration_behavior="create_prorations",
         )
@@ -118,7 +122,7 @@ class BillingService:
 
     def create_usage_record(self, subscription_id: str, quantity: int) -> dict:
         """Report metered usage (per-listing overage). Requires metered price."""
-        subscription = stripe.Subscription.retrieve(subscription_id)
+        subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
         items = subscription.get("items", {}).get("data", [])
         # Find the metered item (if configured)
         metered_item = None

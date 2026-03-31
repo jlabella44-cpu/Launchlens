@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,7 +30,15 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    jwt_expiry_hours: int = 24
+    jwt_expiry_hours: int = 1
+    jwt_refresh_expiry_days: int = 7
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def validate_jwt_secret(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters for security")
+        return v
 
     # Stripe
     stripe_secret_key: str = ""
@@ -62,7 +71,6 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
-    google_drive_api_key: str = ""
     use_mock_providers: bool = False
 
     # ClamAV
@@ -90,9 +98,6 @@ class Settings(BaseSettings):
     stripe_price_active_agent: str = ""
     stripe_price_team: str = ""
     stripe_price_annual: str = ""
-
-    # Google OAuth
-    google_oauth_client_id: str = ""
 
     # Canva OAuth2 (Phase 2 — per-tenant access)
     canva_client_id: str = ""
