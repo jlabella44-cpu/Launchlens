@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
@@ -27,6 +27,9 @@ function BrandKitSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<BrandKitUpsertRequest>({
     brokerage_name: "",
     agent_name: "",
@@ -53,6 +56,35 @@ function BrandKitSettings() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+  }, []);
+
+  const handleLogoUpload = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    setUploading(true);
+    try {
+      const { key, upload } = await apiClient.getLogoUploadUrl();
+      const presigned = upload as { url: string; fields?: Record<string, string> };
+      if (presigned.fields) {
+        const fd = new FormData();
+        Object.entries(presigned.fields).forEach(([k, v]) => fd.append(k, v));
+        fd.append("file", file);
+        await fetch(presigned.url, { method: "POST", body: fd });
+      } else {
+        await fetch(presigned.url, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+      }
+      const logoUrl = presigned.fields
+        ? `${presigned.url}/${key}`
+        : presigned.url.split("?")[0];
+      setForm((f) => ({ ...f, logo_url: logoUrl }));
+    } catch (err) {
+      console.error("Logo upload failed:", err);
+    } finally {
+      setUploading(false);
+    }
   }, []);
 
   async function handleSave() {
@@ -179,18 +211,43 @@ function BrandKitSettings() {
                   </Button>
                 </div>
               ) : (
-                <p className="text-sm text-[var(--color-text-secondary)] mb-4">
-                  No logo uploaded yet. Upload a PNG logo for your flyers and watermarks.
-                </p>
+                <div
+                  className={`relative flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed transition-colors cursor-pointer ${
+                    dragOver
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
+                      : "border-white/20 hover:border-white/40"
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleLogoUpload(file);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleLogoUpload(file);
+                    }}
+                  />
+                  <svg className="w-8 h-8 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  <p className="text-sm text-[var(--color-text-secondary)]">
+                    {uploading ? "Uploading..." : "Drag & drop your logo here, or click to browse"}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-secondary)]/60">
+                    PNG, JPG, WebP, or SVG
+                  </p>
+                </div>
               )}
-              <Input
-                label="Logo URL"
-                placeholder="https://..."
-                value={form.logo_url || ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, logo_url: e.target.value || null }))
-                }
-              />
             </GlassCard>
 
             {/* Live Preview */}
