@@ -4,8 +4,11 @@ import uuid
 import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.config import settings
+from listingjet.models.tenant import Tenant
 from listingjet.services.plan_limits import PLAN_LIMITS, get_limits
 
 
@@ -70,14 +73,23 @@ async def _register(client: AsyncClient) -> tuple[str, str]:
     return token, payload["tenant_id"]
 
 
+async def _set_legacy_billing(db: AsyncSession, tenant_id: str) -> None:
+    """Switch a tenant to legacy (quota-based) billing for plan limit tests."""
+    result = await db.execute(select(Tenant).where(Tenant.id == uuid.UUID(tenant_id)))
+    tenant = result.scalar_one()
+    tenant.billing_model = "legacy"
+    await db.commit()
+
+
 def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.mark.asyncio
-async def test_create_listing_enforces_monthly_quota(async_client: AsyncClient):
+async def test_create_listing_enforces_monthly_quota(async_client: AsyncClient, db_session: AsyncSession):
     """Starter plan: 5 listings/month. 6th should return 403."""
-    token, _ = await _register(async_client)
+    token, tenant_id = await _register(async_client)
+    await _set_legacy_billing(db_session, tenant_id)
     for i in range(5):
         resp = await async_client.post("/listings", json={
             "address": {"street": f"{i} Quota St"}, "metadata": {},

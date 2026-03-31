@@ -11,7 +11,12 @@ from listingjet.database import get_db
 from listingjet.models.credit_account import CreditAccount
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
-from listingjet.services.auth import create_access_token, hash_password, verify_google_id_token, verify_password_constant_time
+from listingjet.services.auth import (
+    create_access_token,
+    hash_password,
+    verify_google_id_token,
+    verify_password_constant_time,
+)
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 

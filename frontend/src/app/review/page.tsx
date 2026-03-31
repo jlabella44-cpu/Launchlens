@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { GlassCard } from "@/components/ui/glass-card";
 import { useToast } from "@/components/ui/toast";
 import apiClient from "@/lib/api-client";
 import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
@@ -46,7 +45,7 @@ function ReviewQueue() {
       }
       prevCountRef.current = data.length;
     } catch {
-      // Silently handle — queue may be empty
+      // Silently handle
     } finally {
       setLoading(false);
     }
@@ -58,7 +57,6 @@ function ReviewQueue() {
     return () => clearInterval(interval);
   }, [fetchQueue]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -134,28 +132,37 @@ function ReviewQueue() {
   return (
     <>
       <Nav />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-1">
             <h1
               className="text-3xl font-bold text-[var(--color-text)]"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Review Queue
             </h1>
-            <p className="text-[var(--color-text-secondary)] mt-1">
-              {listings.length} listing{listings.length !== 1 ? "s" : ""} awaiting review
-              <span className="ml-3 text-xs text-slate-400">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#F97316] text-white text-xs font-bold">
+              {listings.length}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-400">
+              Process pending listings for pre-flight altitude clearance
+            </p>
+            <div className="hidden sm:flex items-center gap-4">
+              <span className="text-[10px] uppercase tracking-wider text-slate-300">
                 j/k navigate · a approve · s reject · space toggle
               </span>
-            </p>
+            </div>
           </div>
         </div>
 
+        {/* Content */}
         {loading ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 rounded-xl bg-white/50 animate-pulse" />
+              <div key={i} className="h-20 rounded-2xl bg-white animate-pulse border border-slate-100" />
             ))}
           </div>
         ) : listings.length === 0 ? (
@@ -164,12 +171,21 @@ function ReviewQueue() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
           >
-            <p className="text-lg text-[var(--color-text-secondary)]">
+            <p className="text-lg text-slate-400">
               No listings awaiting review. Queue refreshes every 30s.
             </p>
+            <p className="text-xs text-slate-300 mt-2 uppercase tracking-wider">Load More Flights</p>
           </motion.div>
         ) : (
           <div className="space-y-3">
+            {/* Table Header */}
+            <div className="flex items-center gap-4 px-5 py-2 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+              <div className="flex-1">Street Address</div>
+              <div className="w-40">Date Submitted</div>
+              <div className="w-36 text-center">Status</div>
+              <div className="w-24 text-center">Actions</div>
+            </div>
+
             {listings.map((listing) => {
               const addr = listing.address;
               const isExpanded = expandedId === listing.id;
@@ -177,47 +193,61 @@ function ReviewQueue() {
 
               return (
                 <motion.div key={listing.id} layout>
-                  <GlassCard tilt={false}>
+                  <div className={`bg-white rounded-2xl border transition-all ${
+                    isExpanded ? "border-[#F97316]/30 shadow-md" : "border-slate-100"
+                  }`}>
                     {/* Row */}
                     <div
-                      className="flex items-center gap-4 cursor-pointer"
+                      className="flex items-center gap-4 px-5 py-4 cursor-pointer"
                       onClick={() => toggleExpand(listing.id)}
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-[var(--color-text)] truncate">
                           {addr.street || "Untitled"}
                         </p>
-                        <p className="text-xs text-[var(--color-text-secondary)]">
+                        <p className="text-xs text-slate-400">
                           {[addr.city, addr.state].filter(Boolean).join(", ")}
-                          {" · "}
-                          {new Date(listing.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <Badge state={listing.state} />
-                      <div className="flex gap-2">
-                        <Button
-                          variant="primary"
-                          onClick={(e) => { e.stopPropagation(); handleApprove(listing.id); }}
-                          loading={actionLoading === listing.id}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="danger"
-                          onClick={(e) => { e.stopPropagation(); setRejectingId(listing.id); }}
-                        >
-                          Reject
-                        </Button>
+                      <div className="w-40 text-xs text-slate-400">
+                        {new Date(listing.created_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })},{" "}
+                        {new Date(listing.created_at).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </div>
-                      <svg
-                        className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <div className="w-36 flex justify-center">
+                        <Badge state={listing.state} />
+                      </div>
+                      <div className="w-24 flex justify-center gap-2">
+                        {/* Approve */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleApprove(listing.id); }}
+                          disabled={actionLoading === listing.id}
+                          className="w-8 h-8 rounded-full border border-green-200 flex items-center justify-center text-green-500 hover:bg-green-50 transition-colors disabled:opacity-50"
+                          aria-label="Approve"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                        {/* Reject */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setRejectingId(listing.id); }}
+                          className="w-8 h-8 rounded-full border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
+                          aria-label="Reject"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Expanded detail panel */}
+                    {/* Expanded photo grid */}
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -227,45 +257,59 @@ function ReviewQueue() {
                           transition={{ duration: 0.2 }}
                           className="overflow-hidden"
                         >
-                          <div className="pt-4 mt-4 border-t border-white/20">
+                          <div className="px-5 pb-5 pt-2 border-t border-slate-100">
                             {!data ? (
                               <div className="h-24 flex items-center justify-center">
-                                <div className="w-5 h-5 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
+                                <div className="w-5 h-5 border-2 border-[#F97316] border-t-transparent rounded-full animate-spin" />
                               </div>
                             ) : data.selections.length === 0 ? (
-                              <p className="text-sm text-[var(--color-text-secondary)] text-center py-4">
+                              <p className="text-sm text-slate-400 text-center py-4">
                                 No packaged photos yet.
                               </p>
                             ) : (
-                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                                {data.selections.map((sel) => (
-                                  <div
-                                    key={`${sel.asset_id}-${sel.position}`}
-                                    className="relative aspect-[4/3] bg-gradient-to-br from-slate-200 to-slate-100 rounded-lg overflow-hidden group"
-                                  >
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <span className="text-[10px] font-mono text-slate-400 px-1 truncate">
-                                        #{sel.position + 1}
-                                      </span>
+                              <>
+                                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-4">
+                                  {data.selections.map((sel) => (
+                                    <div
+                                      key={`${sel.asset_id}-${sel.position}`}
+                                      className="aspect-square bg-gradient-to-br from-slate-100 to-slate-50 rounded-xl overflow-hidden flex items-center justify-center relative"
+                                    >
+                                      <svg className="w-5 h-5 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
                                     </div>
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1.5 py-0.5 flex items-center justify-between">
-                                      <span className="text-[10px] text-white font-medium">
-                                        {Math.round(sel.composite_score)}%
-                                      </span>
-                                      {sel.position === 0 && (
-                                        <span className="text-[9px] text-orange-300 font-bold">HERO</span>
-                                      )}
+                                  ))}
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-6">
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">AI Trust Score</p>
+                                      <p className="text-lg font-bold text-[var(--color-text)]">
+                                        {data.selections.length > 0
+                                          ? (data.selections.reduce((s, sel) => s + sel.composite_score, 0) / data.selections.length).toFixed(1)
+                                          : "—"}%
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Glamour Score</p>
+                                      <p className="text-lg font-bold text-[var(--color-text)]">None</p>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
+                                  <Link href={`/listings/${listing.id}`}>
+                                    <button className="px-4 py-2 rounded-full bg-[#0B1120] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#1a2744] transition-colors">
+                                      View Full Asset
+                                    </button>
+                                  </Link>
+                                </div>
+                              </>
                             )}
                           </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
 
-                    {/* Reject modal */}
+                    {/* Reject panel */}
                     <AnimatePresence>
                       {rejectingId === listing.id && (
                         <motion.div
@@ -274,8 +318,8 @@ function ReviewQueue() {
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="pt-4 mt-4 border-t border-red-200/40 space-y-3">
-                            <p className="text-sm font-medium text-red-600">Rejection Reason</p>
+                          <div className="px-5 pb-5 pt-3 border-t border-red-100 space-y-3">
+                            <p className="text-sm font-semibold text-red-600">Rejection Reason</p>
                             <div className="flex flex-wrap gap-2">
                               {REASON_CODES.map((rc) => (
                                 <button
@@ -284,7 +328,7 @@ function ReviewQueue() {
                                   className={`text-xs px-3 py-1.5 rounded-full border transition-colors cursor-pointer ${
                                     rejectReason === rc.value
                                       ? "bg-red-50 border-red-300 text-red-700"
-                                      : "bg-white/50 border-white/30 text-[var(--color-text-secondary)] hover:bg-white/80"
+                                      : "border-slate-200 text-slate-500 hover:border-slate-300"
                                   }`}
                                 >
                                   {rc.label}
@@ -297,34 +341,51 @@ function ReviewQueue() {
                                 value={rejectDetail}
                                 onChange={(e) => setRejectDetail(e.target.value)}
                                 placeholder="Describe the issue..."
-                                className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
                               />
                             )}
                             <div className="flex gap-2">
-                              <Button
-                                variant="danger"
+                              <button
                                 onClick={() => handleReject(listing.id)}
-                                loading={actionLoading === listing.id}
+                                disabled={actionLoading === listing.id}
+                                className="px-4 py-2 rounded-full bg-red-600 text-white text-xs font-semibold disabled:opacity-50"
                               >
                                 Confirm Reject
-                              </Button>
-                              <Button
-                                variant="secondary"
+                              </button>
+                              <button
                                 onClick={() => { setRejectingId(null); setRejectDetail(""); }}
+                                className="px-4 py-2 rounded-full border border-slate-200 text-xs text-slate-600"
                               >
                                 Cancel
-                              </Button>
+                              </button>
                             </div>
                           </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </GlassCard>
+                  </div>
                 </motion.div>
               );
             })}
+
+            {/* Load more */}
+            <div className="text-center pt-4">
+              <span className="text-xs text-slate-300 uppercase tracking-wider">Load More Flights</span>
+            </div>
           </div>
         )}
+
+        {/* Footer */}
+        <footer className="mt-16 pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-300">
+          <span>ListingJet</span>
+          <span>© {new Date().getFullYear()} ListingJet Command. All systems operational.</span>
+          <div className="flex items-center gap-6">
+            <span>Support</span>
+            <span>Privacy</span>
+            <span>Terms</span>
+            <span>API Status</span>
+          </div>
+        </footer>
       </main>
     </>
   );

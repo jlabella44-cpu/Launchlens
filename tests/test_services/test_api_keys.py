@@ -1,9 +1,7 @@
 import uuid
 
 import pytest
-from sqlalchemy import select
 
-from listingjet.models.api_key import APIKey
 from listingjet.services.api_keys import create_api_key, generate_key, hash_key, validate_api_key
 
 

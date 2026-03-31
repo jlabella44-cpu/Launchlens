@@ -21,6 +21,9 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&family=Josefin+Sans:wght@300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){try{var t=localStorage.getItem('listingjet_theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})();
+        `}} />
       </head>
       <body className="min-h-full flex flex-col">
         <ErrorBoundary>

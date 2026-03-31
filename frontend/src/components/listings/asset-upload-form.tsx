@@ -356,8 +356,8 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
       </AnimatePresence>
 
       {/* Import from Link */}
-      <div className="mt-6 pt-6 border-t border-white/10">
-        <p className="text-sm text-[var(--color-text-secondary)] mb-3">
+      <div className="mt-6 pt-6 border-t border-slate-100">
+        <p className="text-sm text-slate-500 mb-3">
           Or import directly from a delivery link
         </p>
         <div className="flex gap-2">
@@ -367,34 +367,34 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
             value={importUrl}
             onChange={(e) => setImportUrl(e.target.value)}
             disabled={importing}
-            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)]/50 text-sm focus:outline-none focus:border-[var(--color-accent)]"
+            className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all"
           />
           <button
             onClick={handleImportLink}
             disabled={importing || !importUrl.trim()}
-            className="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            className="px-4 py-2.5 rounded-lg bg-[#F97316] text-white text-sm font-medium hover:bg-[#EA580C] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
           >
             {importing ? "Importing..." : "Import"}
           </button>
         </div>
         {importProgress && (
           <div className="mt-3">
-            <div className="flex justify-between text-xs text-[var(--color-text-secondary)] mb-1">
+            <div className="flex justify-between text-xs text-slate-500 mb-1">
               <span>{importProgress.status === "downloading" ? "Downloading photos..." : importProgress.status}</span>
               <span>{importProgress.completed}/{importProgress.total}</span>
             </div>
-            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-[var(--color-accent)] rounded-full transition-all duration-300"
+                className="h-full bg-[#F97316] rounded-full transition-all duration-300"
                 style={{ width: importProgress.total > 0 ? `${(importProgress.completed / importProgress.total) * 100}%` : '0%' }}
               />
             </div>
           </div>
         )}
         {importError && (
-          <p className="mt-2 text-sm text-red-400">{importError}</p>
+          <p className="mt-2 text-sm text-red-500">{importError}</p>
         )}
-        <p className="mt-2 text-xs text-[var(--color-text-secondary)]/60">
+        <p className="mt-2 text-xs text-slate-400">
           Supports Google Drive shared folders and Show &amp; Tour delivery links
         </p>
       </div>
