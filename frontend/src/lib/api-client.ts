@@ -263,7 +263,8 @@ class ApiClient {
 
   // Review queue
   async getReviewQueue(): Promise<ListingResponse[]> {
-    return this.request<ListingResponse[]>("/listings?state=awaiting_review");
+    const res = await this.request<{ items: ListingResponse[] }>("/listings?state=awaiting_review");
+    return res.items;
   }
 
   // Reject

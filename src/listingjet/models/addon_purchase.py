@@ -12,7 +12,7 @@ class AddonPurchase(Base):
     __table_args__ = (UniqueConstraint("listing_id", "addon_id"),)
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
-    listing_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    listing_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     addon_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     credit_transaction_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="active")  # active, refunded, completed

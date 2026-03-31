@@ -1,6 +1,7 @@
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from listingjet.services.webhook_delivery import _is_url_safe, deliver_webhook
@@ -8,17 +9,31 @@ from listingjet.services.webhook_delivery import _is_url_safe, deliver_webhook
 _SSRF_PATCH_TARGET = "listingjet.services.webhook_delivery._is_url_safe"
 
 
+def _make_mock_client(mock_response):
+    """Create a properly configured AsyncClient mock for httpx context manager."""
+    mock_client = AsyncMock()
+    mock_client.post.return_value = mock_response
+    # Use MagicMock for the class so that AsyncClient() returns a sync value,
+    # not a coroutine.  The returned object needs __aenter__/__aexit__ for
+    # ``async with``.
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=mock_client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cls = MagicMock(return_value=ctx)
+    return mock_client_cls, mock_client
+
+
 @pytest.mark.asyncio
 async def test_successful_delivery():
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
 
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cls, mock_client = _make_mock_client(mock_response)
 
+    with (
+        patch(_SSRF_PATCH_TARGET, return_value=True),
+        patch("listingjet.services.webhook_delivery.httpx.AsyncClient", mock_client_cls),
+    ):
         result = await deliver_webhook(
             url="https://example.com/webhook",
             event_type="pipeline.completed",
@@ -30,22 +45,34 @@ async def test_successful_delivery():
     assert result is True
     mock_client.post.assert_called_once()
     call_kwargs = mock_client.post.call_args
-    body = json.loads(call_kwargs.kwargs.get("content") or call_kwargs.args[1] if len(call_kwargs.args) > 1 else call_kwargs.kwargs["content"])
+    body = json.loads(
+        call_kwargs.kwargs.get("content")
+        or call_kwargs.args[1]
+        if len(call_kwargs.args) > 1
+        else call_kwargs.kwargs["content"]
+    )
     assert body["event"] == "pipeline.completed"
     assert body["tenant_id"] == "tenant-123"
 
 
 @pytest.mark.asyncio
 async def test_failed_delivery_retries():
-    mock_response = AsyncMock()
+    """Server errors (500) should trigger retries via raise_for_status."""
+    mock_response = MagicMock()
     mock_response.status_code = 500
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "500 Server Error",
+        request=httpx.Request("POST", "https://example.com"),
+        response=httpx.Response(500),
+    )
 
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cls, mock_client = _make_mock_client(mock_response)
 
+    with (
+        patch(_SSRF_PATCH_TARGET, return_value=True),
+        patch("listingjet.services.webhook_delivery.httpx.AsyncClient", mock_client_cls),
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
         result = await deliver_webhook(
             url="https://example.com/webhook",
             event_type="test.event",
@@ -54,17 +81,20 @@ async def test_failed_delivery_retries():
         )
 
     assert result is False
-    assert mock_client.post.call_count == 3  # 3 retries
+    assert mock_client.post.call_count == 3
 
 
 @pytest.mark.asyncio
 async def test_network_error_retries():
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.side_effect = Exception("Connection refused")
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    """Network errors (httpx.ConnectError) should trigger retries."""
+    mock_client_cls, mock_client = _make_mock_client(None)
+    mock_client.post.side_effect = httpx.ConnectError("Connection refused")
 
+    with (
+        patch(_SSRF_PATCH_TARGET, return_value=True),
+        patch("listingjet.services.webhook_delivery.httpx.AsyncClient", mock_client_cls),
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
         result = await deliver_webhook(
             url="https://example.com/webhook",
             event_type="test.event",
@@ -78,15 +108,15 @@ async def test_network_error_retries():
 
 @pytest.mark.asyncio
 async def test_signature_header_present():
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
 
-    with patch(_SSRF_PATCH_TARGET, return_value=True), patch("listingjet.services.webhook_delivery.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cls, mock_client = _make_mock_client(mock_response)
 
+    with (
+        patch(_SSRF_PATCH_TARGET, return_value=True),
+        patch("listingjet.services.webhook_delivery.httpx.AsyncClient", mock_client_cls),
+    ):
         await deliver_webhook(
             url="https://example.com/hook",
             event_type="test",
@@ -104,7 +134,6 @@ async def test_signature_header_present():
 @pytest.mark.asyncio
 async def test_ssrf_blocks_private_ips():
     """SSRF protection: deliver_webhook must reject URLs that resolve to private IPs."""
-    # Mock DNS resolution to return a private IP
     with patch("listingjet.services.webhook_delivery.socket.getaddrinfo") as mock_dns:
         mock_dns.return_value = [(2, 1, 0, "", ("127.0.0.1", 0))]
         assert _is_url_safe("https://evil.example.com/webhook") is False
