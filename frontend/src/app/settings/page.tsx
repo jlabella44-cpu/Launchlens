@@ -60,28 +60,25 @@ function BrandKitSettings() {
 
   const handleLogoUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setForm((f) => ({ ...f, logo_url: localUrl }));
     setUploading(true);
     try {
       const { key, upload } = await apiClient.getLogoUploadUrl();
-      const presigned = upload as { url: string; fields?: Record<string, string> };
-      if (presigned.fields) {
-        const fd = new FormData();
-        Object.entries(presigned.fields).forEach(([k, v]) => fd.append(k, v));
-        fd.append("file", file);
-        await fetch(presigned.url, { method: "POST", body: fd });
-      } else {
-        await fetch(presigned.url, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type },
-        });
-      }
-      const logoUrl = presigned.fields
-        ? `${presigned.url}/${key}`
-        : presigned.url.split("?")[0];
-      setForm((f) => ({ ...f, logo_url: logoUrl }));
+      const presigned = upload as { url: string; fields: Record<string, string> };
+      const fd = new FormData();
+      Object.entries(presigned.fields).forEach(([k, v]) => fd.append(k, v));
+      fd.append("file", file);
+      await fetch(presigned.url, { method: "POST", body: fd });
+      // Construct the final S3 URL
+      const s3Url = `${presigned.url}/${key}`;
+      setForm((f) => ({ ...f, logo_url: s3Url }));
+      URL.revokeObjectURL(localUrl);
     } catch (err) {
       console.error("Logo upload failed:", err);
+      setForm((f) => ({ ...f, logo_url: null }));
+      URL.revokeObjectURL(localUrl);
     } finally {
       setUploading(false);
     }
