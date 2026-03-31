@@ -202,3 +202,130 @@ async def test_webhook_missing_signature_returns_400(async_client: AsyncClient):
         headers={"content-type": "application/json"},
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+@patch("listingjet.api.billing.BillingService")
+async def test_webhook_invalid_signature_returns_400(MockBilling, async_client: AsyncClient):
+    """POST /billing/webhook with a bad stripe-signature returns 400."""
+    import stripe as stripe_mod
+
+    mock_svc = MockBilling.return_value
+    mock_svc.construct_webhook_event.side_effect = stripe_mod.SignatureVerificationError(
+        "Invalid signature", sig_header="bad_sig"
+    )
+
+    resp = await async_client.post(
+        "/billing/webhook",
+        content=b'{"type": "test"}',
+        headers={"stripe-signature": "bad_sig", "content-type": "application/json"},
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+@patch("listingjet.api.billing.BillingService")
+async def test_checkout_completed_missing_tenant_id_noop(MockBilling, async_client: AsyncClient, db_session):
+    """checkout.session.completed with no tenant_id in metadata → 200, no DB changes."""
+    from sqlalchemy import func, select
+
+    from listingjet.models.credit_transaction import CreditTransaction
+
+    # Count transactions before
+    before_count = (await db_session.execute(
+        select(func.count(CreditTransaction.id))
+    )).scalar() or 0
+
+    mock_event = MagicMock()
+    mock_event.type = "checkout.session.completed"
+    mock_event.id = "evt_no_tenant"
+    mock_event.__getitem__ = lambda self, key: {
+        "data": {"object": {"metadata": {}, "customer": "cus_unknown"}}
+    }[key]
+
+    mock_svc = MockBilling.return_value
+    mock_svc.construct_webhook_event.return_value = mock_event
+
+    resp = await async_client.post(
+        "/billing/webhook",
+        content=b"payload",
+        headers={"stripe-signature": "sig_test", "content-type": "application/json"},
+    )
+    assert resp.status_code == 200
+
+    # No new transactions created
+    after_count = (await db_session.execute(
+        select(func.count(CreditTransaction.id))
+    )).scalar() or 0
+    assert after_count == before_count
+
+
+@pytest.mark.asyncio
+@patch("listingjet.api.billing.BillingService")
+async def test_subscription_deleted_downgrades_to_lite(MockBilling, async_client: AsyncClient, db_session):
+    """Send customer.subscription.deleted → tenant.plan == 'lite', stripe_subscription_id is None."""
+    tenant = Tenant(
+        id=uuid.uuid4(), name="ProCo", plan="pro",
+        stripe_customer_id="cus_pro_del", stripe_subscription_id="sub_pro_del",
+    )
+    db_session.add(tenant)
+    await db_session.commit()
+
+    mock_event = MagicMock()
+    mock_event.type = "customer.subscription.deleted"
+    mock_event.id = "evt_del_downgrade"
+    mock_event.__getitem__ = lambda self, key: {
+        "data": {"object": {"customer": "cus_pro_del"}}
+    }[key]
+
+    mock_svc = MockBilling.return_value
+    mock_svc.construct_webhook_event.return_value = mock_event
+
+    resp = await async_client.post(
+        "/billing/webhook",
+        content=b"payload",
+        headers={"stripe-signature": "sig_test", "content-type": "application/json"},
+    )
+    assert resp.status_code == 200
+
+    from sqlalchemy import select as sa_select
+    db_session.expire_all()
+    t = (await db_session.execute(sa_select(Tenant).where(Tenant.id == tenant.id))).scalar_one()
+    assert t.plan == "lite"
+    assert t.stripe_subscription_id is None
+
+
+@pytest.mark.asyncio
+@patch("listingjet.api.billing.BillingService")
+@patch("listingjet.api.billing._handle_invoice_paid")
+async def test_invoice_paid_grants_included_credits(mock_handle_inv, MockBilling, async_client: AsyncClient, db_session):
+    """Send invoice.paid webhook for tenant with included_credits=3 → handler is called."""
+    from unittest.mock import AsyncMock
+
+    tenant = Tenant(
+        id=uuid.uuid4(), name="InvCo", plan="pro",
+        stripe_customer_id="cus_inv_paid", stripe_subscription_id="sub_inv",
+        included_credits=3, rollover_cap=5,
+    )
+    db_session.add(tenant)
+    await db_session.commit()
+
+    mock_handle_inv.side_effect = AsyncMock()
+
+    mock_event = MagicMock()
+    mock_event.type = "invoice.paid"
+    mock_event.id = "evt_inv_grant"
+    mock_event.__getitem__ = lambda self, key: {
+        "data": {"object": {"customer": "cus_inv_paid", "amount_paid": 4900, "id": "inv_test"}}
+    }[key]
+
+    mock_svc = MockBilling.return_value
+    mock_svc.construct_webhook_event.return_value = mock_event
+
+    resp = await async_client.post(
+        "/billing/webhook",
+        content=b"payload",
+        headers={"stripe-signature": "sig_test", "content-type": "application/json"},
+    )
+    assert resp.status_code == 200
+    mock_handle_inv.assert_called_once()
