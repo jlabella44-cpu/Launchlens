@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +31,13 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 24
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def validate_jwt_secret(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters for security")
+        return v
 
     # Stripe
     stripe_secret_key: str = ""

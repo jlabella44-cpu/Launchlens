@@ -1,3 +1,5 @@
+import asyncio
+
 from temporalio.client import Client
 
 from listingjet.config import settings
@@ -7,10 +9,12 @@ from listingjet.workflows.listing_pipeline import ListingPipeline, ListingPipeli
 class TemporalClient:
     def __init__(self):
         self._client: Client | None = None
+        self._lock = asyncio.Lock()
 
     async def _connect(self) -> Client:
-        if self._client is None:
-            self._client = await Client.connect(settings.temporal_host, namespace=settings.temporal_namespace)
+        async with self._lock:
+            if self._client is None:
+                self._client = await Client.connect(settings.temporal_host, namespace=settings.temporal_namespace)
         return self._client
 
     async def start_pipeline(self, listing_id: str, tenant_id: str, plan: str = "starter") -> str:

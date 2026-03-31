@@ -108,7 +108,7 @@ class VideoAgent(BaseAgent):
                         logo_bytes=self._try_download_logo(brand_kit.logo_url),
                     )
                     if endcard_png:
-                        endcard_path = self._endcard_to_video(endcard_png)
+                        endcard_path = await self._endcard_to_video(endcard_png)
                         if endcard_path:
                             clip_paths.append(endcard_path)
 
@@ -232,8 +232,6 @@ class VideoAgent(BaseAgent):
 
         Returns original video bytes if voiceover generation fails or is unavailable.
         """
-        import subprocess
-
         voiceover = get_voiceover_provider()
         description = (listing.metadata_ or {}).get("description", "")
         if not description:
@@ -262,21 +260,23 @@ class VideoAgent(BaseAgent):
             audio_path = tempfile.mktemp(suffix=".mp3", prefix="listingjet_vo_audio_")
             output_path = tempfile.mktemp(suffix=".mp4", prefix="listingjet_vo_out_")
 
-            with open(video_path, "wb") as f:
-                f.write(video_bytes)
-            with open(audio_path, "wb") as f:
-                f.write(audio_bytes)
+            await asyncio.to_thread(self._write_file, video_path, video_bytes)
+            await asyncio.to_thread(self._write_file, audio_path, audio_bytes)
 
-            subprocess.run([
+            proc = await asyncio.create_subprocess_exec(
                 "ffmpeg", "-i", video_path, "-i", audio_path,
                 "-c:v", "copy", "-c:a", "aac",
                 "-map", "0:v:0", "-map", "1:a:0",
                 "-shortest",
                 "-y", output_path,
-            ], check=True, capture_output=True)
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise RuntimeError(f"ffmpeg voiceover merge failed: {stderr.decode()}")
 
-            with open(output_path, "rb") as f:
-                result = f.read()
+            result = await asyncio.to_thread(self._read_file, output_path)
 
             for p in (video_path, audio_path, output_path):
                 if os.path.exists(p):
@@ -296,21 +296,34 @@ class VideoAgent(BaseAgent):
         except Exception:
             return None
 
-    def _endcard_to_video(self, png_bytes: bytes) -> str | None:
+    async def _endcard_to_video(self, png_bytes: bytes) -> str | None:
         """Convert a PNG end-card to a 5-second MP4 clip via ffmpeg."""
-        import subprocess
         try:
             png_path = tempfile.mktemp(suffix=".png", prefix="listingjet_endcard_")
             mp4_path = tempfile.mktemp(suffix=".mp4", prefix="listingjet_endcard_")
-            with open(png_path, "wb") as f:
-                f.write(png_bytes)
-            subprocess.run([
+            await asyncio.to_thread(self._write_file, png_path, png_bytes)
+            proc = await asyncio.create_subprocess_exec(
                 "ffmpeg", "-loop", "1", "-i", png_path,
                 "-c:v", "libx264", "-t", str(ENDCARD_DURATION),
                 "-pix_fmt", "yuv420p", "-vf", "scale=1280:720",
                 "-y", mp4_path,
-            ], check=True, capture_output=True)
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
             os.unlink(png_path)
+            if proc.returncode != 0:
+                return None
             return mp4_path
         except Exception:
             return None
+
+    @staticmethod
+    def _write_file(path: str, data: bytes) -> None:
+        with open(path, "wb") as f:
+            f.write(data)
+
+    @staticmethod
+    def _read_file(path: str) -> bytes:
+        with open(path, "rb") as f:
+            return f.read()

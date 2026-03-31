@@ -117,16 +117,24 @@ def create_app() -> FastAPI:
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(health.router)
 
-    # Debug error handler — returns tracebacks in response (remove for real production)
     from fastapi.responses import JSONResponse
     import traceback as tb
 
-    @app.exception_handler(Exception)
-    async def debug_exception_handler(request, exc):
-        return JSONResponse(
-            status_code=500,
-            content={"detail": str(exc), "traceback": tb.format_exc()},
-        )
+    if settings.app_env == "development":
+        @app.exception_handler(Exception)
+        async def debug_exception_handler(request, exc):
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(exc), "traceback": tb.format_exc()},
+            )
+    else:
+        @app.exception_handler(Exception)
+        async def production_exception_handler(request, exc):
+            logging.getLogger(__name__).exception("Unhandled exception")
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
 
     return app
 

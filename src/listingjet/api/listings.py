@@ -507,7 +507,7 @@ async def start_review(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -539,7 +539,7 @@ async def approve_listing(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -578,7 +578,7 @@ async def reject_listing(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -623,7 +623,7 @@ async def retry_pipeline(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -663,7 +663,7 @@ async def cancel_listing(
         select(Listing).where(
             Listing.id == listing_id,
             Listing.tenant_id == current_user.tenant_id,
-        )
+        ).with_for_update()
     )).scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
