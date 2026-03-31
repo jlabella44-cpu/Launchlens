@@ -31,6 +31,18 @@ class NetworkStack(Stack):
             ],
         )
 
+        # S3 Gateway Endpoint (free, reduces NAT costs)
+        self.vpc.add_gateway_endpoint(
+            "S3Endpoint",
+            service=ec2.GatewayVpcEndpointAwsService.S3,
+        )
+
+        # Secrets Manager Interface Endpoint
+        self.vpc.add_interface_endpoint(
+            "SecretsManagerEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+        )
+
         # Security group: ALB (public-facing)
         self.alb_sg = ec2.SecurityGroup(
             self, "AlbSg",
