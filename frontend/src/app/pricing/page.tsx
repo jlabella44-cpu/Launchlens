@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
@@ -69,6 +69,8 @@ const ADDONS = [
 ];
 
 export default function PricingPage() {
+  useEffect(() => { document.title = "Pricing | ListingJet"; }, []);
+
   const [listingsPerMonth, setListingsPerMonth] = useState(3);
 
   function calculateCost(tier: (typeof TIERS)[number]) {

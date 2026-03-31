@@ -36,6 +36,8 @@ function ReviewQueue() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const prevCountRef = useRef(0);
 
+  useEffect(() => { document.title = "Review Queue | ListingJet"; }, []);
+
   const fetchQueue = useCallback(async () => {
     try {
       const data = await apiClient.getReviewQueue();
