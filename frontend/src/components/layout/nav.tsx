@@ -11,7 +11,7 @@ export function Nav() {
   return (
     <nav className="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
       <Link
-        href="/dashboard"
+        href="/"
         className="font-[var(--font-heading)] text-xl font-bold text-[var(--color-primary)] tracking-wide"
         style={{ fontFamily: "var(--font-heading)" }}
       >
