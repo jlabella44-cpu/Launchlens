@@ -11,7 +11,7 @@ export function Nav() {
   return (
     <nav className="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
       <Link
-        href="/dashboard"
+        href="/"
         className="font-[var(--font-heading)] text-xl font-bold text-[var(--color-primary)] tracking-wide"
         style={{ fontFamily: "var(--font-heading)" }}
       >
@@ -29,10 +29,26 @@ export function Nav() {
         )}
         {user && (
           <Link
+            href="/listings"
+            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            Listings
+          </Link>
+        )}
+        {user && (
+          <Link
             href="/review"
             className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
           >
-            Review Queue
+            Review
+          </Link>
+        )}
+        {user && (
+          <Link
+            href="/billing"
+            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            Billing
           </Link>
         )}
         <Link
@@ -40,6 +56,12 @@ export function Nav() {
           className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
         >
           Pricing
+        </Link>
+        <Link
+          href="/demo"
+          className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors"
+        >
+          Demo
         </Link>
         {user && (
           <Link
