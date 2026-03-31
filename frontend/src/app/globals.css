@@ -13,6 +13,10 @@
   --color-success: #10B981;
   --color-error: #EF4444;
   --color-warning: #F59E0B;
+  --color-card: #FFFFFF;
+  --color-card-border: #F1F5F9;
+  --color-input-bg: #FFFFFF;
+  --color-input-border: #E2E8F0;
 
   /* Typography — Exo 2 for aviation feel, Josefin Sans for body */
   --font-heading: "Exo 2", sans-serif;
@@ -39,6 +43,30 @@
   --radius-lg: 16px;
 }
 
+/* Dark Mode */
+.dark {
+  --color-primary: #1E3A5F;
+  --color-secondary: #2D5A8F;
+  --color-cta: #F97316;
+  --color-background: #0B1120;
+  --color-text: #F1F5F9;
+  --color-text-secondary: #6B7A90;
+  --color-surface: #131D2E;
+  --color-border: #1E2D42;
+  --color-success: #10B981;
+  --color-error: #EF4444;
+  --color-warning: #F59E0B;
+  --color-card: #131D2E;
+  --color-card-border: #1E2D42;
+  --color-input-bg: #162032;
+  --color-input-border: #1E2D42;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.4);
+}
+
 @theme inline {
   --color-background: var(--color-background);
   --color-foreground: var(--color-text);
@@ -52,6 +80,7 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -66,6 +95,34 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.dark .glass {
+  background: rgba(19, 29, 46, 0.8);
+  border: 1px solid rgba(30, 45, 66, 0.6);
+}
+
+/* Dark mode overrides for common Tailwind classes used in pages */
+.dark .bg-white { background-color: var(--color-card) !important; }
+.dark .bg-\[#F5F7FA\] { background-color: var(--color-background) !important; }
+.dark .border-slate-100 { border-color: var(--color-card-border) !important; }
+.dark .border-slate-200 { border-color: var(--color-border) !important; }
+.dark .bg-slate-50 { background-color: #162032 !important; }
+.dark .bg-slate-100 { background-color: #1E2D42 !important; }
+.dark .text-slate-400 { color: #6B7A90 !important; }
+.dark .text-slate-500 { color: #5A6B80 !important; }
+.dark .text-slate-600 { color: #8B9AB0 !important; }
+.dark .text-slate-300 { color: #4A5B70 !important; }
+.dark .text-\[var\(--color-text\)\] { color: var(--color-text) !important; }
+.dark .bg-amber-50 { background-color: rgba(249, 115, 22, 0.1) !important; }
+.dark .border-amber-200\/60 { border-color: rgba(249, 115, 22, 0.2) !important; }
+.dark .bg-white\/50 { background-color: rgba(19, 29, 46, 0.5) !important; }
+.dark .bg-white\/70 { background-color: rgba(19, 29, 46, 0.7) !important; }
+
+/* Dark mode gradient placeholders */
+.dark .from-slate-200 { --tw-gradient-from: #1E2D42 !important; }
+.dark .to-slate-100 { --tw-gradient-to: #162032 !important; }
+.dark .from-slate-100 { --tw-gradient-from: #1E2D42 !important; }
+.dark .to-slate-50 { --tw-gradient-to: #131D2E !important; }
+
 /* Touch-friendly: minimum 44x44 tap targets */
 @media (pointer: coarse) {
   button, a, [role="button"] {
@@ -77,6 +134,17 @@ h1, h2, h3, h4, h5, h6 {
 /* Disable touch delays */
 a, button, input, select, textarea {
   touch-action: manipulation;
+}
+
+/* Dark mode inputs */
+.dark input, .dark select, .dark textarea {
+  background-color: var(--color-input-bg);
+  border-color: var(--color-input-border);
+  color: var(--color-text);
+}
+
+.dark input::placeholder, .dark textarea::placeholder {
+  color: #4A5B70;
 }
 
 /* Prevent horizontal overflow on mobile */
