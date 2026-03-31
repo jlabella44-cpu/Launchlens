@@ -31,7 +31,7 @@ async def test_csp_header_present(async_client: AsyncClient):
     """Content-Security-Policy header is present."""
     resp = await async_client.get("/health")
     assert "content-security-policy" in resp.headers
-    assert "default-src" in resp.headers["content-security-policy"]
+    assert "frame-ancestors" in resp.headers["content-security-policy"]
 
 
 @pytest.mark.asyncio

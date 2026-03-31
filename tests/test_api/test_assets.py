@@ -24,7 +24,11 @@ def _auth(token: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_register_assets(async_client: AsyncClient):
+@patch("listingjet.api.listings.get_temporal_client")
+async def test_register_assets(mock_get_client, async_client: AsyncClient):
+    mock_client = AsyncMock()
+    mock_get_client.return_value = mock_client
+
     token, _ = await _register(async_client)
     create_resp = await async_client.post("/listings", json={
         "address": {"street": "1 Photo St"}, "metadata": {},
