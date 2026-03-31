@@ -98,6 +98,12 @@ class ReorderRequest(BaseModel):
     swaps: list[dict]  # [{"asset_id": "...", "new_position": 0}, ...]
 
 
+class UploadUrlFileItem(BaseModel):
+    filename: str
+    content_type: str | None = None
+
+
 class UploadUrlsRequest(BaseModel):
-    filenames: list[str]
+    filenames: list[str] | None = None
+    files: list[UploadUrlFileItem | str] | None = None
     content_type: str = "image/jpeg"

@@ -85,4 +85,5 @@ async def test_status_returns_plan(_mock_rate_limiter, async_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["plan"] == "starter"
-    assert data["stripe_customer_id"] is None
+    assert data["has_payment_method"] is False
+    assert data["has_subscription"] is False

@@ -29,6 +29,7 @@ class CreditPurchaseRequest(BaseModel):
     bundle_size: int  # 5, 10, 25, or 50
     success_url: str
     cancel_url: str
+    idempotency_key: str | None = None  # Client-generated key to prevent duplicate purchases
 
 
 class CreditPurchaseResponse(BaseModel):
