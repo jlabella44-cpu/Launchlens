@@ -264,17 +264,28 @@ function BrandKitSettings() {
                 className="p-6 rounded-lg border border-white/20"
                 style={{ backgroundColor: form.primary_color || "#0F1B2D" }}
               >
-                <p
-                  className="text-white text-xl font-bold"
-                  style={{ fontFamily: form.font_primary || "inherit" }}
-                >
-                  {form.brokerage_name || "Your Brokerage"}
-                </p>
-                <p className="text-white/80 text-sm mt-1">
-                  {form.agent_name || "Agent Name"}
-                </p>
+                <div className="flex items-center gap-4 mb-3">
+                  {(logoPreview || form.logo_url) && (
+                    <img
+                      src={logoPreview || form.logo_url || ""}
+                      alt="Logo preview"
+                      className="w-12 h-12 object-contain rounded"
+                    />
+                  )}
+                  <div>
+                    <p
+                      className="text-white text-xl font-bold"
+                      style={{ fontFamily: form.font_primary || "inherit" }}
+                    >
+                      {form.brokerage_name || "Your Brokerage"}
+                    </p>
+                    <p className="text-white/80 text-sm">
+                      {form.agent_name || "Agent Name"}
+                    </p>
+                  </div>
+                </div>
                 <div
-                  className="mt-3 inline-block px-4 py-1.5 rounded-full text-white text-sm font-medium"
+                  className="inline-block px-4 py-1.5 rounded-full text-white text-sm font-medium"
                   style={{ backgroundColor: form.secondary_color || "#FF6B2C" }}
                 >
                   Schedule Showing
