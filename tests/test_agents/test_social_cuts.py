@@ -47,7 +47,8 @@ async def test_social_cut_agent_creates_cuts(db_session, listing_with_video):
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
     mock_storage = MagicMock()
-    mock_storage.upload_bytes = MagicMock(side_effect=lambda data, key, content_type: key)
+    mock_storage.download = MagicMock(return_value=b"fake-video-bytes")
+    mock_storage.upload = MagicMock(side_effect=lambda key="", data=b"", content_type="": key)
 
     mock_cutter = MagicMock()
     mock_cutter.create_cut = MagicMock(return_value=b"fake-cut-bytes")

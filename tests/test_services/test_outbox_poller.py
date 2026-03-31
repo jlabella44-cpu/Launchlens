@@ -3,13 +3,22 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy import delete
 
 from listingjet.models.outbox import Outbox
 from listingjet.services.outbox_poller import OutboxPoller
 
 
+async def _clear_undelivered_outbox(db_session):
+    """Remove all undelivered outbox rows so tests aren't affected by other tests' data."""
+    await db_session.execute(delete(Outbox).where(Outbox.delivered_at.is_(None)))
+    await db_session.flush()
+
+
 @pytest.mark.asyncio
 async def test_poller_marks_rows_delivered(db_session):
+    await _clear_undelivered_outbox(db_session)
+
     tenant_id = uuid.uuid4()
     outbox = Outbox(
         event_type="test.event",
@@ -36,6 +45,8 @@ async def test_poller_marks_rows_delivered(db_session):
 
 @pytest.mark.asyncio
 async def test_poller_skips_already_delivered_rows(db_session):
+    await _clear_undelivered_outbox(db_session)
+
     tenant_id = uuid.uuid4()
     already_delivered = datetime.now(timezone.utc)
     outbox = Outbox(
@@ -59,6 +70,8 @@ async def test_poller_skips_already_delivered_rows(db_session):
 
 @pytest.mark.asyncio
 async def test_poller_processes_multiple_rows(db_session):
+    await _clear_undelivered_outbox(db_session)
+
     tenant_id = uuid.uuid4()
     for i in range(3):
         db_session.add(Outbox(

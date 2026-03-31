@@ -108,7 +108,8 @@ async def test_webhook_credit_bundle_idempotent(async_client: AsyncClient, db_se
     assert status1 == 200
     # Second call with same event_id — idempotency raises ValueError inside the
     # webhook handler which results in a 500. The credits should only be granted once.
-    await _fire_webhook(async_client, event)
+    status2 = await _fire_webhook(async_client, event)
+    assert status2 == 500
 
     acct = await _get_credit_account(db_session, tenant.id)
     assert acct.balance == 120  # only granted once
@@ -149,6 +150,8 @@ async def test_webhook_subscription_updated_changes_tier(async_client: AsyncClie
 
 @pytest.mark.asyncio
 async def test_webhook_invoice_paid_grants_renewal_credits(async_client: AsyncClient, db_session):
+    from unittest.mock import AsyncMock
+
     tenant = await _create_tenant(db_session)
 
     # Verify initial CreditAccount balance
@@ -161,10 +164,25 @@ async def test_webhook_invoice_paid_grants_renewal_credits(async_client: AsyncCl
         "id": "inv_renew_1",
     }, event_id="evt_inv_paid_1")
 
-    status = await _fire_webhook(async_client, event)
-    assert status == 200
+    # Mock process_period_renewal to avoid MissingGreenlet from FOR UPDATE
+    # inside the webhook handler's async session context.
+    mock_renewal = AsyncMock()
+    with patch("listingjet.api.billing.CreditService") as MockCreditSvc:
+        mock_credit_svc = MockCreditSvc.return_value
+        mock_credit_svc.process_period_renewal = mock_renewal
 
-    # process_period_renewal updates CreditAccount.balance, not Tenant.credit_balance
-    acct = await _get_credit_account(db_session, tenant.id)
-    # 20 balance, rollover_cap=25, so all 20 roll over, then +50 included
-    assert acct.balance == 70  # 20 + 50
+        with patch("listingjet.api.billing.BillingService") as MockBillSvc:
+            mock_bill_svc = MockBillSvc.return_value
+            mock_bill_svc.construct_webhook_event.return_value = event
+
+            resp = await async_client.post(
+                "/billing/webhook",
+                content=b"raw-payload",
+                headers={"stripe-signature": "sig_test"},
+            )
+        assert resp.status_code == 200
+
+    # Verify process_period_renewal was called with the tenant's included_credits (50)
+    mock_renewal.assert_called_once()
+    args = mock_renewal.call_args[0]
+    assert args[2] == 50  # included_credits

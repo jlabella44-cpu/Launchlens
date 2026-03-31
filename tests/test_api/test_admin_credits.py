@@ -50,7 +50,7 @@ async def test_adjust_credits_add(async_client: AsyncClient):
     assert body["amount"] == 10
     assert body["balance_after"] == 10
     assert body["transaction_type"] == "admin_adjustment"
-    assert body["reason"] == "Welcome bonus"
+    assert body["description"] == "Welcome bonus"
 
 
 @pytest.mark.asyncio

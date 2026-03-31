@@ -224,12 +224,12 @@ async def test_webhook_idempotency(async_client: AsyncClient, db_session):
         mock_svc_cls.return_value = mock_svc
 
         # First call should succeed
-        resp = await async_client.post(
+        resp1 = await async_client.post(
             "/billing/webhook",
             content=b"{}",
             headers={"stripe-signature": "test_sig"},
         )
-        assert resp.status_code == 200
+        assert resp1.status_code == 200
 
         # Subsequent calls trigger the idempotency guard in add_credits
         # which raises ValueError. The webhook handler doesn't catch this,
@@ -241,7 +241,7 @@ async def test_webhook_idempotency(async_client: AsyncClient, db_session):
                 headers={"stripe-signature": "test_sig"},
             )
             # 500 is expected — idempotency guard prevents double-grant
-            assert resp.status_code in (200, 500)
+            assert resp.status_code == 500
 
 
 # ── Test: Pipeline Failure + Credit Refund ───────────────────────────

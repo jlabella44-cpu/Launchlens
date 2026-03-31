@@ -132,24 +132,17 @@ async def test_purchase_not_configured(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_purchase_creates_checkout(async_client: AsyncClient):
+async def test_purchase_creates_checkout(async_client: AsyncClient, monkeypatch):
     """With mocked Stripe and config, purchase returns a checkout URL."""
     token, _ = await _register(async_client)
 
     mock_session = MagicMock()
     mock_session.url = "https://checkout.stripe.com/test"
 
-    with (
-        patch("listingjet.config.settings") as mock_settings,
-        patch("stripe.checkout.Session.create", return_value=mock_session),
-    ):
-        # Provide all attributes the code accesses
-        mock_settings.jwt_secret = settings.jwt_secret
-        mock_settings.jwt_algorithm = settings.jwt_algorithm
-        mock_settings.stripe_price_credit_bundle_5 = "price_test_5"
-        # Make getattr work for dynamic lookup
-        type(mock_settings).__getattr__ = lambda self, name: "price_test_5" if "credit_bundle" in name else ""
+    # Monkeypatch the settings attribute so getattr(settings, ...) returns a real price ID
+    monkeypatch.setattr(settings, "stripe_price_credit_bundle_5", "price_test_5")
 
+    with patch("stripe.checkout.Session.create", return_value=mock_session):
         resp = await async_client.post("/credits/purchase", json={
             "bundle_size": 5,
             "success_url": "https://example.com/ok",

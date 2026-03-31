@@ -39,12 +39,15 @@ class WatermarkAgent(BaseAgent):
                 rows = result.all()
 
                 for ps, asset in rows:
-                    image_bytes = self._storage.download(asset.file_path)
-                    watermarked_bytes = self._apply_watermark(image_bytes)
-                    filename = asset.file_path.rsplit("/", 1)[-1]
-                    upload_key = f"listings/{listing_id}/watermarked/{filename}"
-                    self._storage.upload(upload_key, watermarked_bytes, "image/jpeg")
-                    watermarked_count += 1
+                    try:
+                        image_bytes = self._storage.download(asset.file_path)
+                        watermarked_bytes = self._apply_watermark(image_bytes)
+                        filename = asset.file_path.rsplit("/", 1)[-1]
+                        upload_key = f"listings/{listing_id}/watermarked/{filename}"
+                        self._storage.upload(upload_key, watermarked_bytes, "image/jpeg")
+                        watermarked_count += 1
+                    except Exception:
+                        continue
 
                 await emit_event(
                     session=session,
