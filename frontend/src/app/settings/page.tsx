@@ -37,6 +37,8 @@ function BrandKitSettings() {
     logo_url: null,
   });
 
+  useEffect(() => { document.title = "Brand Kit | ListingJet"; }, []);
+
   useEffect(() => {
     apiClient
       .getBrandKit()

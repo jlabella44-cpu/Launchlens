@@ -15,11 +15,12 @@ from listingjet.api.schemas.billing import (
     PortalRequest,
     PortalResponse,
 )
+from listingjet.config.tiers import TIER_CREDITS
 from listingjet.database import get_db
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.billing import BillingService
-from listingjet.services.credits import TIER_CREDITS, CreditService
+from listingjet.services.credits import CreditService
 from listingjet.services.endpoint_rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)

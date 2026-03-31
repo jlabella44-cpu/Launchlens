@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -43,6 +43,8 @@ function RegisterForm() {
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { document.title = "Create Account | ListingJet"; }, []);
 
   const planInfo = plan ? PLAN_DISPLAY[plan] : PLAN_DISPLAY["active_agent"];
 

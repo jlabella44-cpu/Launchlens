@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import apiClient from "@/lib/api-client";
@@ -75,6 +76,8 @@ const ADDONS = [
 ];
 
 export default function PricingPage() {
+  useEffect(() => { document.title = "Pricing | ListingJet"; }, []);
+
   const [listingsPerMonth, setListingsPerMonth] = useState(3);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const router = useRouter();

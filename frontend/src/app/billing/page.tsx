@@ -34,6 +34,8 @@ function BillingContent() {
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => { document.title = "Credits & Billing | ListingJet"; }, []);
+
   useEffect(() => {
     async function load() {
       try {

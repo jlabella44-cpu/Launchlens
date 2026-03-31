@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -36,6 +36,8 @@ const MODE_INFO: Record<Mode, { title: string; badge: string; items: { label: st
 function ExportPage() {
   const params = useParams();
   const id = params.id as string;
+  useEffect(() => { document.title = "Export | ListingJet"; }, []);
+
   const [mode, setMode] = useState<Mode>("mls");
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");

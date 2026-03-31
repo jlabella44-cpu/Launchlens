@@ -24,6 +24,8 @@ function AdminDashboard() {
   const [sortBy, setSortBy] = useState<"name" | "plan" | "credit_balance">("name");
   const [search, setSearch] = useState("");
 
+  useEffect(() => { document.title = "Admin Dashboard | ListingJet"; }, []);
+
   useEffect(() => {
     apiClient.adminStats().then(setStats).catch(console.error);
     apiClient.adminCreditsSummary().then(setCreditSummary).catch(console.error);
