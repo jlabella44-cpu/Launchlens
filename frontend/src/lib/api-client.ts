@@ -35,6 +35,33 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
+interface PropertyLookupResponse {
+  source: string;
+  found: boolean;
+  core: {
+    beds: number | null; baths: number | null; half_baths: number | null;
+    sqft: number | null; lot_sqft: number | null; year_built: number | null;
+  };
+  details: {
+    property_type: string | null; stories: number | null; garage_spaces: number | null;
+    has_pool: boolean | null; has_basement: boolean | null;
+    heating_type: string | null; cooling_type: string | null; roof_type: string | null;
+    hoa_monthly: number | null;
+  };
+  neighborhood: {
+    walk_score: number | null; transit_score: number | null; bike_score: number | null;
+    nearby_amenities: Array<{ name: string; type: string; distance_mi: number }>;
+    school_ratings: {
+      elementary: { name: string; rating: number | null } | null;
+      middle: { name: string; rating: number | null } | null;
+      high: { name: string; rating: number | null } | null;
+    } | null;
+    lifestyle_tags: string[];
+  };
+}
+
+export type { PropertyLookupResponse };
+
 class ApiClient {
   private token: string | null = null;
 
@@ -335,6 +362,13 @@ class ApiClient {
 
   async getImportStatus(listingId: string, importId: string): Promise<{ import_id: string; status: string; platform: string; total_files: number; completed_files: number; error_message: string | null }> {
     return this.request(`/listings/${listingId}/import-status/${importId}`);
+  }
+
+  // Property lookup
+  async propertyLookup(address: string): Promise<PropertyLookupResponse> {
+    return this.request<PropertyLookupResponse>(
+      `/properties/lookup?address=${encodeURIComponent(address)}`
+    );
   }
 
   // Admin
