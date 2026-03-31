@@ -60,6 +60,8 @@ const STEPS: Step[] = [
 
 function OnboardingFlow() {
   const router = useRouter();
+  useEffect(() => { document.title = "Get Started | ListingJet"; }, []);
+
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [hasBrandKit, setHasBrandKit] = useState(false);

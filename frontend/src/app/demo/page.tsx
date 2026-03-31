@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
@@ -10,6 +10,8 @@ import apiClient from "@/lib/api-client";
 
 export default function DemoPage() {
   const router = useRouter();
+  useEffect(() => { document.title = "Demo | ListingJet"; }, []);
+
   const [paths, setPaths] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

@@ -18,6 +18,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  useEffect(() => { document.title = "Sign In | ListingJet"; }, []);
+
   const handleGoogleResponse = useCallback(
     async (response: { credential: string }) => {
       setError("");
