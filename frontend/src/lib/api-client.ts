@@ -248,12 +248,13 @@ class ApiClient {
 
   // Upload URLs
   async getUploadUrls(listingId: string, filenames: string[]): Promise<{
-    urls: { filename: string; key: string; upload_url: string; content_type: string }[];
+    urls: { filename: string; key: string; upload_url: { url: string; fields: Record<string, string> }; content_type: string }[];
   }> {
-    return this.request(`/listings/${listingId}/upload-urls`, {
+    const res = await this.request<{ upload_urls: any[] }>(`/listings/${listingId}/upload-urls`, {
       method: "POST",
       body: JSON.stringify({ filenames }),
     });
+    return { urls: res.upload_urls };
   }
 
   // Pipeline status

@@ -376,7 +376,19 @@ async def list_assets(
     result = await db.execute(
         select(Asset).where(Asset.listing_id == listing.id).order_by(Asset.created_at)
     )
-    return result.scalars().all()
+    assets = result.scalars().all()
+
+    from listingjet.services.storage import StorageService
+    storage = StorageService()
+    response = []
+    for asset in assets:
+        data = AssetResponse.model_validate(asset)
+        try:
+            data.thumbnail_url = storage.presigned_url(asset.file_path, expires_in=3600)
+        except Exception:
+            data.thumbnail_url = None
+        response.append(data)
+    return response
 
 
 @router.get("/{listing_id}/package")
@@ -781,7 +793,7 @@ async def get_pipeline_status(
 
     return {
         "listing_id": str(listing.id),
-        "state": state_val,
+        "listing_state": state_val,
         "steps": steps,
         "engagement_score": engagement_score,
         "detected_features": detected_features,
