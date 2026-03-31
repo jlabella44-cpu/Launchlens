@@ -6,8 +6,6 @@ import zipfile
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from temporalio import activity
-
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing, ListingState
@@ -214,15 +212,3 @@ class MLSExportAgent(BaseAgent):
             "marketing_bundle_path": mkt_key,
             "photo_count": photo_count,
         }
-
-
-@activity.defn
-async def run_mls_export(
-    listing_id: str,
-    tenant_id: str,
-    content_result: dict | None = None,
-    flyer_s3_key: str | None = None,
-) -> dict:
-    agent = MLSExportAgent(content_result=content_result, flyer_s3_key=flyer_s3_key)
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

@@ -209,7 +209,7 @@ class ServicesStack(Stack):
 
         worker_task.add_container(
             "worker",
-            image=ecs.ContainerImage.from_ecr_repository(self.api_repo, tag="latest"),
+            image=ecs.ContainerImage.from_ecr_repository(self.worker_repo, tag="latest"),
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="worker",
                 log_group=logs.LogGroup(
@@ -277,7 +277,7 @@ class ServicesStack(Stack):
             self, "TemporalService",
             cluster=self.cluster,
             task_definition=temporal_task,
-            desired_count=0,  # Start at 0, scale up after verifying DB connectivity
+            desired_count=1,
             service_name="listingjet-temporal",
             assign_public_ip=False,
             cloud_map_options=ecs.CloudMapOptions(name="temporal"),

@@ -2,8 +2,6 @@ import uuid
 from collections import Counter
 
 from sqlalchemy import select
-from temporalio import activity
-
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
@@ -95,10 +93,3 @@ class CoverageAgent(BaseAgent):
             "covered_shots": sorted(covered & REQUIRED_SHOTS),
             "mismatches": mismatches,
         }
-
-
-@activity.defn
-async def run_coverage(listing_id: str, tenant_id: str) -> dict:
-    agent = CoverageAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)
