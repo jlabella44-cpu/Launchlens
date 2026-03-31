@@ -1,5 +1,5 @@
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -13,17 +13,20 @@ def _make_mock_client(mock_response):
     """Create a properly configured AsyncClient mock for httpx context manager."""
     mock_client = AsyncMock()
     mock_client.post.return_value = mock_response
-    mock_client_cls = AsyncMock()
-    mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    # Use MagicMock for the class so that AsyncClient() returns a sync value,
+    # not a coroutine.  The returned object needs __aenter__/__aexit__ for
+    # ``async with``.
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=mock_client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cls = MagicMock(return_value=ctx)
     return mock_client_cls, mock_client
 
 
 @pytest.mark.asyncio
 async def test_successful_delivery():
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.raise_for_status = lambda: None
 
     mock_client_cls, mock_client = _make_mock_client(mock_response)
 
@@ -55,12 +58,12 @@ async def test_successful_delivery():
 @pytest.mark.asyncio
 async def test_failed_delivery_retries():
     """Server errors (500) should trigger retries via raise_for_status."""
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 500
     mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
         "500 Server Error",
         request=httpx.Request("POST", "https://example.com"),
-        response=mock_response,
+        response=httpx.Response(500),
     )
 
     mock_client_cls, mock_client = _make_mock_client(mock_response)
@@ -105,9 +108,8 @@ async def test_network_error_retries():
 
 @pytest.mark.asyncio
 async def test_signature_header_present():
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.raise_for_status = lambda: None
 
     mock_client_cls, mock_client = _make_mock_client(mock_response)
 
