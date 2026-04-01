@@ -245,7 +245,7 @@ async def _handle_checkout_completed(
     # Resolve plan from subscription — fetch from Stripe since checkout session
     # doesn't include line item details in the webhook payload
     sub_id = data_object.get("subscription")
-    resolved_plan = "pro"  # fallback
+    resolved_plan = None
     if sub_id:
         try:
             sub = stripe_mod.Subscription.retrieve(sub_id, api_key=svc._api_key)
@@ -253,14 +253,13 @@ async def _handle_checkout_completed(
                 price_id = sub["items"]["data"][0].get("price", {}).get("id", "")
                 resolved_plan = svc.resolve_plan(price_id)
         except Exception:
-            logger.warning("Could not fetch subscription %s for plan resolution", sub_id)
+            logger.error("Could not fetch subscription %s for plan resolution — leaving plan unchanged", sub_id)
 
-    tenant.plan = resolved_plan
-
-    # Set credit tier
-    included, cap = TIER_CREDITS.get(tenant.plan, (0, 0))
-    tenant.included_credits = included
-    tenant.rollover_cap = cap
+    if resolved_plan:
+        tenant.plan = resolved_plan
+        included, cap = TIER_CREDITS.get(resolved_plan, (0, 0))
+        tenant.included_credits = included
+        tenant.rollover_cap = cap
 
     await db.commit()
 
