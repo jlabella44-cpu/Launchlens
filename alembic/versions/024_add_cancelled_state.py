@@ -15,6 +15,8 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("ALTER TYPE listingstate ADD VALUE IF NOT EXISTS 'cancelled'")
+    op.execute("ALTER TYPE listingstate ADD VALUE IF NOT EXISTS 'exporting'")
+    op.execute("ALTER TYPE listingstate ADD VALUE IF NOT EXISTS 'demo'")
 
 
 def downgrade() -> None:

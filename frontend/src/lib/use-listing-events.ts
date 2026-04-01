@@ -25,7 +25,7 @@ export function useListingEvents(
   listingId: string | null,
   options: UseListingEventsOptions = {},
 ) {
-  const { reconnect = true, baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000" } = options;
+  const { reconnect = true, baseUrl = process.env.NEXT_PUBLIC_API_URL || "/api" } = options;
 
   const [events, setEvents] = useState<ListingEvent[]>([]);
   const [connected, setConnected] = useState(false);
