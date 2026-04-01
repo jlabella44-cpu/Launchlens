@@ -230,6 +230,13 @@ class ServicesStack(Stack):
                 "KLING_SECRET_KEY": ecs.Secret.from_secrets_manager(app_secrets, "KLING_SECRET_KEY"),
             },
             command=["worker"],
+            health_check=ecs.HealthCheck(
+                command=["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8081/health')\" || exit 1"],
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+                retries=3,
+                start_period=Duration.seconds(30),
+            ),
         )
 
         self.worker_service = ecs.FargateService(
