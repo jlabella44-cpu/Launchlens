@@ -10,6 +10,11 @@ import type {
   CreateAssetsResponse,
   AdminStatsResponse,
   AdminTenantResponse,
+  AdminListingItem,
+  AdminUserItem,
+  AuditLogEntry,
+  SystemEvent,
+  RevenueBreakdownResponse,
   CreditSummaryResponse,
   TenantCreditsResponse,
   CreditBalance,
@@ -393,6 +398,106 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({ amount, reason }),
     });
+  }
+
+  // Admin Listings
+  async adminListings(params?: {
+    state?: string;
+    tenant_id?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AdminListingItem[]> {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+    return this.request<AdminListingItem[]>(`/admin/listings?${qs}`);
+  }
+
+  async adminRetryListing(listingId: string): Promise<{ listing_id: string; state: string }> {
+    return this.request(`/admin/listings/${listingId}/retry`, { method: "POST" });
+  }
+
+  async adminUpdateListing(listingId: string, data: {
+    address?: Record<string, string>;
+    metadata?: Record<string, unknown>;
+    state?: string;
+  }): Promise<AdminListingItem> {
+    return this.request(`/admin/listings/${listingId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Admin Users (cross-tenant)
+  async adminAllUsers(params?: {
+    search?: string;
+    role?: string;
+    tenant_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AdminUserItem[]> {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+    return this.request<AdminUserItem[]>(`/admin/users?${qs}`);
+  }
+
+  async adminChangeUserRole(userId: string, role: string): Promise<void> {
+    await this.request(`/admin/users/${userId}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async adminInviteUser(tenantId: string, data: {
+    email: string;
+    name?: string;
+    password: string;
+    role?: string;
+  }): Promise<AdminUserItem> {
+    return this.request(`/admin/tenants/${tenantId}/users`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Admin Tenant management
+  async adminUpdateTenant(tenantId: string, data: {
+    name?: string;
+    plan?: string;
+    webhook_url?: string;
+  }): Promise<AdminTenantResponse> {
+    return this.request(`/admin/tenants/${tenantId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async adminTestWebhook(tenantId: string): Promise<{ delivered: boolean; webhook_url: string }> {
+    return this.request(`/admin/tenants/${tenantId}/test-webhook`, { method: "POST" });
+  }
+
+  // Admin Audit Log
+  async adminAuditLog(params?: {
+    action?: string;
+    resource_type?: string;
+    tenant_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLogEntry[]> {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+    return this.request<AuditLogEntry[]>(`/admin/audit-log?${qs}`);
+  }
+
+  // Admin Events + Revenue
+  async adminRecentEvents(params?: { event_type?: string; limit?: number }): Promise<SystemEvent[]> {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+    return this.request<SystemEvent[]>(`/admin/events/recent?${qs}`);
+  }
+
+  async adminRevenue(): Promise<RevenueBreakdownResponse> {
+    return this.request<RevenueBreakdownResponse>("/admin/analytics/revenue");
   }
 }
 

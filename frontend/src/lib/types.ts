@@ -270,9 +270,63 @@ export interface AdminTenantResponse {
   plan_tier: string;
   credit_balance: number;
   stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  webhook_url: string | null;
   user_count: number;
   listing_count: number;
   created_at: string;
+}
+
+export interface AdminListingItem {
+  id: string;
+  tenant_id: string;
+  tenant_name: string;
+  address: Record<string, string>;
+  metadata: Record<string, number | string>;
+  state: string;
+  analysis_tier: string;
+  credit_cost: number | null;
+  is_demo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminUserItem {
+  id: string;
+  tenant_id: string;
+  tenant_name: string;
+  email: string;
+  name: string | null;
+  role: string;
+  created_at: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  user_id: string;
+  tenant_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SystemEvent {
+  id: string;
+  tenant_id: string;
+  listing_id: string | null;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface RevenueBreakdownResponse {
+  subscription_tenant_count: number;
+  credit_purchase_count: number;
+  total_credits_purchased: number;
+  top_tenants_by_usage: { tenant_id: string; credits_used: number }[];
+  avg_credits_per_listing: number | null;
 }
 
 export interface CreditSummaryResponse {
