@@ -89,7 +89,7 @@ async def test_checkout_returns_url(MockBilling, async_client: AsyncClient):
 
     resp = await async_client.post(
         "/billing/checkout",
-        json={"price_id": "price_pro", "success_url": "https://app.test/ok", "cancel_url": "https://app.test/no"},
+        json={"price_id": "price_pro", "success_url": "http://localhost:3000/ok", "cancel_url": "http://localhost:3000/no"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200

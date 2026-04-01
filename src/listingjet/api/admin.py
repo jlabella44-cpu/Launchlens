@@ -592,16 +592,10 @@ async def admin_retry_listing(
             detail=f"Can only retry failed listings, current state: {listing.state.value}",
         )
 
-    listing.state = ListingState.UPLOADING
+    previous_state = listing.state.value
     tenant = await db.get(Tenant, listing.tenant_id)
 
-    await audit_log(
-        db, admin_user.id, "retry_listing", "listing", str(listing_id),
-        tenant_id=listing.tenant_id,
-        details={"previous_state": listing.state.value},
-    )
-    await db.commit()
-
+    # Start the workflow BEFORE committing the state change
     try:
         from listingjet.temporal_client import get_temporal_client
 
@@ -613,6 +607,19 @@ async def admin_retry_listing(
         )
     except Exception:
         logger.exception("Admin pipeline retry trigger failed for listing %s", listing.id)
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to start pipeline — listing state unchanged",
+        )
+
+    # Only update state after workflow is confirmed running
+    listing.state = ListingState.UPLOADING
+    await audit_log(
+        db, admin_user.id, "retry_listing", "listing", str(listing_id),
+        tenant_id=listing.tenant_id,
+        details={"previous_state": previous_state},
+    )
+    await db.commit()
 
     return {"listing_id": str(listing.id), "state": "uploading"}
 
