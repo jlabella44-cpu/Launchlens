@@ -2,17 +2,22 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_db_admin, require_admin, require_superadmin
 from listingjet.api.schemas.admin import (
     AdjustCreditsRequest,
+    AdminListingResponse,
+    AdminUpdateListingRequest,
+    AdminUserResponse,
+    AuditLogResponse,
     CreditSummaryResponse,
     CreditTransactionResponse,
     InviteUserRequest,
     PlatformStatsResponse,
     RevenueBreakdownResponse,
+    SystemEventResponse,
     TenantCreditsResponse,
     TenantDetailResponse,
     TenantResponse,
@@ -20,8 +25,10 @@ from listingjet.api.schemas.admin import (
     UpdateUserRoleRequest,
     UserResponse,
 )
+from listingjet.models.audit_log import AuditLog
 from listingjet.models.credit_transaction import CreditTransaction
-from listingjet.models.listing import Listing
+from listingjet.models.event import Event
+from listingjet.models.listing import Listing, ListingState
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
 from listingjet.services.audit import audit_log
@@ -457,3 +464,247 @@ async def revenue_breakdown(
         top_tenants_by_usage=top_tenants,
         avg_credits_per_listing=avg_per_listing,
     )
+
+
+# ── Listings Management ──────────────────────────────────────────────
+
+
+@router.get("/listings", response_model=list[AdminListingResponse])
+async def admin_list_listings(
+    state: str | None = Query(default=None),
+    tenant_id: uuid.UUID | None = Query(default=None),
+    search: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """List all listings across tenants with filters."""
+    query = select(
+        Listing, Tenant.name.label("tenant_name")
+    ).join(Tenant, Listing.tenant_id == Tenant.id)
+
+    if state:
+        try:
+            ls = ListingState(state)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid state: {state}")
+        query = query.where(Listing.state == ls)
+    if tenant_id:
+        query = query.where(Listing.tenant_id == tenant_id)
+    if search:
+        query = query.where(
+            func.cast(Listing.address, String).ilike(f"%{search}%")
+        )
+
+    query = query.order_by(Listing.updated_at.desc()).offset(offset).limit(limit)
+    rows = (await db.execute(query)).all()
+
+    return [
+        AdminListingResponse(
+            id=listing.id,
+            tenant_id=listing.tenant_id,
+            tenant_name=tenant_name,
+            address=listing.address or {},
+            metadata=listing.metadata_ or {},
+            state=listing.state.value if hasattr(listing.state, "value") else listing.state,
+            analysis_tier=listing.analysis_tier or "standard",
+            credit_cost=listing.credit_cost,
+            is_demo=listing.is_demo,
+            created_at=listing.created_at,
+            updated_at=listing.updated_at,
+        )
+        for listing, tenant_name in rows
+    ]
+
+
+@router.patch("/listings/{listing_id}", response_model=AdminListingResponse)
+async def admin_update_listing(
+    listing_id: uuid.UUID,
+    body: AdminUpdateListingRequest,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Update a listing's address, metadata, or state (for fixing errors)."""
+    listing = await db.get(Listing, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    changes = {}
+    if body.address is not None:
+        changes["address"] = {"old": listing.address, "new": body.address}
+        listing.address = body.address
+    if body.metadata is not None:
+        changes["metadata"] = {"old": listing.metadata_, "new": body.metadata}
+        listing.metadata_ = body.metadata
+    if body.state is not None:
+        try:
+            new_state = ListingState(body.state)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid state: {body.state}")
+        changes["state"] = {"old": listing.state.value, "new": body.state}
+        listing.state = new_state
+
+    await audit_log(
+        db, admin_user.id, "update", "listing", str(listing_id),
+        tenant_id=listing.tenant_id, details=changes,
+    )
+    await db.commit()
+    await db.refresh(listing)
+
+    tenant = await db.get(Tenant, listing.tenant_id)
+    return AdminListingResponse(
+        id=listing.id,
+        tenant_id=listing.tenant_id,
+        tenant_name=tenant.name if tenant else "Unknown",
+        address=listing.address or {},
+        metadata=listing.metadata_ or {},
+        state=listing.state.value if hasattr(listing.state, "value") else listing.state,
+        analysis_tier=listing.analysis_tier or "standard",
+        credit_cost=listing.credit_cost,
+        is_demo=listing.is_demo,
+        created_at=listing.created_at,
+        updated_at=listing.updated_at,
+    )
+
+
+@router.post("/listings/{listing_id}/retry")
+async def admin_retry_listing(
+    listing_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Admin retry of a failed/timed-out listing (cross-tenant)."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    listing = (await db.execute(
+        select(Listing).where(Listing.id == listing_id).with_for_update()
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    retryable = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    if listing.state not in retryable:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Can only retry failed listings, current state: {listing.state.value}",
+        )
+
+    listing.state = ListingState.UPLOADING
+    tenant = await db.get(Tenant, listing.tenant_id)
+
+    await audit_log(
+        db, admin_user.id, "retry_listing", "listing", str(listing_id),
+        tenant_id=listing.tenant_id,
+        details={"previous_state": listing.state.value},
+    )
+    await db.commit()
+
+    try:
+        from listingjet.temporal_client import get_temporal_client
+
+        client = get_temporal_client()
+        await client.start_pipeline(
+            listing_id=str(listing.id),
+            tenant_id=str(listing.tenant_id),
+            plan=tenant.plan if tenant else "starter",
+        )
+    except Exception:
+        logger.exception("Admin pipeline retry trigger failed for listing %s", listing.id)
+
+    return {"listing_id": str(listing.id), "state": "uploading"}
+
+
+# ── Users (cross-tenant) ─────────────────────────────────────────────
+
+
+@router.get("/users", response_model=list[AdminUserResponse])
+async def admin_list_all_users(
+    search: str | None = Query(default=None),
+    role: str | None = Query(default=None),
+    tenant_id: uuid.UUID | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """List all users across tenants with filters."""
+    query = select(
+        User, Tenant.name.label("tenant_name")
+    ).join(Tenant, User.tenant_id == Tenant.id)
+
+    if search:
+        query = query.where(
+            (User.email.ilike(f"%{search}%")) | (User.name.ilike(f"%{search}%"))
+        )
+    if role:
+        if role not in VALID_ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
+        query = query.where(User.role == UserRole(role))
+    if tenant_id:
+        query = query.where(User.tenant_id == tenant_id)
+
+    query = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
+    rows = (await db.execute(query)).all()
+
+    return [
+        AdminUserResponse(
+            id=user.id,
+            tenant_id=user.tenant_id,
+            tenant_name=tenant_name,
+            email=user.email,
+            name=user.name,
+            role=user.role.value if hasattr(user.role, "value") else user.role,
+            created_at=user.created_at,
+        )
+        for user, tenant_name in rows
+    ]
+
+
+# ── Audit Log ────────────────────────────────────────────────────────
+
+
+@router.get("/audit-log", response_model=list[AuditLogResponse])
+async def admin_audit_log(
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    tenant_id: uuid.UUID | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Paginated audit log viewer."""
+    query = select(AuditLog)
+
+    if action:
+        query = query.where(AuditLog.action == action)
+    if resource_type:
+        query = query.where(AuditLog.resource_type == resource_type)
+    if tenant_id:
+        query = query.where(AuditLog.tenant_id == tenant_id)
+
+    query = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)
+    rows = (await db.execute(query)).scalars().all()
+    return rows
+
+
+# ── Recent Events ────────────────────────────────────────────────────
+
+
+@router.get("/events/recent", response_model=list[SystemEventResponse])
+async def admin_recent_events(
+    event_type: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Recent system events for health monitoring."""
+    query = select(Event)
+    if event_type:
+        query = query.where(Event.event_type == event_type)
+    query = query.order_by(Event.created_at.desc()).limit(limit)
+    rows = (await db.execute(query)).scalars().all()
+    return rows

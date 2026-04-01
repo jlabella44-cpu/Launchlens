@@ -71,6 +71,14 @@ export function Nav() {
             Settings
           </Link>
         )}
+        {user && user.role === "superadmin" && (
+          <Link
+            href="/admin"
+            className="text-sm font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary)]/80 transition-colors"
+          >
+            Admin
+          </Link>
+        )}
         <ThemeToggle />
         {user && (
           <>

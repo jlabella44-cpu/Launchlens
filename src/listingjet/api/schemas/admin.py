@@ -105,3 +105,57 @@ class RevenueBreakdownResponse(BaseModel):
     total_credits_purchased: int
     top_tenants_by_usage: list[dict]
     avg_credits_per_listing: float | None
+
+
+class AdminListingResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    tenant_name: str
+    address: dict
+    metadata: dict
+    state: str
+    analysis_tier: str
+    credit_cost: int | None
+    is_demo: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminUpdateListingRequest(BaseModel):
+    address: dict | None = None
+    metadata: dict | None = None
+    state: str | None = None
+
+
+class AuditLogResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    tenant_id: uuid.UUID | None
+    action: str
+    resource_type: str
+    resource_id: str | None
+    details: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminUserResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    tenant_name: str
+    email: str
+    name: str | None
+    role: str
+    created_at: datetime
+
+
+class SystemEventResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    listing_id: uuid.UUID | None
+    event_type: str
+    payload: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
