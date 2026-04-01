@@ -64,6 +64,8 @@ function BillingContent() {
         window.location.href,
         window.location.href,
       );
+      const parsed = new URL(checkout_url);
+      if (!parsed.hostname.endsWith("stripe.com")) throw new Error("Invalid checkout URL");
       window.location.href = checkout_url;
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : "Purchase failed", "error");

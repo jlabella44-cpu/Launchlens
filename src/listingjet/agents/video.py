@@ -258,9 +258,15 @@ class VideoAgent(BaseAgent):
                 return video_bytes
 
             # Write video + audio to temp files, merge with ffmpeg
-            video_path = tempfile.mktemp(suffix=".mp4", prefix="listingjet_vo_in_")
-            audio_path = tempfile.mktemp(suffix=".mp3", prefix="listingjet_vo_audio_")
-            output_path = tempfile.mktemp(suffix=".mp4", prefix="listingjet_vo_out_")
+            video_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_vo_in_", delete=False)
+            audio_fd = tempfile.NamedTemporaryFile(suffix=".mp3", prefix="listingjet_vo_audio_", delete=False)
+            output_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_vo_out_", delete=False)
+            video_path = video_fd.name
+            video_fd.close()
+            audio_path = audio_fd.name
+            audio_fd.close()
+            output_path = output_fd.name
+            output_fd.close()
 
             with open(video_path, "wb") as f:
                 f.write(video_bytes)
@@ -288,8 +294,12 @@ class VideoAgent(BaseAgent):
             return video_bytes
 
     def _try_download_logo(self, logo_url: str | None) -> bytes | None:
-        """Download logo from S3. Returns None on failure."""
+        """Download logo from S3. Returns None on failure or invalid key."""
         if not logo_url:
+            return None
+        # Reject keys that look like URLs or contain path traversal
+        if logo_url.startswith(("http://", "https://")) or ".." in logo_url:
+            logger.warning("logo_url_rejected key=%s", logo_url)
             return None
         try:
             return self._storage.download(logo_url)
@@ -300,8 +310,12 @@ class VideoAgent(BaseAgent):
         """Convert a PNG end-card to a 5-second MP4 clip via ffmpeg."""
         import subprocess
         try:
-            png_path = tempfile.mktemp(suffix=".png", prefix="listingjet_endcard_")
-            mp4_path = tempfile.mktemp(suffix=".mp4", prefix="listingjet_endcard_")
+            png_fd = tempfile.NamedTemporaryFile(suffix=".png", prefix="listingjet_endcard_", delete=False)
+            mp4_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_endcard_", delete=False)
+            png_path = png_fd.name
+            png_fd.close()
+            mp4_path = mp4_fd.name
+            mp4_fd.close()
             with open(png_path, "wb") as f:
                 f.write(png_bytes)
             subprocess.run([

@@ -54,6 +54,7 @@ class BillingService:
         price_id: str,
         success_url: str,
         cancel_url: str,
+        tenant_id: str | None = None,
     ) -> str:
         session = stripe.checkout.Session.create(
             api_key=self._api_key,
@@ -63,6 +64,7 @@ class BillingService:
             mode="subscription",
             success_url=success_url,
             cancel_url=cancel_url,
+            metadata={"tenant_id": tenant_id} if tenant_id else {},
         )
         return session.url
 
