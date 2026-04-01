@@ -20,6 +20,7 @@ from listingjet.api import (
     listings,
     properties,
     sse,
+    team,
     tenant_settings,
 )
 from listingjet.config import settings
@@ -68,6 +69,7 @@ _TAG_METADATA = [
     {"name": "analytics", "description": "Usage metrics and reporting"},
     {"name": "demo", "description": "Public demo listing upload"},
     {"name": "sse", "description": "Server-Sent Events for real-time pipeline updates"},
+    {"name": "team", "description": "Team member management within a tenant"},
 ]
 
 
@@ -116,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(credits.router, prefix="/credits", tags=["credits"])
     app.include_router(addons.router, prefix="/addons", tags=["addons"])
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
+    app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(health.router)
 

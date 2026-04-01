@@ -12,6 +12,12 @@ interface BrandKitFormState {
   logo_url: string | null;
   headshot_url: string | null;
   team_logo_url: string | null;
+  accent_color: string;
+  background_color: string;
+  font_secondary: string;
+  brand_voice: string;
+  brand_tone: string;
+  voice_notes: string;
 }
 
 interface HudPreviewProps {

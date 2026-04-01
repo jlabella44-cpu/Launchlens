@@ -10,6 +10,7 @@ import type { BrandKitResponse } from "@/lib/types";
 import BrokerageInfoSection from "./_components/brokerage-info-section";
 import BrandColorsSection from "./_components/brand-colors-section";
 import TypographySection from "./_components/typography-section";
+import BrandVoiceSection from "./_components/brand-voice-section";
 import LogosSection from "./_components/logos-section";
 import HudPreview from "./_components/hud-preview";
 
@@ -24,6 +25,13 @@ interface BrandKitFormState {
   logo_url: string | null;
   headshot_url: string | null;
   team_logo_url: string | null;
+  // Phase 2 fields (stored in raw_config)
+  accent_color: string;
+  background_color: string;
+  font_secondary: string;
+  brand_voice: string;
+  brand_tone: string;
+  voice_notes: string;
 }
 
 const DEFAULTS: BrandKitFormState = {
@@ -35,6 +43,12 @@ const DEFAULTS: BrandKitFormState = {
   logo_url: null,
   headshot_url: null,
   team_logo_url: null,
+  accent_color: "",
+  background_color: "",
+  font_secondary: "",
+  brand_voice: "",
+  brand_tone: "",
+  voice_notes: "",
 };
 
 /* ─── Upload helper (shared by logo, headshot, team-logo) ─── */
@@ -86,7 +100,12 @@ function BrandKitSettings() {
         if (kit) {
           const rc = kit.raw_config || {};
           // Extract known raw_config keys, preserve the rest
-          const { headshot_url, team_logo_url, ...extras } = rc as Record<string, unknown>;
+          const {
+            headshot_url, team_logo_url,
+            accent_color, background_color, font_secondary,
+            brand_voice, brand_tone, voice_notes,
+            ...extras
+          } = rc as Record<string, unknown>;
           rawConfigExtrasRef.current = extras;
 
           setForm({
@@ -98,6 +117,12 @@ function BrandKitSettings() {
             logo_url: kit.logo_url || null,
             headshot_url: (headshot_url as string) || null,
             team_logo_url: (team_logo_url as string) || null,
+            accent_color: (accent_color as string) || "",
+            background_color: (background_color as string) || "",
+            font_secondary: (font_secondary as string) || "",
+            brand_voice: (brand_voice as string) || "",
+            brand_tone: (brand_tone as string) || "",
+            voice_notes: (voice_notes as string) || "",
           });
         }
       })
@@ -155,13 +180,24 @@ function BrandKitSettings() {
     setSaving(true);
     setSaved(false);
     try {
-      const { headshot_url, team_logo_url, ...topLevel } = form;
+      const {
+        headshot_url, team_logo_url,
+        accent_color, background_color, font_secondary,
+        brand_voice, brand_tone, voice_notes,
+        ...topLevel
+      } = form;
       await apiClient.upsertBrandKit({
         ...topLevel,
         raw_config: {
           ...rawConfigExtrasRef.current,
           headshot_url,
           team_logo_url,
+          accent_color,
+          background_color,
+          font_secondary,
+          brand_voice,
+          brand_tone,
+          voice_notes,
         },
       });
       setSaved(true);
@@ -228,6 +264,7 @@ function BrandKitSettings() {
               />
               <BrandColorsSection form={form} setForm={setForm} />
               <TypographySection form={form} setForm={setForm} />
+              <BrandVoiceSection form={form} setForm={setForm} />
               <LogosSection
                 form={form}
                 setForm={setForm}

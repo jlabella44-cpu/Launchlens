@@ -12,6 +12,12 @@ interface BrandKitFormState {
   logo_url: string | null;
   headshot_url: string | null;
   team_logo_url: string | null;
+  accent_color: string;
+  background_color: string;
+  font_secondary: string;
+  brand_voice: string;
+  brand_tone: string;
+  voice_notes: string;
 }
 
 interface BrandColorsSectionProps {
@@ -91,6 +97,55 @@ export default function BrandColorsSection({
               value={form.secondary_color}
               onChange={(color: string) =>
                 setForm((prev) => ({ ...prev, secondary_color: color }))
+              }
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2: Accent + Background */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6 pt-6 border-t border-[var(--color-card-border)]">
+        {/* Accent Color */}
+        <div>
+          <label
+            className="block text-[10px] uppercase tracking-wider font-medium text-[var(--color-text)]/60 mb-3"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Accent Highlight
+          </label>
+          <div className="flex items-center gap-4">
+            <div
+              className="w-14 h-14 rounded-full shadow-lg border-2 border-white/10 flex-shrink-0"
+              style={{ backgroundColor: form.accent_color || "#3B82F6" }}
+            />
+            <ColorPicker
+              label=""
+              value={form.accent_color || "#3B82F6"}
+              onChange={(color: string) =>
+                setForm((prev) => ({ ...prev, accent_color: color }))
+              }
+            />
+          </div>
+        </div>
+
+        {/* Background Color */}
+        <div>
+          <label
+            className="block text-[10px] uppercase tracking-wider font-medium text-[var(--color-text)]/60 mb-3"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Background Base
+          </label>
+          <div className="flex items-center gap-4">
+            <div
+              className="w-14 h-14 rounded-full shadow-lg border-2 border-white/10 flex-shrink-0"
+              style={{ backgroundColor: form.background_color || "#F8FAFC" }}
+            />
+            <ColorPicker
+              label=""
+              value={form.background_color || "#F8FAFC"}
+              onChange={(color: string) =>
+                setForm((prev) => ({ ...prev, background_color: color }))
               }
             />
           </div>

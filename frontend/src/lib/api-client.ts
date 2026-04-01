@@ -36,6 +36,8 @@ import type {
   PipelineStatusResponse,
   ReviewQueueItem,
   RejectRequest,
+  TeamMemberResponse,
+  InviteTeamMemberRequest,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -363,6 +365,33 @@ class ApiClient {
 
   async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
     return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
+  }
+
+  // Team
+  async getTeamMembers(): Promise<TeamMemberResponse[]> {
+    return this.request("/team/members");
+  }
+
+  async getMyProfile(): Promise<TeamMemberResponse> {
+    return this.request("/team/me");
+  }
+
+  async inviteTeamMember(data: InviteTeamMemberRequest): Promise<TeamMemberResponse> {
+    return this.request("/team/members", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTeamMemberRole(memberId: string, role: string): Promise<TeamMemberResponse> {
+    return this.request(`/team/members/${memberId}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async removeTeamMember(memberId: string): Promise<void> {
+    return this.request(`/team/members/${memberId}`, { method: "DELETE" });
   }
 
   // Import from link
