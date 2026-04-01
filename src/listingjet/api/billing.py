@@ -186,6 +186,9 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     if event_type == "checkout.session.completed":
         await _handle_checkout_completed(db, data_object, event_id, svc, credit_svc)
 
+    elif event_type == "customer.subscription.created":
+        await _handle_subscription_created(db, data_object, svc)
+
     elif event_type == "customer.subscription.updated":
         await _handle_subscription_updated(db, data_object, svc)
 
@@ -258,6 +261,42 @@ async def _handle_checkout_completed(
     if resolved_plan:
         tenant.plan = resolved_plan
         included, cap = TIER_CREDITS.get(resolved_plan, (0, 0))
+        tenant.included_credits = included
+        tenant.rollover_cap = cap
+
+    await db.commit()
+
+
+async def _handle_subscription_created(
+    db: AsyncSession,
+    data_object: dict,
+    svc: BillingService,
+) -> None:
+    """Deterministic plan-set when a subscription is first created.
+
+    This provides a reliable fallback if checkout.session.completed fails to
+    resolve the plan (e.g. Stripe API timeout during checkout).
+    """
+    customer_id = data_object.get("customer")
+    if not customer_id:
+        return
+
+    tenant = await _find_tenant_by_customer(db, customer_id)
+    if not tenant:
+        return
+
+    # Set subscription ID if not already set by checkout handler
+    sub_id = data_object.get("id")
+    if sub_id and not tenant.stripe_subscription_id:
+        tenant.stripe_subscription_id = sub_id
+
+    items = data_object.get("items", {}).get("data", [])
+    if items:
+        price_id = items[0].get("price", {}).get("id", "")
+        new_plan = svc.resolve_plan(price_id)
+        tenant.plan = new_plan
+
+        included, cap = TIER_CREDITS.get(new_plan, (0, 0))
         tenant.included_credits = included
         tenant.rollover_cap = cap
 
