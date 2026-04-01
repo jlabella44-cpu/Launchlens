@@ -12,6 +12,7 @@ PLAN_TO_PRICE: dict[str, str] = {}
 def _init_price_map():
     """Build price-to-plan map from config. Called lazily so settings are loaded."""
     if not PRICE_TO_PLAN:
+        # Primary plan names (stripe_price_starter, stripe_price_pro, stripe_price_enterprise)
         if settings.stripe_price_starter:
             PRICE_TO_PLAN[settings.stripe_price_starter] = "starter"
             PLAN_TO_PRICE["starter"] = settings.stripe_price_starter
@@ -21,6 +22,17 @@ def _init_price_map():
         if settings.stripe_price_enterprise:
             PRICE_TO_PLAN[settings.stripe_price_enterprise] = "enterprise"
             PLAN_TO_PRICE["enterprise"] = settings.stripe_price_enterprise
+
+        # Tier-based names (stripe_price_lite, stripe_price_active_agent, stripe_price_team)
+        if settings.stripe_price_lite:
+            PRICE_TO_PLAN[settings.stripe_price_lite] = "starter"
+            PLAN_TO_PRICE.setdefault("starter", settings.stripe_price_lite)
+        if settings.stripe_price_active_agent:
+            PRICE_TO_PLAN[settings.stripe_price_active_agent] = "pro"
+            PLAN_TO_PRICE.setdefault("pro", settings.stripe_price_active_agent)
+        if settings.stripe_price_team:
+            PRICE_TO_PLAN[settings.stripe_price_team] = "enterprise"
+            PLAN_TO_PRICE.setdefault("enterprise", settings.stripe_price_team)
 
 
 class BillingService:
