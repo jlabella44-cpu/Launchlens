@@ -1,4 +1,5 @@
 """Credit system service — atomic deduction, refunds, rollover, balance queries."""
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.models.credit_account import CreditAccount
 from listingjet.models.credit_transaction import CreditTransaction
+
+logger = logging.getLogger(__name__)
+
+# Track last low-credit alert per tenant to avoid spamming (tenant_id -> date)
+_low_credit_sent: dict[uuid.UUID, datetime] = {}
 
 
 class InsufficientCreditsError(Exception):
@@ -81,6 +87,35 @@ class CreditService:
             description=description,
         )
         session.add(txn)
+
+        # Send low-credit alert if balance < 3 (once per day per tenant)
+        if account.balance < 3:
+            now = datetime.now(timezone.utc)
+            last_sent = _low_credit_sent.get(tenant_id)
+            if not last_sent or (now - last_sent).total_seconds() > 86400:
+                _low_credit_sent[tenant_id] = now
+                try:
+                    from listingjet.models.user import User, UserRole
+                    from listingjet.services.email import get_email_service
+                    admin_result = await session.execute(
+                        select(User).where(
+                            User.tenant_id == tenant_id,
+                            User.role == UserRole.ADMIN,
+                        ).limit(1)
+                    )
+                    admin_user = admin_result.scalar_one_or_none()
+                    if admin_user:
+                        email_svc = get_email_service()
+                        email_svc.send_notification(
+                            admin_user.email,
+                            "credits_low",
+                            name=admin_user.name or "there",
+                            balance=str(account.balance),
+                            buy_url="https://app.listingjet.com/billing/credits",
+                        )
+                except Exception:
+                    logger.exception("credits_low email failed for tenant %s", tenant_id)
+
         return txn
 
     async def add_credits(

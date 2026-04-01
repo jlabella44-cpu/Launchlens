@@ -583,6 +583,21 @@ async def approve_listing(
     except Exception:
         logger.exception("Review signal failed for listing %s", listing.id)
 
+    # Send REVIEW_APPROVED email (fire-and-forget)
+    try:
+        from listingjet.services.email import get_email_service
+        from listingjet.services.notifications import _listing_address_str
+        address = _listing_address_str(listing)
+        email_svc = get_email_service()
+        email_svc.send_notification(
+            current_user.email,
+            "review_approved",
+            name=current_user.name or "there",
+            address=address,
+        )
+    except Exception:
+        logger.exception("review_approved email failed for listing %s", listing.id)
+
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
@@ -628,6 +643,23 @@ async def reject_listing(
 
     await db.commit()
     await db.refresh(listing)
+
+    # Send REVIEW_REJECTED email (fire-and-forget)
+    try:
+        from listingjet.services.email import get_email_service
+        from listingjet.services.notifications import _listing_address_str
+        address = _listing_address_str(listing)
+        email_svc = get_email_service()
+        email_svc.send_notification(
+            current_user.email,
+            "review_rejected",
+            name=current_user.name or "there",
+            address=address,
+            reason=body.reason,
+            detail=body.detail or "",
+        )
+    except Exception:
+        logger.exception("review_rejected email failed for listing %s", listing.id)
 
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
