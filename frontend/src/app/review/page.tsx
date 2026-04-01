@@ -149,11 +149,11 @@ function ReviewQueue() {
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-[var(--color-text-secondary)]">
               Process pending listings for pre-flight altitude clearance
             </p>
             <div className="hidden sm:flex items-center gap-4">
-              <span className="text-[10px] uppercase tracking-wider text-slate-300">
+              <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
                 j/k navigate · a approve · s reject · space toggle
               </span>
             </div>
@@ -164,7 +164,7 @@ function ReviewQueue() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 rounded-2xl bg-white animate-pulse border border-slate-100" />
+              <div key={i} className="h-20 rounded-2xl bg-[var(--color-surface)] animate-pulse border border-[var(--color-card-border)]" />
             ))}
           </div>
         ) : listings.length === 0 ? (
@@ -173,15 +173,15 @@ function ReviewQueue() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
           >
-            <p className="text-lg text-slate-400">
+            <p className="text-lg text-[var(--color-text-secondary)]">
               No listings awaiting review. Queue refreshes every 30s.
             </p>
-            <p className="text-xs text-slate-300 mt-2 uppercase tracking-wider">Load More Flights</p>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-2 uppercase tracking-wider">Load More Flights</p>
           </motion.div>
         ) : (
           <div className="space-y-3">
             {/* Table Header */}
-            <div className="flex items-center gap-4 px-5 py-2 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+            <div className="flex items-center gap-4 px-5 py-2 text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">
               <div className="flex-1">Street Address</div>
               <div className="w-40">Date Submitted</div>
               <div className="w-36 text-center">Status</div>
@@ -195,8 +195,8 @@ function ReviewQueue() {
 
               return (
                 <motion.div key={listing.id} layout>
-                  <div className={`bg-white rounded-2xl border transition-all ${
-                    isExpanded ? "border-[#F97316]/30 shadow-md" : "border-slate-100"
+                  <div className={`bg-[var(--color-surface)] rounded-2xl border transition-all ${
+                    isExpanded ? "border-[#F97316]/30 shadow-md" : "border-[var(--color-card-border)]"
                   }`}>
                     {/* Row */}
                     <div
@@ -207,11 +207,11 @@ function ReviewQueue() {
                         <p className="text-sm font-medium text-[var(--color-text)] truncate">
                           {addr.street || "Untitled"}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-[var(--color-text-secondary)]">
                           {[addr.city, addr.state].filter(Boolean).join(", ")}
                         </p>
                       </div>
-                      <div className="w-40 text-xs text-slate-400">
+                      <div className="w-40 text-xs text-[var(--color-text-secondary)]">
                         {new Date(listing.created_at).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
@@ -259,13 +259,13 @@ function ReviewQueue() {
                           transition={{ duration: 0.2 }}
                           className="overflow-hidden"
                         >
-                          <div className="px-5 pb-5 pt-2 border-t border-slate-100">
+                          <div className="px-5 pb-5 pt-2 border-t border-[var(--color-card-border)]">
                             {!data ? (
                               <div className="h-24 flex items-center justify-center">
                                 <div className="w-5 h-5 border-2 border-[#F97316] border-t-transparent rounded-full animate-spin" />
                               </div>
                             ) : data.selections.length === 0 ? (
-                              <p className="text-sm text-slate-400 text-center py-4">
+                              <p className="text-sm text-[var(--color-text-secondary)] text-center py-4">
                                 No packaged photos yet.
                               </p>
                             ) : (
@@ -286,7 +286,7 @@ function ReviewQueue() {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-6">
                                     <div>
-                                      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">AI Trust Score</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">AI Trust Score</p>
                                       <p className="text-lg font-bold text-[var(--color-text)]">
                                         {data.selections.length > 0
                                           ? (data.selections.reduce((s, sel) => s + sel.composite_score, 0) / data.selections.length).toFixed(1)
@@ -294,7 +294,7 @@ function ReviewQueue() {
                                       </p>
                                     </div>
                                     <div>
-                                      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Glamour Score</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">Glamour Score</p>
                                       <p className="text-lg font-bold text-[var(--color-text)]">None</p>
                                     </div>
                                   </div>
@@ -330,7 +330,7 @@ function ReviewQueue() {
                                   className={`text-xs px-3 py-1.5 rounded-full border transition-colors cursor-pointer ${
                                     rejectReason === rc.value
                                       ? "bg-red-50 border-red-300 text-red-700"
-                                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                                      : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)]"
                                   }`}
                                 >
                                   {rc.label}
@@ -343,7 +343,7 @@ function ReviewQueue() {
                                 value={rejectDetail}
                                 onChange={(e) => setRejectDetail(e.target.value)}
                                 placeholder="Describe the issue..."
-                                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
+                                className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-red-300"
                               />
                             )}
                             <div className="flex gap-2">
@@ -356,7 +356,7 @@ function ReviewQueue() {
                               </button>
                               <button
                                 onClick={() => { setRejectingId(null); setRejectDetail(""); }}
-                                className="px-4 py-2 rounded-full border border-slate-200 text-xs text-slate-600"
+                                className="px-4 py-2 rounded-full border border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"
                               >
                                 Cancel
                               </button>
@@ -372,13 +372,13 @@ function ReviewQueue() {
 
             {/* Load more */}
             <div className="text-center pt-4">
-              <span className="text-xs text-slate-300 uppercase tracking-wider">Load More Flights</span>
+              <span className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider">Load More Flights</span>
             </div>
           </div>
         )}
 
         {/* Footer */}
-        <footer className="mt-16 pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-300">
+        <footer className="mt-16 pt-6 border-t border-[var(--color-card-border)] flex items-center justify-between text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
           <span>ListingJet</span>
           <span>© {new Date().getFullYear()} ListingJet Command. All systems operational.</span>
           <div className="flex items-center gap-6">

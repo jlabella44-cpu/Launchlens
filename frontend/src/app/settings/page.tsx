@@ -104,7 +104,7 @@ function BrandKitSettings() {
       <>
         <Nav />
         <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
-          <div className="h-96 rounded-2xl bg-white animate-pulse border border-slate-100" />
+          <div className="h-96 rounded-2xl bg-[var(--color-surface)] animate-pulse border border-[var(--color-card-border)]" />
         </main>
       </>
     );
@@ -116,7 +116,7 @@ function BrandKitSettings() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           {/* Header */}
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)] font-semibold mb-1">
             Configuration Protocol
           </p>
           <h1
@@ -125,7 +125,7 @@ function BrandKitSettings() {
           >
             Brand Kit
           </h1>
-          <p className="text-sm text-slate-400 mb-8">
+          <p className="text-sm text-[var(--color-text-secondary)] mb-8">
             Calibrate your visual signature for the real estate stratosphere.
           </p>
 
@@ -134,16 +134,16 @@ function BrandKitSettings() {
             {/* Left: Form Sections */}
             <div className="lg:col-span-3 space-y-6">
               {/* Brokerage Info */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm">🏢</span>
+                  <span className="w-8 h-8 rounded-full bg-[var(--color-background)] flex items-center justify-center text-sm">🏢</span>
                   <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text)]">
                     Brokerage Info
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
                       Brokerage Name
                     </label>
                     <input
@@ -151,11 +151,11 @@ function BrandKitSettings() {
                       value={form.brokerage_name || ""}
                       onChange={(e) => setForm((f) => ({ ...f, brokerage_name: e.target.value }))}
                       placeholder="Skyline Realty Group"
-                      className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
                       Agent Name
                     </label>
                     <input
@@ -163,23 +163,23 @@ function BrandKitSettings() {
                       value={form.agent_name || ""}
                       onChange={(e) => setForm((f) => ({ ...f, agent_name: e.target.value }))}
                       placeholder="Capt. Jordan Sterling"
-                      className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Brand Colors */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm">🎨</span>
+                  <span className="w-8 h-8 rounded-full bg-[var(--color-background)] flex items-center justify-center text-sm">🎨</span>
                   <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text)]">
                     Brand Colors
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
                       Primary Main Navy
                     </label>
                     <ColorPicker
@@ -189,7 +189,7 @@ function BrandKitSettings() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
                       Afterburner Accent
                     </label>
                     <ColorPicker
@@ -202,9 +202,9 @@ function BrandKitSettings() {
               </div>
 
               {/* Typography */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-500">Ty</span>
+                  <span className="w-8 h-8 rounded-full bg-[var(--color-background)] flex items-center justify-center text-sm font-bold text-[var(--color-text-secondary)]">Ty</span>
                   <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text)]">
                     Typography
                   </h2>
@@ -221,9 +221,9 @@ function BrandKitSettings() {
               </div>
 
               {/* Logo */}
-              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm">📐</span>
+                  <span className="w-8 h-8 rounded-full bg-[var(--color-background)] flex items-center justify-center text-sm">📐</span>
                   <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text)]">
                     Logo
                   </h2>
@@ -233,23 +233,23 @@ function BrandKitSettings() {
                     <img
                       src={logoPreview || form.logo_url || ""}
                       alt="Brand logo"
-                      className="w-16 h-16 object-contain rounded-xl border border-slate-100"
+                      className="w-16 h-16 object-contain rounded-xl border border-[var(--color-card-border)]"
                     />
                     <div className="flex-1">
-                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
                         Logo URL / Source
                       </label>
                       <input
                         type="text"
                         value={form.logo_url || ""}
                         readOnly
-                        className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-400 truncate"
+                        className="w-full px-4 py-2.5 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-secondary)] truncate"
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-1.5 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:border-slate-300 transition-colors"
+                        className="px-3 py-1.5 rounded-full border border-[var(--color-border)] text-xs font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)] transition-colors"
                       >
                         Replace Asset
                       </button>
@@ -267,7 +267,7 @@ function BrandKitSettings() {
                     className={`relative flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed transition-colors cursor-pointer ${
                       dragOver
                         ? "border-[#F97316] bg-[#F97316]/5"
-                        : "border-slate-200 hover:border-slate-300"
+                        : "border-[var(--color-border)] hover:border-[var(--color-text-secondary)]"
                     }`}
                     onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
@@ -279,13 +279,13 @@ function BrandKitSettings() {
                     }}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <svg className="w-8 h-8 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-[var(--color-text-secondary)]">
                       {uploading ? "Uploading..." : "Drag & drop your logo, or click to browse"}
                     </p>
-                    <p className="text-[10px] text-slate-300">PNG, JPG, WebP, or SVG</p>
+                    <p className="text-[10px] text-[var(--color-text-secondary)]">PNG, JPG, WebP, or SVG</p>
                   </div>
                 )}
                 <input
@@ -304,10 +304,10 @@ function BrandKitSettings() {
             {/* Right: Live HUD Preview */}
             <div className="lg:col-span-2">
               <div className="sticky top-24">
-                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold mb-3">
                   Live HUD Preview
                 </p>
-                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] overflow-hidden shadow-sm">
                   {/* Property Image */}
                   <div className="aspect-[4/3] bg-gradient-to-br from-slate-200 to-slate-100 flex items-center justify-center relative">
                     <svg className="w-12 h-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -336,7 +336,7 @@ function BrandKitSettings() {
                     >
                       The Stratos Villa
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">742 Aurelia Way, Los Angeles</p>
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">742 Aurelia Way, Los Angeles</p>
                     <div className="flex items-center justify-between mt-2">
                       <span
                         className="text-[10px] uppercase tracking-wider font-bold"
@@ -346,20 +346,20 @@ function BrandKitSettings() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
+                    <div className="flex items-center gap-4 mt-3 text-xs text-[var(--color-text-secondary)]">
                       <span><strong className="text-[var(--color-text)]">5</strong> 🛏</span>
                       <span><strong className="text-[var(--color-text)]">4.5</strong> 🛁</span>
                       <span><strong className="text-[var(--color-text)]">5,400</strong> sqft</span>
                     </div>
 
-                    <p className="text-xs text-slate-400 mt-3 leading-relaxed">
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-3 leading-relaxed">
                       Experience uncompromised altitude with this architectural marvel. Engineered for elite living with seamless glass transitions...
                     </p>
 
-                    <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
-                      <div className="w-7 h-7 rounded-full bg-slate-200" />
+                    <div className="flex items-center gap-2 mt-4 pt-3 border-t border-[var(--color-card-border)]">
+                      <div className="w-7 h-7 rounded-full bg-[var(--color-border)]" />
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider">Listed By</p>
+                        <p className="text-[10px] text-[var(--color-text-secondary)] uppercase tracking-wider">Listed By</p>
                         <p className="text-xs font-medium text-[var(--color-text)]">
                           {form.agent_name || "Agent Name"}
                         </p>
@@ -397,7 +397,7 @@ function BrandKitSettings() {
                     Saved successfully
                   </motion.p>
                 )}
-                <p className="text-center text-[10px] text-slate-300 uppercase tracking-wider mt-3">
+                <p className="text-center text-[10px] text-[var(--color-text-secondary)] uppercase tracking-wider mt-3">
                   Flight Check: All Systems Nominal
                 </p>
               </div>
@@ -406,7 +406,7 @@ function BrandKitSettings() {
         </motion.div>
 
         {/* Footer */}
-        <footer className="mt-16 pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-300">
+        <footer className="mt-16 pt-6 border-t border-[var(--color-card-border)] flex items-center justify-between text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
           <span>ListingJet Command</span>
           <div className="flex gap-6">
             <span>Flight Manual</span>
