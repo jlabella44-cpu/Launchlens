@@ -9,6 +9,22 @@ class CreateListingRequest(BaseModel):
     address: dict
     metadata: dict = {}
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "address": {
+                        "street": "123 Main St",
+                        "city": "Austin",
+                        "state": "TX",
+                        "zip": "78701",
+                    },
+                    "metadata": {"bedrooms": 3, "bathrooms": 2, "sqft": 1850},
+                }
+            ]
+        }
+    }
+
 
 class UpdateListingRequest(BaseModel):
     address: dict | None = None
@@ -24,7 +40,22 @@ class ListingResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "tenant_id": "550e8400-e29b-41d4-a716-446655440001",
+                    "address": {"street": "123 Main St", "city": "Austin", "state": "TX", "zip": "78701"},
+                    "metadata": {"bedrooms": 3, "bathrooms": 2, "sqft": 1850},
+                    "state": "new",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "updated_at": "2024-01-15T10:30:00Z",
+                }
+            ]
+        },
+    }
 
     @classmethod
     def from_orm_listing(cls, listing):

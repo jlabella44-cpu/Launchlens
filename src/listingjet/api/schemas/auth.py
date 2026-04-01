@@ -11,6 +11,20 @@ class RegisterRequest(BaseModel):
     company_name: str
     plan_tier: str | None = None
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "email": "agent@realty.com",
+                    "password": "SecurePass1!",
+                    "name": "Jane Smith",
+                    "company_name": "Smith Realty",
+                    "plan_tier": "active_agent",
+                }
+            ]
+        }
+    }
+
     @field_validator("password")
     @classmethod
     def password_complexity(cls, v: str) -> str:
@@ -29,11 +43,29 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{"email": "agent@realty.com", "password": "SecurePass1!"}]
+        }
+    }
+
 
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str | None = None
     token_type: str = "bearer"
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "token_type": "bearer",
+                }
+            ]
+        }
+    }
 
 
 class UserResponse(BaseModel):
