@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 import { usePlan } from "@/contexts/plan-context";
-import { usePlacesAutocomplete } from "@/hooks/use-places-autocomplete";
 import apiClient from "@/lib/api-client";
 import type { ListingResponse } from "@/lib/types";
 
@@ -27,23 +27,11 @@ export function CreateListingDialog({
   onCreated,
 }: CreateListingDialogProps) {
   const { billingModel, creditBalance, listingCreditCost, canAffordListing, refresh } = usePlan();
-  const places = usePlacesAutocomplete();
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        places.dismiss();
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [places]);
+  const [zip, setZip] = useState("");
   const [beds, setBeds] = useState("");
   const [baths, setBaths] = useState("");
   const [sqft, setSqft] = useState("");
@@ -72,7 +60,7 @@ export function CreateListingDialog({
     setLoading(true);
     try {
       const listing = await apiClient.createListing({
-        address: { street, city, state },
+        address: { street, city, state, zip },
         metadata: {
           beds: Number(beds),
           baths: Number(baths),
@@ -96,6 +84,7 @@ export function CreateListingDialog({
       setStreet("");
       setCity("");
       setState("");
+      setZip("");
       setBeds("");
       setBaths("");
       setSqft("");
@@ -138,48 +127,23 @@ export function CreateListingDialog({
               </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="relative" ref={dropdownRef}>
+                <div>
                   <label htmlFor="street" className="block text-sm font-medium mb-1">
                     Street Address
                   </label>
-                  <input
-                    id="street"
-                    required
-                    value={places.query || street}
-                    onChange={(e) => {
-                      places.setQuery(e.target.value);
-                      setStreet(e.target.value);
+                  <AddressAutocomplete
+                    value={street}
+                    onChange={(val) => setStreet(val)}
+                    onAddressSelect={(addr) => {
+                      setStreet(addr.street);
+                      setCity(addr.city);
+                      setState(addr.state);
+                      setZip(addr.zip);
                     }}
-                    onFocus={() => {
-                      if (places.predictions.length > 0) places.setQuery(places.query);
-                    }}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--color-border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    placeholder="Start typing an address..."
-                    autoComplete="off"
                   />
-                  {places.isOpen && places.predictions.length > 0 && (
-                    <div className="absolute z-50 top-full mt-1 w-full bg-white border border-[var(--color-border)] rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {places.predictions.map((p) => (
-                        <button
-                          key={p.place_id}
-                          type="button"
-                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--color-primary)]/10 transition-colors cursor-pointer"
-                          onClick={async () => {
-                            const addr = await places.selectPlace(p.place_id);
-                            setStreet(addr.street);
-                            setCity(addr.city);
-                            setState(addr.state);
-                          }}
-                        >
-                          <span className="font-medium">{p.structured_formatting.main_text}</span>
-                          <span className="text-[var(--color-text-secondary)] ml-1">{p.structured_formatting.secondary_text}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label htmlFor="city" className="block text-sm font-medium mb-1">
                       City
@@ -203,6 +167,18 @@ export function CreateListingDialog({
                       onChange={(e) => setState(e.target.value)}
                       className="w-full px-4 py-2.5 rounded-lg border border-[var(--color-border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                       placeholder="TX"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="zip" className="block text-sm font-medium mb-1">
+                      ZIP
+                    </label>
+                    <input
+                      id="zip"
+                      value={zip}
+                      onChange={(e) => setZip(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-[var(--color-border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      placeholder="78701"
                     />
                   </div>
                 </div>
