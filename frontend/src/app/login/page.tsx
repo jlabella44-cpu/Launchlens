@@ -91,14 +91,13 @@ export default function LoginPage() {
 
         {/* Hero Image */}
         <div className="flex-1 flex items-center justify-center z-10 my-8">
-          <div className="w-[85%] aspect-[4/3] rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 shadow-2xl overflow-hidden transform -rotate-2">
-            <div className="w-full h-full bg-gradient-to-b from-[#1a2744] via-[#1e3a5f] to-[#0d1b2a] flex items-center justify-center">
-              <div className="text-center opacity-40">
-                <svg className="w-16 h-16 mx-auto text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                </svg>
-              </div>
-            </div>
+          <div className="relative w-[85%] max-w-md group">
+            <div className="absolute inset-0 bg-blue-400/20 blur-3xl rounded-full scale-75 group-hover:scale-110 transition-transform duration-1000" />
+            <img
+              src="/images/login-villa.jpg"
+              alt="Futuristic minimalist villa with cinematic lighting"
+              className="relative z-10 w-full h-auto rounded-xl shadow-[0_35px_35px_rgba(0,0,0,0.5)] transform -rotate-3 hover:rotate-0 transition-all duration-700 ease-in-out"
+            />
           </div>
         </div>
 
