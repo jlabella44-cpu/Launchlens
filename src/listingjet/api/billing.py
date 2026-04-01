@@ -31,12 +31,17 @@ router = APIRouter()
 
 
 def _validate_redirect_url(url: str) -> None:
-    """Reject redirect URLs that don't match a configured CORS origin."""
+    """Reject redirect URLs that don't match a configured CORS origin or Vercel pattern."""
+    import re
     allowed = {o.strip().rstrip("/") for o in settings.cors_origins.split(",")}
     parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
-    if origin not in allowed:
-        raise HTTPException(status_code=400, detail="Redirect URL not allowed")
+    if origin in allowed:
+        return
+    # Also allow the same Vercel pattern used in CORS middleware
+    if re.fullmatch(r"https://launchlens[a-z0-9-]*\.vercel\.app", origin):
+        return
+    raise HTTPException(status_code=400, detail="Redirect URL not allowed")
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
