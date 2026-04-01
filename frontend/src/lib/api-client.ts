@@ -38,6 +38,9 @@ import type {
   RejectRequest,
   TeamMemberResponse,
   InviteTeamMemberRequest,
+  ListingPermissionResponse,
+  SharedListingResponse,
+  AuditLogEntryResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -392,6 +395,37 @@ class ApiClient {
 
   async removeTeamMember(memberId: string): Promise<void> {
     return this.request(`/team/members/${memberId}`, { method: "DELETE" });
+  }
+
+  // Listing Permissions
+  async shareListing(listingId: string, data: { email: string; permission?: string; expires_at?: string | null }): Promise<ListingPermissionResponse> {
+    return this.request(`/listings/${listingId}/permissions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getListingPermissions(listingId: string): Promise<ListingPermissionResponse[]> {
+    return this.request(`/listings/${listingId}/permissions`);
+  }
+
+  async updateListingPermission(listingId: string, permissionId: string, data: { permission?: string; expires_at?: string | null }): Promise<ListingPermissionResponse> {
+    return this.request(`/listings/${listingId}/permissions/${permissionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async revokeListingPermission(listingId: string, permissionId: string): Promise<void> {
+    return this.request(`/listings/${listingId}/permissions/${permissionId}`, { method: "DELETE" });
+  }
+
+  async getSharedWithMe(): Promise<SharedListingResponse[]> {
+    return this.request("/listings/shared-with-me");
+  }
+
+  async getListingAuditLog(listingId: string): Promise<AuditLogEntryResponse[]> {
+    return this.request(`/listings/${listingId}/audit-log`);
   }
 
   // Import from link

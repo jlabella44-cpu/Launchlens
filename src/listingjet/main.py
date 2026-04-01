@@ -17,6 +17,7 @@ from listingjet.api import (
     credits,
     demo,
     health,
+    listing_permissions,
     listings,
     properties,
     sse,
@@ -107,6 +108,7 @@ def create_app() -> FastAPI:
     init_monitoring(app)
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
+    app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
     app.include_router(listings.router, prefix="/listings", tags=["listings"])
     app.include_router(assets.router, prefix="/assets", tags=["assets"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
