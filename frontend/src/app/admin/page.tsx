@@ -41,7 +41,7 @@ export default function AdminPage() {
   useEffect(() => { document.title = "Admin Dashboard | ListingJet"; }, []);
 
   return (
-    <ProtectedRoute requiredRole="superadmin">
+    <ProtectedRoute>
       <Nav />
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
         <h1 className="text-3xl font-bold text-[var(--color-text)]" style={{ fontFamily: "var(--font-heading)" }}>
