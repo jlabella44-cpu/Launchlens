@@ -6,6 +6,7 @@ from sqlalchemy import select
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
+from listingjet.models.property_data import PropertyData
 from listingjet.models.vision_result import VisionResult
 from listingjet.services.events import emit_event
 
@@ -85,6 +86,43 @@ class CoverageAgent(BaseAgent):
                         session=session,
                         event_type="coverage.mismatch",
                         payload={"mismatches": mismatches},
+                        tenant_id=context.tenant_id,
+                        listing_id=context.listing_id,
+                    )
+
+                prop_result = await session.execute(
+                    select(PropertyData).where(PropertyData.listing_id == listing_id)
+                )
+                prop_data = prop_result.scalar_one_or_none()
+
+                record_mismatches = []
+                if prop_data and prop_data.beds is not None:
+                    listing_beds = listing.metadata_.get("beds", 0) if listing.metadata_ else 0
+                    photo_beds = sum(1 for vr in vision_results if vr.room_label == "bedroom")
+                    if prop_data.beds != listing_beds and listing_beds > 0:
+                        record_mismatches.append({
+                            "field": "beds",
+                            "user_entered": listing_beds,
+                            "public_records": prop_data.beds,
+                            "photo_count": photo_beds,
+                        })
+
+                if prop_data and prop_data.baths is not None:
+                    listing_baths = listing.metadata_.get("baths", 0) if listing.metadata_ else 0
+                    photo_baths = sum(1 for vr in vision_results if vr.room_label == "bathroom")
+                    if prop_data.baths != listing_baths and listing_baths > 0:
+                        record_mismatches.append({
+                            "field": "baths",
+                            "user_entered": listing_baths,
+                            "public_records": prop_data.baths,
+                            "photo_count": photo_baths,
+                        })
+
+                if record_mismatches:
+                    await emit_event(
+                        session=session,
+                        event_type="coverage.record_mismatch",
+                        payload={"mismatches": record_mismatches},
                         tenant_id=context.tenant_id,
                         listing_id=context.listing_id,
                     )

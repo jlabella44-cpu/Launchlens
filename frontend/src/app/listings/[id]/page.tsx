@@ -267,13 +267,25 @@ function ListingDetail() {
                   ))}
                 </div>
               ) : (
-                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-80 overflow-y-auto">
                   {assets.map((a) => (
                     <div
                       key={a.id}
-                      className="text-xs font-mono text-slate-500 px-2 py-1.5 rounded-lg bg-slate-50 truncate"
+                      className="aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-200"
                     >
-                      {a.file_path}
+                      {a.thumbnail_url ? (
+                        <img
+                          src={a.thumbnail_url}
+                          alt={a.file_path.split('/').pop() || 'Photo'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

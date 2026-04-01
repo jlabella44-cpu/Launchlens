@@ -37,6 +37,7 @@ export interface AssetResponse {
   file_path: string;
   file_hash: string;
   state: string;
+  thumbnail_url: string | null;
   created_at: string;
 }
 

@@ -114,31 +114,58 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
         try {
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
-            xhr.open("PUT", urlInfo.upload_url);
-            xhr.setRequestHeader("Content-Type", urlInfo.content_type);
+            const presigned = urlInfo.upload_url as unknown as { url: string; fields: Record<string, string> };
 
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                const pct = Math.round((e.loaded / e.total) * 100);
-                setFiles((prev) =>
-                  prev.map((f, j) => (j === i ? { ...f, progress: pct } : f))
-                );
-              }
-            };
+            if (typeof presigned === "object" && presigned.fields) {
+              xhr.open("POST", presigned.url);
+              const fd = new FormData();
+              Object.entries(presigned.fields).forEach(([k, v]) => fd.append(k, v));
+              fd.append("file", files[i].file);
 
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                setFiles((prev) =>
-                  prev.map((f, j) => (j === i ? { ...f, status: "done", progress: 100 } : f))
-                );
-                resolve();
-              } else {
-                reject(new Error(`Upload failed: ${xhr.status}`));
-              }
-            };
-
-            xhr.onerror = () => reject(new Error("Network error"));
-            xhr.send(files[i].file);
+              xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                  const pct = Math.round((e.loaded / e.total) * 100);
+                  setFiles((prev) =>
+                    prev.map((f, j) => (j === i ? { ...f, progress: pct } : f))
+                  );
+                }
+              };
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  setFiles((prev) =>
+                    prev.map((f, j) => (j === i ? { ...f, status: "done", progress: 100 } : f))
+                  );
+                  resolve();
+                } else {
+                  reject(new Error(`Upload failed: ${xhr.status}`));
+                }
+              };
+              xhr.onerror = () => reject(new Error("Network error"));
+              xhr.send(fd);
+            } else {
+              xhr.open("PUT", urlInfo.upload_url as unknown as string);
+              xhr.setRequestHeader("Content-Type", urlInfo.content_type);
+              xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                  const pct = Math.round((e.loaded / e.total) * 100);
+                  setFiles((prev) =>
+                    prev.map((f, j) => (j === i ? { ...f, progress: pct } : f))
+                  );
+                }
+              };
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  setFiles((prev) =>
+                    prev.map((f, j) => (j === i ? { ...f, status: "done", progress: 100 } : f))
+                  );
+                  resolve();
+                } else {
+                  reject(new Error(`Upload failed: ${xhr.status}`));
+                }
+              };
+              xhr.onerror = () => reject(new Error("Network error"));
+              xhr.send(files[i].file);
+            }
           });
 
           return { key: urlInfo.key, file: files[i].file };
