@@ -86,8 +86,12 @@ function RegisterForm() {
     <div className="min-h-screen flex">
       {/* Left: Hero Panel */}
       <div className="hidden lg:flex lg:w-[45%] flex-col justify-between bg-[#0B1120] relative overflow-hidden">
-        {/* Background image placeholder */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1a2744] via-[#2d4a6f] to-[#0d1b2a]" />
+        <img
+          src="/images/register-bg.jpg"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover opacity-40"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1a2744]/80 via-[#2d4a6f]/60 to-[#0d1b2a]" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
         {/* Logo */}

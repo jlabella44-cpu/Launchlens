@@ -187,40 +187,17 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="hidden lg:block"
           >
-            {/* Dashboard mockup placeholder */}
-            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-              <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-[#0B1120] p-6">
-                {/* Title bar */}
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="w-3 h-3 rounded-full bg-red-400" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                  <div className="w-3 h-3 rounded-full bg-green-400" />
-                  <span className="ml-3 text-xs text-slate-500">ListingJet Dashboard</span>
-                </div>
-                {/* Fake stats row */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  {["Active Listings", "Photos Processed", "Avg Score"].map((label, i) => (
-                    <div key={i} className="bg-slate-800/60 rounded-xl p-3">
-                      <div className="text-xs text-slate-500">{label}</div>
-                      <div className="text-lg font-bold text-white mt-1">{["12", "847", "94%"][i]}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Fake photo grid */}
-                <div className="grid grid-cols-4 gap-2">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-lg"
-                      style={{
-                        background: `linear-gradient(${135 + i * 20}deg, ${
-                          ["#334155", "#1e293b", "#0f172a", "#475569", "#1e293b", "#334155", "#0f172a", "#475569"][i]
-                        }, ${
-                          ["#475569", "#334155", "#1e293b", "#334155", "#0f172a", "#1e293b", "#475569", "#334155"][i]
-                        })`,
-                      }}
-                    />
-                  ))}
+            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl transform rotate-2 translate-x-6">
+              <img
+                src="/images/hero-dashboard.jpg"
+                alt="ListingJet dashboard showing real estate analytics, property photo grid, and AI generation progress"
+                className="w-full h-full object-cover"
+              />
+              {/* HUD Overlay */}
+              <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md rounded-xl px-4 py-2 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#F97316] rounded-full animate-pulse" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-700">Processing Listing_084</span>
                 </div>
               </div>
             </div>
@@ -373,16 +350,12 @@ export default function Home() {
             transition={{ duration: 0.5 }}
             className="grid lg:grid-cols-2 gap-12 items-center mb-20"
           >
-            <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-slate-200 via-slate-100 to-white aspect-video flex items-center justify-center border border-slate-100">
-              <div className="text-center p-8">
-                <div className="text-[#F97316] mx-auto mb-3">
-                  <svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-slate-400">Smart Photo Intelligence</p>
-              </div>
+            <div className="rounded-2xl overflow-hidden aspect-video border border-slate-100 shadow-lg bg-slate-100">
+              <img
+                src="/images/photo-intelligence.jpg"
+                alt="Before and after: dark unedited room transformed into a brightly lit, professionally enhanced space"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <h3 className="text-2xl lg:text-3xl font-bold text-slate-900" style={{ fontFamily: "var(--font-heading)" }}>
@@ -410,15 +383,12 @@ export default function Home() {
                 From solo agents to large brokerages. White-label branding, credit-based billing, and MLS integrations that scale with your business.
               </p>
             </div>
-            <div className="order-1 lg:order-2 rounded-2xl overflow-hidden bg-gradient-to-br from-slate-200 via-slate-100 to-white aspect-video flex items-center justify-center border border-slate-100">
-              <div className="text-center p-8">
-                <div className="text-[#F97316] mx-auto mb-3">
-                  <svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-slate-400">Built for Teams</p>
-              </div>
+            <div className="order-1 lg:order-2 rounded-2xl overflow-hidden aspect-video border border-slate-100 shadow-lg bg-slate-100">
+              <img
+                src="/images/built-for-teams.jpg"
+                alt="Team collaboration dashboard with agent profiles, shared listing analytics, and credit usage metrics"
+                className="w-full h-full object-cover"
+              />
             </div>
           </motion.div>
         </div>
