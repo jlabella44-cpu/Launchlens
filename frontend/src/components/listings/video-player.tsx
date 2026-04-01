@@ -67,9 +67,9 @@ export function VideoPlayer({ listingId, onNoVideo }: VideoPlayerProps) {
 
       <video
         ref={videoRef}
-        src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/listings/${listingId}/video/stream?key=${encodeURIComponent(video.s3_key)}`}
+        src={`${process.env.NEXT_PUBLIC_API_URL || "/api"}/listings/${listingId}/video/stream?key=${encodeURIComponent(video.s3_key)}`}
         controls
-        poster={video.thumbnail_s3_key ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/listings/${listingId}/video/stream?key=${encodeURIComponent(video.thumbnail_s3_key)}` : undefined}
+        poster={video.thumbnail_s3_key ? `${process.env.NEXT_PUBLIC_API_URL || "/api"}/listings/${listingId}/video/stream?key=${encodeURIComponent(video.thumbnail_s3_key)}` : undefined}
         className="w-full rounded-lg bg-black"
       />
 
