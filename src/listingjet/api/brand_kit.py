@@ -87,3 +87,33 @@ async def get_logo_upload_url(
         expires_in=300,
     )
     return {"key": key, "upload": presigned}
+
+
+@router.post("/headshot-upload-url")
+async def get_headshot_upload_url(
+    current_user: User = Depends(get_current_user),
+):
+    """Get a presigned S3 URL for uploading an agent headshot."""
+    storage = get_storage()
+    key = f"brand-kits/{current_user.tenant_id}/headshot-{uuid.uuid4()}.png"
+    presigned = storage.presigned_upload_url(
+        key=key,
+        content_type="image/png",
+        expires_in=300,
+    )
+    return {"key": key, "upload": presigned}
+
+
+@router.post("/team-logo-upload-url")
+async def get_team_logo_upload_url(
+    current_user: User = Depends(get_current_user),
+):
+    """Get a presigned S3 URL for uploading a personal/team logo."""
+    storage = get_storage()
+    key = f"brand-kits/{current_user.tenant_id}/team-logo-{uuid.uuid4()}.png"
+    presigned = storage.presigned_upload_url(
+        key=key,
+        content_type="image/png",
+        expires_in=300,
+    )
+    return {"key": key, "upload": presigned}

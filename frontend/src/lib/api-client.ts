@@ -278,6 +278,14 @@ class ApiClient {
     return this.request("/brand-kit/logo-upload-url", { method: "POST" });
   }
 
+  async getHeadshotUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
+    return this.request("/brand-kit/headshot-upload-url", { method: "POST" });
+  }
+
+  async getTeamLogoUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
+    return this.request("/brand-kit/team-logo-upload-url", { method: "POST" });
+  }
+
   // Upload URLs
   async getUploadUrls(listingId: string, filenames: string[]): Promise<{
     urls: { filename: string; key: string; upload_url: { url: string; fields: Record<string, string> }; content_type: string }[];
