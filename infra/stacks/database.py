@@ -42,7 +42,7 @@ class DatabaseStack(Stack):
                 version=rds.PostgresEngineVersion.VER_16,
             ),
             instance_type=ec2.InstanceType.of(
-                ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.MICRO,
+                ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.SMALL,
             ),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
@@ -51,8 +51,8 @@ class DatabaseStack(Stack):
             credentials=rds.Credentials.from_generated_secret("listingjet"),
             allocated_storage=20,
             max_allocated_storage=50,
-            multi_az=False,
-            backup_retention=Duration.days(1),
+            multi_az=True,
+            backup_retention=Duration.days(7),
             deletion_protection=False,  # beta - flip for production
             removal_policy=RemovalPolicy.SNAPSHOT,
         )
@@ -71,14 +71,16 @@ class DatabaseStack(Stack):
             allow_all_outbound=False,
         )
 
-        self.redis_cluster = elasticache.CfnCacheCluster(
+        self.redis_cluster = elasticache.CfnReplicationGroup(
             self, "Redis",
-            cache_node_type="cache.t4g.micro",
+            replication_group_description="ListingJet Redis replication group",
+            cache_node_type="cache.t4g.small",
             engine="redis",
             engine_version="7.1",
-            num_cache_nodes=1,
+            num_cache_clusters=2,
+            automatic_failover_enabled=True,
             cache_subnet_group_name=redis_subnet_group.ref,
-            vpc_security_group_ids=[redis_sg.security_group_id],
+            security_group_ids=[redis_sg.security_group_id],
         )
 
         # Allow ECS services -> RDS and Redis

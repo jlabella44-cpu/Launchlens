@@ -16,11 +16,11 @@ from urllib.parse import urlparse
 import httpx
 
 from listingjet.config import settings
+from listingjet.utils.retry import async_retry
 
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 10.0
-_MAX_RETRIES = 3
 
 # Private/reserved IP networks that webhooks must never target (SSRF protection)
 _BLOCKED_NETWORKS = [
@@ -106,27 +106,26 @@ async def deliver_webhook(
         "User-Agent": "ListingJet-Webhook/1.0",
     }
 
-    async with httpx.AsyncClient() as client:
-        for attempt in range(_MAX_RETRIES):
-            try:
-                resp = await client.post(
-                    url, content=body_bytes, headers=headers, timeout=_TIMEOUT
-                )
-                if 200 <= resp.status_code < 300:
-                    logger.info(
-                        "webhook.delivered url=%s event=%s status=%d",
-                        url, event_type, resp.status_code,
-                    )
-                    return True
-                logger.warning(
-                    "webhook.failed url=%s event=%s status=%d attempt=%d",
-                    url, event_type, resp.status_code, attempt + 1,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "webhook.error url=%s event=%s error=%s attempt=%d",
-                    url, event_type, str(exc), attempt + 1,
-                )
+    @async_retry(
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=30.0,
+        retry_on=(httpx.HTTPError, httpx.TimeoutException),
+    )
+    async def _post_with_retry() -> bool:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                url, content=body_bytes, headers=headers, timeout=_TIMEOUT
+            )
+            resp.raise_for_status()
+            logger.info(
+                "webhook.delivered url=%s event=%s status=%d",
+                url, event_type, resp.status_code,
+            )
+            return True
 
-    logger.error("webhook.exhausted url=%s event=%s after %d attempts", url, event_type, _MAX_RETRIES)
-    return False
+    try:
+        return await _post_with_retry()
+    except Exception:
+        logger.error("webhook.exhausted url=%s event=%s after retries", url, event_type)
+        return False

@@ -123,5 +123,12 @@ class Settings(BaseSettings):
     video_score_floor: float = 0.65
     video_clip_duration: int = 5
 
+    # Property Lookup
+    attom_api_key: str = ""
+    walk_score_api_key: str = ""
+    property_lookup_cache_ttl: int = 86400  # 24h
+    property_verification_enabled: bool = True
+    scraper_rate_limit_seconds: int = 5
+
 
 settings = Settings()

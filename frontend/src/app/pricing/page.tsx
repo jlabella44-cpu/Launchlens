@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
+import apiClient from "@/lib/api-client";
+
+const PRICE_IDS: Record<string, string> = {
+  lite: "price_1TH4J9RZ4TuRrBpyUHm6Eg5p",
+  active_agent: "price_1TH4JARZ4TuRrBpywg1XdkoE",
+};
 
 const TIERS = [
   {
@@ -69,7 +76,58 @@ const ADDONS = [
 ];
 
 export default function PricingPage() {
+  useEffect(() => { document.title = "Pricing | ListingJet"; }, []);
+
   const [listingsPerMonth, setListingsPerMonth] = useState(3);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const router = useRouter();
+
+  async function handleTierCheckout(tierName: string) {
+    const key = tierName.toLowerCase().replace(" ", "_");
+    const token = localStorage.getItem("listingjet_token");
+    if (!token) {
+      router.push(`/register?plan=${key}`);
+      return;
+    }
+    if (key === "free") {
+      router.push("/register?plan=free");
+      return;
+    }
+    const priceId = PRICE_IDS[key];
+    if (!priceId) return;
+    setCheckoutLoading(key);
+    try {
+      const res = await apiClient.billingCheckout(
+        priceId,
+        `${window.location.origin}/billing?success=true`,
+        `${window.location.origin}/pricing`,
+      );
+      window.location.href = res.checkout_url;
+    } catch (err) {
+      console.error("Checkout failed:", err);
+      setCheckoutLoading(null);
+    }
+  }
+
+  async function handleCreditPurchase(bundleSize: number) {
+    const token = localStorage.getItem("listingjet_token");
+    if (!token) {
+      router.push("/register");
+      return;
+    }
+    setCheckoutLoading(`bundle_${bundleSize}`);
+    try {
+      const res = await apiClient.purchaseCredits(
+        bundleSize,
+        `${window.location.origin}/billing?success=true`,
+        `${window.location.origin}/pricing`,
+      );
+      window.location.href = res.checkout_url;
+    } catch (err) {
+      console.error("Purchase failed:", err);
+      setCheckoutLoading(null);
+    }
+  }
 
   function calculateCost(tier: (typeof TIERS)[number]) {
     const listingCreditsNeeded = Math.max(0, listingsPerMonth - tier.includedCredits);
@@ -92,7 +150,7 @@ export default function PricingPage() {
           >
             Simple, Transparent Pricing
           </h1>
-          <p className="text-sm text-slate-400 mt-2 uppercase tracking-wider">
+          <p className="text-sm text-[var(--color-text-secondary)] mt-2 uppercase tracking-wider">
             Atmospheric clarity for your real estate portfolio
           </p>
         </motion.div>
@@ -102,15 +160,15 @@ export default function PricingPage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl border border-slate-100 p-6 mb-10"
+          className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-6 mb-10"
         >
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">
                 Volume Calculator
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-slate-500">I list about</span>
+                <span className="text-sm text-[var(--color-text-secondary)]">I list about</span>
                 <input
                   type="range"
                   min={1}
@@ -122,15 +180,15 @@ export default function PricingPage() {
                 <span className="text-lg font-bold text-[var(--color-text)] min-w-[3ch] text-center">
                   {listingsPerMonth}
                 </span>
-                <span className="text-sm text-slate-500">properties/month</span>
+                <span className="text-sm text-[var(--color-text-secondary)]">properties/month</span>
               </div>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold text-[var(--color-text)]">
                 ${calculateCost(TIERS[2])}
-                <span className="text-sm font-normal text-slate-400">/mo</span>
+                <span className="text-sm font-normal text-[var(--color-text-secondary)]">/mo</span>
               </p>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
                 Estimated at Active Agent
               </p>
             </div>
@@ -151,7 +209,7 @@ export default function PricingPage() {
                 className={`rounded-2xl p-6 flex flex-col ${
                   tier.recommended
                     ? "bg-[#0B1120] text-white ring-2 ring-[#F97316]"
-                    : "bg-white border border-slate-100"
+                    : "bg-[var(--color-surface)] border border-[var(--color-card-border)]"
                 }`}
               >
                 {tier.recommended && (
@@ -169,27 +227,27 @@ export default function PricingPage() {
                   <span className={`text-4xl font-bold ${tier.recommended ? "text-white" : "text-[var(--color-text)]"}`}>
                     ${tier.price}
                   </span>
-                  <span className={`text-sm ${tier.recommended ? "text-white/60" : "text-slate-400"}`}>
+                  <span className={`text-sm ${tier.recommended ? "text-white/60" : "text-[var(--color-text-secondary)]"}`}>
                     /{tier.period}
                   </span>
                 </div>
-                <p className={`text-xs mb-4 ${tier.recommended ? "text-white/50" : "text-slate-400"}`}>
+                <p className={`text-xs mb-4 ${tier.recommended ? "text-white/50" : "text-[var(--color-text-secondary)]"}`}>
                   + ${tier.perListingPrice}/listing
                 </p>
 
                 {/* Estimated Cost */}
                 <div className={`rounded-xl px-4 py-3 mb-4 text-center ${
-                  tier.recommended ? "bg-white/10" : "bg-slate-50"
+                  tier.recommended ? "bg-white/10" : "bg-[var(--color-background)]"
                 }`}>
                   <p className={`text-sm font-semibold ${tier.recommended ? "text-white" : "text-[var(--color-text)]"}`}>
                     ~${monthlyCost}/mo
                   </p>
-                  <p className={`text-[10px] ${tier.recommended ? "text-white/50" : "text-slate-400"}`}>
+                  <p className={`text-[10px] ${tier.recommended ? "text-white/50" : "text-[var(--color-text-secondary)]"}`}>
                     at {listingsPerMonth} listings
                   </p>
                 </div>
 
-                <p className={`text-sm mb-4 ${tier.recommended ? "text-white/70" : "text-slate-500"}`}>
+                <p className={`text-sm mb-4 ${tier.recommended ? "text-white/70" : "text-[var(--color-text-secondary)]"}`}>
                   {tier.description}
                 </p>
 
@@ -204,15 +262,16 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Link href={`/register?plan=${tier.name.toLowerCase().replace(" ", "_")}`}>
-                  <button className={`w-full py-3 rounded-full font-semibold text-sm transition-colors ${
+                <button
+                  onClick={() => handleTierCheckout(tier.name)}
+                  disabled={checkoutLoading === tier.name.toLowerCase().replace(" ", "_")}
+                  className={`w-full py-3 rounded-full font-semibold text-sm transition-colors disabled:opacity-50 ${
                     tier.recommended
                       ? "bg-[#F97316] hover:bg-[#ea580c] text-white shadow-lg shadow-orange-500/30"
-                      : "border border-slate-200 text-slate-600 hover:border-slate-300"
+                      : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)]"
                   }`}>
-                    Get Started
-                  </button>
-                </Link>
+                  {checkoutLoading === tier.name.toLowerCase().replace(" ", "_") ? "Redirecting..." : "Get Started"}
+                </button>
               </motion.div>
             );
           })}
@@ -260,16 +319,16 @@ export default function PricingPage() {
           >
             Fuel Your Fleet: Credit Bundles
           </h2>
-          <p className="text-sm text-slate-400 text-center mb-6">Buy credits in bulk for better per-listing rates.</p>
+          <p className="text-sm text-[var(--color-text-secondary)] text-center mb-6">Buy credits in bulk for better per-listing rates.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {CREDIT_BUNDLES.map((bundle) => (
               <div
                 key={bundle.size}
-                className="bg-white rounded-2xl border border-slate-100 p-5 text-center hover:border-[#F97316]/30 transition-colors"
+                className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-5 text-center hover:border-[#F97316]/30 transition-colors"
               >
-                <p className="text-2xl font-bold text-[var(--color-text)]">{bundle.size} <span className="text-sm font-normal text-slate-400">Credits</span></p>
+                <p className="text-2xl font-bold text-[var(--color-text)]">{bundle.size} <span className="text-sm font-normal text-[var(--color-text-secondary)]">Credits</span></p>
                 <p className="text-lg font-bold text-[var(--color-text)] mt-1">${bundle.price}</p>
-                <p className="text-xs text-slate-400">${bundle.perCredit}/credit</p>
+                <p className="text-xs text-[var(--color-text-secondary)]">${bundle.perCredit}/credit</p>
               </div>
             ))}
           </div>
@@ -288,10 +347,10 @@ export default function PricingPage() {
           >
             Mission Augments
           </h2>
-          <p className="text-sm text-slate-400 text-center mb-6">Enhance your listings with premium capabilities.</p>
+          <p className="text-sm text-[var(--color-text-secondary)] text-center mb-6">Enhance your listings with premium capabilities.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {ADDONS.map((addon) => (
-              <div key={addon.name} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-start gap-3">
+              <div key={addon.name} className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-5 flex items-start gap-3">
                 <span className="text-2xl">{addon.icon}</span>
                 <div>
                   <h4 className="font-semibold text-[var(--color-text)]">{addon.name}</h4>
@@ -303,7 +362,7 @@ export default function PricingPage() {
         </motion.div>
 
         {/* Footer */}
-        <footer className="pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-300">
+        <footer className="pt-6 border-t border-[var(--color-card-border)] flex items-center justify-between text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
           <span>ListingJet</span>
           <div className="flex items-center gap-6">
             <span className="hover:text-slate-400 cursor-pointer">Support</span>

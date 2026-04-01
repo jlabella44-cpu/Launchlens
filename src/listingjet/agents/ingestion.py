@@ -1,7 +1,6 @@
 import uuid
 
 from sqlalchemy import select
-from temporalio import activity
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
@@ -58,10 +57,3 @@ class IngestionAgent(BaseAgent):
                 )
 
         return {"ingested_count": len(ingested), "duplicate_count": len(duplicates)}
-
-
-@activity.defn
-async def run_ingestion(listing_id: str, tenant_id: str) -> dict:
-    agent = IngestionAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

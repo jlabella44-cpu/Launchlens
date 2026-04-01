@@ -24,6 +24,8 @@ function AdminDashboard() {
   const [sortBy, setSortBy] = useState<"name" | "plan" | "credit_balance">("name");
   const [search, setSearch] = useState("");
 
+  useEffect(() => { document.title = "Admin Dashboard | ListingJet"; }, []);
+
   useEffect(() => {
     apiClient.adminStats().then(setStats).catch(console.error);
     apiClient.adminCreditsSummary().then(setCreditSummary).catch(console.error);
@@ -81,7 +83,7 @@ function AdminDashboard() {
         >
           Admin Dashboard
         </h1>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-8">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-secondary)] font-semibold mb-8">
           Flight Level: Command Center Ops
         </p>
 
@@ -93,13 +95,13 @@ function AdminDashboard() {
             { label: "Listings", value: stats?.total_listings ?? "—", suffix: "Supersonic" },
             { label: "Credits Outstanding", value: creditSummary?.total_credits_outstanding ?? "—", suffix: "" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-5 text-center">
+            <div key={s.label} className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-5 text-center">
               <p className="text-3xl font-bold text-[var(--color-text)]">
                 {typeof s.value === "number" ? s.value.toLocaleString() : s.value}
               </p>
-              <p className="text-xs text-slate-400 mt-1">{s.label}</p>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-1">{s.label}</p>
               {s.suffix && (
-                <span className="inline-flex mt-1 text-[9px] uppercase tracking-wider font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded">
+                <span className="inline-flex mt-1 text-[9px] uppercase tracking-wider font-bold bg-[var(--color-background)] text-[var(--color-text-secondary)] px-2 py-0.5 rounded">
                   {s.suffix}
                 </span>
               )}
@@ -133,7 +135,7 @@ function AdminDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Left: Tenant Roster */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-2xl border border-slate-100 p-5">
+            <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2
                   className="text-lg font-bold text-[var(--color-text)]"
@@ -143,7 +145,7 @@ function AdminDashboard() {
                 </h2>
                 <div className="flex items-center gap-2">
                   <div className="relative">
-                    <svg className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input
@@ -151,11 +153,11 @@ function AdminDashboard() {
                       placeholder="Search..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 w-32"
+                      className="pl-8 pr-3 py-1.5 text-xs border border-[var(--color-input-border)] rounded-lg bg-[var(--color-input-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 w-32"
                     />
                   </div>
                   <select
-                    className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+                    className="text-xs border border-[var(--color-input-border)] rounded-lg px-2 py-1.5 bg-[var(--color-input-bg)] text-[var(--color-text)] focus:outline-none"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                   >
@@ -168,7 +170,7 @@ function AdminDashboard() {
 
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100">
+                  <tr className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold border-b border-[var(--color-card-border)]">
                     <th className="pb-2 text-left">Name</th>
                     <th className="pb-2 text-left">Plan</th>
                     <th className="pb-2 text-left">Credit Balance</th>
@@ -179,7 +181,7 @@ function AdminDashboard() {
                   {sortedTenants.map((t) => (
                     <tr
                       key={t.id}
-                      className={`border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${
+                      className={`border-b border-[var(--color-card-border)] cursor-pointer hover:bg-[var(--color-background)] transition-colors ${
                         selectedTenant === t.id ? "bg-[#F97316]/5" : ""
                       }`}
                       onClick={() => handleSelectTenant(t.id)}
@@ -213,14 +215,14 @@ function AdminDashboard() {
             {selectedTenant && tenantCredits && selectedTenantData ? (
               <>
                 {/* Tenant Info */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-5">
+                <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-5">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-500">
+                    <div className="w-10 h-10 rounded-full bg-[var(--color-background)] flex items-center justify-center text-sm font-bold text-[var(--color-text-secondary)]">
                       {selectedTenantData.name.charAt(0)}
                     </div>
                     <div>
                       <p className="font-semibold text-[var(--color-text)]">{selectedTenantData.name}</p>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wider">Active Tenant Since {new Date(selectedTenantData.created_at).getFullYear()}</p>
+                      <p className="text-[10px] text-[var(--color-text-secondary)] uppercase tracking-wider">Active Tenant Since {new Date(selectedTenantData.created_at).getFullYear()}</p>
                     </div>
                   </div>
 
@@ -232,28 +234,28 @@ function AdminDashboard() {
                   </div>
 
                   {/* Adjustment Form */}
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-2">
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold mb-2">
                     Credit Adjustment
                   </p>
                   <div className="space-y-2 mb-3">
                     <div>
-                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Adjustment Amount</label>
+                      <label className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Adjustment Amount</label>
                       <input
                         type="number"
                         placeholder="e.g. 500 or -500"
                         value={adjustAmount}
                         onChange={(e) => setAdjustAmount(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F97316]/30"
+                        className="w-full px-3 py-2 border border-[var(--color-input-border)] rounded-lg text-sm bg-[var(--color-input-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[#F97316]/30"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">Reason for Adjustment</label>
+                      <label className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Reason for Adjustment</label>
                       <input
                         type="text"
                         placeholder="Service compensation, promo code, etc."
                         value={adjustReason}
                         onChange={(e) => setAdjustReason(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#F97316]/30"
+                        className="w-full px-3 py-2 border border-[var(--color-input-border)] rounded-lg text-sm bg-[var(--color-input-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[#F97316]/30"
                       />
                     </div>
                   </div>
@@ -270,12 +272,12 @@ function AdminDashboard() {
                 </div>
 
                 {/* Recent Transactions */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-5">
+                <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-5">
                   <h3 className="text-sm font-bold text-[var(--color-text)] uppercase tracking-wider mb-3">
                     Recent Transactions
                   </h3>
                   {tenantCredits.transactions.length === 0 ? (
-                    <p className="text-sm text-slate-400">No transactions yet.</p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">No transactions yet.</p>
                   ) : (
                     <div className="space-y-3 max-h-[350px] overflow-y-auto">
                       {tenantCredits.transactions.map((txn) => (
@@ -284,7 +286,7 @@ function AdminDashboard() {
                             <p className="text-sm text-[var(--color-text)]">
                               {txn.amount > 0 ? "+" : ""}{txn.amount}
                             </p>
-                            <p className="text-[10px] text-slate-400">
+                            <p className="text-[10px] text-[var(--color-text-secondary)]">
                               {txn.reason || txn.description || txn.transaction_type}
                             </p>
                           </div>
@@ -300,8 +302,8 @@ function AdminDashboard() {
                 </div>
               </>
             ) : (
-              <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center">
-                <p className="text-sm text-slate-400">
+              <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-8 text-center">
+                <p className="text-sm text-[var(--color-text-secondary)]">
                   Select a tenant to view credit details and make adjustments.
                 </p>
               </div>
@@ -310,7 +312,7 @@ function AdminDashboard() {
         </div>
 
         {/* Footer */}
-        <footer className="mt-16 pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-300">
+        <footer className="mt-16 pt-6 border-t border-[var(--color-card-border)] flex items-center justify-between text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
           <span>ListingJet Command</span>
           <span>© {new Date().getFullYear()} ListingJet. System Status: Supersonic.</span>
           <div className="flex gap-6">
