@@ -260,7 +260,14 @@ function BillingContent() {
               Manage your subscription through the billing portal.
             </p>
             <button
-              onClick={() => { window.location.href = "/billing/portal"; }}
+              onClick={async () => {
+                try {
+                  const { portal_url } = await apiClient.billingPortal(window.location.href);
+                  window.location.href = portal_url;
+                } catch (err: any) {
+                  alert(err.message || "Failed to open billing portal");
+                }
+              }}
               className="px-6 py-3 rounded-full border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
             >
               Manage Subscription
