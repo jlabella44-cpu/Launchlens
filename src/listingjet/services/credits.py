@@ -15,13 +15,6 @@ logger = logging.getLogger(__name__)
 # Track last low-credit alert per tenant to avoid spamming (tenant_id -> date)
 _low_credit_sent: dict[uuid.UUID, datetime] = {}
 
-# (included_credits_per_month, rollover_cap)
-TIER_CREDITS: dict[str, tuple[int, int]] = {
-    "starter": (5, 0),
-    "pro": (50, 25),
-    "enterprise": (500, 100),
-}
-
 
 class InsufficientCreditsError(Exception):
     pass

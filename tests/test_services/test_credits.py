@@ -273,7 +273,152 @@ async def test_get_transactions_ordered(db_session: AsyncSession):
     assert txns[0].balance_after > txns[-1].balance_after or txns[0].balance_after == txns[-1].balance_after
 
 
-# --- concurrent deduction ---
+# --- deduct_credits error: insufficient raises and balance unchanged ---
+
+
+@pytest.mark.asyncio
+async def test_deduct_credits_insufficient_raises_error(db_session: AsyncSession):
+    """Set up tenant with 2 credits, try to deduct 5 — error raised, balance unchanged."""
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=2)
+    svc = CreditService()
+
+    with pytest.raises(InsufficientCreditsError):
+        await svc.deduct_credits(
+            db_session, tid, 5,
+            transaction_type="listing_debit",
+            reference_type="listing",
+            reference_id=str(uuid.uuid4()),
+        )
+
+    balance = await svc.get_balance(db_session, tid)
+    assert balance.balance == 2
+
+
+# --- refund with no matching transaction ---
+
+
+@pytest.mark.asyncio
+async def test_refund_credits_no_matching_transaction(db_session: AsyncSession):
+    """Refund for a listing_id with no usage transaction returns None."""
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=10)
+    svc = CreditService()
+
+    result = await svc.refund_credits(db_session, tid, str(uuid.uuid4()))
+    assert result is None
+
+
+# --- period renewal respects rollover cap ---
+
+
+@pytest.mark.asyncio
+async def test_period_renewal_respects_rollover_cap(db_session: AsyncSession):
+    """Tenant with rollover_cap=5 and balance=8: renewal with 3 included credits.
+    Rollover capped at 5 (3 expired), then +3 granted = balance 8."""
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=8, rollover_cap=5)
+    svc = CreditService()
+
+    await svc.process_period_renewal(db_session, tid, included_credits=3)
+
+    balance = await svc.get_balance(db_session, tid)
+    # 8 balance → capped to 5 rollover (3 expired) → 5 + 3 granted = 8
+    assert balance.balance == 8
+    assert balance.rollover_balance == 5
+
+    # Verify expiry transaction
+    txns = await svc.get_transactions(db_session, tid)
+    expiry_txns = [t for t in txns if t.transaction_type == "expiry"]
+    assert len(expiry_txns) == 1
+    assert expiry_txns[0].amount == -3
+
+    # Verify grant transaction
+    grant_txns = [t for t in txns if t.transaction_type == "plan_grant"]
+    assert len(grant_txns) == 1
+    assert grant_txns[0].amount == 3
+
+
+# --- add_credits creates transaction record ---
+
+
+@pytest.mark.asyncio
+async def test_add_credits_creates_transaction_record(db_session: AsyncSession):
+    """Add 10 credits and verify the CreditTransaction has correct amount, type, and balance_after."""
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=5)
+    svc = CreditService()
+
+    txn = await svc.add_credits(
+        db_session, tid, 10,
+        transaction_type="purchase",
+        reference_type="stripe_invoice",
+        reference_id=str(uuid.uuid4()),
+        description="10 credit bundle",
+    )
+
+    assert txn.amount == 10
+    assert txn.transaction_type == "purchase"
+    assert txn.balance_after == 15
+
+    # Verify via get_transactions
+    txns = await svc.get_transactions(db_session, tid)
+    assert len(txns) == 1
+    assert txns[0].amount == 10
+    assert txns[0].balance_after == 15
+    assert txns[0].transaction_type == "purchase"
+
+
+# --- concurrent deduction (5 concurrent from 3 credits) ---
+
+
+@pytest.mark.asyncio
+async def test_deduct_credits_concurrent_no_overdraw(test_engine):
+    """Set up tenant with 3 credits, fire 5 concurrent deduct(1) calls.
+    Exactly 3 succeed, 2 fail, final balance is 0."""
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    factory = async_sessionmaker(test_engine, expire_on_commit=False)
+    tid = uuid.uuid4()
+
+    async with factory() as setup_session:
+        async with setup_session.begin():
+            setup_session.add(CreditAccount(tenant_id=tid, balance=3, rollover_cap=0))
+
+    results = {"success": 0, "insufficient": 0, "error": 0}
+
+    async def attempt_deduct():
+        svc = CreditService()
+        async with factory() as session:
+            async with session.begin():
+                try:
+                    await svc.deduct_credits(
+                        session, tid, 1,
+                        transaction_type="listing_debit",
+                        reference_type="listing",
+                        reference_id=str(uuid.uuid4()),
+                    )
+                    results["success"] += 1
+                except InsufficientCreditsError:
+                    results["insufficient"] += 1
+                except Exception:
+                    results["error"] += 1
+
+    await asyncio.gather(*[attempt_deduct() for _ in range(5)])
+
+    assert results["success"] == 3, f"Expected 3 successes, got {results}"
+    assert results["insufficient"] == 2, f"Expected 2 failures, got {results}"
+    assert results["error"] == 0, f"Unexpected errors: {results}"
+
+    async with factory() as check_session:
+        svc = CreditService()
+        balance = await svc.get_balance(check_session, tid)
+        assert balance.balance == 0, f"Overdraw detected! Balance is {balance.balance}"
+
+
+# --- original concurrent deduction test (2 from 1 credit) ---
 
 
 @pytest.mark.asyncio

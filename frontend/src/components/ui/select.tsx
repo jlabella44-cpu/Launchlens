@@ -16,7 +16,7 @@ export function Select({ label, options, className = "", ...props }: SelectProps
         </label>
       )}
       <select
-        className={`px-3 py-2 rounded-lg border border-white/20 bg-white/60 backdrop-blur-sm
+        className={`px-3 py-2 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)]
           text-[var(--color-text)]
           focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/50 focus:border-[var(--color-primary)]
           transition-all ${className}`}

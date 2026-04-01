@@ -2,12 +2,12 @@ import json
 import uuid
 
 from sqlalchemy import select
-from temporalio import activity
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.brand_kit import BrandKit
 from listingjet.models.listing import Listing
+from listingjet.models.property_data import PropertyData
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_llm_provider
 from listingjet.services.events import emit_event
@@ -132,6 +132,36 @@ class ContentAgent(BaseAgent):
                     market_section=market_section,
                 )
 
+                prop_result = await session.execute(
+                    select(PropertyData).where(PropertyData.listing_id == listing_id)
+                )
+                prop_data = prop_result.scalar_one_or_none()
+
+                neighborhood_context = ""
+                if prop_data:
+                    parts = []
+                    if isinstance(prop_data.walk_score, int) and prop_data.walk_score >= 70:
+                        parts.append(f"Walk Score: {prop_data.walk_score}/100 (very walkable)")
+                    if prop_data.lifestyle_tags:
+                        parts.append(f"Neighborhood: {', '.join(prop_data.lifestyle_tags)}")
+                    if prop_data.nearby_amenities:
+                        top_amenities = prop_data.nearby_amenities[:3]
+                        names = [a["name"] for a in top_amenities if isinstance(a, dict)]
+                        if names:
+                            parts.append(f"Nearby: {', '.join(names)}")
+                    if prop_data.school_ratings:
+                        ratings = prop_data.school_ratings
+                        if isinstance(ratings, dict):
+                            for level in ["elementary", "middle", "high"]:
+                                school = ratings.get(level)
+                                if isinstance(school, dict) and school.get("rating"):
+                                    parts.append(f"{school['name']} ({school['rating']}/10)")
+                                    break
+                    if parts:
+                        neighborhood_context = "\n\nNeighborhood context:\n" + "\n".join(f"- {p}" for p in parts)
+
+                prompt += neighborhood_context
+
                 raw = await self._llm_provider.complete(
                     prompt=prompt,
                     context=safe_metadata,
@@ -170,10 +200,3 @@ class ContentAgent(BaseAgent):
                 )
 
         return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed}
-
-
-@activity.defn
-async def run_content(listing_id: str, tenant_id: str) -> dict:
-    agent = ContentAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

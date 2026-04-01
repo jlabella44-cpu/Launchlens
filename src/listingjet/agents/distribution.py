@@ -2,7 +2,6 @@ import logging
 import uuid
 
 from sqlalchemy import select
-from temporalio import activity
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing, ListingState
@@ -76,10 +75,3 @@ class DistributionAgent(BaseAgent):
                     logger.exception("listing_delivered email failed for listing %s", context.listing_id)
 
         return {"status": "delivered"}
-
-
-@activity.defn
-async def run_distribution(listing_id: str, tenant_id: str) -> dict:
-    agent = DistributionAgent()
-    ctx = AgentContext(listing_id=listing_id, tenant_id=tenant_id)
-    return await agent.instrumented_execute(ctx)

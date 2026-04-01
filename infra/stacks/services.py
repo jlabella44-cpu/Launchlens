@@ -48,7 +48,7 @@ class ServicesStack(Stack):
         id: str,
         vpc: ec2.IVpc,
         db_instance: rds.DatabaseInstance,
-        redis_cluster: elasticache.CfnCacheCluster,
+        redis_cluster: elasticache.CfnReplicationGroup,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -87,7 +87,7 @@ class ServicesStack(Stack):
             "APP_ENV": "production",
             "ENVIRONMENT": "production",
             "AWS_REGION": Stack.of(self).region,
-            "REDIS_URL": f"redis://{redis_cluster.attr_redis_endpoint_address}:{redis_cluster.attr_redis_endpoint_port}/0",
+            "REDIS_URL": f"redis://{redis_cluster.attr_primary_end_point_address}:{redis_cluster.attr_primary_end_point_port}/0",
             "CORS_ORIGINS": "http://localhost:3000,https://launchlens-7bvngk56b-jlabella44-5360s-projects.vercel.app",
             "TEMPORAL_HOST": "temporal:7233",
         }
@@ -95,8 +95,8 @@ class ServicesStack(Stack):
         # --- API Service (Fargate + ALB) ------------------------------------
         api_task = ecs.FargateTaskDefinition(
             self, "ApiTask",
-            cpu=512,
-            memory_limit_mib=1024,
+            cpu=1024,
+            memory_limit_mib=2048,
         )
 
         api_container = api_task.add_container(
@@ -179,6 +179,18 @@ class ServicesStack(Stack):
                 ),
             )
 
+        # Auto-scaling for API service
+        api_scaling = self.api_service.service.auto_scale_task_count(
+            min_capacity=1,
+            max_capacity=4,
+        )
+        api_scaling.scale_on_cpu_utilization(
+            "CpuScaling",
+            target_utilization_percent=70,
+            scale_in_cooldown=Duration.seconds(300),
+            scale_out_cooldown=Duration.seconds(60),
+        )
+
         # --- S3 media bucket -------------------------------------------------
         self.media_bucket = s3.Bucket(
             self, "MediaBucket",
@@ -191,13 +203,13 @@ class ServicesStack(Stack):
         # --- Worker Service (Fargate, no ALB) --------------------------------
         worker_task = ecs.FargateTaskDefinition(
             self, "WorkerTask",
-            cpu=512,
-            memory_limit_mib=1024,
+            cpu=2048,
+            memory_limit_mib=4096,
         )
 
         worker_task.add_container(
             "worker",
-            image=ecs.ContainerImage.from_ecr_repository(self.api_repo, tag="latest"),
+            image=ecs.ContainerImage.from_ecr_repository(self.worker_repo, tag="latest"),
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="worker",
                 log_group=logs.LogGroup(
@@ -218,6 +230,13 @@ class ServicesStack(Stack):
                 "KLING_SECRET_KEY": ecs.Secret.from_secrets_manager(app_secrets, "KLING_SECRET_KEY"),
             },
             command=["worker"],
+            health_check=ecs.HealthCheck(
+                command=["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8081/health')\" || exit 1"],
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+                retries=3,
+                start_period=Duration.seconds(30),
+            ),
         )
 
         self.worker_service = ecs.FargateService(
@@ -265,7 +284,7 @@ class ServicesStack(Stack):
             self, "TemporalService",
             cluster=self.cluster,
             task_definition=temporal_task,
-            desired_count=0,  # Start at 0, scale up after verifying DB connectivity
+            desired_count=1,
             service_name="listingjet-temporal",
             assign_public_ip=False,
             cloud_map_options=ecs.CloudMapOptions(name="temporal"),
