@@ -78,6 +78,17 @@ class EmailService:
         except FileNotFoundError:
             logger.warning("email_template_missing template=%s", template_name)
 
+    def send_notification(self, to: str, template_name: str, **kwargs: str) -> None:
+        """Look up a template function by name, render it, and send."""
+        from listingjet.services.email_templates import TEMPLATES
+
+        template_fn = TEMPLATES.get(template_name)
+        if not template_fn:
+            logger.warning("email_template_unknown template=%s", template_name)
+            return
+        subject, html_body = template_fn(**kwargs)
+        self.send(to, subject, html_body)
+
 
 class NoOpEmailService(EmailService):
     """Does nothing — used in dev/test."""
@@ -87,6 +98,9 @@ class NoOpEmailService(EmailService):
 
     async def send_template(self, to: str, template_name: str, context: dict) -> None:
         logger.debug("noop_email_template", extra={"to": to, "template": template_name})
+
+    def send_notification(self, to: str, template_name: str, **kwargs: str) -> None:
+        logger.debug("noop_email_notification", extra={"to": to, "template": template_name})
 
 
 def get_email_service() -> EmailService:
