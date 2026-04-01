@@ -140,7 +140,7 @@ class ContentAgent(BaseAgent):
                 neighborhood_context = ""
                 if prop_data:
                     parts = []
-                    if prop_data.walk_score and prop_data.walk_score >= 70:
+                    if isinstance(prop_data.walk_score, int) and prop_data.walk_score >= 70:
                         parts.append(f"Walk Score: {prop_data.walk_score}/100 (very walkable)")
                     if prop_data.lifestyle_tags:
                         parts.append(f"Neighborhood: {', '.join(prop_data.lifestyle_tags)}")
