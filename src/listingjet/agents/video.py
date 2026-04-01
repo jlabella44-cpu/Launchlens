@@ -261,9 +261,12 @@ class VideoAgent(BaseAgent):
             video_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_vo_in_", delete=False)
             audio_fd = tempfile.NamedTemporaryFile(suffix=".mp3", prefix="listingjet_vo_audio_", delete=False)
             output_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_vo_out_", delete=False)
-            video_path = video_fd.name; video_fd.close()
-            audio_path = audio_fd.name; audio_fd.close()
-            output_path = output_fd.name; output_fd.close()
+            video_path = video_fd.name
+            video_fd.close()
+            audio_path = audio_fd.name
+            audio_fd.close()
+            output_path = output_fd.name
+            output_fd.close()
 
             with open(video_path, "wb") as f:
                 f.write(video_bytes)
@@ -309,8 +312,10 @@ class VideoAgent(BaseAgent):
         try:
             png_fd = tempfile.NamedTemporaryFile(suffix=".png", prefix="listingjet_endcard_", delete=False)
             mp4_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_endcard_", delete=False)
-            png_path = png_fd.name; png_fd.close()
-            mp4_path = mp4_fd.name; mp4_fd.close()
+            png_path = png_fd.name
+            png_fd.close()
+            mp4_path = mp4_fd.name
+            mp4_fd.close()
             with open(png_path, "wb") as f:
                 f.write(png_bytes)
             subprocess.run([
