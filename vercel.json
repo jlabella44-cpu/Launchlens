@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "http://Listin-ApiSe-Ly4m06X1ArNQ-22089779.us-east-1.elb.amazonaws.com/:path*"
+      "destination": "https://Listin-ApiSe-Ly4m06X1ArNQ-22089779.us-east-1.elb.amazonaws.com/:path*"
     }
   ],
   "env": {
