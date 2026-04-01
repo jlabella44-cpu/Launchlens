@@ -90,7 +90,7 @@ async def test_logo_upload_url(_mock_rate_limiter, async_client):
     mock_storage = MagicMock()
     mock_storage.presigned_upload_url.return_value = "https://s3.example.com/presigned"
 
-    with patch("listingjet.api.brand_kit.StorageService", return_value=mock_storage):
+    with patch("listingjet.api.brand_kit.get_storage", return_value=mock_storage):
         resp = await async_client.post("/brand-kit/logo-upload-url", headers=_auth(token))
 
     assert resp.status_code == 200

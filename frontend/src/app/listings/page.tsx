@@ -20,20 +20,18 @@ function ListingsDashboard() {
   useEffect(() => { document.title = "Listings | ListingJet"; }, []);
 
   useEffect(() => {
-    apiClient
-      .getListings()
-      .then(setListings)
+    Promise.all([
+      apiClient.getListings(),
+      apiClient.getBrandKit().catch(() => null),
+    ])
+      .then(([listings, kit]) => {
+        setListings(listings);
+        if (!kit) setShowBrandBanner(true);
+      })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Failed to load listings");
       })
       .finally(() => setLoading(false));
-
-    apiClient
-      .getBrandKit()
-      .then((kit) => {
-        if (!kit) setShowBrandBanner(true);
-      })
-      .catch(() => {});
   }, []);
 
   function handleCreated(listing: ListingResponse) {

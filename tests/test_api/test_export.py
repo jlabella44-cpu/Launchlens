@@ -53,7 +53,7 @@ async def _create_and_prepare_listing(
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.StorageService")
+@patch("listingjet.api.listings.get_storage")
 async def test_export_returns_mls_bundle(mock_storage_cls, async_client, db_session):
     mock_storage_cls.return_value.presigned_url.return_value = "https://s3.example.com/presigned"
     token, tenant_id = await _register(async_client)
@@ -74,7 +74,7 @@ async def test_export_returns_mls_bundle(mock_storage_cls, async_client, db_sess
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.StorageService")
+@patch("listingjet.api.listings.get_storage")
 async def test_export_defaults_to_marketing(mock_storage_cls, async_client, db_session):
     mock_storage_cls.return_value.presigned_url.return_value = "https://s3.example.com/presigned"
     token, tenant_id = await _register(async_client)
@@ -93,7 +93,7 @@ async def test_export_defaults_to_marketing(mock_storage_cls, async_client, db_s
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.StorageService")
+@patch("listingjet.api.listings.get_storage")
 async def test_export_404_when_no_bundle(mock_storage_cls, async_client, db_session):
     token, tenant_id = await _register(async_client)
     listing = await _create_and_prepare_listing(
@@ -110,7 +110,7 @@ async def test_export_404_when_no_bundle(mock_storage_cls, async_client, db_sess
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.StorageService")
+@patch("listingjet.api.listings.get_storage")
 async def test_export_409_when_not_approved(mock_storage_cls, async_client, db_session):
     token, tenant_id = await _register(async_client)
     listing = await _create_and_prepare_listing(

@@ -36,7 +36,7 @@ async def _create_listing(client: AsyncClient, token: str) -> str:
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.StorageService")
+@patch("listingjet.api.listings.get_storage")
 async def test_upload_urls_max_50_files_succeeds(MockStorage, async_client: AsyncClient):
     """Request presigned URLs for exactly 50 files → 200 with 50 URLs."""
     mock_svc = MockStorage.return_value
@@ -88,7 +88,7 @@ async def test_upload_urls_zero_files_returns_400(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.StorageService")
+@patch("listingjet.api.listings.get_storage")
 async def test_upload_urls_invalid_extension_returns_400(MockStorage, async_client: AsyncClient):
     """Request URL for 'photo.gif' → 400 with message about allowed extensions."""
     mock_svc = MockStorage.return_value
@@ -107,7 +107,7 @@ async def test_upload_urls_invalid_extension_returns_400(MockStorage, async_clie
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.StorageService")
+@patch("listingjet.api.listings.get_storage")
 async def test_upload_urls_valid_extensions_accepted(MockStorage, async_client: AsyncClient):
     """Test .jpg, .jpeg, .png all succeed."""
     mock_svc = MockStorage.return_value

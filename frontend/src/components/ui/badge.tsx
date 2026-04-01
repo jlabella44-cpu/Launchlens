@@ -13,6 +13,7 @@ const STATE_COLORS: Record<string, { bg: string; text: string; dot: string }> = 
   delivered: { bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
   demo: { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
   failed: { bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500" },
+  cancelled: { bg: "bg-slate-100", text: "text-slate-500", dot: "bg-slate-400" },
 };
 
 // Autopilot-themed display labels
@@ -27,6 +28,7 @@ const STATE_LABELS: Record<string, string> = {
   delivered: "Mission Complete",
   demo: "Demo Flight",
   failed: "Course Correction Required",
+  cancelled: "Mission Aborted",
   pipeline_timeout: "Flight Delayed",
 };
 
