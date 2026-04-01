@@ -30,6 +30,8 @@ COPY alembic.ini ./
 COPY docker/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
+RUN pip install playwright && playwright install chromium --with-deps
+
 # Non-root user
 RUN useradd --create-home --shell /bin/bash listingjet && \
     chown -R listingjet:listingjet /app

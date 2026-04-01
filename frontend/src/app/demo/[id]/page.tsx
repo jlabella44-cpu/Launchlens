@@ -20,6 +20,8 @@ export default function DemoResultsPage() {
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
 
+  useEffect(() => { document.title = "Demo Results | ListingJet"; }, []);
+
   useEffect(() => {
     apiClient
       .demoView(id)

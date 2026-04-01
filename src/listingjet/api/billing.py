@@ -15,11 +15,12 @@ from listingjet.api.schemas.billing import (
     PortalRequest,
     PortalResponse,
 )
+from listingjet.config.tiers import TIER_CREDITS
 from listingjet.database import get_db
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.billing import BillingService
-from listingjet.services.credits import TIER_CREDITS, CreditService
+from listingjet.services.credits import CreditService
 from listingjet.services.endpoint_rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)
@@ -241,12 +242,20 @@ async def _handle_checkout_completed(
     if not tenant.stripe_customer_id:
         tenant.stripe_customer_id = data_object.get("customer")
 
-    # Resolve plan from subscription items
-    items = data_object.get("display_items", []) or []
-    if items and items[0].get("price", {}).get("id"):
-        tenant.plan = svc.resolve_plan(items[0]["price"]["id"])
-    else:
-        tenant.plan = "pro"  # fallback
+    # Resolve plan from subscription — fetch from Stripe since checkout session
+    # doesn't include line item details in the webhook payload
+    sub_id = data_object.get("subscription")
+    resolved_plan = "pro"  # fallback
+    if sub_id:
+        try:
+            sub = stripe_mod.Subscription.retrieve(sub_id, api_key=svc._api_key)
+            if sub.get("items", {}).get("data"):
+                price_id = sub["items"]["data"][0].get("price", {}).get("id", "")
+                resolved_plan = svc.resolve_plan(price_id)
+        except Exception:
+            logger.warning("Could not fetch subscription %s for plan resolution", sub_id)
+
+    tenant.plan = resolved_plan
 
     # Set credit tier
     included, cap = TIER_CREDITS.get(tenant.plan, (0, 0))

@@ -264,8 +264,9 @@ async def test_checkout_completed_missing_tenant_id_noop(MockBilling, async_clie
 @patch("listingjet.api.billing.BillingService")
 async def test_subscription_deleted_downgrades_to_lite(MockBilling, async_client: AsyncClient, db_session):
     """Send customer.subscription.deleted → tenant.plan == 'lite', stripe_subscription_id is None."""
+    tenant_id = uuid.uuid4()
     tenant = Tenant(
-        id=uuid.uuid4(), name="ProCo", plan="pro",
+        id=tenant_id, name="ProCo", plan="pro",
         stripe_customer_id="cus_pro_del", stripe_subscription_id="sub_pro_del",
     )
     db_session.add(tenant)
@@ -290,7 +291,7 @@ async def test_subscription_deleted_downgrades_to_lite(MockBilling, async_client
 
     from sqlalchemy import select as sa_select
     db_session.expire_all()
-    t = (await db_session.execute(sa_select(Tenant).where(Tenant.id == tenant.id))).scalar_one()
+    t = (await db_session.execute(sa_select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
     assert t.plan == "lite"
     assert t.stripe_subscription_id is None
 

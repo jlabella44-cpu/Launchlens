@@ -18,6 +18,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  useEffect(() => { document.title = "Sign In | ListingJet"; }, []);
+
   const handleGoogleResponse = useCallback(
     async (response: { credential: string }) => {
       setError("");
@@ -74,7 +76,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* Left: Hero Panel */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-[#0B1120] relative overflow-hidden p-10">
         {/* Logo */}

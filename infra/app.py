@@ -6,6 +6,7 @@ from stacks.ci import CIStack
 from stacks.database import DatabaseStack
 from stacks.monitoring import MonitoringStack
 from stacks.network import NetworkStack
+from stacks.cdn import ListingJetCDN
 from stacks.services import ServicesStack
 
 app = cdk.App()
@@ -32,6 +33,13 @@ services = ServicesStack(
     redis_cluster=database.redis_cluster,
     env=env,
 )
+
+cdn = ListingJetCDN(
+    app, "ListingJetCDN",
+    media_bucket=services.media_bucket,
+    env=env,
+)
+cdn.add_dependency(services)
 
 monitoring = MonitoringStack(
     app, "ListingJetMonitoring",

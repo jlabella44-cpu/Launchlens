@@ -24,6 +24,7 @@ class AssetResponse(BaseModel):
     file_path: str
     file_hash: str
     state: str
+    thumbnail_url: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -1,11 +1,11 @@
 """Upload edge-case tests — file limits, extensions, and asset registration."""
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from listingjet.config import settings
 from listingjet.models.asset import Asset

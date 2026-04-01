@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
@@ -16,6 +16,8 @@ function ListingsDashboard() {
   const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showBrandBanner, setShowBrandBanner] = useState(false);
+
+  useEffect(() => { document.title = "Listings | ListingJet"; }, []);
 
   useEffect(() => {
     apiClient
