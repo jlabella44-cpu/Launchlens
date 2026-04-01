@@ -1,5 +1,6 @@
 import logging
 import uuid
+from urllib.parse import urlparse
 
 import stripe as stripe_mod
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +16,7 @@ from listingjet.api.schemas.billing import (
     PortalRequest,
     PortalResponse,
 )
+from listingjet.config import settings
 from listingjet.config.tiers import TIER_CREDITS
 from listingjet.database import get_db
 from listingjet.models.tenant import Tenant
@@ -28,12 +30,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _validate_redirect_url(url: str) -> None:
+    """Reject redirect URLs that don't match a configured CORS origin."""
+    allowed = {o.strip().rstrip("/") for o in settings.cors_origins.split(",")}
+    parsed = urlparse(url)
+    origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    if origin not in allowed:
+        raise HTTPException(status_code=400, detail="Redirect URL not allowed")
+
+
 @router.post("/checkout", response_model=CheckoutResponse)
 async def create_checkout(
     body: CheckoutRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _validate_redirect_url(body.success_url)
+    _validate_redirect_url(body.cancel_url)
+
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -81,6 +95,8 @@ async def create_portal(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _validate_redirect_url(body.return_url)
+
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
