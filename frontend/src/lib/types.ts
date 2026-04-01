@@ -359,3 +359,18 @@ export interface CreditTransactionResponse {
   reason: string | null;
   created_at: string;
 }
+
+export interface TeamMemberResponse {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  created_at: string;
+}
+
+export interface InviteTeamMemberRequest {
+  email: string;
+  name?: string;
+  password: string;
+  role?: string;
+}

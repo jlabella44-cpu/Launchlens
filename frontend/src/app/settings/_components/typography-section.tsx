@@ -12,6 +12,12 @@ interface BrandKitFormState {
   logo_url: string | null;
   headshot_url: string | null;
   team_logo_url: string | null;
+  accent_color: string;
+  background_color: string;
+  font_secondary: string;
+  brand_voice: string;
+  brand_tone: string;
+  voice_notes: string;
 }
 
 interface TypographySectionProps {
@@ -66,39 +72,67 @@ export default function TypographySection({
         </h3>
       </div>
 
-      {/* Font Select */}
-      <div className="mb-6">
-        <label
-          className="block text-[10px] uppercase tracking-wider font-medium text-[var(--color-text)]/60 mb-1.5"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          System Font Family
-        </label>
-        <Select
-          value={form.font_primary}
-          onChange={(e) =>
-            setForm((prev) => ({ ...prev, font_primary: e.target.value }))
-          }
-          options={FONT_OPTIONS.map((font) => ({
-            label: font || "Default (Josefin Sans)",
-            value: font,
-          }))}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+        {/* Heading Font */}
+        <div>
+          <label
+            className="block text-[10px] uppercase tracking-wider font-medium text-[var(--color-text-secondary)] mb-1.5"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Heading Font
+          </label>
+          <Select
+            value={form.font_primary}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, font_primary: e.target.value }))
+            }
+            options={FONT_OPTIONS.map((font) => ({
+              label: font || "Default (Exo 2)",
+              value: font,
+            }))}
+          />
+        </div>
+
+        {/* Body Font */}
+        <div>
+          <label
+            className="block text-[10px] uppercase tracking-wider font-medium text-[var(--color-text-secondary)] mb-1.5"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Body Font
+          </label>
+          <Select
+            value={form.font_secondary}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, font_secondary: e.target.value }))
+            }
+            options={FONT_OPTIONS.map((font) => ({
+              label: font || "Default (Josefin Sans)",
+              value: font,
+            }))}
+          />
+        </div>
       </div>
 
       {/* Font Preview */}
       <div className="rounded-lg border border-white/10 bg-[var(--color-input-bg)] p-5">
         <p
-          className="text-[10px] uppercase tracking-wider font-medium text-[var(--color-text)]/40 mb-2"
+          className="text-[10px] uppercase tracking-wider font-medium text-[var(--color-text-secondary)] mb-2"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           Preview
         </p>
         <p
-          className="text-lg text-[var(--color-text)]"
-          style={{ fontFamily: form.font_primary || "inherit" }}
+          className="text-xl font-bold text-[var(--color-text)] mb-1"
+          style={{ fontFamily: form.font_primary || "var(--font-heading)" }}
         >
-          The quick brown fox jumps over the lazy dog
+          The Stratos Villa — $4,250,000
+        </p>
+        <p
+          className="text-sm text-[var(--color-text-secondary)] leading-relaxed"
+          style={{ fontFamily: form.font_secondary || "var(--font-body)" }}
+        >
+          Experience uncompromised altitude with this architectural marvel. Engineered for elite living with seamless glass transitions and panoramic views.
         </p>
       </div>
     </section>
