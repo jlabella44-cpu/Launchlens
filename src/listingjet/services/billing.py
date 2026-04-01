@@ -83,7 +83,16 @@ class BillingService:
 
     def resolve_plan(self, price_id: str) -> str:
         _init_price_map()
-        return PRICE_TO_PLAN.get(price_id, "starter")
+        plan = PRICE_TO_PLAN.get(price_id)
+        if plan is None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Unknown Stripe price_id=%s — defaulting to starter. "
+                "Add the price to settings if this is a new product tier.",
+                price_id,
+            )
+            return "starter"
+        return plan
 
     def get_price_for_plan(self, plan: str) -> str | None:
         _init_price_map()
