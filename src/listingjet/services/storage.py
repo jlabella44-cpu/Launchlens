@@ -107,3 +107,14 @@ class StorageService:
         except ClientError as e:
             logger.exception("S3 delete failed key=%s", key)
             raise StorageError(f"Failed to delete {key}: {e}") from e
+
+
+# Module-level singleton — reuses the same boto3 S3 client across requests
+_default_storage: StorageService | None = None
+
+
+def get_storage() -> StorageService:
+    global _default_storage
+    if _default_storage is None:
+        _default_storage = StorageService()
+    return _default_storage

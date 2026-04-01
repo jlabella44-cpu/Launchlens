@@ -323,7 +323,7 @@ async def adjust_credits(
         balance_after=new_balance,
         transaction_type="admin_adjustment",
         description=body.reason,
-        metadata_={"admin_user_id": str(admin_user.id), "admin_email": admin_user.email},
+        metadata_={"admin_user_id": str(admin_user.id)},
     )
     db.add(txn)
     await audit_log(

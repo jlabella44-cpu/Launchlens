@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import apiClient from "@/lib/api-client";
@@ -62,13 +62,13 @@ function AdminDashboard() {
     }
   }
 
-  const sortedTenants = [...tenants]
+  const sortedTenants = useMemo(() => [...tenants]
     .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       if (sortBy === "credit_balance") return (b.credit_balance ?? 0) - (a.credit_balance ?? 0);
       if (sortBy === "plan") return a.plan.localeCompare(b.plan);
       return a.name.localeCompare(b.name);
-    });
+    }), [tenants, search, sortBy]);
 
   const selectedTenantData = tenants.find((t) => t.id === selectedTenant);
 

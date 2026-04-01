@@ -17,7 +17,7 @@ from listingjet.api.deps import get_current_user, get_db
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.user import User
 from listingjet.services.endpoint_rate_limit import rate_limit
-from listingjet.services.storage import StorageService
+from listingjet.services.storage import get_storage
 from listingjet.temporal_client import get_temporal_client
 
 logger = logging.getLogger(__name__)
@@ -106,16 +106,20 @@ async def bulk_export(
     if body.mode not in ("mls", "marketing"):
         raise HTTPException(status_code=400, detail="Mode must be 'mls' or 'marketing'")
 
-    storage = StorageService()
+    storage = get_storage()
     results = []
 
+    # Batch fetch all listings in one query
+    listings_result = await db.execute(
+        select(Listing).where(
+            Listing.id.in_(body.listing_ids),
+            Listing.tenant_id == current_user.tenant_id,
+        )
+    )
+    listings_by_id = {row.id: row for row in listings_result.scalars().all()}
+
     for lid in body.listing_ids:
-        listing = (await db.execute(
-            select(Listing).where(
-                Listing.id == lid,
-                Listing.tenant_id == current_user.tenant_id,
-            )
-        )).scalar_one_or_none()
+        listing = listings_by_id.get(lid)
 
         if not listing:
             results.append({"listing_id": str(lid), "status": "not_found"})

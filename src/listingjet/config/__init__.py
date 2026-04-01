@@ -63,10 +63,6 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     git_sha: str = ""
 
-    # Feature flags
-    shadow_review_enabled: bool = True
-    shadow_review_max_listings: int = 100
-
     # Provider API keys
     openai_api_key: str = ""
     anthropic_api_key: str = ""

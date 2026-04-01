@@ -17,7 +17,7 @@ from listingjet.api.schemas.brand_kit import BrandKitResponse, BrandKitUpsertReq
 from listingjet.database import get_db
 from listingjet.models.brand_kit import BrandKit
 from listingjet.models.user import User
-from listingjet.services.storage import StorageService
+from listingjet.services.storage import get_storage
 
 router = APIRouter()
 
@@ -79,7 +79,7 @@ async def get_logo_upload_url(
     current_user: User = Depends(get_current_user),
 ):
     """Get a presigned S3 URL for uploading a brand logo."""
-    storage = StorageService()
+    storage = get_storage()
     key = f"brand-kits/{current_user.tenant_id}/logo-{uuid.uuid4()}.png"
     presigned = storage.presigned_upload_url(
         key=key,

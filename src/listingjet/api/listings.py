@@ -43,7 +43,7 @@ from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_review_turnaround
 from listingjet.services.plan_limits import check_asset_quota, check_listing_quota, get_limits
-from listingjet.services.storage import StorageService
+from listingjet.services.storage import get_storage
 from listingjet.temporal_client import get_temporal_client
 
 logger = logging.getLogger(__name__)
@@ -276,7 +276,7 @@ async def get_upload_urls(
         raise HTTPException(status_code=400, detail="Provide 1-50 files")
 
     ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
-    storage = StorageService()
+    storage = get_storage()
     upload_urls = []
     for f in files:
         filename = f.get("filename", "") if isinstance(f, dict) else str(f)
@@ -392,16 +392,24 @@ async def list_assets(
     )
     assets = result.scalars().all()
 
-    from listingjet.services.storage import StorageService
-    storage = StorageService()
-    response = []
-    for asset in assets:
-        data = AssetResponse.model_validate(asset)
+    from concurrent.futures import ThreadPoolExecutor
+
+    storage = get_storage()
+    response = [AssetResponse.model_validate(a) for a in assets]
+
+    # Batch generate presigned URLs in thread pool (S3 calls are sync/IO-bound)
+    def _gen_url(file_path: str) -> str | None:
         try:
-            data.thumbnail_url = storage.presigned_url(asset.file_path, expires_in=3600)
+            return storage.presigned_url(file_path, expires_in=3600)
         except Exception:
-            data.thumbnail_url = None
-        response.append(data)
+            return None
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        urls = list(pool.map(_gen_url, [a.file_path for a in assets]))
+
+    for data, url in zip(response, urls):
+        data.thumbnail_url = url
+
     return response
 
 
@@ -762,7 +770,7 @@ async def cancel_listing(
         if txn:
             credits_refunded = txn.amount
 
-    listing.state = ListingState.FAILED  # reuse FAILED state for cancelled
+    listing.state = ListingState.CANCELLED
     await db.commit()
 
     return {"listing_id": str(listing.id), "state": listing.state.value, "credits_refunded": credits_refunded}
@@ -892,7 +900,7 @@ async def export_listing(
     if not bundle_path:
         raise HTTPException(status_code=404, detail="Export not yet generated")
 
-    storage = StorageService()
+    storage = get_storage()
     expires_in = 900  # 15 minutes
     download_url = storage.presigned_url(bundle_path, expires_in=expires_in)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
