@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
 from listingjet.api.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from listingjet.api.schemas.errors import ErrorResponse
 from listingjet.database import get_db
 from listingjet.models.credit_account import CreditAccount
 from listingjet.models.tenant import Tenant
@@ -39,8 +40,20 @@ _TIER_TO_PLAN = {
 }
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post(
+    "/register",
+    response_model=TokenResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    },
+)
 async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_limit(5, 60)), db: AsyncSession = Depends(get_db)):
+    """Register a new user and tenant, returning a JWT token pair.
+
+    Creates a tenant, credit account, and admin user in one transaction, then
+    sends a welcome email. Returns 409 if the email is already registered.
+    """
     email = body.email.strip().lower()
     existing = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if existing:
@@ -103,8 +116,17 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    responses={401: {"model": ErrorResponse}},
+)
 async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10, 60)), db: AsyncSession = Depends(get_db)):
+    """Authenticate with email and password, returning a JWT token pair.
+
+    Uses constant-time password comparison to prevent timing attacks.
+    Returns 401 for any invalid credential combination.
+    """
     email = body.email.strip().lower()
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     # Constant-time comparison: always run bcrypt even if user not found
@@ -135,6 +157,7 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
+    """Return the currently authenticated user's profile."""
     return current_user
 
 

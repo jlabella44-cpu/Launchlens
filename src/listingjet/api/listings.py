@@ -14,6 +14,7 @@ from listingjet.api.schemas.assets import (
     CreateAssetsRequest,
     CreateAssetsResponse,
 )
+from listingjet.api.schemas.errors import ErrorResponse
 from listingjet.api.schemas.listings import (
     ActionResponse,
     BundleMetadata,
@@ -57,6 +58,10 @@ async def create_listing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Create a new listing. Deducts one credit for credit-billed tenants (402 if insufficient).
+
+    For legacy tenants, enforces the monthly listing quota for the current plan.
+    """
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -173,6 +178,7 @@ async def get_listing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Return a single listing by ID. Returns 404 if not found or not owned by the current tenant."""
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -191,6 +197,7 @@ async def update_listing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Update a listing's address or metadata fields. Only provided fields are changed."""
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -216,6 +223,7 @@ async def get_dollhouse(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Return the 3-D dollhouse scene JSON generated from the listing's floorplan asset."""
     listing = (await db.execute(
         select(Listing).where(Listing.id == listing_id, Listing.tenant_id == current_user.tenant_id)
     )).scalar_one_or_none()
@@ -297,6 +305,11 @@ async def register_assets(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Register uploaded S3 assets for a listing and trigger the AI pipeline.
+
+    Advances the listing from NEW → UPLOADING and automatically starts the
+    Temporal workflow. Returns 403 if the plan's per-listing asset quota is exceeded.
+    """
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -364,6 +377,7 @@ async def list_assets(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """List all assets associated with a listing, ordered by upload time."""
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -385,6 +399,7 @@ async def get_package(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Return the AI-selected photo package for the listing, ordered by position."""
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -511,6 +526,7 @@ async def start_review(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Transition a listing from AWAITING_REVIEW to IN_REVIEW, locking it for editing."""
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -536,13 +552,18 @@ async def start_review(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/approve", response_model=ActionResponse)
+@router.post(
+    "/{listing_id}/approve",
+    response_model=ActionResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def approve_listing(
     listing_id: uuid.UUID,
     _rl=Depends(rate_limit(5, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Approve a listing that is IN_REVIEW, signalling the workflow to continue post-approval steps."""
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -574,7 +595,11 @@ async def approve_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/reject", response_model=ActionResponse)
+@router.post(
+    "/{listing_id}/reject",
+    response_model=ActionResponse,
+    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def reject_listing(
     listing_id: uuid.UUID,
     body: RejectRequest,
@@ -660,7 +685,11 @@ async def retry_pipeline(
     return {"listing_id": str(listing.id), "state": "uploading"}
 
 
-@router.post("/{listing_id}/cancel", response_model=CancelResponse)
+@router.post(
+    "/{listing_id}/cancel",
+    response_model=CancelResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def cancel_listing(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),

@@ -22,6 +22,7 @@ router = APIRouter()
 
 @router.get("", response_model=list[AddonResponse])
 async def list_addons(db: AsyncSession = Depends(get_db)):
+    """Return all active add-ons available for purchase."""
     result = await db.execute(
         select(AddonCatalog).where(AddonCatalog.is_active.is_(True))
     )
@@ -35,6 +36,11 @@ async def activate_addon(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Activate an add-on for a listing, deducting the required credits.
+
+    Can only be applied before the pipeline starts (states: NEW, UPLOADING,
+    AWAITING_REVIEW, IN_REVIEW). Returns 402 if credits are insufficient.
+    """
     # Verify listing ownership
     listing = (await db.execute(
         select(Listing).where(
@@ -104,6 +110,7 @@ async def list_listing_addons(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """List all add-ons activated for a specific listing."""
     result = await db.execute(
         select(AddonPurchase, AddonCatalog)
         .join(AddonCatalog, AddonPurchase.addon_id == AddonCatalog.id)

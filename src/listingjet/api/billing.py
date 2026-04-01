@@ -15,6 +15,7 @@ from listingjet.api.schemas.billing import (
     PortalRequest,
     PortalResponse,
 )
+from listingjet.api.schemas.errors import ErrorResponse
 from listingjet.database import get_db
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
@@ -27,12 +28,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/checkout", response_model=CheckoutResponse)
+@router.post(
+    "/checkout",
+    response_model=CheckoutResponse,
+    responses={404: {"model": ErrorResponse}},
+)
 async def create_checkout(
     body: CheckoutRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Create a Stripe Checkout session for a subscription plan.
+
+    Automatically creates a Stripe customer for the tenant if one does not exist yet.
+    """
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -63,6 +72,7 @@ async def billing_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Return the current tenant's plan, payment method, and subscription status."""
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -80,6 +90,10 @@ async def create_portal(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Create a Stripe Customer Portal session for managing billing details.
+
+    Requires the tenant to have completed checkout first (400 if no billing account).
+    """
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -100,7 +114,7 @@ async def list_invoices(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List recent invoices from Stripe."""
+    """List recent invoices from Stripe for the current tenant."""
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -118,7 +132,10 @@ async def change_plan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upgrade or downgrade subscription plan."""
+    """Upgrade or downgrade subscription plan.
+
+    Requires an active Stripe subscription; use /billing/checkout to subscribe first.
+    """
     if body.plan not in ("starter", "pro", "enterprise"):
         raise HTTPException(status_code=400, detail="Invalid plan. Must be: starter, pro, enterprise")
 
@@ -166,6 +183,11 @@ async def _find_tenant_by_customer(db: AsyncSession, customer_id: str) -> Tenant
 
 @router.post("/webhook", dependencies=[Depends(rate_limit(30, 60))])
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    """Receive and process Stripe webhook events.
+
+    Handles checkout completion, subscription updates/deletions, and invoice
+    payment events. Signature is verified against the configured webhook secret.
+    """
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     if not sig_header:

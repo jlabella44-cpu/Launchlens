@@ -11,6 +11,20 @@ class CreditBalanceResponse(BaseModel):
     period_start: datetime
     period_end: datetime
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "balance": 12,
+                    "rollover_balance": 2,
+                    "rollover_cap": 5,
+                    "period_start": "2024-01-01T00:00:00Z",
+                    "period_end": "2024-02-01T00:00:00Z",
+                }
+            ]
+        }
+    }
+
 
 class CreditTransactionResponse(BaseModel):
     id: uuid.UUID
@@ -30,6 +44,19 @@ class CreditPurchaseRequest(BaseModel):
     success_url: str
     cancel_url: str
     idempotency_key: str | None = None  # Client-generated key to prevent duplicate purchases
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "bundle_size": 10,
+                    "success_url": "https://app.listingjet.com/credits?success=1",
+                    "cancel_url": "https://app.listingjet.com/credits?cancelled=1",
+                    "idempotency_key": "buy-10-credits-2024-01-15",
+                }
+            ]
+        }
+    }
 
 
 class CreditPurchaseResponse(BaseModel):

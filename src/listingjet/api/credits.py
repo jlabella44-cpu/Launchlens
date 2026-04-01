@@ -12,6 +12,7 @@ from listingjet.api.schemas.credits import (
     CreditPurchaseResponse,
     CreditTransactionResponse,
 )
+from listingjet.api.schemas.errors import ErrorResponse
 from listingjet.database import get_db
 from listingjet.models.user import User
 from listingjet.services.billing import BillingService
@@ -41,6 +42,7 @@ async def get_credit_balance(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Return the current tenant's credit balance, rollover info, and billing period dates."""
     svc = CreditService()
     try:
         balance = await svc.get_balance(db, current_user.tenant_id)
@@ -59,21 +61,35 @@ async def get_credit_transactions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Return the paginated credit transaction history for the current tenant."""
     svc = CreditService()
     return await svc.get_transactions(db, current_user.tenant_id, limit=limit, offset=offset)
 
 
 @router.get("/pricing", response_model=CreditPricingResponse)
 async def get_credit_pricing():
+    """Return available credit bundle sizes and their prices."""
     return CreditPricingResponse(bundles=CREDIT_BUNDLES)
 
 
-@router.post("/purchase", response_model=CreditPurchaseResponse)
+@router.post(
+    "/purchase",
+    response_model=CreditPurchaseResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        402: {"model": ErrorResponse},
+    },
+)
 async def purchase_credits(
     body: CreditPurchaseRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Create a Stripe Checkout session to purchase a credit bundle.
+
+    Supports bundle sizes of 5, 10, 25, or 50 credits. Supply an idempotency_key
+    to safely retry without creating duplicate checkout sessions.
+    """
     if body.bundle_size not in BUNDLE_SIZE_TO_STRIPE_SETTING:
         raise HTTPException(400, f"Invalid bundle size. Choose from: {list(BUNDLE_SIZE_TO_STRIPE_SETTING.keys())}")
 

@@ -33,11 +33,13 @@ router = APIRouter()
 
 @router.get("/health-detail")
 async def health_detail():
+    """Unauthenticated health check for the admin router."""
     return {"status": "ok", "detail": "admin"}
 
 
 @router.get("/health")
 async def admin_health(admin_user: User = Depends(require_admin)):
+    """Authenticated health check that confirms admin role access."""
     return {"status": "ok", "role": admin_user.role.value}
 
 
@@ -46,6 +48,7 @@ async def list_tenants(
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
+    """List all tenants ordered by creation date. Requires superadmin role."""
     result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
     return result.scalars().all()
 
@@ -56,6 +59,7 @@ async def get_tenant(
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
+    """Return detailed info for a single tenant including user and listing counts. Requires superadmin."""
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -89,6 +93,7 @@ async def update_tenant(
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
+    """Update a tenant's name, plan, or webhook URL. Changes are audit-logged. Requires superadmin."""
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -151,6 +156,7 @@ async def list_users(
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
+    """List all users belonging to a tenant. Requires superadmin."""
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -168,6 +174,7 @@ async def invite_user(
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
+    """Create a new user under the given tenant. Returns 409 if email is already registered. Requires superadmin."""
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -205,6 +212,7 @@ async def change_user_role(
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
+    """Change a user's role (e.g. viewer → admin). Requires superadmin."""
     if body.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
 
@@ -223,6 +231,7 @@ async def platform_stats(
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
+    """Return platform-wide counts: tenants, users, listings, and listings grouped by state. Requires superadmin."""
     total_tenants = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
     total_listings = (await db.execute(select(func.count(Listing.id)))).scalar() or 0
