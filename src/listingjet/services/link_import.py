@@ -63,6 +63,9 @@ class GoogleDriveImporter:
 
     async def list_images(self, folder_id: str) -> list[dict]:
         """List image files inside *folder_id*."""
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9_-]{10,80}", folder_id):
+            raise ValueError(f"Invalid Google Drive folder ID: {folder_id}")
         params = {
             "q": f"'{folder_id}' in parents",
             "key": self.api_key,

@@ -127,7 +127,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(rate_limit(10, 60))])
 async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
     """Exchange a valid refresh token for a new access + refresh token pair."""
     auth_header = request.headers.get("Authorization", "")

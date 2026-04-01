@@ -49,6 +49,6 @@ def create_refresh_token(user: User) -> str:
 
 def decode_token(token: str) -> dict:
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

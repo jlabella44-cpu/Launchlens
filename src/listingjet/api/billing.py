@@ -69,6 +69,7 @@ async def create_checkout(
         price_id=body.price_id,
         success_url=body.success_url,
         cancel_url=body.cancel_url,
+        tenant_id=str(tenant.id),
     )
     return CheckoutResponse(checkout_url=url)
 

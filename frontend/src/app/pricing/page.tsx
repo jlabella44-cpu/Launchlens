@@ -102,6 +102,8 @@ export default function PricingPage() {
         `${window.location.origin}/billing?success=true`,
         `${window.location.origin}/pricing`,
       );
+      const url1 = new URL(res.checkout_url);
+      if (!url1.hostname.endsWith("stripe.com")) throw new Error("Invalid checkout URL");
       window.location.href = res.checkout_url;
     } catch (err) {
       console.error("Checkout failed:", err);
@@ -122,6 +124,8 @@ export default function PricingPage() {
         `${window.location.origin}/billing?success=true`,
         `${window.location.origin}/pricing`,
       );
+      const url2 = new URL(res.checkout_url);
+      if (!url2.hostname.endsWith("stripe.com")) throw new Error("Invalid checkout URL");
       window.location.href = res.checkout_url;
     } catch (err) {
       console.error("Purchase failed:", err);

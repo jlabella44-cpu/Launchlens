@@ -27,7 +27,7 @@ class TenantMiddleware:
             payload = jwt.decode(
                 token,
                 settings.jwt_secret,
-                algorithms=[settings.jwt_algorithm],
+                algorithms=["HS256"],
             )
             tenant_id = payload.get("tenant_id")
             if not tenant_id:
