@@ -268,7 +268,7 @@ function BillingContent() {
                   alert(err.message || "Failed to open billing portal");
                 }
               }}
-              className="px-6 py-3 rounded-full border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors"
+              className="px-6 py-3 rounded-full border border-slate-200 text-sm font-semibold text-slate-600 hover:border-amber-400 hover:text-amber-600 hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             >
               Manage Subscription
             </button>
