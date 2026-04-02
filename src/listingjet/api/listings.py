@@ -796,10 +796,11 @@ async def delete_listing(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    # Refund credits if using credit billing and listing had a cost
+    # Refund credits only if no significant pipeline work was done
     credits_refunded = 0
+    refundable_states = {ListingState.NEW, ListingState.UPLOADING, ListingState.ANALYZING, ListingState.FAILED}
     tenant = await db.get(Tenant, current_user.tenant_id)
-    if tenant and tenant.billing_model == "credit" and listing.credit_cost:
+    if tenant and tenant.billing_model == "credit" and listing.credit_cost and listing.state in refundable_states:
         from listingjet.services.credits import CreditService
         credit_svc = CreditService()
         txn = await credit_svc.refund_credits(db, current_user.tenant_id, str(listing_id))
