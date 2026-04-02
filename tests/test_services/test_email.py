@@ -52,6 +52,7 @@ def test_get_email_service_returns_noop_when_disabled(mock_settings):
 @patch("listingjet.services.email.settings")
 def test_get_email_service_returns_real_when_enabled(mock_settings):
     mock_settings.email_enabled = True
+    mock_settings.ses_enabled = False
     mock_settings.smtp_host = "mail.test"
     mock_settings.smtp_port = 587
     mock_settings.smtp_user = "user"
