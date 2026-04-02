@@ -26,6 +26,21 @@ class UpdatePermissionRequest(BaseModel):
     expires_at: datetime | None = None
 
 
+class BlanketGrantRequest(BaseModel):
+    permission: str = "read"
+
+
+class BlanketGrantResponse(BaseModel):
+    id: uuid.UUID
+    agent_user_id: uuid.UUID | None
+    agent_name: str | None
+    agent_email: str | None
+    grantee_user_id: uuid.UUID
+    permission: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
 class AuditLogEntryResponse(BaseModel):
     id: uuid.UUID
     user_email: str

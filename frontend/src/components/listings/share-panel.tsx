@@ -70,7 +70,12 @@ export function SharePanel({ listingId, isOpen, onClose }: SharePanelProps) {
       setTimeout(() => setSuccess(""), 3000);
       loadPermissions();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to share listing");
+      const msg = err instanceof Error ? err.message : "Failed to share listing";
+      if (msg.toLowerCase().includes("plan") || msg.toLowerCase().includes("upgrade") || msg.toLowerCase().includes("enterprise")) {
+        setError("Listing sharing requires a Pro plan (or Enterprise for cross-brokerage sharing). Upgrade your plan to unlock this feature.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setSharing(false);
     }

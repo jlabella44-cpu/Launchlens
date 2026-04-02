@@ -88,9 +88,24 @@ async def get_listing_with_permission(
             grant_level = PERMISSION_MAP.get(perm_str, PermissionLevel.NONE)
             effective_level = max(effective_level, grant_level)
 
-    # TODO: Phase B - blanket per-agent grants (listing_permissions with
-    # listing_id IS NULL and agent_user_id set). Requires defining how
-    # tenant-scoped listings map to agent users.
+    # Phase B: Blanket grants — listing_id IS NULL, tenant-scoped
+    if effective_level < required_level:
+        blanket_stmt = (
+            select(ListingPermission.permission)
+            .where(
+                ListingPermission.listing_id.is_(None),
+                ListingPermission.grantee_user_id == current_user.id,
+                ListingPermission.grantor_tenant_id == listing.tenant_id,
+                ListingPermission.revoked_at.is_(None),
+            )
+            .where(
+                (ListingPermission.expires_at.is_(None)) | (ListingPermission.expires_at > func.now())
+            )
+        )
+        blanket_result = await db.execute(blanket_stmt)
+        for perm_str in blanket_result.scalars().all():
+            grant_level = PERMISSION_MAP.get(perm_str, PermissionLevel.NONE)
+            effective_level = max(effective_level, grant_level)
 
     if effective_level < required_level:
         # Return 404 for cross-tenant users to avoid leaking listing existence

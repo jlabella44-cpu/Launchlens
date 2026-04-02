@@ -10,18 +10,24 @@ Endpoints:
 """
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
+from listingjet.api.schemas.listing_permission import (
+    BlanketGrantRequest,
+    BlanketGrantResponse,
+)
 from listingjet.api.schemas.team import (
     InviteTeamMemberRequest,
     TeamMemberResponse,
     UpdateRoleRequest,
 )
 from listingjet.database import get_db
+from listingjet.models.listing_permission import ListingPermission
 from listingjet.models.user import User, UserRole
 from listingjet.services.auth import hash_password
 
@@ -150,4 +156,128 @@ async def remove_member(
         raise HTTPException(status_code=404, detail="Member not found")
 
     await db.delete(member)
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Blanket listing access grants (Phase B)
+# ---------------------------------------------------------------------------
+
+def _build_blanket_response(perm: ListingPermission, grantee: User) -> BlanketGrantResponse:
+    return BlanketGrantResponse(
+        id=perm.id,
+        agent_user_id=perm.agent_user_id,
+        agent_name=None,
+        agent_email=None,
+        grantee_user_id=perm.grantee_user_id,
+        permission=perm.permission,
+        created_at=perm.created_at,
+    )
+
+
+@router.post(
+    "/members/{user_id}/listing-access",
+    response_model=BlanketGrantResponse,
+    status_code=201,
+)
+async def create_blanket_grant(
+    user_id: uuid.UUID,
+    body: BlanketGrantRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Grant blanket access to all listings within the tenant for a user."""
+    _require_admin(current_user)
+
+    if body.permission not in ("read", "write"):
+        raise HTTPException(status_code=422, detail="Blanket permission must be 'read' or 'write'")
+
+    # Validate target user exists and is in the same tenant
+    target_user = await db.get(User, user_id)
+    if not target_user or target_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found in your tenant")
+
+    # Check for existing active blanket grant
+    existing = await db.execute(
+        select(ListingPermission).where(
+            ListingPermission.listing_id.is_(None),
+            ListingPermission.grantee_user_id == user_id,
+            ListingPermission.grantor_tenant_id == current_user.tenant_id,
+            ListingPermission.revoked_at.is_(None),
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="User already has an active blanket grant")
+
+    perm = ListingPermission(
+        listing_id=None,
+        agent_user_id=None,
+        grantee_user_id=user_id,
+        grantee_tenant_id=target_user.tenant_id,
+        grantor_user_id=current_user.id,
+        grantor_tenant_id=current_user.tenant_id,
+        permission=body.permission,
+    )
+    db.add(perm)
+    await db.commit()
+    await db.refresh(perm)
+
+    return _build_blanket_response(perm, target_user)
+
+
+@router.get(
+    "/members/{user_id}/listing-access",
+    response_model=list[BlanketGrantResponse],
+)
+async def list_blanket_grants(
+    user_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List blanket listing access grants for a specific user."""
+    _require_admin(current_user)
+
+    target_user = await db.get(User, user_id)
+    if not target_user or target_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found in your tenant")
+
+    stmt = (
+        select(ListingPermission)
+        .where(
+            ListingPermission.listing_id.is_(None),
+            ListingPermission.grantee_user_id == user_id,
+            ListingPermission.grantor_tenant_id == current_user.tenant_id,
+            ListingPermission.revoked_at.is_(None),
+        )
+    )
+    result = await db.execute(stmt)
+    return [_build_blanket_response(perm, target_user) for perm in result.scalars().all()]
+
+
+@router.delete(
+    "/members/{user_id}/listing-access/{permission_id}",
+    status_code=204,
+)
+async def revoke_blanket_grant(
+    user_id: uuid.UUID,
+    permission_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke a blanket listing access grant (soft-delete)."""
+    _require_admin(current_user)
+
+    perm = await db.get(ListingPermission, permission_id)
+    if (
+        not perm
+        or perm.listing_id is not None
+        or perm.grantee_user_id != user_id
+        or perm.grantor_tenant_id != current_user.tenant_id
+    ):
+        raise HTTPException(status_code=404, detail="Blanket grant not found")
+
+    if perm.revoked_at is not None:
+        raise HTTPException(status_code=404, detail="Grant already revoked")
+
+    perm.revoked_at = datetime.now(timezone.utc)
     await db.commit()

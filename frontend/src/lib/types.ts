@@ -402,6 +402,21 @@ export interface AuditLogEntryResponse {
 }
 
 export interface SharedListingResponse {
-  listing: ListingResponse;
+  listing_id: string;
+  tenant_id: string;
+  address: string;
+  state: string;
   permission: string;
+  shared_at: string;
+  expires_at: string | null;
+}
+
+export interface BlanketGrantResponse {
+  id: string;
+  agent_user_id: string | null;
+  agent_name: string | null;
+  agent_email: string | null;
+  grantee_user_id: string;
+  permission: string;
+  created_at: string;
 }
