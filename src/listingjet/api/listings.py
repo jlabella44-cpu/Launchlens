@@ -776,6 +776,51 @@ async def cancel_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value, "credits_refunded": credits_refunded}
 
 
+@router.delete("/{listing_id}", status_code=200)
+async def delete_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a listing and its associated assets.
+
+    Refunds credits if applicable. Removes assets, package selections,
+    and the listing record from the database.
+    """
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        ).with_for_update()
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    # Refund credits if using credit billing and listing had a cost
+    credits_refunded = 0
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if tenant and tenant.billing_model == "credit" and listing.credit_cost:
+        from listingjet.services.credits import CreditService
+        credit_svc = CreditService()
+        txn = await credit_svc.refund_credits(db, current_user.tenant_id, str(listing_id))
+        if txn:
+            credits_refunded = txn.amount
+
+    # Delete related records
+    await db.execute(
+        select(Asset).where(Asset.listing_id == listing_id)
+    )
+    from sqlalchemy import delete as sa_delete
+    await db.execute(sa_delete(PackageSelection).where(PackageSelection.listing_id == listing_id))
+    await db.execute(sa_delete(Asset).where(Asset.listing_id == listing_id))
+
+    # Delete the listing itself
+    await db.delete(listing)
+    await db.commit()
+
+    return {"listing_id": str(listing_id), "deleted": True, "credits_refunded": credits_refunded}
+
+
 @router.get("/{listing_id}/pipeline-status", response_model=PipelineStatusResponse)
 async def get_pipeline_status(
     listing_id: uuid.UUID,

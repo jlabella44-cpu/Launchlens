@@ -167,6 +167,10 @@ class ApiClient {
     return this.request<ListingResponse>(`/listings/${id}`);
   }
 
+  async deleteListing(id: string): Promise<{ listing_id: string; deleted: boolean; credits_refunded: number }> {
+    return this.request(`/listings/${id}`, { method: "DELETE" });
+  }
+
   // Assets
   async registerAssets(listingId: string, data: CreateAssetsRequest): Promise<CreateAssetsResponse> {
     return this.request<CreateAssetsResponse>(`/listings/${listingId}/assets`, {

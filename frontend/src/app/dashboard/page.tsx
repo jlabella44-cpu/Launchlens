@@ -279,7 +279,10 @@ function DashboardContent() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.08 * i }}
                   >
-                    <ListingCard listing={listing} />
+                    <ListingCard
+                      listing={listing}
+                      onDeleted={(id) => setListings((prev) => prev.filter((l) => l.id !== id))}
+                    />
                   </motion.div>
                 ))}
               </div>

@@ -1,16 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import apiClient from "@/lib/api-client";
 import type { ListingResponse } from "@/lib/types";
 
 interface ListingCardProps {
   listing: ListingResponse;
+  onDeleted?: (id: string) => void;
 }
 
-export function ListingCard({ listing }: ListingCardProps) {
+export function ListingCard({ listing, onDeleted }: ListingCardProps) {
   const router = useRouter();
   const { address, metadata, state } = listing;
+  const [deleting, setDeleting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const price = metadata.price
     ? new Intl.NumberFormat("en-US", {
@@ -22,10 +27,31 @@ export function ListingCard({ listing }: ListingCardProps) {
 
   const isDelivered = state === "delivered" || state === "approved";
 
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!showConfirm) {
+      setShowConfirm(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await apiClient.deleteListing(listing.id);
+      onDeleted?.(listing.id);
+    } catch {
+      setDeleting(false);
+      setShowConfirm(false);
+    }
+  }
+
+  function handleCancelDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    setShowConfirm(false);
+  }
+
   return (
     <div
       onClick={() => router.push(`/listings/${listing.id}`)}
-      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer group border border-slate-100"
+      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer group border border-slate-100 relative"
     >
       {/* Photo Thumbnail */}
       <div className="relative aspect-[4/3] bg-gradient-to-br from-slate-200 to-slate-100 overflow-hidden">
@@ -38,6 +64,36 @@ export function ListingCard({ listing }: ListingCardProps) {
         {/* Status Badge Overlay */}
         <div className="absolute top-3 left-3">
           <Badge state={state} />
+        </div>
+        {/* Delete Button */}
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          {showConfirm ? (
+            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-semibold hover:bg-red-600 disabled:opacity-50"
+              >
+                {deleting ? "…" : "Confirm"}
+              </button>
+              <button
+                onClick={handleCancelDelete}
+                className="px-2 py-1 rounded-lg bg-white/90 text-slate-600 text-[10px] font-semibold hover:bg-white"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleDelete}
+              className="w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 flex items-center justify-center transition-colors"
+              title="Delete listing"
+            >
+              <svg className="w-4 h-4 text-slate-400 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
