@@ -424,6 +424,22 @@ class ApiClient {
     return this.request("/listings/shared-with-me");
   }
 
+  // Blanket grants
+  async getBlanketGrants(userId: string): Promise<import("./types").BlanketGrantResponse[]> {
+    return this.request(`/team/members/${userId}/listing-access`);
+  }
+
+  async createBlanketGrant(userId: string, permission: string): Promise<import("./types").BlanketGrantResponse> {
+    return this.request(`/team/members/${userId}/listing-access`, {
+      method: "POST",
+      body: JSON.stringify({ permission }),
+    });
+  }
+
+  async revokeBlanketGrant(userId: string, grantId: string): Promise<void> {
+    return this.request(`/team/members/${userId}/listing-access/${grantId}`, { method: "DELETE" });
+  }
+
   async getListingAuditLog(listingId: string): Promise<AuditLogEntryResponse[]> {
     return this.request(`/listings/${listingId}/audit-log`);
   }

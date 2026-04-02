@@ -19,6 +19,7 @@ import { VideoPlayer } from "@/components/listings/video-player";
 import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
 import { SharePanel } from "@/components/listings/share-panel";
+import { ActivityLog } from "@/components/listings/activity-log";
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
@@ -458,6 +459,11 @@ function ListingDetail() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Activity Log */}
+        <div className="mt-10">
+          <ActivityLog listingId={id} />
         </div>
 
         {/* Footer */}

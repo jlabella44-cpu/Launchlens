@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
 from listingjet.api.schemas.listing_permission import (
+    AuditLogEntryResponse,
     ListingPermissionResponse,
     ShareListingRequest,
     UpdatePermissionRequest,
@@ -272,6 +273,52 @@ async def revoke_permission(
     })
 
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# GET /{listing_id}/audit-log — Audit trail for a listing
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{listing_id}/audit-log",
+    response_model=list[AuditLogEntryResponse],
+)
+async def get_listing_audit_log(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the audit trail for a listing. Requires at least read access."""
+    listing = await _load_listing(db, listing_id)
+
+    # Owner / admin in same tenant can always view
+    has_access = False
+    if current_user.tenant_id == listing.tenant_id:
+        has_access = True
+    elif current_user.role == UserRole.SUPERADMIN:
+        has_access = True
+    else:
+        # Check if user has any active permission on this listing
+        perm_result = await db.execute(
+            select(ListingPermission).where(
+                ListingPermission.listing_id == listing_id,
+                ListingPermission.grantee_user_id == current_user.id,
+                ListingPermission.revoked_at.is_(None),
+            )
+        )
+        if perm_result.scalar_one_or_none() is not None:
+            has_access = True
+
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Not authorised to view this listing's audit log")
+
+    result = await db.execute(
+        select(ListingAuditLog)
+        .where(ListingAuditLog.listing_id == listing_id)
+        .order_by(ListingAuditLog.created_at.desc())
+        .limit(100)
+    )
+    return result.scalars().all()
 
 
 # ---------------------------------------------------------------------------

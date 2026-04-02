@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import apiClient from "@/lib/api-client";
-import type { TeamMemberResponse, InviteTeamMemberRequest } from "@/lib/types";
+import type { TeamMemberResponse, InviteTeamMemberRequest, BlanketGrantResponse } from "@/lib/types";
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
   superadmin: { bg: "rgba(239, 68, 68, 0.15)", text: "#EF4444" },
@@ -48,6 +48,8 @@ function TeamManagement() {
     role: "agent",
   });
 
+  const [blanketGrants, setBlanketGrants] = useState<Record<string, BlanketGrantResponse | null>>({});
+
   const isAdmin = myProfile?.role === "admin" || myProfile?.role === "superadmin";
 
   const fetchData = useCallback(async () => {
@@ -60,6 +62,22 @@ function TeamManagement() {
       ]);
       setMyProfile(profile);
       setMembers(memberList);
+
+      // Fetch blanket grants for each member (admin only)
+      if (profile.role === "admin" || profile.role === "superadmin") {
+        const grantsMap: Record<string, BlanketGrantResponse | null> = {};
+        await Promise.all(
+          memberList.map(async (m) => {
+            try {
+              const grants = await apiClient.getBlanketGrants(m.id);
+              grantsMap[m.id] = grants.length > 0 ? grants[0] : null;
+            } catch {
+              grantsMap[m.id] = null;
+            }
+          })
+        );
+        setBlanketGrants(grantsMap);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load team data");
     } finally {
@@ -96,6 +114,26 @@ function TeamManagement() {
       await fetchData();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update role");
+    }
+  }
+
+  async function handleListingAccessChange(memberId: string, value: string) {
+    const existingGrant = blanketGrants[memberId];
+    try {
+      // Revoke existing grant if any
+      if (existingGrant) {
+        await apiClient.revokeBlanketGrant(memberId, existingGrant.id);
+      }
+      // Create new grant if not "none"
+      if (value === "read" || value === "write") {
+        const newGrant = await apiClient.createBlanketGrant(memberId, value);
+        setBlanketGrants((prev) => ({ ...prev, [memberId]: newGrant }));
+      } else {
+        setBlanketGrants((prev) => ({ ...prev, [memberId]: null }));
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update listing access");
+      await fetchData();
     }
   }
 
@@ -291,10 +329,11 @@ function TeamManagement() {
           {members.length > 0 && (
             <div className="rounded-2xl border border-[var(--color-card-border)] bg-[var(--color-surface)] overflow-hidden">
               {/* Table header */}
-              <div className="hidden sm:grid grid-cols-[1fr_1fr_140px_120px_80px] gap-4 px-6 py-3 border-b border-[var(--color-card-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">
+              <div className="hidden sm:grid grid-cols-[1fr_1fr_140px_150px_120px_80px] gap-4 px-6 py-3 border-b border-[var(--color-card-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">
                 <span>Member</span>
                 <span>Email</span>
                 <span>Role</span>
+                <span>Listing Access</span>
                 <span>Joined</span>
                 <span />
               </div>
@@ -307,7 +346,7 @@ function TeamManagement() {
                 return (
                   <div
                     key={member.id}
-                    className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_140px_120px_80px] gap-2 sm:gap-4 items-center px-6 py-4 border-b border-[var(--color-card-border)] last:border-b-0 hover:bg-[var(--color-bg)] transition-colors"
+                    className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_140px_150px_120px_80px] gap-2 sm:gap-4 items-center px-6 py-4 border-b border-[var(--color-card-border)] last:border-b-0 hover:bg-[var(--color-bg)] transition-colors"
                   >
                     {/* Name + avatar */}
                     <div className="flex items-center gap-3">
@@ -356,6 +395,31 @@ function TeamManagement() {
                           style={{ background: colors.bg, color: colors.text }}
                         >
                           {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Listing Access */}
+                    <div>
+                      {isAdmin && !isSelf ? (
+                        <select
+                          value={blanketGrants[member.id]?.permission || "none"}
+                          onChange={(e) => handleListingAccessChange(member.id, e.target.value)}
+                          className="px-2.5 py-1 rounded-md text-xs font-semibold border border-[var(--color-card-border)] bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:border-[#F97316] cursor-pointer"
+                        >
+                          <option value="none">Own listings only</option>
+                          <option value="read">Read all listings</option>
+                          <option value="write">Read &amp; write all</option>
+                        </select>
+                      ) : (
+                        <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-500">
+                          {isSelf
+                            ? "Full access"
+                            : blanketGrants[member.id]?.permission === "write"
+                              ? "Read & write all"
+                              : blanketGrants[member.id]?.permission === "read"
+                                ? "Read all listings"
+                                : "Own listings only"}
                         </span>
                       )}
                     </div>
