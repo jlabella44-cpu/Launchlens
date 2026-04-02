@@ -48,10 +48,11 @@ export function CreditHistory({ data }: { data: CreditDataPoint[] }) {
             borderRadius: 8,
             fontSize: 12,
           }}
-          formatter={(value: number, name: string) => {
-            if (name === "Balance") return [value, "Credits"];
-            const sign = value >= 0 ? "+" : "";
-            return [`${sign}${value}`, "Change"];
+          formatter={(value, name) => {
+            const num = Number(value);
+            if (name === "Balance") return [num, "Credits"];
+            const sign = num >= 0 ? "+" : "";
+            return [`${sign}${num}`, "Change"];
           }}
         />
         <Line
