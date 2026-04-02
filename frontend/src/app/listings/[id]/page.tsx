@@ -353,12 +353,26 @@ function ListingDetail() {
             )}
 
             {/* Error / Retry State */}
-            {["failed", "pipeline_timeout"].includes(listing.state) && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
-                <h4 className="text-red-800 font-semibold mb-1">Course Correction Required</h4>
-                <p className="text-sm text-red-600 mb-4">
+            {["failed", "pipeline_timeout", "uploading", "analyzing"].includes(listing.state) && (
+              <div className={`rounded-2xl p-5 ${
+                ["uploading", "analyzing"].includes(listing.state)
+                  ? "bg-amber-50 border border-amber-200"
+                  : "bg-red-50 border border-red-200"
+              }`}>
+                <h4 className={`font-semibold mb-1 ${
+                  ["uploading", "analyzing"].includes(listing.state) ? "text-amber-800" : "text-red-800"
+                }`}>
+                  {["uploading", "analyzing"].includes(listing.state)
+                    ? "Processing Stalled"
+                    : "Course Correction Required"}
+                </h4>
+                <p className={`text-sm mb-4 ${
+                  ["uploading", "analyzing"].includes(listing.state) ? "text-amber-600" : "text-red-600"
+                }`}>
                   {listing.state === "pipeline_timeout"
                     ? "Flight delayed. Processing timed out — this can happen with large photo sets."
+                    : ["uploading", "analyzing"].includes(listing.state)
+                    ? "This listing appears stuck. Click retry to restart the pipeline."
                     : "Turbulence detected. Something went wrong during processing."}
                 </p>
                 <div className="flex gap-3">
