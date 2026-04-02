@@ -18,5 +18,6 @@ class Asset(TenantScopedModel):
     api_request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     file_path: Mapped[str]
     file_hash: Mapped[str]  # SHA-256
+    proxy_path: Mapped[str | None] = mapped_column(nullable=True)
     required_for_mls: Mapped[bool] = mapped_column(default=False)
     state: Mapped[str] = mapped_column(String(50), default="uploaded")

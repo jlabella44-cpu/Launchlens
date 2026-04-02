@@ -1,4 +1,5 @@
 # src/listingjet/agents/vision.py
+import logging
 import uuid
 
 from sqlalchemy import select
@@ -10,8 +11,11 @@ from listingjet.providers import get_vision_provider
 from listingjet.providers.base import VisionLabel
 from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_cost
+from listingjet.services.storage import get_storage
 
 from .base import AgentContext, BaseAgent
+
+logger = logging.getLogger(__name__)
 
 ROOM_LABEL_MAP = {
     "living room": "living_room",
@@ -92,12 +96,23 @@ class VisionAgent(BaseAgent):
                 )
                 assets = result.scalars().all()
 
+                storage = get_storage()
                 count = 0
                 for asset in assets:
-                    labels = await self._vision_provider.analyze(image_url=asset.file_path)
+                    image_url = self._resolve_image_url(asset, storage)
+                    logger.info(
+                        "Vision T1 [%d/%d] asset=%s proxy=%s",
+                        count + 1, len(assets), asset.id,
+                        "yes" if asset.proxy_path else "no",
+                    )
+                    labels = await self._vision_provider.analyze(image_url=image_url)
                     vr = _labels_to_vision_result(asset.id, labels)
                     session.add(vr)
                     count += 1
+                    logger.info(
+                        "Vision T1 completed asset=%s labels=%d",
+                        asset.id, len(labels),
+                    )
 
                 if count > 0:
                     await emit_event(
@@ -109,6 +124,12 @@ class VisionAgent(BaseAgent):
                     )
 
         return count
+
+    @staticmethod
+    def _resolve_image_url(asset: Asset, storage) -> str:
+        """Return a presigned URL for the proxy image if available, otherwise full-res."""
+        key = asset.proxy_path or asset.file_path
+        return storage.presigned_url(key)
 
     async def execute(self, context: AgentContext) -> dict:
         tier1_count = await self.run_tier1(context)
@@ -141,10 +162,17 @@ class VisionAgent(BaseAgent):
                 if not candidates:
                     return 0
 
+                storage = get_storage()
                 count = 0
                 for vr in candidates:
                     asset = await session.get(Asset, vr.asset_id)
-                    labels = await self._vision_provider.analyze(image_url=asset.file_path)
+                    image_url = self._resolve_image_url(asset, storage)
+                    logger.info(
+                        "Vision T2 [%d/%d] asset=%s proxy=%s",
+                        count + 1, len(candidates), asset.id,
+                        "yes" if asset.proxy_path else "no",
+                    )
+                    labels = await self._vision_provider.analyze(image_url=image_url)
 
                     quality_labels = [lbl for lbl in labels if lbl.category == "quality"]
                     shot_labels = [lbl for lbl in labels if lbl.category == "shot_type"]

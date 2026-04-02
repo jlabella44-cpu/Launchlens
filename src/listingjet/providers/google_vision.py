@@ -33,7 +33,7 @@ class GoogleVisionProvider(VisionProvider):
                     _ENDPOINT,
                     params={"key": self._api_key},
                     json=payload,
-                    timeout=10.0,
+                    timeout=30.0,
                 )
                 response.raise_for_status()
             record_provider_call("google_vision", True)

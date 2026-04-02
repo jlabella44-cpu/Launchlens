@@ -1,5 +1,5 @@
 # tests/test_agents/test_vision.py
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -9,6 +9,19 @@ from listingjet.agents.vision import VisionAgent
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers.base import VisionLabel
 from tests.test_agents.conftest import make_session_factory
+
+
+def _mock_storage():
+    storage = MagicMock()
+    storage.presigned_url.side_effect = lambda key, **kw: f"https://s3.example.com/{key}?signed=1"
+    return storage
+
+
+@pytest.fixture(autouse=True)
+def patch_storage():
+    mock = _mock_storage()
+    with patch("listingjet.agents.vision.get_storage", return_value=mock):
+        yield mock
 
 
 def make_mock_vision_provider(labels):

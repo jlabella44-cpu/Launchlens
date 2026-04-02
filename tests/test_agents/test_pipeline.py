@@ -4,7 +4,7 @@ End-to-end smoke test: run all agents in sequence with mock providers.
 Verifies state machine progression and that each agent produces correct DB output.
 """
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -21,6 +21,35 @@ from listingjet.models.listing import Listing, ListingState
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers.base import VisionLabel
 from tests.test_agents.conftest import make_session_factory
+
+
+def _mock_storage_service():
+    """Create a mock StorageService that handles download, upload, and presigned URLs."""
+    storage = MagicMock()
+    # Return small fake JPEG bytes for proxy generation
+    storage.download.return_value = _tiny_jpeg()
+    storage.upload.return_value = "proxies/test.jpg"
+    storage.presigned_url.side_effect = lambda key, **kw: f"https://s3.example.com/{key}?signed=1"
+    return storage
+
+
+def _tiny_jpeg() -> bytes:
+    """Generate a minimal valid JPEG for PIL to open."""
+    import io
+
+    from PIL import Image
+    img = Image.new("RGB", (100, 100), color="red")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def patch_storage_everywhere():
+    mock = _mock_storage_service()
+    with patch("listingjet.agents.ingestion.get_storage", return_value=mock), \
+         patch("listingjet.agents.vision.get_storage", return_value=mock):
+        yield mock
 
 
 @pytest.fixture
@@ -75,13 +104,17 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
         "bathroom": "bathroom",
     }
 
-    # Build lookup: file_hash -> shot_type labels
+    # Build lookups: file_hash -> shot_type, and asset_id -> shot_type
     hash_to_room_label = {h: shot_type for h, shot_type in shot_hashes}
+    asset_id_to_room_label = {
+        str(a.id): hash_to_room_label[a.file_hash] for a in assets
+    }
 
     async def mock_analyze(image_url):
-        # image_url is like "listings/{listing_id}/aaa.jpg"
-        file_hash = image_url.split("/")[-1].split(".")[0]
-        shot_type = hash_to_room_label.get(file_hash, "living_room")
+        # URL is presigned: https://s3.example.com/listings/{id}/proxies/{asset_id}.jpg?signed=1
+        # or https://s3.example.com/listings/{id}/{hash}.jpg?signed=1
+        filename = image_url.split("/")[-1].split(".")[0]
+        shot_type = asset_id_to_room_label.get(filename) or hash_to_room_label.get(filename, "living_room")
         label_name = SHOT_TO_LABEL_NAME.get(shot_type, shot_type.replace("_", " "))
         return [
             VisionLabel(name=label_name, confidence=0.95, category="room"),
