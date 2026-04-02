@@ -1,4 +1,4 @@
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +39,21 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("JWT_SECRET must be at least 32 characters for security")
         return v
+
+    @model_validator(mode="after")
+    def validate_provider_keys(self) -> "Settings":
+        if not self.use_mock_providers:
+            missing = []
+            if not self.anthropic_api_key:
+                missing.append("ANTHROPIC_API_KEY")
+            if not self.google_vision_api_key:
+                missing.append("GOOGLE_VISION_API_KEY")
+            if missing:
+                raise ValueError(
+                    f"USE_MOCK_PROVIDERS is false but required provider keys are missing: "
+                    f"{', '.join(missing)}. Set them or enable USE_MOCK_PROVIDERS=true."
+                )
+        return self
 
     # Stripe
     stripe_secret_key: str = ""
@@ -108,7 +123,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
-    email_from: str = "noreply@listingjet.com"
+    email_from: str = "noreply@listingjet.ai"
     email_enabled: bool = False
     ses_enabled: bool = False
 
