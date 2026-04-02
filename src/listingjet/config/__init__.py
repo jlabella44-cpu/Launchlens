@@ -84,6 +84,9 @@ class Settings(BaseSettings):
     google_vision_api_key: str = ""
     use_mock_providers: bool = False
 
+    # Google OAuth
+    google_oauth_client_id: str = ""
+
     # ClamAV
     clamav_host: str = "localhost"
     clamav_port: int = 3310
