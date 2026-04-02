@@ -2,6 +2,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -161,3 +162,119 @@ async def logout():
     blocklist. For now, short-lived access tokens (1hr) limit exposure.
     """
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Google Sign-In
+# ---------------------------------------------------------------------------
+
+_GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
+_google_jwks_cache: dict | None = None
+
+
+async def _get_google_jwks() -> dict:
+    """Fetch and cache Google's public JWKS for ID token verification."""
+    global _google_jwks_cache
+    if _google_jwks_cache is not None:
+        return _google_jwks_cache
+    import httpx
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(_GOOGLE_JWKS_URL)
+        resp.raise_for_status()
+        _google_jwks_cache = resp.json()
+    return _google_jwks_cache
+
+
+def _verify_google_id_token(id_token: str, client_id: str) -> dict:
+    """Verify a Google ID token and return the payload (email, name, sub)."""
+    import jwt as pyjwt
+    from jwt import PyJWKClient
+
+    jwk_client = PyJWKClient(_GOOGLE_JWKS_URL)
+    signing_key = jwk_client.get_signing_key_from_jwt(id_token)
+    payload = pyjwt.decode(
+        id_token,
+        signing_key.key,
+        algorithms=["RS256"],
+        audience=client_id,
+        issuer=["https://accounts.google.com", "accounts.google.com"],
+    )
+    if not payload.get("email_verified"):
+        raise ValueError("Email not verified by Google")
+    return payload
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
+
+@router.post("/google", response_model=TokenResponse)
+async def google_login(
+    body: GoogleLoginRequest,
+    _rl=Depends(rate_limit(10, 60)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sign in or register with a Google ID token from the Sign In With Google flow."""
+    from listingjet.config import settings
+
+    if not settings.google_oauth_client_id:
+        raise HTTPException(status_code=501, detail="Google sign-in is not configured")
+
+    try:
+        google_payload = _verify_google_id_token(body.id_token, settings.google_oauth_client_id)
+    except Exception as exc:
+        logger.warning("google_auth_failed error=%s", exc)
+        raise HTTPException(status_code=401, detail="Invalid Google ID token")
+
+    email = google_payload["email"].strip().lower()
+    name = google_payload.get("name")
+
+    # Check if user already exists
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+
+    if user:
+        # Existing user — log them in
+        logger.info("auth.google_login email=%s user=%s", email, user.id)
+        return TokenResponse(
+            access_token=create_access_token(user),
+            refresh_token=create_refresh_token(user),
+        )
+
+    # New user — auto-register with default plan
+    tenant = Tenant(id=uuid.uuid4(), name=name or email.split("@")[0], plan="starter", billing_model="credit")
+    db.add(tenant)
+    await db.flush()
+
+    from listingjet.models.credit_account import CreditAccount
+
+    credit_account = CreditAccount(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        balance=0,
+        rollover_cap=5,
+    )
+    db.add(credit_account)
+
+    user = User(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        email=email,
+        password_hash="",  # No password for Google-only users
+        name=name,
+        role=UserRole.ADMIN,
+    )
+    db.add(user)
+    await emit_event(
+        session=db,
+        event_type="user.registered",
+        payload={"email": email, "user_id": str(user.id), "provider": "google", "plan": "starter"},
+        tenant_id=str(tenant.id),
+    )
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info("auth.google_register email=%s tenant=%s", email, tenant.id)
+    return TokenResponse(
+        access_token=create_access_token(user),
+        refresh_token=create_refresh_token(user),
+    )
