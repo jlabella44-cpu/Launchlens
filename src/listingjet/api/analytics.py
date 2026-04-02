@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user, get_db
 from listingjet.models.asset import Asset
+from listingjet.models.credit_transaction import CreditTransaction
 from listingjet.models.event import Event
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.user import User
@@ -143,4 +144,38 @@ async def analytics_usage(
         "listings_this_month": listings_this_month,
         "total_assets": total_assets,
         "total_listings": total_listings,
+    }
+
+
+@router.get("/credits")
+async def analytics_credits(
+    days: int = Query(default=30, ge=1, le=365),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Credit transaction history for charting."""
+    tid = current_user.tenant_id
+    start = datetime.now(timezone.utc) - timedelta(days=days)
+
+    rows = (await db.execute(
+        select(CreditTransaction)
+        .where(
+            CreditTransaction.tenant_id == tid,
+            CreditTransaction.created_at >= start,
+        )
+        .order_by(CreditTransaction.created_at.asc())
+    )).scalars().all()
+
+    return {
+        "days": days,
+        "data": [
+            {
+                "date": row.created_at.isoformat(),
+                "amount": row.amount,
+                "balance_after": row.balance_after,
+                "type": row.transaction_type,
+                "description": row.description,
+            }
+            for row in rows
+        ],
     }
