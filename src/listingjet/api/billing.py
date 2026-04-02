@@ -240,12 +240,22 @@ async def _handle_checkout_completed(
 ) -> None:
     metadata = data_object.get("metadata", {})
     tenant_id_str = metadata.get("tenant_id")
-    if not tenant_id_str:
-        return
 
-    tenant_id = uuid.UUID(tenant_id_str)
-    tenant = await db.get(Tenant, tenant_id)
+    tenant = None
+    if tenant_id_str:
+        tenant = await db.get(Tenant, uuid.UUID(tenant_id_str))
+
+    # Fallback: look up by customer_id if tenant_id not in metadata
     if not tenant:
+        customer_id = data_object.get("customer")
+        if customer_id:
+            tenant = await _find_tenant_by_customer(db, customer_id)
+
+    if not tenant:
+        logger.warning(
+            "checkout.session.completed: no tenant found for metadata=%s customer=%s",
+            tenant_id_str, data_object.get("customer"),
+        )
         return
 
     # Credit bundle purchase
@@ -253,7 +263,7 @@ async def _handle_checkout_completed(
         bundle_size = int(metadata.get("bundle_size", 0))
         if bundle_size > 0:
             await credit_svc.add_credits(
-                db, tenant_id, bundle_size,
+                db, tenant.id, bundle_size,
                 transaction_type="purchase",
                 reference_type="stripe_event",
                 reference_id=event_id,
