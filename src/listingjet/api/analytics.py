@@ -12,6 +12,7 @@ from sqlalchemy import extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user, get_db
+from listingjet.models.asset import Asset
 from listingjet.models.event import Event
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.user import User
@@ -107,4 +108,39 @@ async def analytics_timeline(
     return {
         "days": days,
         "data": [{"date": str(row[0]), "count": row[1]} for row in rows],
+    }
+
+
+@router.get("/usage")
+async def analytics_usage(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Usage summary for dashboard: listings this month, total assets, total listings."""
+    tid = current_user.tenant_id
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    total_listings = (await db.execute(
+        select(func.count(Listing.id)).where(Listing.tenant_id == tid)
+    )).scalar() or 0
+
+    listings_this_month = (await db.execute(
+        select(func.count(Listing.id)).where(
+            Listing.tenant_id == tid,
+            Listing.created_at >= month_start,
+            Listing.is_demo.is_(False),
+        )
+    )).scalar() or 0
+
+    total_assets = (await db.execute(
+        select(func.count(Asset.id))
+        .join(Listing, Asset.listing_id == Listing.id)
+        .where(Listing.tenant_id == tid)
+    )).scalar() or 0
+
+    return {
+        "listings_this_month": listings_this_month,
+        "total_assets": total_assets,
+        "total_listings": total_listings,
     }
