@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
@@ -20,25 +19,6 @@ import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
 import { SharePanel } from "@/components/listings/share-panel";
 import { ActivityLog } from "@/components/listings/activity-log";
-
-const SceneWrapper = dynamic(
-  () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-secondary)]/5 animate-pulse" />
-    ),
-  }
-);
-const PhotoOrbit = dynamic(
-  () => import("@/components/three/photo-orbit").then((m) => ({ default: m.PhotoOrbit })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--color-primary)]/10 to-[var(--color-secondary)]/5 animate-pulse" />
-    ),
-  }
-);
 
 function ListingDetail() {
   const params = useParams();
