@@ -314,23 +314,5 @@ class VideoAgent(BaseAgent):
 
     def _endcard_to_video(self, png_bytes: bytes) -> str | None:
         """Convert a PNG end-card to a 5-second MP4 clip via ffmpeg."""
-        import subprocess
-        try:
-            png_fd = tempfile.NamedTemporaryFile(suffix=".png", prefix="listingjet_endcard_", delete=False)
-            mp4_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_endcard_", delete=False)
-            png_path = png_fd.name
-            png_fd.close()
-            mp4_path = mp4_fd.name
-            mp4_fd.close()
-            with open(png_path, "wb") as f:
-                f.write(png_bytes)
-            subprocess.run([
-                "ffmpeg", "-loop", "1", "-i", png_path,
-                "-c:v", "libx264", "-t", str(ENDCARD_DURATION),
-                "-pix_fmt", "yuv420p", "-vf", "scale=1280:720",
-                "-y", mp4_path,
-            ], check=True, capture_output=True)
-            os.unlink(png_path)
-            return mp4_path
-        except Exception:
-            return None
+        from listingjet.services.endcard import endcard_png_to_video
+        return endcard_png_to_video(png_bytes)

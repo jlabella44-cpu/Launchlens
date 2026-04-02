@@ -1013,11 +1013,25 @@ async def upload_video(
         s3_key=body.s3_key,
         video_type=body.video_type,
         duration_seconds=body.duration_seconds,
-        status="ready",
+        status="processing",
     )
     db.add(video)
     await db.commit()
     await db.refresh(video)
+
+    # Trigger post-processing (endcard + social cuts)
+    try:
+        from listingjet.temporal_client import get_temporal_client
+        client = get_temporal_client()
+        await client.start_video_postprocess(
+            listing_id=str(listing_id),
+            tenant_id=str(current_user.tenant_id),
+            video_asset_id=str(video.id),
+        )
+    except Exception:
+        logger.warning("video_postprocess_start_failed video=%s", video.id, exc_info=True)
+        video.status = "ready"
+        await db.commit()
 
     return {
         "id": str(video.id),

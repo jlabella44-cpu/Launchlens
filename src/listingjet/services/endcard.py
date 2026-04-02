@@ -111,3 +111,31 @@ def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     if len(hex_color) != 6:
         return (37, 99, 235)  # Default blue
     return (int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16))
+
+
+def endcard_png_to_video(png_bytes: bytes) -> str | None:
+    """Convert a PNG end-card to a 5-second MP4 clip via ffmpeg."""
+    import os
+    import subprocess
+    import tempfile
+
+    try:
+        png_fd = tempfile.NamedTemporaryFile(suffix=".png", prefix="listingjet_endcard_", delete=False)
+        mp4_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_endcard_", delete=False)
+        png_path = png_fd.name
+        png_fd.close()
+        mp4_path = mp4_fd.name
+        mp4_fd.close()
+        with open(png_path, "wb") as f:
+            f.write(png_bytes)
+        subprocess.run([
+            "ffmpeg", "-loop", "1", "-i", png_path,
+            "-c:v", "libx264", "-t", str(ENDCARD_DURATION),
+            "-pix_fmt", "yuv420p", "-vf", "scale=1280:720",
+            "-y", mp4_path,
+        ], check=True, capture_output=True)
+        os.unlink(png_path)
+        return mp4_path
+    except Exception:
+        logger.warning("endcard_png_to_video failed", exc_info=True)
+        return None

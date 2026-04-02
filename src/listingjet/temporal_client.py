@@ -2,6 +2,7 @@ from temporalio.client import Client
 
 from listingjet.config import settings
 from listingjet.workflows.listing_pipeline import ListingPipeline, ListingPipelineInput
+from listingjet.workflows.video_postprocess import VideoPostProcessWorkflow, VideoPostProcessInput
 
 
 class TemporalClient:
@@ -19,6 +20,17 @@ class TemporalClient:
         handle = await client.start_workflow(
             ListingPipeline.run,
             ListingPipelineInput(listing_id=listing_id, tenant_id=tenant_id, plan=plan),
+            id=workflow_id,
+            task_queue=settings.temporal_task_queue,
+        )
+        return handle.id
+
+    async def start_video_postprocess(self, listing_id: str, tenant_id: str, video_asset_id: str) -> str:
+        client = await self._connect()
+        workflow_id = f"video-postprocess-{video_asset_id}"
+        handle = await client.start_workflow(
+            VideoPostProcessWorkflow.run,
+            VideoPostProcessInput(listing_id=listing_id, tenant_id=tenant_id, video_asset_id=video_asset_id),
             id=workflow_id,
             task_queue=settings.temporal_task_queue,
         )

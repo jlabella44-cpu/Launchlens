@@ -13,6 +13,8 @@ from listingjet.telemetry import init_tracing
 from listingjet.workflows.baseline_aggregation import BaselineAggregationWorkflow, run_baseline_aggregation
 from listingjet.workflows.demo_cleanup import DemoCleanupWorkflow, run_demo_cleanup
 from listingjet.workflows.listing_pipeline import ListingPipeline
+from listingjet.workflows.video_postprocess import VideoPostProcessWorkflow
+from listingjet.activities.video_postprocess import run_append_endcard
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +111,8 @@ async def create_worker() -> Worker:
     return Worker(
         client,
         task_queue=settings.temporal_task_queue,
-        workflows=[ListingPipeline, DemoCleanupWorkflow, BaselineAggregationWorkflow],
-        activities=[*ALL_ACTIVITIES, run_demo_cleanup, run_baseline_aggregation],
+        workflows=[ListingPipeline, DemoCleanupWorkflow, BaselineAggregationWorkflow, VideoPostProcessWorkflow],
+        activities=[*ALL_ACTIVITIES, run_demo_cleanup, run_baseline_aggregation, run_append_endcard],
         interceptors=interceptors,
     )
 
