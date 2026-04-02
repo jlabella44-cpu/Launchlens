@@ -261,7 +261,7 @@ async def _handle_checkout_completed(
         bundle_size = int(metadata.get("bundle_size", 0))
         if bundle_size > 0:
             await credit_svc.add_credits(
-                db, tenant_id, bundle_size,
+                db, tenant.id, bundle_size,
                 transaction_type="purchase",
                 reference_type="stripe_event",
                 reference_id=event_id,
