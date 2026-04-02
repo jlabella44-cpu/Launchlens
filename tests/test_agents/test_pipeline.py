@@ -104,13 +104,17 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
         "bathroom": "bathroom",
     }
 
-    # Build lookup: file_hash -> shot_type labels
+    # Build lookups: file_hash -> shot_type, and asset_id -> shot_type
     hash_to_room_label = {h: shot_type for h, shot_type in shot_hashes}
+    asset_id_to_room_label = {
+        str(a.id): hash_to_room_label[a.file_hash] for a in assets
+    }
 
     async def mock_analyze(image_url):
-        # image_url is like "listings/{listing_id}/aaa.jpg"
-        file_hash = image_url.split("/")[-1].split(".")[0]
-        shot_type = hash_to_room_label.get(file_hash, "living_room")
+        # URL is presigned: https://s3.example.com/listings/{id}/proxies/{asset_id}.jpg?signed=1
+        # or https://s3.example.com/listings/{id}/{hash}.jpg?signed=1
+        filename = image_url.split("/")[-1].split(".")[0]
+        shot_type = asset_id_to_room_label.get(filename) or hash_to_room_label.get(filename, "living_room")
         label_name = SHOT_TO_LABEL_NAME.get(shot_type, shot_type.replace("_", " "))
         return [
             VisionLabel(name=label_name, confidence=0.95, category="room"),
