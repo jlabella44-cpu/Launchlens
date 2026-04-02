@@ -41,6 +41,9 @@ import type {
   ListingPermissionResponse,
   SharedListingResponse,
   AuditLogEntryResponse,
+  AnalyticsOverview,
+  AnalyticsTimeline,
+  AnalyticsCredits,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -265,6 +268,19 @@ class ApiClient {
   // Usage (analytics)
   async getUsage(): Promise<UsageResponse> {
     return this.request<UsageResponse>("/analytics/usage");
+  }
+
+  // Analytics
+  async getAnalyticsOverview(): Promise<AnalyticsOverview> {
+    return this.request<AnalyticsOverview>("/analytics/overview");
+  }
+
+  async getAnalyticsTimeline(days = 30): Promise<AnalyticsTimeline> {
+    return this.request<AnalyticsTimeline>(`/analytics/timeline?days=${days}`);
+  }
+
+  async getAnalyticsCredits(days = 30): Promise<AnalyticsCredits> {
+    return this.request<AnalyticsCredits>(`/analytics/credits?days=${days}`);
   }
 
   // Brand Kit
