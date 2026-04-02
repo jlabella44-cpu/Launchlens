@@ -271,40 +271,43 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
         </div>
       )}
 
-      {/* Drop zone */}
+      {/* Drop zone — wraps everything so dragging over previews also works */}
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`
-          relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer
-          transition-colors duration-200
-          ${dragOver
-            ? "border-[var(--color-primary)] bg-blue-50/50"
-            : "border-[var(--color-border)] hover:border-[var(--color-primary)]/50 hover:bg-white/30"
-          }
-        `}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+        onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); handleDrop(e); }}
       >
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={ACCEPTED_EXTENSIONS}
-          capture="environment"
-          onChange={handleFileInput}
-          className="hidden"
-        />
-        <svg className="w-8 h-8 mx-auto mb-2 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Drag photos here or <span className="text-[var(--color-primary)] font-medium">browse</span>
-        </p>
-        <p className="text-xs text-slate-400 mt-1">
-          JPG, PNG · max {MAX_SIZE_MB}MB each · up to {MAX_FILES} files
-        </p>
-      </div>
+        <div
+          onClick={() => inputRef.current?.click()}
+          className={`
+            relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer
+            transition-colors duration-200
+            ${dragOver
+              ? "border-[var(--color-primary)] bg-blue-50/50"
+              : "border-[var(--color-border)] hover:border-[var(--color-primary)]/50 hover:bg-white/30"
+            }
+          `}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            accept={ACCEPTED_EXTENSIONS}
+            capture="environment"
+            onChange={handleFileInput}
+            className="hidden"
+          />
+          <svg className="w-8 h-8 mx-auto mb-2 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Drag photos here or <span className="text-[var(--color-primary)] font-medium">browse</span>
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            JPG, PNG · max {MAX_SIZE_MB}MB each · up to {MAX_FILES} files
+          </p>
+        </div>
 
       {/* File previews */}
       <AnimatePresence>
@@ -381,6 +384,7 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
 
       {/* Import from Link */}
       <div className="mt-6 pt-6 border-t border-slate-100">

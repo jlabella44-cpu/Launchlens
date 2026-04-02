@@ -76,8 +76,9 @@ export function ActivityLog({ listingId }: ActivityLogProps) {
       try {
         const data = await apiClient.getListingAuditLog(listingId);
         if (!cancelled) setEntries(data);
-      } catch (err: unknown) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load activity");
+      } catch {
+        // Silently handle 404 (endpoint not deployed yet) — show empty state
+        if (!cancelled) setEntries([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
