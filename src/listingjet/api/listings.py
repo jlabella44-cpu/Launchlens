@@ -713,11 +713,11 @@ async def retry_pipeline(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    retryable = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    retryable = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT, ListingState.UPLOADING, ListingState.ANALYZING}
     if listing.state not in retryable:
         raise HTTPException(
             status_code=409,
-            detail=f"Can only retry failed listings, current state: {listing.state.value}",
+            detail=f"Can only retry failed or stuck listings, current state: {listing.state.value}",
         )
 
     listing.state = ListingState.UPLOADING
