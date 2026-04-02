@@ -110,6 +110,7 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     email_from: str = "noreply@listingjet.com"
     email_enabled: bool = False
+    ses_enabled: bool = False
 
     # Video (Kling AI)
     kling_access_key: str = ""
