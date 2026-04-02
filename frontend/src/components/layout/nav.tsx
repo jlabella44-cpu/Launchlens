@@ -40,6 +40,7 @@ export function Nav() {
         <div className="hidden md:flex items-center gap-4">
           {user && <Link href="/dashboard" className={linkClass}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass}>Listings</Link>}
+          {user && <Link href="/analytics" className={linkClass}>Analytics</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass}>Review</Link>
           )}
@@ -66,6 +67,7 @@ export function Nav() {
         <div className="md:hidden mt-3 pt-3 border-t border-slate-200/50 flex flex-col gap-3">
           {user && <Link href="/dashboard" className={linkClass} onClick={() => setMenuOpen(false)}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass} onClick={() => setMenuOpen(false)}>Listings</Link>}
+          {user && <Link href="/analytics" className={linkClass} onClick={() => setMenuOpen(false)}>Analytics</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass} onClick={() => setMenuOpen(false)}>Review</Link>
           )}
