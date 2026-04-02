@@ -51,3 +51,28 @@ class TemplateProvider(ABC):
     async def render(self, template_id: str, data: dict) -> bytes:
         """Render a template and return raw bytes (PDF or PNG)."""
         ...
+
+
+class VideoClipProvider(ABC):
+    @abstractmethod
+    async def generate_clip(
+        self,
+        image_url: str,
+        prompt: str,
+        negative_prompt: str = "",
+        camera_control: dict | None = None,
+        duration: int = 5,
+        mode: str = "pro",
+    ) -> str:
+        """Submit an image-to-video task. Returns task_id."""
+        ...
+
+    @abstractmethod
+    async def poll_task(
+        self,
+        task_id: str,
+        timeout: int = 300,
+        interval: int = 5,
+    ) -> str | None:
+        """Poll a video task until completion. Returns video URL or None."""
+        ...

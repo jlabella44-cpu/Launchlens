@@ -26,7 +26,7 @@ from listingjet.models.package_selection import PackageSelection
 from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers.elevenlabs import get_voiceover_provider
-from listingjet.providers.kling import KlingProvider
+from listingjet.providers.factory import get_kling_provider
 from listingjet.services.endcard import ENDCARD_DURATION, generate_endcard
 from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_cost
@@ -48,7 +48,7 @@ class VideoAgent(BaseAgent):
         video_stitcher=None,
         session_factory=None,
     ):
-        self._kling = kling_provider or KlingProvider()
+        self._kling = kling_provider or get_kling_provider()
         self._storage = storage_service or StorageService()
         self._stitcher = video_stitcher or VideoStitcher()
         self._session_factory = session_factory or AsyncSessionLocal
@@ -216,14 +216,20 @@ class VideoAgent(BaseAgent):
         return await asyncio.gather(*tasks)
 
     async def _download_clips(self, urls: list[str]) -> list[str]:
-        """Download clip URLs to temporary files."""
+        """Download clip URLs to temporary files. Handles local file paths for mock provider."""
+        import shutil
+
         paths = []
         async with httpx.AsyncClient(timeout=60) as client:
             for url in urls:
-                resp = await client.get(url)
                 fd, path = tempfile.mkstemp(suffix=".mp4", prefix="listingjet_clip_")
-                with os.fdopen(fd, "wb") as f:
-                    f.write(resp.content)
+                os.close(fd)
+                if os.path.isfile(url):
+                    shutil.copy2(url, path)
+                else:
+                    resp = await client.get(url)
+                    with open(path, "wb") as f:
+                        f.write(resp.content)
                 paths.append(path)
         return paths
 

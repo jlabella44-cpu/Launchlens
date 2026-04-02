@@ -1,6 +1,9 @@
 # src/listingjet/providers/mock.py
 """Mock provider implementations for tests and local development."""
-from .base import LLMProvider, TemplateProvider, VisionLabel, VisionProvider
+import uuid
+from pathlib import Path
+
+from .base import LLMProvider, TemplateProvider, VideoClipProvider, VisionLabel, VisionProvider
 
 
 class MockVisionProvider(VisionProvider):
@@ -33,3 +36,30 @@ class MockLLMProvider(LLMProvider):
 class MockTemplateProvider(TemplateProvider):
     async def render(self, template_id: str, data: dict) -> bytes:
         return b"%PDF-mock-content"
+
+
+class MockKlingProvider(VideoClipProvider):
+    """Returns a local test video fixture instead of calling Kling API."""
+
+    FIXTURE_PATH = str(
+        Path(__file__).resolve().parent.parent.parent.parent / "tests" / "fixtures" / "test_clip.mp4"
+    )
+
+    async def generate_clip(
+        self,
+        image_url: str,
+        prompt: str,
+        negative_prompt: str = "",
+        camera_control: dict | None = None,
+        duration: int = 5,
+        mode: str = "pro",
+    ) -> str:
+        return f"mock_task_{uuid.uuid4().hex[:8]}"
+
+    async def poll_task(
+        self,
+        task_id: str,
+        timeout: int = 300,
+        interval: int = 5,
+    ) -> str | None:
+        return self.FIXTURE_PATH

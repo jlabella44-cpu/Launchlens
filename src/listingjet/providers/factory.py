@@ -7,7 +7,7 @@ Returns real providers otherwise (requires API keys in environment).
 """
 from listingjet.config import settings
 
-from .base import LLMProvider, TemplateProvider, VisionProvider
+from .base import LLMProvider, TemplateProvider, VideoClipProvider, VisionProvider
 
 
 def get_vision_provider() -> VisionProvider:
@@ -35,3 +35,11 @@ def get_template_provider() -> TemplateProvider:
         return CanvaTemplateProvider(api_key=settings.canva_api_key, llm_provider=get_llm_provider())
     from .mock import MockTemplateProvider
     return MockTemplateProvider()
+
+
+def get_kling_provider() -> VideoClipProvider:
+    if settings.use_mock_providers:
+        from .mock import MockKlingProvider
+        return MockKlingProvider()
+    from .kling import KlingProvider
+    return KlingProvider()
