@@ -33,6 +33,9 @@ from aws_cdk import (
     aws_rds as rds,
 )
 from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
     aws_s3 as s3,
 )
 from aws_cdk import (
@@ -88,8 +91,9 @@ class ServicesStack(Stack):
             "ENVIRONMENT": "production",
             "AWS_REGION": Stack.of(self).region,
             "REDIS_URL": f"redis://{redis_cluster.attr_primary_end_point_address}:{redis_cluster.attr_primary_end_point_port}/0",
-            "CORS_ORIGINS": "http://localhost:3000,https://launchlens-7bvngk56b-jlabella44-5360s-projects.vercel.app",
-            "TEMPORAL_HOST": "temporal:7233",
+            "CORS_ORIGINS": "http://localhost:3000,https://listingjet.ai,https://www.listingjet.ai,https://launchlens-7bvngk56b-jlabella44-5360s-projects.vercel.app",
+            "TEMPORAL_HOST": "temporal.listingjet.local:7233",
+            "S3_BUCKET_NAME": "listingjet-dev",
         }
 
         # --- API Service (Fargate + ALB) ------------------------------------
@@ -200,6 +204,25 @@ class ServicesStack(Stack):
             versioned=True,
         )
 
+        # --- IAM: Grant S3 + CloudWatch to API and Worker task roles ----------
+        s3_bucket_arn = "arn:aws:s3:::listingjet-dev"
+        s3_policy = iam.PolicyStatement(
+            actions=["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+            resources=[f"{s3_bucket_arn}/*"],
+        )
+        s3_list_policy = iam.PolicyStatement(
+            actions=["s3:ListBucket"],
+            resources=[s3_bucket_arn],
+        )
+        cloudwatch_policy = iam.PolicyStatement(
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        )
+
+        api_task.task_role.add_to_policy(s3_policy)
+        api_task.task_role.add_to_policy(s3_list_policy)
+        api_task.task_role.add_to_policy(cloudwatch_policy)
+
         # --- Worker Service (Fargate, no ALB) --------------------------------
         worker_task = ecs.FargateTaskDefinition(
             self, "WorkerTask",
@@ -238,6 +261,10 @@ class ServicesStack(Stack):
                 start_period=Duration.seconds(30),
             ),
         )
+
+        worker_task.task_role.add_to_policy(s3_policy)
+        worker_task.task_role.add_to_policy(s3_list_policy)
+        worker_task.task_role.add_to_policy(cloudwatch_policy)
 
         self.worker_service = ecs.FargateService(
             self, "WorkerService",
