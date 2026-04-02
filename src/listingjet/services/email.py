@@ -1,10 +1,13 @@
-"""Email service — SMTP for production, NoOp for dev/test."""
+"""Email service — SES, SMTP, or NoOp depending on config."""
 
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
+
+import boto3
+from botocore.exceptions import ClientError
 
 from listingjet.config import settings
 
@@ -90,6 +93,58 @@ class EmailService:
         self.send(to, subject, html_body)
 
 
+class SESEmailService(EmailService):
+    """Send emails via AWS SES."""
+
+    def __init__(self, sender: str | None = None) -> None:
+        self.sender = sender or settings.email_from
+        self._client = boto3.client("ses", region_name=settings.aws_region)
+
+    def send(self, to: str, subject: str, html_body: str) -> None:
+        try:
+            self._client.send_email(
+                Source=self.sender,
+                Destination={"ToAddresses": [to]},
+                Message={
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": html_body, "Charset": "UTF-8"}},
+                },
+            )
+            logger.info("ses_email_sent", extra={"to": to, "subject": subject})
+        except ClientError as e:
+            logger.error("ses_email_failed", extra={"to": to, "error": str(e)})
+            raise
+
+    # Share-specific notification helpers
+
+    def send_listing_shared(self, to: str, sharer_name: str, listing_address: str, permission: str, listing_id: str) -> None:
+        html = _load_template(
+            "listing_shared.html",
+            sharer_name=sharer_name,
+            listing_address=listing_address,
+            permission=permission,
+            listing_id=listing_id,
+        )
+        self.send(to, f"{sharer_name} shared a listing with you on ListingJet", html)
+
+    def send_listing_unshared(self, to: str, listing_address: str) -> None:
+        html = _load_template("listing_unshared.html", listing_address=listing_address)
+        self.send(to, f"Your access was revoked: {listing_address}", html)
+
+    def send_permission_expiring(self, to: str, listing_address: str, days_left: str) -> None:
+        html = _load_template("permission_expiring.html", listing_address=listing_address, days_left=days_left)
+        self.send(to, f"Access expiring soon: {listing_address}", html)
+
+    def send_edit_digest(self, to: str, listing_address: str, change_count: str, editor_names: str) -> None:
+        html = _load_template(
+            "edit_digest.html",
+            listing_address=listing_address,
+            change_count=change_count,
+            editor_names=editor_names,
+        )
+        self.send(to, f"{change_count} changes on {listing_address}", html)
+
+
 class NoOpEmailService(EmailService):
     """Does nothing — used in dev/test."""
 
@@ -107,4 +162,6 @@ def get_email_service() -> EmailService:
     """Return the appropriate email service based on config."""
     if not settings.email_enabled:
         return NoOpEmailService()
+    if getattr(settings, "ses_enabled", False):
+        return SESEmailService()
     return EmailService()

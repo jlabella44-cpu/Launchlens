@@ -18,6 +18,7 @@ from listingjet.models.listing import Listing
 from listingjet.models.listing_permission import ListingAuditLog, ListingPermission
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
+from listingjet.services.email import get_email_service
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,21 @@ async def share_listing(
     await db.commit()
     await db.refresh(perm)
 
+    # Send email notification (fire-and-forget)
+    try:
+        email_svc = get_email_service()
+        addr = listing.address or {}
+        listing_address = addr.get("street", "a listing")
+        email_svc.send_listing_shared(
+            to=grantee.email,
+            sharer_name=user.name or user.email,
+            listing_address=listing_address,
+            permission=body.permission,
+            listing_id=str(listing.id),
+        )
+    except Exception:
+        logger.warning("share_email_failed", extra={"grantee": grantee.email})
+
     return _build_permission_response(perm, grantee)
 
 
@@ -273,6 +289,19 @@ async def revoke_permission(
     })
 
     await db.commit()
+
+    # Send revoke notification (fire-and-forget)
+    try:
+        grantee = await db.get(User, perm.grantee_user_id)
+        if grantee:
+            email_svc = get_email_service()
+            addr = listing.address or {}
+            email_svc.send_listing_unshared(
+                to=grantee.email,
+                listing_address=addr.get("street", "a listing"),
+            )
+    except Exception:
+        logger.warning("unshare_email_failed", extra={"perm_id": str(permission_id)})
 
 
 # ---------------------------------------------------------------------------
