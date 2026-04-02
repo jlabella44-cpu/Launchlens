@@ -341,6 +341,10 @@ class ApiClient {
     return this.request(`/listings/${listingId}/cancel`, { method: "POST" });
   }
 
+  async deleteListing(listingId: string): Promise<{ listing_id: string; deleted: boolean; credits_refunded: number }> {
+    return this.request(`/listings/${listingId}`, { method: "DELETE" });
+  }
+
   // Credits
   async getCreditBalance(): Promise<CreditBalance> {
     return this.request<CreditBalance>("/credits/balance");

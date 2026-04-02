@@ -104,7 +104,7 @@ export function ListingCard({ listing, onDeleted }: ListingCardProps) {
                       e.stopPropagation();
                       setDeleting(true);
                       try {
-                        await apiClient.cancelListing(listing.id);
+                        await apiClient.deleteListing(listing.id);
                         onDeleted?.(listing.id);
                       } catch {
                         setDeleting(false);
