@@ -318,7 +318,6 @@ async def adjust_credits(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    from listingjet.models.credit_account import CreditAccount
     from listingjet.services.credits import CreditService
 
     credit_svc = CreditService()
