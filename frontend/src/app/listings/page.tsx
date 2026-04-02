@@ -273,7 +273,7 @@ function ListingsDashboard() {
                   show: { opacity: 1, y: 0 },
                 }}
               >
-                <ListingCard listing={listing} />
+                <ListingCard listing={listing} onDeleted={(id) => setListings((prev) => prev.filter((l) => l.id !== id))} />
               </motion.div>
             ))}
           </motion.div>

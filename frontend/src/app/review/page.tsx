@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/contexts/auth-context";
 import apiClient from "@/lib/api-client";
 import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
 
@@ -393,10 +395,28 @@ function ReviewQueue() {
   );
 }
 
+function AdminGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user && user.role !== "admin" && user.role !== "superadmin") {
+      router.push("/dashboard");
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) return null;
+  if (user.role !== "admin" && user.role !== "superadmin") return null;
+
+  return <>{children}</>;
+}
+
 export default function ReviewPage() {
   return (
     <ProtectedRoute>
-      <ReviewQueue />
+      <AdminGate>
+        <ReviewQueue />
+      </AdminGate>
     </ProtectedRoute>
   );
 }
