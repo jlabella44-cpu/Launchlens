@@ -17,9 +17,11 @@ from listingjet.api import (
     credits,
     demo,
     health,
+    listing_permissions,
     listings,
     properties,
     sse,
+    team,
     tenant_settings,
 )
 from listingjet.config import settings
@@ -68,6 +70,7 @@ _TAG_METADATA = [
     {"name": "analytics", "description": "Usage metrics and reporting"},
     {"name": "demo", "description": "Public demo listing upload"},
     {"name": "sse", "description": "Server-Sent Events for real-time pipeline updates"},
+    {"name": "team", "description": "Team member management within a tenant"},
 ]
 
 
@@ -105,6 +108,7 @@ def create_app() -> FastAPI:
     init_monitoring(app)
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
+    app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
     app.include_router(listings.router, prefix="/listings", tags=["listings"])
     app.include_router(assets.router, prefix="/assets", tags=["assets"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
@@ -116,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(credits.router, prefix="/credits", tags=["credits"])
     app.include_router(addons.router, prefix="/addons", tags=["addons"])
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
+    app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(health.router)
 

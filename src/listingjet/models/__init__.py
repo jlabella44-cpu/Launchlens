@@ -22,3 +22,5 @@ from .credit_account import CreditAccount                    # noqa
 from .credit_transaction import CreditTransaction            # noqa
 from .addon_catalog import AddonCatalog                      # noqa
 from .addon_purchase import AddonPurchase                    # noqa
+from .listing_permission import ListingPermission            # noqa
+from .listing_permission import ListingAuditLog              # noqa

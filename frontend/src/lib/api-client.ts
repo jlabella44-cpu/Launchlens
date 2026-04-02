@@ -36,6 +36,11 @@ import type {
   PipelineStatusResponse,
   ReviewQueueItem,
   RejectRequest,
+  TeamMemberResponse,
+  InviteTeamMemberRequest,
+  ListingPermissionResponse,
+  SharedListingResponse,
+  AuditLogEntryResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -278,6 +283,14 @@ class ApiClient {
     return this.request("/brand-kit/logo-upload-url", { method: "POST" });
   }
 
+  async getHeadshotUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
+    return this.request("/brand-kit/headshot-upload-url", { method: "POST" });
+  }
+
+  async getTeamLogoUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
+    return this.request("/brand-kit/team-logo-upload-url", { method: "POST" });
+  }
+
   // Upload URLs
   async getUploadUrls(listingId: string, filenames: string[]): Promise<{
     urls: { filename: string; key: string; upload_url: { url: string; fields: Record<string, string> }; content_type: string }[];
@@ -355,6 +368,80 @@ class ApiClient {
 
   async removeAddon(listingId: string, addonSlug: string): Promise<{ status: string; credits_returned: number }> {
     return this.request(`/listings/${listingId}/addons/${addonSlug}`, { method: "DELETE" });
+  }
+
+  // Team
+  async getTeamMembers(): Promise<TeamMemberResponse[]> {
+    return this.request("/team/members");
+  }
+
+  async getMyProfile(): Promise<TeamMemberResponse> {
+    return this.request("/team/me");
+  }
+
+  async inviteTeamMember(data: InviteTeamMemberRequest): Promise<TeamMemberResponse> {
+    return this.request("/team/members", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTeamMemberRole(memberId: string, role: string): Promise<TeamMemberResponse> {
+    return this.request(`/team/members/${memberId}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async removeTeamMember(memberId: string): Promise<void> {
+    return this.request(`/team/members/${memberId}`, { method: "DELETE" });
+  }
+
+  // Listing Permissions
+  async shareListing(listingId: string, data: { email: string; permission?: string; expires_at?: string | null }): Promise<ListingPermissionResponse> {
+    return this.request(`/listings/${listingId}/permissions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getListingPermissions(listingId: string): Promise<ListingPermissionResponse[]> {
+    return this.request(`/listings/${listingId}/permissions`);
+  }
+
+  async updateListingPermission(listingId: string, permissionId: string, data: { permission?: string; expires_at?: string | null }): Promise<ListingPermissionResponse> {
+    return this.request(`/listings/${listingId}/permissions/${permissionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async revokeListingPermission(listingId: string, permissionId: string): Promise<void> {
+    return this.request(`/listings/${listingId}/permissions/${permissionId}`, { method: "DELETE" });
+  }
+
+  async getSharedWithMe(): Promise<SharedListingResponse[]> {
+    return this.request("/listings/shared-with-me");
+  }
+
+  // Blanket grants
+  async getBlanketGrants(userId: string): Promise<import("./types").BlanketGrantResponse[]> {
+    return this.request(`/team/members/${userId}/listing-access`);
+  }
+
+  async createBlanketGrant(userId: string, permission: string): Promise<import("./types").BlanketGrantResponse> {
+    return this.request(`/team/members/${userId}/listing-access`, {
+      method: "POST",
+      body: JSON.stringify({ permission }),
+    });
+  }
+
+  async revokeBlanketGrant(userId: string, grantId: string): Promise<void> {
+    return this.request(`/team/members/${userId}/listing-access/${grantId}`, { method: "DELETE" });
+  }
+
+  async getListingAuditLog(listingId: string): Promise<AuditLogEntryResponse[]> {
+    return this.request(`/listings/${listingId}/audit-log`);
   }
 
   // Import from link

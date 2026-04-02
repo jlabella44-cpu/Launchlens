@@ -359,3 +359,64 @@ export interface CreditTransactionResponse {
   reason: string | null;
   created_at: string;
 }
+
+export interface TeamMemberResponse {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  created_at: string;
+}
+
+export interface InviteTeamMemberRequest {
+  email: string;
+  name?: string;
+  password: string;
+  role?: string;
+}
+
+export interface ListingPermissionResponse {
+  id: string;
+  listing_id: string | null;
+  grantee_user_id: string;
+  grantee_email: string;
+  grantee_name: string | null;
+  permission: string;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface ShareListingRequest {
+  email: string;
+  permission?: string;
+  expires_at?: string | null;
+}
+
+export interface AuditLogEntryResponse {
+  id: string;
+  user_email: string;
+  user_name: string | null;
+  action: string;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SharedListingResponse {
+  listing_id: string;
+  tenant_id: string;
+  address: string;
+  state: string;
+  permission: string;
+  shared_at: string;
+  expires_at: string | null;
+}
+
+export interface BlanketGrantResponse {
+  id: string;
+  agent_user_id: string | null;
+  agent_name: string | null;
+  agent_email: string | null;
+  grantee_user_id: string;
+  permission: string;
+  created_at: string;
+}

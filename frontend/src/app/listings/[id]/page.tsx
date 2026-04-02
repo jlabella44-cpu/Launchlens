@@ -18,6 +18,8 @@ import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/typ
 import { VideoPlayer } from "@/components/listings/video-player";
 import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
+import { SharePanel } from "@/components/listings/share-panel";
+import { ActivityLog } from "@/components/listings/activity-log";
 
 const SceneWrapper = dynamic(
   () => import("@/components/three/scene-wrapper").then((m) => ({ default: m.SceneWrapper })),
@@ -48,6 +50,7 @@ function ListingDetail() {
   const [selections, setSelections] = useState<PackageSelection[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
   const [showVideoUpload, setShowVideoUpload] = useState(false);
@@ -197,9 +200,23 @@ function ListingDetail() {
                 {[addr.city, addr.state, addr.zip].filter(Boolean).join(", ")}
               </p>
             </div>
-            <Badge state={listing.state} />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShareOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--color-border)] text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[#F97316] hover:text-[#F97316] transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                </svg>
+                Share
+              </button>
+              <Badge state={listing.state} />
+            </div>
           </div>
         </div>
+
+        {/* Share Panel */}
+        <SharePanel listingId={id} isOpen={shareOpen} onClose={() => setShareOpen(false)} />
 
         {/* Pipeline Status */}
         <div className="mb-8 space-y-4">
@@ -442,6 +459,11 @@ function ListingDetail() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Activity Log */}
+        <div className="mt-10">
+          <ActivityLog listingId={id} />
         </div>
 
         {/* Footer */}
