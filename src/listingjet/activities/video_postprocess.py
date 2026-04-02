@@ -93,6 +93,49 @@ async def run_append_endcard(context: AgentContext, video_asset_id: str) -> dict
                 if os.path.exists(p):
                     os.unlink(p)
 
+        # Optionally add voiceover
+        listing_meta = {}
+        from listingjet.models.listing import Listing
+        listing = await session.get(Listing, video.listing_id)
+        if listing:
+            listing_meta = listing.metadata_ or {}
+
+        voiceover_enabled = listing_meta.get("voiceover_enabled")
+        if voiceover_enabled is None and brand_kit:
+            voiceover_enabled = (brand_kit.raw_config or {}).get("voiceover_enabled", False)
+
+        if voiceover_enabled:
+            try:
+                from listingjet.providers.elevenlabs import get_voiceover_provider
+                import subprocess
+                description = listing_meta.get("description", "") if listing else ""
+                if description:
+                    voiceover = get_voiceover_provider()
+                    audio_bytes = await voiceover.synthesize(description)
+                    if audio_bytes:
+                        import tempfile
+                        vid_fd, vid_path = tempfile.mkstemp(suffix=".mp4", prefix="listingjet_vo_in_")
+                        aud_fd, aud_path = tempfile.mkstemp(suffix=".mp3", prefix="listingjet_vo_audio_")
+                        out_fd, out_path = tempfile.mkstemp(suffix=".mp4", prefix="listingjet_vo_out_")
+                        with os.fdopen(vid_fd, "wb") as f:
+                            f.write(stitched_bytes)
+                        with os.fdopen(aud_fd, "wb") as f:
+                            f.write(audio_bytes)
+                        os.close(out_fd)
+                        subprocess.run([
+                            "ffmpeg", "-i", vid_path, "-i", aud_path,
+                            "-c:v", "copy", "-c:a", "aac",
+                            "-map", "0:v:0", "-map", "1:a:0",
+                            "-shortest", "-y", out_path,
+                        ], check=True, capture_output=True)
+                        with open(out_path, "rb") as f:
+                            stitched_bytes = f.read()
+                        for p in (vid_path, aud_path, out_path):
+                            if os.path.exists(p):
+                                os.unlink(p)
+            except Exception:
+                logger.warning("voiceover_failed video=%s", video_asset_id, exc_info=True)
+
         # Upload branded video
         branded_key = f"videos/{video.listing_id}/branded.mp4"
         storage.upload(branded_key, stitched_bytes, content_type="video/mp4")

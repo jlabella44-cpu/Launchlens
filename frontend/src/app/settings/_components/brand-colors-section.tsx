@@ -18,6 +18,7 @@ interface BrandKitFormState {
   brand_voice: string;
   brand_tone: string;
   voice_notes: string;
+  voiceover_enabled: boolean;
 }
 
 interface BrandColorsSectionProps {

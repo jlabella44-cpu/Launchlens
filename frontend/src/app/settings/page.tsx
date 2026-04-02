@@ -32,6 +32,7 @@ interface BrandKitFormState {
   brand_voice: string;
   brand_tone: string;
   voice_notes: string;
+  voiceover_enabled: boolean;
 }
 
 const DEFAULTS: BrandKitFormState = {
@@ -49,6 +50,7 @@ const DEFAULTS: BrandKitFormState = {
   brand_voice: "",
   brand_tone: "",
   voice_notes: "",
+  voiceover_enabled: true,
 };
 
 /* ─── Upload helper (shared by logo, headshot, team-logo) ─── */
@@ -103,7 +105,7 @@ function BrandKitSettings() {
           const {
             headshot_url, team_logo_url,
             accent_color, background_color, font_secondary,
-            brand_voice, brand_tone, voice_notes,
+            brand_voice, brand_tone, voice_notes, voiceover_enabled,
             ...extras
           } = rc as Record<string, unknown>;
           rawConfigExtrasRef.current = extras;
@@ -123,6 +125,7 @@ function BrandKitSettings() {
             brand_voice: (brand_voice as string) || "",
             brand_tone: (brand_tone as string) || "",
             voice_notes: (voice_notes as string) || "",
+            voiceover_enabled: voiceover_enabled !== false,
           });
         }
       })
@@ -183,7 +186,7 @@ function BrandKitSettings() {
       const {
         headshot_url, team_logo_url,
         accent_color, background_color, font_secondary,
-        brand_voice, brand_tone, voice_notes,
+        brand_voice, brand_tone, voice_notes, voiceover_enabled,
         ...topLevel
       } = form;
       await apiClient.upsertBrandKit({
@@ -198,6 +201,7 @@ function BrandKitSettings() {
           brand_voice,
           brand_tone,
           voice_notes,
+          voiceover_enabled,
         },
       });
       setSaved(true);

@@ -119,7 +119,7 @@ class VideoAgent(BaseAgent):
                 video_bytes = self._stitcher.stitch(clip_paths, transitions)
 
                 # Generate voiceover narration from listing description
-                video_bytes = await self._add_voiceover(video_bytes, listing)
+                video_bytes = await self._add_voiceover(video_bytes, listing, brand_kit=brand_kit)
 
                 # Upload to S3
                 s3_key = self._storage.upload_bytes(
@@ -233,11 +233,22 @@ class VideoAgent(BaseAgent):
                 paths.append(path)
         return paths
 
-    async def _add_voiceover(self, video_bytes: bytes, listing) -> bytes:
+    async def _add_voiceover(self, video_bytes: bytes, listing, brand_kit=None) -> bytes:
         """Generate voiceover from listing description and overlay on video.
 
+        Respects per-listing and per-tenant voiceover toggle.
         Returns original video bytes if voiceover generation fails or is unavailable.
         """
+        # Check per-listing override first, then tenant default from BrandKit
+        listing_meta = listing.metadata_ or {}
+        if listing_meta.get("voiceover_enabled") is False:
+            logger.info("voiceover_disabled_per_listing listing=%s", listing.id)
+            return video_bytes
+        if listing_meta.get("voiceover_enabled") is None and brand_kit:
+            raw = brand_kit.raw_config or {}
+            if raw.get("voiceover_enabled") is False:
+                logger.info("voiceover_disabled_per_tenant listing=%s", listing.id)
+                return video_bytes
         import subprocess
 
         voiceover = get_voiceover_provider()

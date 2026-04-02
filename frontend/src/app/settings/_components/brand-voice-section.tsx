@@ -112,6 +112,24 @@ export default function BrandVoiceSection({ form, setForm }: BrandVoiceSectionPr
           These instructions guide AI when generating listing descriptions and marketing copy.
         </p>
       </div>
+      {/* Voiceover Toggle */}
+      <div className="mt-5 flex items-center justify-between p-4 rounded-lg border border-[var(--color-input-border)] bg-[var(--color-input-bg)]">
+        <div>
+          <p className="text-sm font-medium text-[var(--color-text)]">AI Voiceover</p>
+          <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">
+            Generate narration for property tour videos using ElevenLabs TTS. Can be overridden per listing.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setForm((prev) => ({ ...prev, voiceover_enabled: !prev.voiceover_enabled }))}
+          className={`relative w-11 h-6 rounded-full transition-colors ${form.voiceover_enabled ? "bg-[#F97316]" : "bg-slate-300"}`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${form.voiceover_enabled ? "translate-x-5" : "translate-x-0"}`}
+          />
+        </button>
+      </div>
     </section>
   );
 }
