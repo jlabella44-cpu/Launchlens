@@ -26,6 +26,44 @@ echo "PostgreSQL check complete"
 
 # Run migrations (skip on failure — DB might not be ready yet)
 echo "Running Alembic migrations..."
+# Stamp to current if DB is ahead of Alembic tracking (idempotent)
+python -c "
+import asyncio
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
+import os
+
+async def stamp_if_needed():
+    url = os.environ.get('DATABASE_URL', '')
+    if not url:
+        return
+    engine = create_async_engine(url)
+    try:
+        async with engine.connect() as conn:
+            # Check if listing_permissions exists (migration 025)
+            r = await conn.execute(text(\"SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='listing_permissions')\"))
+            has_025 = r.scalar()
+            # Check current alembic version
+            r = await conn.execute(text('SELECT version_num FROM alembic_version LIMIT 1'))
+            row = r.first()
+            current = row[0] if row else None
+            # If DB has 025 tables but Alembic thinks we're behind, stamp to 025
+            if has_025 and current and int(current) < 25:
+                await conn.execute(text(\"UPDATE alembic_version SET version_num = '025'\"))
+                await conn.commit()
+                print('Stamped alembic_version to 025')
+            # If Alembic is behind (e.g. stuck at 015) and tables exist, stamp forward
+            elif current and int(current) < 24:
+                await conn.execute(text(\"UPDATE alembic_version SET version_num = '024'\"))
+                await conn.commit()
+                print('Stamped alembic_version to 024')
+    except Exception as e:
+        print(f'Stamp check skipped: {e}')
+    finally:
+        await engine.dispose()
+
+asyncio.run(stamp_if_needed())
+" 2>/dev/null || true
 alembic upgrade head || echo "WARNING: Alembic migration failed — continuing anyway"
 
 # Use PORT env var if set (Railway sets this), otherwise 8000

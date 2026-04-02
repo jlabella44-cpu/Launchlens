@@ -71,6 +71,8 @@ async def get_tenant(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    from listingjet.models.credit_account import CreditAccount
+
     user_count = (await db.execute(
         select(func.count(User.id)).where(User.tenant_id == tenant_id)
     )).scalar() or 0
@@ -79,6 +81,11 @@ async def get_tenant(
         select(func.count(Listing.id)).where(Listing.tenant_id == tenant_id)
     )).scalar() or 0
 
+    credit_acct = (await db.execute(
+        select(CreditAccount).where(CreditAccount.tenant_id == tenant_id)
+    )).scalar_one_or_none()
+    balance = credit_acct.balance if credit_acct else 0
+
     return TenantDetailResponse(
         id=tenant.id,
         name=tenant.name,
@@ -86,7 +93,7 @@ async def get_tenant(
         stripe_customer_id=tenant.stripe_customer_id,
         stripe_subscription_id=tenant.stripe_subscription_id,
         webhook_url=tenant.webhook_url,
-        credit_balance=tenant.credit_balance,
+        credit_balance=balance,
         created_at=tenant.created_at,
         user_count=user_count,
         listing_count=listing_count,
@@ -270,9 +277,16 @@ async def get_tenant_credits(
     db: AsyncSession = Depends(get_db_admin),
 ):
     """Credit balance + recent transactions for a tenant."""
+    from listingjet.models.credit_account import CreditAccount
+
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
+
+    credit_acct = (await db.execute(
+        select(CreditAccount).where(CreditAccount.tenant_id == tenant_id)
+    )).scalar_one_or_none()
+    balance = credit_acct.balance if credit_acct else 0
 
     result = await db.execute(
         select(CreditTransaction)
@@ -284,7 +298,7 @@ async def get_tenant_credits(
 
     return TenantCreditsResponse(
         tenant_id=tenant_id,
-        credit_balance=tenant.credit_balance,
+        credit_balance=balance,
         transactions=[CreditTransactionResponse.model_validate(t) for t in txns],
     )
 
@@ -304,24 +318,22 @@ async def adjust_credits(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    new_balance = tenant.credit_balance + body.amount
+    from listingjet.services.credits import CreditService
+
+    credit_svc = CreditService()
+    credit_acct = await credit_svc.ensure_account(db, tenant_id, rollover_cap=tenant.rollover_cap)
+
+    new_balance = credit_acct.balance + body.amount
     if new_balance < 0:
         raise HTTPException(
             status_code=400,
-            detail=f"Adjustment would result in negative balance ({new_balance}). Current: {tenant.credit_balance}",
+            detail=f"Adjustment would result in negative balance ({new_balance}). Current: {credit_acct.balance}",
         )
 
-    tenant.credit_balance = new_balance
+    credit_acct.balance = new_balance
+    tenant.credit_balance = new_balance  # keep in sync for backward compat
 
-    # Sync CreditAccount (source of truth) with Tenant.credit_balance
-    from listingjet.models.credit_account import CreditAccount
-    credit_acct = (await db.execute(
-        select(CreditAccount).where(CreditAccount.tenant_id == tenant_id)
-    )).scalar_one_or_none()
-    if credit_acct:
-        credit_acct.balance = new_balance
-
-    account_id = credit_acct.id if credit_acct else uuid.uuid4()
+    account_id = credit_acct.id
     txn = CreditTransaction(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -362,14 +374,16 @@ async def credits_summary(
     db: AsyncSession = Depends(get_db_admin),
 ):
     """Platform-wide credit statistics."""
-    # Total credits outstanding
+    from listingjet.models.credit_account import CreditAccount
+
+    # Total credits outstanding (from CreditAccount — source of truth)
     total_outstanding = (await db.execute(
-        select(func.coalesce(func.sum(Tenant.credit_balance), 0))
+        select(func.coalesce(func.sum(CreditAccount.balance), 0))
     )).scalar()
 
     # Tenants with credits
     tenant_count = (await db.execute(
-        select(func.count(Tenant.id)).where(Tenant.credit_balance > 0)
+        select(func.count(CreditAccount.tenant_id)).where(CreditAccount.balance > 0)
     )).scalar() or 0
 
     # This month's transactions
