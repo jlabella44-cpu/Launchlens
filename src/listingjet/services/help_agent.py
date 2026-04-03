@@ -159,7 +159,7 @@ _INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(all\s+)?above\s+instructions", re.IGNORECASE),
     re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
     re.compile(r"pretend\s+you\s+are\s+", re.IGNORECASE),
-    re.compile(r"act\s+as\s+(if\s+you\s+are\s+)?a?\s*(different|new)", re.IGNORECASE),
+    re.compile(r"act\s+as\s+(if\s+you\s+(are|were)\s+)?", re.IGNORECASE),
     re.compile(r"reveal\s+(your\s+)?(system\s+)?prompt", re.IGNORECASE),
     re.compile(r"show\s+(me\s+)?(your\s+)?(system\s+)?prompt", re.IGNORECASE),
 ]
