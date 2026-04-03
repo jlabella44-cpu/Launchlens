@@ -309,8 +309,11 @@ class ApiClient {
 
   // Review queue
   async getReviewQueue(): Promise<ListingResponse[]> {
-    const res = await this.request<{ items: ListingResponse[] }>("/listings?state=awaiting_review");
-    return res.items;
+    const [awaiting, inReview] = await Promise.all([
+      this.request<{ items: ListingResponse[] }>("/listings?state=awaiting_review"),
+      this.request<{ items: ListingResponse[] }>("/listings?state=in_review"),
+    ]);
+    return [...awaiting.items, ...inReview.items];
   }
 
   // Reject

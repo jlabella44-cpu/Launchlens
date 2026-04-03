@@ -139,6 +139,10 @@ async def list_listings(
 
     base_query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
 
+    # Hide cancelled listings unless explicitly requested
+    if state != "cancelled":
+        base_query = base_query.where(Listing.state != ListingState.CANCELLED)
+
     if state:
         try:
             validated_state = ListingState(state)

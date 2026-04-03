@@ -11,6 +11,7 @@ from listingjet.models.property_data import PropertyData
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_llm_provider
 from listingjet.services.events import emit_event
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.services.fha_filter import fha_check
 from listingjet.services.pii_filter import sanitize_for_prompt
 
@@ -106,6 +107,7 @@ class ContentAgent(BaseAgent):
                 # Load brand kit for voice samples
                 brand_kit = (await session.execute(
                     select(BrandKit).where(BrandKit.tenant_id == tenant_id)
+                    .limit(1)
                 )).scalar_one_or_none()
 
                 voice_section = ""
@@ -168,7 +170,7 @@ class ContentAgent(BaseAgent):
                     temperature=temperature,
                     system_prompt=system_prompt,
                 )
-                parsed = json.loads(raw)
+                parsed = json.loads(strip_markdown_fences(raw))
                 mls_safe = parsed["mls_safe"]
                 marketing = parsed["marketing"]
                 fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
@@ -180,7 +182,7 @@ class ContentAgent(BaseAgent):
                         temperature=max(0.1, temperature - 0.2),  # Lower temp for FHA retry
                         system_prompt=system_prompt,
                     )
-                    parsed = json.loads(raw)
+                    parsed = json.loads(strip_markdown_fences(raw))
                     mls_safe = parsed["mls_safe"]
                     marketing = parsed["marketing"]
                     fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})

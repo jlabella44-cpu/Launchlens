@@ -35,7 +35,7 @@ class BrandAgent(BaseAgent):
                     select(PackageSelection).where(
                         PackageSelection.listing_id == listing_id,
                         PackageSelection.position == 0,
-                    )
+                    ).limit(1)
                 )
                 hero = result.scalar_one_or_none()
                 hero_asset_id = str(hero.asset_id) if hero else None
@@ -50,11 +50,12 @@ class BrandAgent(BaseAgent):
                 # Load brand kit for tenant
                 brand_kit = (await session.execute(
                     select(BrandKit).where(BrandKit.tenant_id == tenant_id)
+                    .limit(1)
                 )).scalar_one_or_none()
 
                 # Determine template ID: tenant override or default
                 template_id = "flyer-standard"
-                if brand_kit and hasattr(brand_kit, "canva_template_id") and brand_kit.canva_template_id:
+                if brand_kit and getattr(brand_kit, "canva_template_id", None):
                     template_id = brand_kit.canva_template_id
 
                 # Build data payload with listing + brand kit fields

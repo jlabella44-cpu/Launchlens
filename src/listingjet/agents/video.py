@@ -97,6 +97,7 @@ class VideoAgent(BaseAgent):
                 from listingjet.models.brand_kit import BrandKit
                 brand_kit = (await session.execute(
                     select(BrandKit).where(BrandKit.tenant_id == listing.tenant_id)
+                    .limit(1)
                 )).scalar_one_or_none()
 
                 endcard_path = None

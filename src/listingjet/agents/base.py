@@ -1,8 +1,16 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from listingjet.services.metrics import StepTimer
 from listingjet.telemetry import agent_span
+
+
+def strip_markdown_fences(text: str) -> str:
+    """Remove ```json ... ``` wrappers that LLMs often add around JSON."""
+    text = text.strip()
+    m = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
+    return m.group(1).strip() if m else text
 
 
 @dataclass

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
@@ -69,7 +70,7 @@ class PhotoComplianceAgent(BaseAgent):
         """Analyze a single photo for compliance issues."""
         try:
             raw = await self._vision.analyze_with_prompt(image_url, _COMPLIANCE_PROMPT)
-            data = json.loads(raw)
+            data = json.loads(strip_markdown_fences(raw))
             return PhotoComplianceResult(
                 asset_id=asset_id,
                 file_path=file_path,
