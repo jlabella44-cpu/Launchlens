@@ -41,6 +41,7 @@ function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -62,7 +63,7 @@ function RegisterForm() {
     setError("");
     setLoading(true);
     try {
-      await register(email, password, name, companyName, plan || undefined);
+      await register(email, password, name, companyName, plan || undefined, consent);
 
       if (claimId) {
         try {
@@ -275,6 +276,28 @@ function RegisterForm() {
                 </div>
               </div>
 
+              {/* Consent */}
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#F97316] focus:ring-[#F97316]/30"
+                  required
+                />
+                <span className="text-xs text-slate-500">
+                  I agree to the{" "}
+                  <Link href="/terms" className="text-[#F97316] hover:underline" target="_blank">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="text-[#F97316] hover:underline" target="_blank">
+                    Privacy Policy
+                  </Link>, and consent to my listing data being processed by third-party AI
+                  services as described therein.
+                </span>
+              </label>
+
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
                   {error}
@@ -314,11 +337,12 @@ function RegisterForm() {
 
             {/* Footer Links */}
             <div className="flex items-center justify-center gap-6 mt-8">
-              {["Privacy Policy", "Terms of Flight", "System Status"].map((link) => (
-                <span key={link} className="text-[10px] text-slate-400 uppercase tracking-wider hover:text-slate-600 cursor-pointer">
-                  {link}
-                </span>
-              ))}
+              <Link href="/privacy" className="text-[10px] text-slate-400 uppercase tracking-wider hover:text-slate-600">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="text-[10px] text-slate-400 uppercase tracking-wider hover:text-slate-600">
+                Terms of Service
+              </Link>
             </div>
           </div>
         </div>

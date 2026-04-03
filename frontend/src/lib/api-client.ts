@@ -41,6 +41,9 @@ import type {
   ListingPermissionResponse,
   SharedListingResponse,
   AuditLogEntryResponse,
+  AnalyticsOverview,
+  AnalyticsTimeline,
+  AnalyticsCredits,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -100,6 +103,7 @@ class ApiClient {
     const response = await fetch(`${API_URL}${path}`, {
       ...options,
       headers,
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -119,6 +123,7 @@ class ApiClient {
     name: string,
     companyName: string,
     planTier?: string,
+    consent: boolean = true,
   ): Promise<TokenResponse> {
     return this.request<TokenResponse>("/auth/register", {
       method: "POST",
@@ -128,6 +133,7 @@ class ApiClient {
         name,
         company_name: companyName,
         plan_tier: planTier || undefined,
+        consent,
       }),
     });
   }
@@ -267,6 +273,19 @@ class ApiClient {
     return this.request<UsageResponse>("/analytics/usage");
   }
 
+  // Analytics
+  async getAnalyticsOverview(): Promise<AnalyticsOverview> {
+    return this.request<AnalyticsOverview>("/analytics/overview");
+  }
+
+  async getAnalyticsTimeline(days = 30): Promise<AnalyticsTimeline> {
+    return this.request<AnalyticsTimeline>(`/analytics/timeline?days=${days}`);
+  }
+
+  async getAnalyticsCredits(days = 30): Promise<AnalyticsCredits> {
+    return this.request<AnalyticsCredits>(`/analytics/credits?days=${days}`);
+  }
+
   // Brand Kit
   async getBrandKit(): Promise<BrandKitResponse | null> {
     return this.request<BrandKitResponse | null>("/brand-kit");
@@ -326,6 +345,10 @@ class ApiClient {
 
   async cancelListing(listingId: string): Promise<{ listing_id: string; state: string; credits_refunded: number }> {
     return this.request(`/listings/${listingId}/cancel`, { method: "POST" });
+  }
+
+  async deleteListing(listingId: string): Promise<{ listing_id: string; deleted: boolean; credits_refunded: number }> {
+    return this.request(`/listings/${listingId}`, { method: "DELETE" });
   }
 
   // Credits
@@ -588,6 +611,38 @@ class ApiClient {
 
   async adminRevenue(): Promise<RevenueBreakdownResponse> {
     return this.request<RevenueBreakdownResponse>("/admin/analytics/revenue");
+  }
+
+  // Help Agent
+  async sendHelpMessage(message: string, sessionId?: string): Promise<Response> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
+    };
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+    return fetch(`${API_URL}/help/chat`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify({ message, session_id: sessionId }),
+    });
+  }
+
+  async getHelpHistory(sessionId: string): Promise<{ session_id: string; messages: Array<{ role: string; content: string }> }> {
+    return this.request(`/help/history?session_id=${encodeURIComponent(sessionId)}`);
+  }
+
+  async clearHelpHistory(sessionId: string): Promise<void> {
+    return this.request(`/help/history?session_id=${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+  }
+
+  async sendHelpFeedback(sessionId: string, messageIndex: number, rating: "up" | "down"): Promise<void> {
+    return this.request("/help/feedback", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId, message_index: messageIndex, rating }),
+    });
   }
 }
 

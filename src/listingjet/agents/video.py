@@ -210,7 +210,11 @@ class VideoAgent(BaseAgent):
                     )
                     url = await self._kling.poll_task(task_id)
                     return url
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "video_clip_failed room=%s asset=%s error=%s",
+                        room, asset.file_path, exc,
+                    )
                     return None
 
         tasks = [generate_one(i, ps, asset, vr) for i, (ps, asset, vr) in enumerate(selected)]

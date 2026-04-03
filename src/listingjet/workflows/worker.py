@@ -1,8 +1,8 @@
 import asyncio
-import json
 import logging
 import signal
 from datetime import timedelta
+from pathlib import Path
 
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -16,65 +16,23 @@ from listingjet.workflows.listing_pipeline import ListingPipeline
 
 logger = logging.getLogger(__name__)
 
-# Health state shared between health server and worker
-_health_state = {"ready": False, "shutting_down": False}
-
-HEALTH_PORT = 8081
-
-
-# ---------------------------------------------------------------------------
-# Health check HTTP server (raw asyncio, no dependencies)
-# ---------------------------------------------------------------------------
-
-async def _handle_health_request(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Handle a single HTTP request on the health port."""
-    try:
-        request_line = await asyncio.wait_for(reader.readline(), timeout=5.0)
-        # Consume remaining headers
-        while True:
-            line = await asyncio.wait_for(reader.readline(), timeout=5.0)
-            if line in (b"\r\n", b"\n", b""):
-                break
-    except (asyncio.TimeoutError, ConnectionResetError):
-        writer.close()
-        return
-
-    path = request_line.decode().split(" ")[1] if len(request_line.decode().split(" ")) > 1 else "/"
-
-    if path == "/health":
-        if _health_state["shutting_down"]:
-            status, body = 503, {"status": "shutting_down"}
-        elif _health_state["ready"]:
-            status, body = 200, {"status": "ok"}
-        else:
-            status, body = 503, {"status": "starting"}
-    elif path == "/ready":
-        if _health_state["ready"] and not _health_state["shutting_down"]:
-            status, body = 200, {"status": "ready"}
-        else:
-            status, body = 503, {"status": "not_ready"}
-    else:
-        status, body = 404, {"error": "not found"}
-
-    response_body = json.dumps(body).encode()
-    status_text = {200: "OK", 404: "Not Found", 503: "Service Unavailable"}.get(status, "Unknown")
-    response = (
-        f"HTTP/1.1 {status} {status_text}\r\n"
-        f"Content-Type: application/json\r\n"
-        f"Content-Length: {len(response_body)}\r\n"
-        f"Connection: close\r\n"
-        f"\r\n"
-    ).encode() + response_body
-
-    writer.write(response)
-    await writer.drain()
-    writer.close()
+# Touch-file heartbeat — Docker/ECS checks if the file was updated recently.
+# No HTTP server needed; the worker just touches this file on a loop.
+HEARTBEAT_FILE = Path("/tmp/worker-heartbeat")
+HEARTBEAT_INTERVAL = 15  # seconds
 
 
-async def _start_health_server() -> asyncio.AbstractServer:
-    server = await asyncio.start_server(_handle_health_request, "0.0.0.0", HEALTH_PORT)
-    logger.info("Health check server listening on port %d", HEALTH_PORT)
-    return server
+async def _heartbeat_loop(shutdown_event: asyncio.Event) -> None:
+    """Touch the heartbeat file periodically until shutdown."""
+    while not shutdown_event.is_set():
+        try:
+            HEARTBEAT_FILE.touch()
+        except OSError:
+            logger.warning("Failed to touch heartbeat file %s", HEARTBEAT_FILE)
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=HEARTBEAT_INTERVAL)
+        except asyncio.TimeoutError:
+            pass  # Normal — loop continues
 
 
 # ---------------------------------------------------------------------------
@@ -167,14 +125,13 @@ async def main():
     shutdown_event = asyncio.Event()
     shutdown_timeout = 30  # seconds
 
-    # Start health check server
-    health_server = await _start_health_server()
-
     # Create Temporal worker
     worker = await create_worker()
 
-    # Mark as ready
-    _health_state["ready"] = True
+    # Start heartbeat touch-file loop (replaces the old HTTP health server).
+    # Docker/ECS health check just runs: find /tmp/worker-heartbeat -mmin -2
+    heartbeat_task = asyncio.create_task(_heartbeat_loop(shutdown_event))
+
     logger.info("Worker ready — connected to Temporal at %s", settings.temporal_host)
 
     # Ensure cron schedules exist
@@ -185,7 +142,6 @@ async def main():
 
     def _signal_handler(sig):
         logger.info("Received signal %s — initiating graceful shutdown", sig.name)
-        _health_state["shutting_down"] = True
         shutdown_event.set()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -213,10 +169,12 @@ async def main():
             logger.error("Error during shutdown: %s", exc)
 
     # Cleanup
-    health_server.close()
-    await health_server.wait_closed()
-    _health_state["ready"] = False
-    logger.info("Health server closed. Worker exit complete.")
+    heartbeat_task.cancel()
+    try:
+        HEARTBEAT_FILE.unlink(missing_ok=True)
+    except OSError:
+        pass
+    logger.info("Worker exit complete.")
 
 
 if __name__ == "__main__":

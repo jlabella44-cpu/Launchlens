@@ -1,6 +1,6 @@
 """Test tenant settings API."""
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import jwt as pyjwt
 import pytest
@@ -25,10 +25,8 @@ def _auth(token: str) -> dict:
 
 @pytest.fixture
 def _mock_rate_limiter():
-    limiter = MagicMock()
-    limiter.acquire.return_value = True
-    with patch("listingjet.middleware.rate_limit._get_limiter", return_value=limiter):
-        yield
+    """Rate limiting is handled by the autouse _mock_redis_globally fixture."""
+    yield
 
 
 @pytest.mark.asyncio

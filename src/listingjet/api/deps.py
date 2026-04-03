@@ -9,14 +9,27 @@ from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
 from listingjet.services.auth import decode_token
 
-_bearer = HTTPBearer(auto_error=True)
+_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    payload = decode_token(credentials.credentials)
+    # Prefer explicit Authorization header, fall back to httpOnly cookie.
+    # This ordering is critical: httpx and browsers may persist cookies
+    # across requests, so an explicit Bearer header must take priority
+    # to avoid using a stale cookie from a different user/session.
+    token: str | None = None
+    if credentials:
+        token = credentials.credentials
+    if not token:
+        token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    payload = decode_token(token)
     user_id_str = payload.get("sub")
     if not user_id_str:
         raise HTTPException(status_code=401, detail="Invalid token payload")

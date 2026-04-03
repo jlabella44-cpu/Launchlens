@@ -17,6 +17,7 @@ from listingjet.api import (
     credits,
     demo,
     health,
+    help_agent,
     listing_permissions,
     listings,
     properties,
@@ -39,6 +40,22 @@ setup_logging(app_env=settings.app_env, log_level=settings.log_level)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import redis as redis_lib
+
+    # Initialize shared Redis connection pool — used by auth lockout,
+    # credit alerts, and any future Redis consumers via get_redis() dep.
+    try:
+        app.state.redis = redis_lib.from_url(
+            settings.redis_url,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+            decode_responses=True,
+        )
+        app.state.redis.ping()
+    except Exception:
+        logging.getLogger(__name__).warning("Redis unavailable at startup — features degraded")
+        app.state.redis = None
+
     task = None
     try:
         poller = OutboxPoller(session_factory=AsyncSessionLocal)
@@ -56,6 +73,9 @@ async def lifespan(app: FastAPI):
         except (asyncio.CancelledError, Exception):
             pass
 
+    if app.state.redis:
+        app.state.redis.close()
+
 
 _TAG_METADATA = [
     {"name": "auth", "description": "Registration, login, and user profile"},
@@ -71,6 +91,7 @@ _TAG_METADATA = [
     {"name": "demo", "description": "Public demo listing upload"},
     {"name": "sse", "description": "Server-Sent Events for real-time pipeline updates"},
     {"name": "team", "description": "Team member management within a tenant"},
+    {"name": "help-agent", "description": "AI help agent for product support and data lookups"},
 ]
 
 
@@ -122,27 +143,21 @@ def create_app() -> FastAPI:
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
     app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
+    app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
     app.include_router(health.router)
-
-    import traceback as tb
 
     from fastapi.responses import JSONResponse
 
-    if settings.app_env == "development":
-        @app.exception_handler(Exception)
-        async def debug_exception_handler(request, exc):
-            return JSONResponse(
-                status_code=500,
-                content={"detail": str(exc), "traceback": tb.format_exc()},
-            )
-    else:
-        @app.exception_handler(Exception)
-        async def production_exception_handler(request, exc):
-            logging.getLogger(__name__).exception("Unhandled exception")
-            return JSONResponse(
-                status_code=500,
-                content={"detail": "Internal server error"},
-            )
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request, exc):
+        request_id = getattr(getattr(request, "state", None), "request_id", "unknown")
+        logging.getLogger(__name__).exception(
+            "unhandled_error request_id=%s", request_id,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "request_id": request_id},
+        )
 
     return app
 

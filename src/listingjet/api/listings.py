@@ -42,7 +42,7 @@ from listingjet.models.video_asset import VideoAsset
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_review_turnaround
-from listingjet.services.plan_limits import check_asset_quota, check_listing_quota, get_limits
+from listingjet.services.plan_limits import check_asset_quota, get_limits
 from listingjet.services.storage import get_storage
 from listingjet.temporal_client import get_temporal_client
 
@@ -61,56 +61,36 @@ async def create_listing(
     """Create a new listing. Deducts one credit for credit-billed tenants (402 if insufficient).
 
     For legacy tenants, enforces the monthly listing quota for the current plan.
+    Accepts an optional Idempotency-Key header to prevent duplicate creation.
     """
+    from listingjet.services.credits import InsufficientCreditsError
+    from listingjet.services.listing_creation import ListingCreationService, ListingQuotaExceededError
+
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    listing = Listing(
-        id=uuid.uuid4(),
-        tenant_id=current_user.tenant_id,
-        address=body.address,
-        metadata_=body.metadata,
-        state=ListingState.NEW,
-    )
-
-    if tenant.billing_model == "credit":
-        # Credit-based billing: deduct credits
-        from listingjet.services.credits import CreditService, InsufficientCreditsError
-        credit_svc = CreditService()
-        cost = tenant.per_listing_credit_cost
-        try:
-            await credit_svc.deduct_credits(
-                db, tenant.id, cost,
-                transaction_type="listing_debit",
-                reference_type="listing",
-                reference_id=str(listing.id),
-                description=f"Listing at {body.address.get('street', 'new listing')}",
-            )
-            listing.credit_cost = cost
-        except InsufficientCreditsError:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Insufficient credits. Need {cost} credit(s). Purchase more to continue.",
-            )
-    else:
-        # Legacy billing: monthly quota check
-        now = datetime.now(timezone.utc)
-        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        count_result = await db.execute(
-            select(func.count(Listing.id)).where(
-                Listing.tenant_id == current_user.tenant_id,
-                Listing.created_at >= month_start,
-            )
+    svc = ListingCreationService()
+    try:
+        listing = await svc.create(
+            session=db,
+            tenant=tenant,
+            tenant_id=current_user.tenant_id,
+            address=body.address.model_dump(exclude_none=True),
+            metadata=body.metadata.model_dump(exclude_none=True) if body.metadata else {},
+            idempotency_key=body.idempotency_key,
         )
-        current_count = count_result.scalar() or 0
-        if not check_listing_quota(tenant.plan, current_count):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Monthly listing limit reached ({current_count}). Upgrade your plan for more.",
-            )
+    except InsufficientCreditsError:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient credits. Need {tenant.per_listing_credit_cost} credit(s). Purchase more to continue.",
+        )
+    except ListingQuotaExceededError as e:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Monthly listing limit reached ({e.current_count}). Upgrade your plan for more.",
+        )
 
-    db.add(listing)
     await db.commit()
     await db.refresh(listing)
     return ListingResponse.from_orm_listing(listing)
@@ -132,9 +112,9 @@ async def list_listings(
     - **state**: filter by listing state (e.g. "approved", "delivered")
     - **search**: search in address fields (street, city)
     - **page**: page number (default 1)
-    - **page_size**: items per page (default 50, max 200)
+    - **page_size**: items per page (default 50, max 50)
     """
-    page_size = min(page_size, 200)
+    page_size = min(page_size, 50)
     offset = (max(page, 1) - 1) * page_size
 
     base_query = select(Listing).where(Listing.tenant_id == current_user.tenant_id)
@@ -212,9 +192,9 @@ async def update_listing(
         raise HTTPException(status_code=404, detail="Listing not found")
 
     if body.address is not None:
-        listing.address = body.address
+        listing.address = body.address.model_dump(exclude_none=True)
     if body.metadata is not None:
-        listing.metadata_ = body.metadata
+        listing.metadata_ = body.metadata.model_dump(exclude_none=True)
 
     await db.commit()
     await db.refresh(listing)
@@ -778,6 +758,48 @@ async def cancel_listing(
     await db.commit()
 
     return {"listing_id": str(listing.id), "state": listing.state.value, "credits_refunded": credits_refunded}
+
+
+@router.delete("/{listing_id}", status_code=200)
+async def delete_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a listing and its associated assets.
+
+    Credits are refunded only if the pipeline hasn't done significant work
+    (states: NEW, UPLOADING, ANALYZING, FAILED). Once a listing reaches
+    AWAITING_REVIEW or beyond, no refund is issued.
+    """
+    listing = (await db.execute(
+        select(Listing).where(
+            Listing.id == listing_id,
+            Listing.tenant_id == current_user.tenant_id,
+        ).with_for_update()
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    # Refund credits only if no significant pipeline work was done
+    credits_refunded = 0
+    refundable_states = {ListingState.NEW, ListingState.UPLOADING, ListingState.ANALYZING, ListingState.FAILED}
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if tenant and tenant.billing_model == "credit" and listing.credit_cost and listing.state in refundable_states:
+        from listingjet.services.credits import CreditService
+        credit_svc = CreditService()
+        txn = await credit_svc.refund_credits(db, current_user.tenant_id, str(listing_id))
+        if txn:
+            credits_refunded = txn.amount
+
+    # Delete related records
+    from sqlalchemy import delete as sa_delete
+    await db.execute(sa_delete(PackageSelection).where(PackageSelection.listing_id == listing_id))
+    await db.execute(sa_delete(Asset).where(Asset.listing_id == listing_id))
+    await db.delete(listing)
+    await db.commit()
+
+    return {"listing_id": str(listing_id), "deleted": True, "credits_refunded": credits_refunded}
 
 
 @router.get("/{listing_id}/pipeline-status", response_model=PipelineStatusResponse)

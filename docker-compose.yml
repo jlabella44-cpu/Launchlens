@@ -135,7 +135,7 @@ services:
     volumes:
       - ./src:/app/src
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8081/health')\" 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "find /tmp/worker-heartbeat -mmin -2 | grep -q ."]
       interval: 30s
       timeout: 5s
       retries: 3

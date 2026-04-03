@@ -2,6 +2,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,10 +16,12 @@ from listingjet.models.credit_account import CreditAccount
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
 from listingjet.services.auth import (
+    clear_auth_cookies,
     create_access_token,
     create_refresh_token,
     decode_token,
     hash_password,
+    set_auth_cookies,
     verify_password_constant_time,
 )
 from listingjet.services.endpoint_rate_limit import rate_limit
@@ -56,6 +59,7 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     )
     db.add(credit_account)
 
+    from datetime import datetime, timezone
     user = User(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -63,6 +67,8 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         password_hash=hash_password(body.password),
         name=body.name,
         role=UserRole.ADMIN,
+        consent_at=datetime.now(timezone.utc),
+        consent_version="2026-04-03",
     )
     db.add(user)
     await emit_event(
@@ -86,41 +92,94 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     except Exception:
         logger.exception("welcome email failed for %s", email)
 
-    logger.info("auth.register email=%s tenant=%s tier=%s", email, tenant.id, tier)
-    return TokenResponse(
-        access_token=create_access_token(user),
-        refresh_token=create_refresh_token(user),
-    )
+    logger.info("auth.register tenant=%s tier=%s", tenant.id, tier)
+    access = create_access_token(user)
+    refresh = create_refresh_token(user)
+    body = TokenResponse(access_token=access, refresh_token=refresh)
+    return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
+
+
+_LOGIN_LOCKOUT_MAX_ATTEMPTS = 5
+_LOGIN_LOCKOUT_WINDOW = 900  # 15 minutes
+
+
+def _get_lockout_redis(request: Request | None = None):
+    """Get Redis client — prefer shared pool from app.state, fall back to new connection."""
+    if request is not None:
+        pool = getattr(getattr(request, "app", None), "state", None)
+        r = getattr(pool, "redis", None)
+        if r is not None:
+            return r
+    import redis as redis_lib  # noqa: I001
+
+    from listingjet.config import settings as _settings
+
+    return redis_lib.from_url(_settings.redis_url, socket_connect_timeout=2, socket_timeout=2)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10, 60)), db: AsyncSession = Depends(get_db)):
+    import hashlib
     email = body.email.strip().lower()
+    email_hash = hashlib.sha256(email.encode()).hexdigest()[:12]
+
+    # Account lockout: check if too many failed attempts
+    lockout_key = f"login_failures:{email_hash}"
+    try:
+        r = _get_lockout_redis(request)
+        attempts = int(r.get(lockout_key) or 0)
+        if attempts >= _LOGIN_LOCKOUT_MAX_ATTEMPTS:
+            ttl = r.ttl(lockout_key)
+            logger.warning("auth.login_locked email_hash=%s attempts=%d", email_hash, attempts)
+            raise HTTPException(
+                status_code=429,
+                detail=f"Account temporarily locked due to too many failed attempts. Try again in {max(ttl, 60)} seconds.",
+                headers={"Retry-After": str(max(ttl, 60))},
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Redis down — fail open, don't block logins
+
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     # Constant-time comparison: always run bcrypt even if user not found
     password_valid = verify_password_constant_time(
         body.password, user.password_hash if user else None
     )
     if not user or not password_valid:
-        import hashlib
-        email_hash = hashlib.sha256(email.encode()).hexdigest()[:12]
+        # Increment failure counter in Redis
+        try:
+            r = _get_lockout_redis(request)
+            pipe = r.pipeline()
+            pipe.incr(lockout_key)
+            pipe.expire(lockout_key, _LOGIN_LOCKOUT_WINDOW)
+            pipe.execute()
+        except Exception:
+            pass  # Redis down — fail open
         logger.warning("auth.login_failed email_hash=%s", email_hash)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # Successful login — clear failure counter
+    try:
+        r = _get_lockout_redis(request)
+        r.delete(lockout_key)
+    except Exception:
+        pass
 
     ip = request.client.host if request.client else "unknown"
     await emit_event(
         session=db,
         event_type="user.login",
-        payload={"email": email, "user_id": str(user.id), "ip": ip},
+        payload={"user_id": str(user.id), "ip": ip},
         tenant_id=str(user.tenant_id),
     )
     await db.commit()
 
-    logger.info("auth.login_success email=%s user=%s", email, user.id)
-    return TokenResponse(
-        access_token=create_access_token(user),
-        refresh_token=create_refresh_token(user),
-    )
+    logger.info("auth.login_success email_hash=%s user=%s", email_hash, user.id)
+    access = create_access_token(user)
+    refresh = create_refresh_token(user)
+    body = TokenResponse(access_token=access, refresh_token=refresh)
+    return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -128,14 +187,111 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+# ---------------------------------------------------------------------------
+# Password Reset
+# ---------------------------------------------------------------------------
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password", dependencies=[Depends(rate_limit(3, 60))])
+async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Send a password reset email. Always returns 200 to prevent user enumeration."""
+    from datetime import datetime, timedelta, timezone
+
+    import jwt as pyjwt
+
+    from listingjet.config import settings
+
+    email = body.email.strip().lower()
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+
+    if user:
+        reset_token = pyjwt.encode(
+            {
+                "sub": str(user.id),
+                "type": "password_reset",
+                "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+            },
+            settings.jwt_secret,
+            algorithm=settings.jwt_algorithm,
+        )
+        try:
+            from listingjet.services.email import get_email_service
+            email_svc = get_email_service()
+            email_svc.send(
+                to=email,
+                subject="Reset your ListingJet password",
+                html_body=(
+                    f"<p>You requested a password reset.</p>"
+                    f"<p><a href='https://app.listingjet.com/reset-password?token={reset_token}'>"
+                    f"Click here to reset your password</a></p>"
+                    f"<p>This link expires in 15 minutes.</p>"
+                    f"<p>If you didn't request this, you can safely ignore this email.</p>"
+                ),
+            )
+        except Exception:
+            logger.exception("password_reset_email_failed for user=%s", user.id)
+
+    # Always return 200 to prevent user enumeration
+    return {"status": "ok", "message": "If an account exists with that email, a reset link has been sent."}
+
+
+@router.post("/reset-password", dependencies=[Depends(rate_limit(5, 60))])
+async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Reset password using a token from the forgot-password email."""
+    import jwt as pyjwt
+
+    from listingjet.config import settings
+
+    try:
+        payload = pyjwt.decode(body.token, settings.jwt_secret, algorithms=["HS256"])
+    except pyjwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if payload.get("type") != "password_reset":
+        raise HTTPException(status_code=400, detail="Invalid token type")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    user = await db.get(User, uuid.UUID(user_id))
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    # Validate new password
+    from listingjet.api.schemas.auth import RegisterRequest
+    try:
+        RegisterRequest.password_complexity(body.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    user.password_hash = hash_password(body.new_password)
+    await db.commit()
+
+    logger.info("auth.password_reset user=%s", user.id)
+    return {"status": "ok", "message": "Password has been reset. You can now log in."}
+
+
 @router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(rate_limit(10, 60))])
 async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
     """Exchange a valid refresh token for a new access + refresh token pair."""
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing refresh token")
+    # Try cookie first, then Authorization header (backward compat)
+    token = request.cookies.get("refresh_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing refresh token")
+        token = auth_header.split(" ", 1)[1]
 
-    token = auth_header.split(" ", 1)[1]
     payload = decode_token(token)
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Not a refresh token")
@@ -148,20 +304,82 @@ async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    return TokenResponse(
-        access_token=create_access_token(user),
-        refresh_token=create_refresh_token(user),
-    )
+    access = create_access_token(user)
+    refresh = create_refresh_token(user)
+    body = TokenResponse(access_token=access, refresh_token=refresh)
+    return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
 
 
 @router.post("/logout")
 async def logout():
-    """Logout endpoint. Client should discard tokens.
+    """Logout endpoint. Clears httpOnly auth cookies.
 
     Note: Full server-side token revocation requires a Redis-backed
-    blocklist. For now, short-lived access tokens (1hr) limit exposure.
+    blocklist. For now, short-lived access tokens (1hr) + cookie removal
+    limit exposure.
     """
-    return {"status": "ok"}
+    return clear_auth_cookies(JSONResponse(content={"status": "ok"}))
+
+
+# ---------------------------------------------------------------------------
+# Account Deletion (GDPR/CCPA — "right to be forgotten")
+# ---------------------------------------------------------------------------
+
+
+class DeleteAccountRequest(BaseModel):
+    confirmation: str  # Must be "DELETE" to confirm
+
+
+@router.post("/delete-account")
+async def request_account_deletion(
+    body: DeleteAccountRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Request account deletion. Logs an audit event and emails support for
+    processing. This satisfies the GDPR/CCPA right-to-erasure without
+    requiring a fully automated cascade — support handles the actual purge.
+    """
+    if body.confirmation != "DELETE":
+        raise HTTPException(status_code=400, detail='Confirmation must be the string "DELETE"')
+
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    tenant_name = tenant.name if tenant else "unknown"
+
+    await emit_event(
+        session=db,
+        event_type="account.deletion_requested",
+        payload={
+            "user_id": str(current_user.id),
+            "tenant_id": str(current_user.tenant_id),
+            "tenant_name": tenant_name,
+        },
+        tenant_id=str(current_user.tenant_id),
+    )
+    await db.commit()
+
+    # Send notification email to support (fire-and-forget)
+    try:
+        from listingjet.services.email import get_email_service
+        email_svc = get_email_service()
+        email_svc.send(
+            to="support@listingjet.ai",
+            subject=f"Account Deletion Request — {tenant_name}",
+            html_body=(
+                f"<p>User <strong>{current_user.email}</strong> "
+                f"(tenant: {tenant_name}, id: {current_user.tenant_id}) "
+                f"has requested account deletion.</p>"
+                f"<p>Please process within 30 days per GDPR/CCPA requirements.</p>"
+            ),
+        )
+    except Exception:
+        logger.exception("delete_account_email_failed user=%s", current_user.id)
+
+    logger.info("account.deletion_requested user=%s tenant=%s", current_user.id, current_user.tenant_id)
+    return {
+        "status": "deletion_requested",
+        "message": "Your account deletion request has been received and will be processed within 30 days.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -170,18 +388,23 @@ async def logout():
 
 _GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 _google_jwks_cache: dict | None = None
+_google_jwks_fetched_at: float = 0
+_GOOGLE_JWKS_TTL = 43200  # 12 hours
 
 
 async def _get_google_jwks() -> dict:
-    """Fetch and cache Google's public JWKS for ID token verification."""
-    global _google_jwks_cache
-    if _google_jwks_cache is not None:
+    """Fetch and cache Google's public JWKS for ID token verification (12h TTL)."""
+    global _google_jwks_cache, _google_jwks_fetched_at
+    import time
+    now = time.time()
+    if _google_jwks_cache is not None and (now - _google_jwks_fetched_at) < _GOOGLE_JWKS_TTL:
         return _google_jwks_cache
     import httpx
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(_GOOGLE_JWKS_URL)
         resp.raise_for_status()
         _google_jwks_cache = resp.json()
+        _google_jwks_fetched_at = now
     return _google_jwks_cache
 
 
@@ -234,11 +457,11 @@ async def google_login(
 
     if user:
         # Existing user — log them in
-        logger.info("auth.google_login email=%s user=%s", email, user.id)
-        return TokenResponse(
-            access_token=create_access_token(user),
-            refresh_token=create_refresh_token(user),
-        )
+        logger.info("auth.google_login user=%s", user.id)
+        access = create_access_token(user)
+        refresh = create_refresh_token(user)
+        body = TokenResponse(access_token=access, refresh_token=refresh)
+        return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
 
     # New user — auto-register with default plan
     tenant = Tenant(id=uuid.uuid4(), name=name or email.split("@")[0], plan="starter", billing_model="credit")
@@ -273,8 +496,8 @@ async def google_login(
     await db.commit()
     await db.refresh(user)
 
-    logger.info("auth.google_register email=%s tenant=%s", email, tenant.id)
-    return TokenResponse(
-        access_token=create_access_token(user),
-        refresh_token=create_refresh_token(user),
-    )
+    logger.info("auth.google_register tenant=%s", tenant.id)
+    access = create_access_token(user)
+    refresh = create_refresh_token(user)
+    body = TokenResponse(access_token=access, refresh_token=refresh)
+    return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)

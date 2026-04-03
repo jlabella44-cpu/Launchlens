@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 
@@ -76,7 +77,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="h-screen flex overflow-hidden"
+    >
       {/* Left: Hero Panel */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-[#0B1120] relative overflow-hidden p-10">
         {/* Logo */}
@@ -170,9 +176,9 @@ export default function LoginPage() {
                   <label htmlFor="password" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                     Security Cipher
                   </label>
-                  <button type="button" className="text-[10px] font-semibold uppercase tracking-wider text-[#F97316] hover:text-[#ea580c]">
+                  <Link href="/forgot-password" className="text-[10px] font-semibold uppercase tracking-wider text-[#F97316] hover:text-[#ea580c]">
                     Forgot?
-                  </button>
+                  </Link>
                 </div>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -295,6 +301,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

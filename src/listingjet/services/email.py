@@ -49,12 +49,25 @@ class EmailService:
         msg["To"] = to
         msg.attach(MIMEText(html_body, "html"))
 
-        with smtplib.SMTP(self.host, self.port) as server:
-            server.starttls()
-            if self.user and self.password:
-                server.login(self.user, self.password)
-            server.sendmail(self.sender, [to], msg.as_string())
-        logger.info("email_sent", extra={"to": to, "subject": subject})
+        last_error: Exception | None = None
+        for attempt in range(1, 4):  # 3 retries with exponential backoff
+            try:
+                with smtplib.SMTP(self.host, self.port, timeout=15) as server:
+                    server.starttls()
+                    if self.user and self.password:
+                        server.login(self.user, self.password)
+                    server.sendmail(self.sender, [to], msg.as_string())
+                logger.info("email_sent", extra={"to": to, "subject": subject})
+                return
+            except (smtplib.SMTPException, OSError, TimeoutError) as exc:
+                last_error = exc
+                if attempt < 3:
+                    import time
+                    delay = 2 ** attempt  # 2s, 4s
+                    logger.warning("email_retry attempt=%d/%d error=%s delay=%ds", attempt, 3, exc, delay)
+                    time.sleep(delay)
+        logger.error("email_failed after 3 attempts", extra={"to": to, "error": str(last_error)})
+        raise last_error  # type: ignore[misc]
 
     def send_pipeline_complete(self, to: str, listing_address: str, listing_id: str) -> None:
         html = _load_template("pipeline_complete.html", address=listing_address, listing_id=listing_id)

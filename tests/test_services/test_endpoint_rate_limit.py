@@ -4,9 +4,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
+import listingjet.middleware.rate_limit as rl_mod
+
 # The RateLimiter is imported *inside* the dependency function from
 # listingjet.services.rate_limiter, so we patch it at that location.
 _RL_PATCH = "listingjet.services.rate_limiter.RateLimiter"
+
+
+@pytest.fixture(autouse=True)
+def _disable_bypass():
+    """These tests verify rate limiting behavior — disable the test bypass."""
+    original = rl_mod._bypass_for_testing
+    rl_mod._bypass_for_testing = False
+    yield
+    rl_mod._bypass_for_testing = original
 
 
 @pytest.mark.asyncio

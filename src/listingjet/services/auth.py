@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 
 from listingjet.config import settings
 from listingjet.models.user import User
@@ -52,3 +53,34 @@ def decode_token(token: str) -> dict:
         return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str) -> JSONResponse:
+    """Attach httpOnly, Secure, SameSite cookies for both tokens."""
+    is_prod = settings.app_env != "development"
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=is_prod,
+        samesite="lax",
+        max_age=settings.jwt_expiry_hours * 3600,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=is_prod,
+        samesite="lax",
+        max_age=settings.jwt_refresh_expiry_days * 86400,
+        path="/auth/refresh",
+    )
+    return response
+
+
+def clear_auth_cookies(response: JSONResponse) -> JSONResponse:
+    """Remove auth cookies on logout."""
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/auth/refresh")
+    return response

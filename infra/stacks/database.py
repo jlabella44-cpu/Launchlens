@@ -51,9 +51,10 @@ class DatabaseStack(Stack):
             credentials=rds.Credentials.from_generated_secret("listingjet"),
             allocated_storage=20,
             max_allocated_storage=50,
+            storage_encrypted=True,
             multi_az=True,
             backup_retention=Duration.days(7),
-            deletion_protection=False,  # beta - flip for production
+            deletion_protection=True,
             removal_policy=RemovalPolicy.SNAPSHOT,
         )
 

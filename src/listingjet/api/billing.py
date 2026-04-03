@@ -69,13 +69,21 @@ async def create_checkout(
         tenant.stripe_customer_id = customer_id
         await db.commit()
 
-    url = svc.create_checkout_session(
-        customer_id=customer_id,
-        price_id=body.price_id,
-        success_url=body.success_url,
-        cancel_url=body.cancel_url,
-        tenant_id=str(tenant.id),
-    )
+    try:
+        url = svc.create_checkout_session(
+            customer_id=customer_id,
+            price_id=body.price_id,
+            success_url=body.success_url,
+            cancel_url=body.cancel_url,
+            tenant_id=str(tenant.id),
+        )
+    except stripe_mod.RateLimitError:
+        raise HTTPException(status_code=503, detail="Payment service is busy — please retry shortly")
+    except stripe_mod.APIConnectionError:
+        raise HTTPException(status_code=503, detail="Payment service is temporarily unavailable")
+    except stripe_mod.StripeError as e:
+        logger.error("stripe_checkout_error type=%s message=%s", type(e).__name__, str(e))
+        raise HTTPException(status_code=502, detail="Payment processing error")
     return CheckoutResponse(checkout_url=url)
 
 
@@ -110,10 +118,14 @@ async def create_portal(
         raise HTTPException(status_code=400, detail="No billing account — complete checkout first")
 
     svc = BillingService()
-    url = svc.create_portal_session(
-        customer_id=tenant.stripe_customer_id,
-        return_url=body.return_url,
-    )
+    try:
+        url = svc.create_portal_session(
+            customer_id=tenant.stripe_customer_id,
+            return_url=body.return_url,
+        )
+    except stripe_mod.StripeError as e:
+        logger.error("stripe_portal_error type=%s message=%s", type(e).__name__, str(e))
+        raise HTTPException(status_code=502, detail="Billing portal temporarily unavailable")
     return PortalResponse(portal_url=url)
 
 

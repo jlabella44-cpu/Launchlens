@@ -19,6 +19,7 @@ import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
 import { SharePanel } from "@/components/listings/share-panel";
 import { ActivityLog } from "@/components/listings/activity-log";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 function ListingDetail() {
   const params = useParams();
@@ -158,13 +159,13 @@ function ListingDetail() {
     <>
       <Nav />
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
-        {/* Back Link */}
-        <Link
-          href="/listings"
-          className="text-xs uppercase tracking-wider text-slate-400 hover:text-[#F97316] transition-colors mb-4 inline-flex items-center gap-1"
-        >
-          ← Back to Listings
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Listings", href: "/listings" },
+            { label: listing?.address?.street || listing?.address?.city || "Listing" },
+          ]}
+        />
 
         {/* Header */}
         <div className="mb-6">

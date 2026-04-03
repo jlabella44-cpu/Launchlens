@@ -58,12 +58,17 @@ class OutboxPoller:
             )
         except Exception:
             # FOR UPDATE SKIP LOCKED may fail inside a savepoint (e.g. tests);
-            # fall back to a plain SELECT.
-            result = await session.execute(
-                select(Outbox)
-                .where(Outbox.delivered_at.is_(None))
-                .limit(BATCH_SIZE)
-            )
+            # fall back but still lock rows to prevent duplicate delivery.
+            try:
+                result = await session.execute(
+                    select(Outbox)
+                    .where(Outbox.delivered_at.is_(None))
+                    .limit(BATCH_SIZE)
+                    .with_for_update()
+                )
+            except Exception:
+                logger.warning("outbox_poller: could not acquire row locks — skipping batch")
+                return 0
         rows = result.scalars().all()
         now = datetime.now(timezone.utc)
 

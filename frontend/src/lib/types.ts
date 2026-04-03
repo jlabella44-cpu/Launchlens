@@ -420,3 +420,35 @@ export interface BlanketGrantResponse {
   permission: string;
   created_at: string;
 }
+
+export interface AnalyticsOverview {
+  total_listings: number;
+  delivered: number;
+  by_state: Record<string, number>;
+  avg_pipeline_minutes: number | null;
+  success_rate_pct: number | null;
+  events_last_30d: Record<string, number>;
+}
+
+export interface TimelineDataPoint {
+  date: string;
+  count: number;
+}
+
+export interface AnalyticsTimeline {
+  days: number;
+  data: TimelineDataPoint[];
+}
+
+export interface CreditDataPoint {
+  date: string;
+  amount: number;
+  balance_after: number;
+  type: string;
+  description: string | null;
+}
+
+export interface AnalyticsCredits {
+  days: number;
+  data: CreditDataPoint[];
+}
