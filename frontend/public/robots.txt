@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /listings
+Disallow: /settings
+Disallow: /admin
+Disallow: /review
+Disallow: /analytics
+Disallow: /billing
+Disallow: /onboarding
+
+Sitemap: https://app.listingjet.com/sitemap.xml
