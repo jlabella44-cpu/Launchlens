@@ -28,7 +28,6 @@ async def test_request_with_valid_jwt_sets_tenant(async_client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Pre-existing: tenant isolation not enforced in test DB session")
 async def test_tenant_a_cannot_see_tenant_b_listings(async_client):
     token_a = await _register(async_client)
     token_b = await _register(async_client)

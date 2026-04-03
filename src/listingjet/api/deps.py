@@ -17,10 +17,15 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    # Prefer httpOnly cookie, fall back to Authorization header
-    token: str | None = request.cookies.get("access_token")
-    if not token and credentials:
+    # Prefer explicit Authorization header, fall back to httpOnly cookie.
+    # This ordering is critical: httpx and browsers may persist cookies
+    # across requests, so an explicit Bearer header must take priority
+    # to avoid using a stale cookie from a different user/session.
+    token: str | None = None
+    if credentials:
         token = credentials.credentials
+    if not token:
+        token = request.cookies.get("access_token")
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
