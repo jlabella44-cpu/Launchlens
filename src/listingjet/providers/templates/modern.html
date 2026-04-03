@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { background: #ffffff; }
+
+    .hero-section {
+        width: 8.5in;
+        height: 4.2in;
+        overflow: hidden;
+        background: #d1d5db;
+    }
+
+    .hero-section img {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .content-section {
+        width: 8.5in;
+        padding: 22px 40px 0 40px;
+    }
+
+    .price-block {
+        margin-bottom: 4px;
+    }
+
+    .price {
+        font-size: 32pt;
+        font-weight: bold;
+        color: #1a1a1a;
+    }
+
+    .address {
+        font-size: 13pt;
+        color: #555555;
+        margin-top: 2px;
+    }
+
+    .accent-line {
+        height: 4px;
+        margin: 14px 0;
+        border: none;
+        display: block;
+    }
+
+    .specs-section {
+        margin: 0;
+        padding: 0;
+    }
+
+    .specs-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .spec-cell {
+        text-align: center;
+        padding: 8px 0;
+        width: 33%;
+    }
+
+    .spec-divider {
+        border-left: 1px solid #e5e7eb;
+    }
+
+    .spec-value {
+        font-size: 18pt;
+        font-weight: bold;
+        color: #1a1a1a;
+        display: block;
+        line-height: 1.1;
+    }
+
+    .spec-label {
+        font-size: 7.5pt;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #888888;
+        display: block;
+        margin-top: 2px;
+    }
+
+    .description-section {
+        margin-top: 14px;
+        padding-bottom: 6px;
+    }
+
+    .description-text {
+        font-size: 9.5pt;
+        color: #555555;
+        line-height: 1.55;
+    }
+
+    .brand-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 8.5in;
+        padding: 12px 40px;
+        background: #f9fafb;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .brand-bar-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .brand-left {
+        vertical-align: middle;
+    }
+
+    .brand-right {
+        text-align: right;
+        vertical-align: middle;
+    }
+
+    .agent-name {
+        font-size: 11pt;
+        font-weight: bold;
+        color: #1a1a1a;
+    }
+
+    .brokerage-name {
+        font-size: 9pt;
+        color: #666666;
+        margin-top: 2px;
+    }
+
+    .brand-logo {
+        max-height: 40px;
+        max-width: 130px;
+    }
+</style>
+</head>
+<body>
+<div class="page">
+
+    <!-- Hero Image: top 40% -->
+    <div class="hero-section">
+        {% if hero_image_url %}
+        <img src="{{ hero_image_url }}" alt="Property photo">
+        {% else %}
+        <table style="width:100%;height:100%;background:linear-gradient(135deg,#2563EB,#1e40af);">
+            <tr><td style="text-align:center;vertical-align:middle;color:#ffffff;font-size:16pt;font-weight:bold;">Property Photo</td></tr>
+        </table>
+        {% endif %}
+    </div>
+
+    <!-- Content below hero -->
+    <div class="content-section">
+
+        <div class="price-block">
+            <div class="price">{{ price_formatted }}</div>
+            <div class="address">{{ address_line }}</div>
+        </div>
+
+        <!-- Accent line -->
+        <hr class="accent-line" style="background-color: {{ primary_color }};">
+
+        <!-- Specs row -->
+        {% if beds or baths or sqft_formatted %}
+        <div class="specs-section">
+            <table class="specs-table">
+                <tr>
+                    {% if beds %}
+                    <td class="spec-cell">
+                        <span class="spec-value">{{ beds }}</span>
+                        <span class="spec-label">Bedrooms</span>
+                    </td>
+                    {% endif %}
+                    {% if baths %}
+                    <td class="spec-cell spec-divider">
+                        <span class="spec-value">{{ baths }}</span>
+                        <span class="spec-label">Bathrooms</span>
+                    </td>
+                    {% endif %}
+                    {% if sqft_formatted %}
+                    <td class="spec-cell spec-divider">
+                        <span class="spec-value">{{ sqft_formatted }}</span>
+                        <span class="spec-label">Sq Ft</span>
+                    </td>
+                    {% endif %}
+                </tr>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Description -->
+        {% if description %}
+        <div class="description-section">
+            <p class="description-text">{{ description }}</p>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Brand bar pinned to bottom -->
+    <div class="brand-bar">
+        <table class="brand-bar-table">
+            <tr>
+                <td class="brand-left">
+                    {% if agent_name %}
+                    <div class="agent-name">{{ agent_name }}</div>
+                    {% endif %}
+                    {% if brokerage_name %}
+                    <div class="brokerage-name">{{ brokerage_name }}</div>
+                    {% endif %}
+                </td>
+                <td class="brand-right">
+                    {% if logo_url %}
+                    <img src="{{ logo_url }}" alt="Logo" class="brand-logo">
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+</div>
+</body>
+</html>

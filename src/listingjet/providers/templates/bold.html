@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { background: #ffffff; }
+
+    /* Header band */
+    .header-band {
+        width: 8.5in;
+        padding: 20px 40px 18px 40px;
+        background: {{ primary_color }};
+    }
+
+    .header-price {
+        font-size: 34pt;
+        font-weight: bold;
+        color: #ffffff;
+        line-height: 1.0;
+        letter-spacing: -0.5px;
+    }
+
+    .header-address {
+        font-size: 12pt;
+        color: rgba(255,255,255,0.88);
+        margin-top: 5px;
+        font-weight: 500;
+    }
+
+    /* Hero photo — center section */
+    .hero-section {
+        width: 8.5in;
+        height: 3.8in;
+        overflow: hidden;
+        padding: 16px 40px;
+        background: #111111;
+    }
+
+    .hero-inner {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border: 4px solid #ffffff;
+    }
+
+    .hero-inner img {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    /* Specs badges */
+    .specs-section {
+        padding: 14px 40px 0 40px;
+        background: #ffffff;
+    }
+
+    .specs-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 8px 0;
+    }
+
+    .badge-cell {
+        text-align: center;
+        padding: 10px 0;
+        border-radius: 6px;
+    }
+
+    .spec-value {
+        font-size: 20pt;
+        font-weight: bold;
+        color: #ffffff;
+        display: block;
+        line-height: 1.0;
+    }
+
+    .spec-label {
+        font-size: 7.5pt;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(255,255,255,0.82);
+        display: block;
+        margin-top: 3px;
+    }
+
+    /* Description */
+    .description-section {
+        padding: 12px 40px 0 40px;
+    }
+
+    .description-text {
+        font-size: 9.5pt;
+        color: #444444;
+        line-height: 1.55;
+    }
+
+    /* Footer band */
+    .footer-band {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 8.5in;
+        padding: 14px 40px;
+        background: #1a1a1a;
+    }
+
+    .footer-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .footer-left {
+        vertical-align: middle;
+    }
+
+    .footer-right {
+        text-align: right;
+        vertical-align: middle;
+    }
+
+    .agent-name {
+        font-size: 12pt;
+        font-weight: bold;
+        color: #ffffff;
+    }
+
+    .brokerage-name {
+        font-size: 9.5pt;
+        color: rgba(255,255,255,0.7);
+        margin-top: 2px;
+    }
+
+    .brand-logo {
+        max-height: 38px;
+        max-width: 120px;
+    }
+</style>
+</head>
+<body>
+<div class="page">
+
+    <!-- Header band: price + address on primary color -->
+    <div class="header-band">
+        <div class="header-price">{{ price_formatted }}</div>
+        <div class="header-address">{{ address_line }}</div>
+    </div>
+
+    <!-- Hero photo with border -->
+    <div class="hero-section">
+        <div class="hero-inner">
+            {% if hero_image_url %}
+            <img src="{{ hero_image_url }}" alt="Property photo">
+            {% else %}
+            <table style="width:100%;height:100%;background:linear-gradient(135deg,#374151,#6b7280);">
+                <tr><td style="text-align:center;vertical-align:middle;color:#ffffff;font-size:16pt;font-weight:bold;">Property Photo</td></tr>
+            </table>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Specs in colored badges -->
+    {% if beds or baths or sqft_formatted %}
+    <div class="specs-section">
+        <table class="specs-table">
+            <tr>
+                {% set badge_bg = secondary_color if secondary_color else primary_color %}
+                {% if beds %}
+                <td class="badge-cell" style="background:{{ badge_bg }};">
+                    <span class="spec-value">{{ beds }}</span>
+                    <span class="spec-label">Beds</span>
+                </td>
+                {% endif %}
+                {% if baths %}
+                <td class="badge-cell" style="background:{{ badge_bg }};">
+                    <span class="spec-value">{{ baths }}</span>
+                    <span class="spec-label">Baths</span>
+                </td>
+                {% endif %}
+                {% if sqft_formatted %}
+                <td class="badge-cell" style="background:{{ badge_bg }};">
+                    <span class="spec-value">{{ sqft_formatted }}</span>
+                    <span class="spec-label">Sq Ft</span>
+                </td>
+                {% endif %}
+            </tr>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Description -->
+    {% if description %}
+    <div class="description-section">
+        <p class="description-text">{{ description }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Footer band: dark with agent info -->
+    <div class="footer-band">
+        <table class="footer-table">
+            <tr>
+                <td class="footer-left">
+                    {% if agent_name %}
+                    <div class="agent-name">{{ agent_name }}</div>
+                    {% endif %}
+                    {% if brokerage_name %}
+                    <div class="brokerage-name">{{ brokerage_name }}</div>
+                    {% endif %}
+                </td>
+                <td class="footer-right">
+                    {% if logo_url %}
+                    <img src="{{ logo_url }}" alt="Logo" class="brand-logo">
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+</div>
+</body>
+</html>
