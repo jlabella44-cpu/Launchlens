@@ -6,6 +6,8 @@ import { PlanProvider } from "@/contexts/plan-context";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { CommandPalette } from "@/components/command-palette";
 import { HelpChat } from "@/components/ui/help-chat";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { KeyboardNav } from "@/components/keyboard-nav";
 import { ToastProvider } from "@/components/ui/toast";
 import type { ReactNode } from "react";
 
@@ -23,6 +25,8 @@ export function AuthProviderWrapper({ children }: { children: ReactNode }) {
       <PlanProvider>
         <ToastProvider>
           <CommandPalette />
+          <KeyboardShortcuts />
+          <KeyboardNav />
           {isPublicPath(pathname) ? (
             children
           ) : (
