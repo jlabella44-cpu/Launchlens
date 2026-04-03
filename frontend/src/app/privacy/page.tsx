@@ -77,12 +77,16 @@ export default function PrivacyPolicyPage() {
                 <strong>Kling AI</strong> &mdash; Image-to-video generation, rendering static property photos into
                 dynamic video tours.
               </li>
+              <li>
+                <strong>ElevenLabs</strong> &mdash; AI-generated voiceover narration for video tours (when enabled
+                in your Brand Kit settings or per-listing override).
+              </li>
             </ul>
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-3">
               <p className="font-semibold text-[var(--color-text)] text-sm mb-1">AI Data Usage &amp; Training</p>
               <p className="text-sm">
                 We utilize API enterprise agreements with our AI vendors. Under these agreements, the data (images,
-                floorplans, and property details) we transmit to OpenAI, Anthropic, Google Cloud, and Kling AI is{" "}
+                floorplans, and property details) we transmit to OpenAI, Anthropic, Google Cloud, Kling AI, and ElevenLabs is{" "}
                 <strong>strictly used for fulfilling your immediate request</strong> (e.g., generating a description or
                 video). Our agreements stipulate that your submitted data and assets are{" "}
                 <strong>not</strong> used by these vendors to train their foundational machine learning models.
@@ -134,11 +138,28 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-[var(--color-text)]">6. Data Security and Retention</h2>
             <p>
-              We implement industry-standard security measures, including database isolation and Row-Level Security (RLS),
-              to protect your personal information and property assets from unauthorized access. We retain your account
-              data and uploaded assets for as long as your account is active or as needed to provide you services.
-              Processed ZIP bundles and generated media links are securely stored and delivered via time-bound links.
+              We implement industry-standard security measures, including database encryption at rest (AES-256),
+              Row-Level Security (RLS) for tenant isolation, and TLS 1.2+ for all data in transit, to protect your
+              personal information and property assets from unauthorized access.
             </p>
+            <p>We retain your data according to the following schedule:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                <strong>Account &amp; listing data:</strong> Retained for as long as your account is active or as
+                needed to provide services.
+              </li>
+              <li>
+                <strong>Export bundles (ZIP packages):</strong> Automatically deleted after 90 days. Generated media
+                links are delivered via time-bound presigned URLs.
+              </li>
+              <li>
+                <strong>Webhook delivery logs:</strong> Automatically purged after 30 days.
+              </li>
+              <li>
+                <strong>Account deletion requests:</strong> Processed within 30 days. All personal data, listing
+                assets, and associated records are purged from our systems.
+              </li>
+            </ul>
           </section>
 
           <section>
