@@ -609,6 +609,38 @@ class ApiClient {
   async adminRevenue(): Promise<RevenueBreakdownResponse> {
     return this.request<RevenueBreakdownResponse>("/admin/analytics/revenue");
   }
+
+  // Help Agent
+  async sendHelpMessage(message: string, sessionId?: string): Promise<Response> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
+    };
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+    return fetch(`${API_URL}/help/chat`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify({ message, session_id: sessionId }),
+    });
+  }
+
+  async getHelpHistory(sessionId: string): Promise<{ session_id: string; messages: Array<{ role: string; content: string }> }> {
+    return this.request(`/help/history?session_id=${encodeURIComponent(sessionId)}`);
+  }
+
+  async clearHelpHistory(sessionId: string): Promise<void> {
+    return this.request(`/help/history?session_id=${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+  }
+
+  async sendHelpFeedback(sessionId: string, messageIndex: number, rating: "up" | "down"): Promise<void> {
+    return this.request("/help/feedback", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId, message_index: messageIndex, rating }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
