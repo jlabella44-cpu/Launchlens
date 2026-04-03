@@ -27,8 +27,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Auth is now handled by httpOnly cookies (sent automatically).
-    // Try to load user profile; if it fails, the cookie is missing/expired.
+    // Try to restore session: check localStorage for token (Bearer auth),
+    // then try /auth/me (which also works with httpOnly cookies).
+    const savedToken = localStorage.getItem("listingjet_token");
+    if (savedToken) {
+      apiClient.setToken(savedToken);
+    }
     apiClient
       .me()
       .then((u) => {
@@ -37,21 +41,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         localStorage.removeItem("listingjet_logged_in");
+        localStorage.removeItem("listingjet_token");
         apiClient.setToken(null);
       })
       .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    await apiClient.login(email, password);
-    // Cookie is set by the server response; fetch user profile
+    const res = await apiClient.login(email, password);
+    // Store token for Bearer auth (works cross-origin); cookies are backup (same-origin)
+    if (res.access_token) {
+      localStorage.setItem("listingjet_token", res.access_token);
+      apiClient.setToken(res.access_token);
+    }
     const me = await apiClient.me();
     setUser(me);
     localStorage.setItem("listingjet_logged_in", "1");
   }, []);
 
   const loginWithGoogle = useCallback(async (idToken: string) => {
-    await apiClient.googleLogin(idToken);
+    const res = await apiClient.googleLogin(idToken);
+    if (res.access_token) {
+      localStorage.setItem("listingjet_token", res.access_token);
+      apiClient.setToken(res.access_token);
+    }
     const me = await apiClient.me();
     setUser(me);
     localStorage.setItem("listingjet_logged_in", "1");
@@ -59,7 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (email: string, password: string, name: string, companyName: string, planTier?: string, consent?: boolean) => {
-      await apiClient.register(email, password, name, companyName, planTier, consent ?? true);
+      const res = await apiClient.register(email, password, name, companyName, planTier, consent ?? true);
+      if (res.access_token) {
+        localStorage.setItem("listingjet_token", res.access_token);
+        apiClient.setToken(res.access_token);
+      }
       const me = await apiClient.me();
       setUser(me);
       localStorage.setItem("listingjet_logged_in", "1");
@@ -69,15 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      // Server clears httpOnly cookies
       await fetch(`${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
     } catch {
-      // Best-effort; cookies may already be expired
+      // Best-effort
     }
     localStorage.removeItem("listingjet_logged_in");
+    localStorage.removeItem("listingjet_token");
     apiClient.setToken(null);
     setUser(null);
   }, []);
