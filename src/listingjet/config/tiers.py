@@ -19,6 +19,13 @@ TIER_CREDITS: dict[str, tuple[int, int]] = {
     "enterprise": (500, 100),
 }
 
+# Daily token limits for the AI help agent (input + output tokens)
+HELP_AGENT_TOKEN_LIMITS: dict[str, int] = {
+    "starter": 200_000,
+    "pro": 1_000_000,
+    "enterprise": 5_000_000,
+}
+
 CREDIT_BUNDLES = [
     {"size": 5, "price_cents": 9500, "per_credit_cents": 1900},
     {"size": 10, "price_cents": 14000, "per_credit_cents": 1400},
