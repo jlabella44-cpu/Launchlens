@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProviderWrapper } from "./auth-wrapper";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { Footer } from "@/components/layout/footer";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 
 export const metadata: Metadata = {
@@ -28,7 +29,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ErrorBoundary>
           <OfflineBanner />
-          <AuthProviderWrapper>{children}</AuthProviderWrapper>
+          <AuthProviderWrapper>
+            <div className="flex-1">{children}</div>
+            <Footer />
+          </AuthProviderWrapper>
         </ErrorBoundary>
       </body>
     </html>
