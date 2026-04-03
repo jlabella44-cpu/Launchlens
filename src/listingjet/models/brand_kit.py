@@ -1,4 +1,6 @@
-from sqlalchemy import String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,3 +19,11 @@ class BrandKit(TenantScopedModel):
     canva_template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     voice_samples: Mapped[list] = mapped_column(JSONB, default=list)
     raw_config: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    # Canva OAuth2 per-tenant tokens
+    canva_access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    canva_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    canva_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    canva_user_id: Mapped[str | None] = mapped_column(String(255), nullable=True)

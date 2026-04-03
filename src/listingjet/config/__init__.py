@@ -100,6 +100,7 @@ class Settings(BaseSettings):
 
     # Canva
     canva_api_key: str = ""
+    canva_default_template_id: str = ""  # Canva Brand Template ID used when tenant has no override
 
     # Credit bundles (Stripe price IDs for one-time purchases)
     stripe_price_credit_bundle_5: str = ""
@@ -116,6 +117,8 @@ class Settings(BaseSettings):
     # Canva OAuth2 (Phase 2 — per-tenant access)
     canva_client_id: str = ""
     canva_client_secret: str = ""
+    canva_redirect_uri: str = "https://api.listingjet.ai/auth/canva/callback"
+    canva_frontend_redirect: str = "https://listingjet.ai/settings/brand-kit"
 
     # ElevenLabs (voiceover)
     elevenlabs_api_key: str = ""

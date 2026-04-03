@@ -51,9 +51,15 @@ _CANVA_API_BASE = "https://api.canva.com/rest"
 class CanvaTemplateProvider(TemplateProvider):
     """Renders listing flyers via the Canva Connect API."""
 
-    def __init__(self, api_key: str, llm_provider=None):
+    def __init__(self, api_key: str, llm_provider=None, access_token: str | None = None):
         self._api_key = api_key
         self._llm = llm_provider
+        self._access_token = access_token
+
+    @property
+    def _effective_token(self) -> str:
+        """Per-tenant OAuth token takes priority; fall back to global API key."""
+        return self._access_token or self._api_key
 
     async def render(self, template_id: str, data: dict) -> bytes:
         """
@@ -68,7 +74,7 @@ class CanvaTemplateProvider(TemplateProvider):
         """
         client = AuthenticatedClient(
             base_url=_CANVA_API_BASE,
-            token=self._api_key,
+            token=self._effective_token,
             timeout=httpx.Timeout(60.0),
         )
 
