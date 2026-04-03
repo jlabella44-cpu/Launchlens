@@ -11,14 +11,6 @@ from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
-_limiter = None
-
-
-def _get_limiter(capacity: int, refill_rate: float):
-    """Get or create a RateLimiter instance for endpoint limiting."""
-    from listingjet.services.rate_limiter import RateLimiter
-    return RateLimiter(key_prefix="endpoint", capacity=capacity, refill_rate=refill_rate)
-
 
 def rate_limit(limit: int, period: int = 60, key_func: Callable | None = None):
     """
@@ -41,6 +33,10 @@ def rate_limit(limit: int, period: int = 60, key_func: Callable | None = None):
     refill_rate = limit / period
 
     async def _rate_limit_dep(request: Request):
+        from listingjet.middleware.rate_limit import _bypass_for_testing
+        if _bypass_for_testing:
+            return
+
         try:
             from listingjet.services.rate_limiter import RateLimiter
             limiter = RateLimiter(

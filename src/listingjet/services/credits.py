@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+import redis as redis_lib
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,8 +13,14 @@ from listingjet.models.credit_transaction import CreditTransaction
 
 logger = logging.getLogger(__name__)
 
-# Track last low-credit alert per tenant to avoid spamming (tenant_id -> date)
-_low_credit_sent: dict[uuid.UUID, datetime] = {}
+# Low-credit alert dedup lives in Redis with a 24h TTL per tenant,
+# shared across all Uvicorn worker processes with no memory leak.
+_LOW_CREDIT_TTL = 86400  # 24 hours
+
+
+def _get_redis():
+    from listingjet.config import settings
+    return redis_lib.from_url(settings.redis_url, socket_connect_timeout=2, socket_timeout=2)
 
 
 class InsufficientCreditsError(Exception):
@@ -88,13 +95,15 @@ class CreditService:
         )
         session.add(txn)
 
-        # Send low-credit alert if balance < 3 (once per day per tenant)
+        # Send low-credit alert if balance < 3 (once per day per tenant).
+        # Dedup key lives in Redis with a 24h TTL — shared across all
+        # worker processes and automatically cleaned up.
         if account.balance < 3:
-            now = datetime.now(timezone.utc)
-            last_sent = _low_credit_sent.get(tenant_id)
-            if not last_sent or (now - last_sent).total_seconds() > 86400:
-                _low_credit_sent[tenant_id] = now
-                try:
+            dedup_key = f"low_credit_sent:{tenant_id}"
+            try:
+                r = _get_redis()
+                # SET NX = only set if not exists; EX = expire after TTL
+                if r.set(dedup_key, "1", nx=True, ex=_LOW_CREDIT_TTL):
                     from listingjet.models.user import User, UserRole
                     from listingjet.services.email import get_email_service
                     admin_result = await session.execute(
@@ -113,8 +122,8 @@ class CreditService:
                             balance=str(account.balance),
                             buy_url="https://app.listingjet.com/billing/credits",
                         )
-                except Exception:
-                    logger.exception("credits_low email failed for tenant %s", tenant_id)
+            except Exception:
+                logger.exception("credits_low email failed for tenant %s", tenant_id)
 
         return txn
 
