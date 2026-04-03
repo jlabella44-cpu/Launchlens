@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
@@ -188,10 +189,13 @@ export default function Home() {
             className="hidden lg:block"
           >
             <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl transform rotate-2 translate-x-6">
-              <img
+              <Image
                 src="/images/hero-dashboard.jpg"
                 alt="ListingJet dashboard showing real estate analytics, property photo grid, and AI generation progress"
+                width={800}
+                height={500}
                 className="w-full h-full object-cover"
+                priority
               />
               {/* HUD Overlay */}
               <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md rounded-xl px-4 py-2 shadow-lg">
@@ -351,9 +355,11 @@ export default function Home() {
             className="grid lg:grid-cols-2 gap-12 items-center mb-20"
           >
             <div className="rounded-2xl overflow-hidden aspect-video border border-slate-100 shadow-lg bg-slate-100">
-              <img
+              <Image
                 src="/images/photo-intelligence.jpg"
                 alt="Before and after: dark unedited room transformed into a brightly lit, professionally enhanced space"
+                width={800}
+                height={450}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -384,9 +390,11 @@ export default function Home() {
               </p>
             </div>
             <div className="order-1 lg:order-2 rounded-2xl overflow-hidden aspect-video border border-slate-100 shadow-lg bg-slate-100">
-              <img
+              <Image
                 src="/images/built-for-teams.jpg"
                 alt="Team collaboration dashboard with agent profiles, shared listing analytics, and credit usage metrics"
+                width={800}
+                height={450}
                 className="w-full h-full object-cover"
               />
             </div>
