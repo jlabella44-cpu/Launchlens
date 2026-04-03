@@ -6,7 +6,6 @@ Redis for session history and token budget tracking.
 import json
 import logging
 import re
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator
@@ -370,7 +369,7 @@ class HelpAgentService:
                     tools=TOOL_DEFINITIONS,
                 )
                 record_provider_call("claude_help_agent", True)
-            except Exception as exc:
+            except Exception:
                 record_provider_call("claude_help_agent", False)
                 logger.exception("help_agent.claude_error")
                 yield f'data: {json.dumps({"type": "error", "text": "I am having trouble connecting right now. Please try again in a moment."})}\n\n'

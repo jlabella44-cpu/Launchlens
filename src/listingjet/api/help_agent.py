@@ -120,6 +120,7 @@ async def get_admin_stats(
 ):
     """Get help agent usage statistics (admin only)."""
     import redis as redis_lib
+
     from listingjet.config import settings
 
     target_date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")

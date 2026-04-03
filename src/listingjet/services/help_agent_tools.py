@@ -7,7 +7,7 @@ All queries are scoped to the tenant via WHERE clauses.
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from listingjet.config.tiers import CREDIT_BUNDLES, TIER_CREDITS, TIER_DEFAULTS
 from listingjet.models.addon_catalog import AddonCatalog
 from listingjet.models.addon_purchase import AddonPurchase
-from listingjet.models.credit_transaction import CreditTransaction
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
@@ -235,7 +234,7 @@ async def get_listings_summary(
         listing_query = listing_query.where(Listing.state == state_enum)
 
     listings_result = await db.execute(listing_query)
-    listings = [_listing_to_dict(l) for l in listings_result.scalars().all()]
+    listings = [_listing_to_dict(row) for row in listings_result.scalars().all()]
 
     return {
         "total_listings": sum(counts.values()),
@@ -270,7 +269,8 @@ async def search_listings_by_address(
         return {"error": "Search query must be at least 2 characters."}
 
     # Search in the JSONB address field using cast-to-text ILIKE
-    from sqlalchemy import cast, String as SAString
+    from sqlalchemy import String as SAString
+    from sqlalchemy import cast
     result = await db.execute(
         select(Listing)
         .where(
@@ -280,7 +280,7 @@ async def search_listings_by_address(
         .order_by(Listing.created_at.desc())
         .limit(10)
     )
-    listings = [_listing_to_dict(l) for l in result.scalars().all()]
+    listings = [_listing_to_dict(row) for row in result.scalars().all()]
     return {"results": listings, "count": len(listings)}
 
 
@@ -441,7 +441,7 @@ async def request_human_support(
             ),
         )
         return {"status": "sent", "message": "Your request has been sent to our support team. They'll be in touch shortly."}
-    except Exception as exc:
+    except Exception:
         logger.exception("help_agent.escalation_failed tenant=%s", tenant_id)
         return {"status": "failed", "message": "We couldn't send the support request right now. Please try again or email support@listingjet.com directly."}
 
@@ -497,7 +497,7 @@ async def execute_tool(
             result = await fn(db=db, tenant_id=tenant_id, **safe_input)
         else:
             result = {"error": f"Unknown tool '{tool_name}'."}
-    except Exception as exc:
+    except Exception:
         logger.exception("help_agent.tool_error tool=%s tenant=%s", tool_name, tenant_id)
         result = {"error": "An internal error occurred while looking up this information."}
 

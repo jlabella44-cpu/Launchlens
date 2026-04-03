@@ -1,13 +1,10 @@
 """Tests for the AI help agent — tools, input sanitization, and injection resistance."""
 import json
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from listingjet.models.addon_catalog import AddonCatalog
 from listingjet.models.credit_account import CreditAccount
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.tenant import Tenant
@@ -23,7 +20,6 @@ from listingjet.services.help_agent_tools import (
     get_team_members,
     search_listings_by_address,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
