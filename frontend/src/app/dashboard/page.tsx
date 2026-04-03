@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -258,17 +259,21 @@ function DashboardContent() {
               </Link>
             </div>
             {recentListings.length === 0 ? (
-              <GlassCard tilt={false} className="text-center py-12">
-                <p className="text-[var(--color-text-secondary)]">
-                  No listings yet. Create your first one!
-                </p>
-                <Button
-                  variant="primary"
-                  className="mt-4"
-                  onClick={() => setShowCreateDialog(true)}
-                >
-                  Create First Listing
-                </Button>
+              <GlassCard tilt={false}>
+                <EmptyState
+                  icon={
+                    <svg className="w-12 h-12 text-[#F97316]/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  }
+                  title="No listings yet"
+                  description="Upload your first property photos and let our AI generate MLS-ready marketing materials in minutes."
+                  action={
+                    <Button variant="primary" onClick={() => setShowCreateDialog(true)}>
+                      Create First Listing
+                    </Button>
+                  }
+                />
               </GlassCard>
             ) : (
               <div className="space-y-3">
