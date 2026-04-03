@@ -21,3 +21,27 @@ jobs:
 
       - name: Run ruff
         run: ruff check src/ tests/
+
+      - name: Python dependency audit
+        run: pip install pip-audit && pip-audit --strict --desc 2>&1 || true
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit
+        run: npm audit --audit-level=high 2>&1 || true

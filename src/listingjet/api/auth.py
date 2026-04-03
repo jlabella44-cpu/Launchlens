@@ -59,6 +59,7 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     )
     db.add(credit_account)
 
+    from datetime import datetime, timezone
     user = User(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -66,6 +67,8 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         password_hash=hash_password(body.password),
         name=body.name,
         role=UserRole.ADMIN,
+        consent_at=datetime.now(timezone.utc),
+        consent_version="2026-04-03",
     )
     db.add(user)
     await emit_event(
@@ -182,6 +185,100 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+# ---------------------------------------------------------------------------
+# Password Reset
+# ---------------------------------------------------------------------------
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password", dependencies=[Depends(rate_limit(3, 60))])
+async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Send a password reset email. Always returns 200 to prevent user enumeration."""
+    from datetime import datetime, timedelta, timezone
+
+    import jwt as pyjwt
+
+    from listingjet.config import settings
+
+    email = body.email.strip().lower()
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+
+    if user:
+        reset_token = pyjwt.encode(
+            {
+                "sub": str(user.id),
+                "type": "password_reset",
+                "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+            },
+            settings.jwt_secret,
+            algorithm=settings.jwt_algorithm,
+        )
+        try:
+            from listingjet.services.email import get_email_service
+            email_svc = get_email_service()
+            email_svc.send(
+                to=email,
+                subject="Reset your ListingJet password",
+                html_body=(
+                    f"<p>You requested a password reset.</p>"
+                    f"<p><a href='https://app.listingjet.com/reset-password?token={reset_token}'>"
+                    f"Click here to reset your password</a></p>"
+                    f"<p>This link expires in 15 minutes.</p>"
+                    f"<p>If you didn't request this, you can safely ignore this email.</p>"
+                ),
+            )
+        except Exception:
+            logger.exception("password_reset_email_failed for user=%s", user.id)
+
+    # Always return 200 to prevent user enumeration
+    return {"status": "ok", "message": "If an account exists with that email, a reset link has been sent."}
+
+
+@router.post("/reset-password", dependencies=[Depends(rate_limit(5, 60))])
+async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Reset password using a token from the forgot-password email."""
+    import jwt as pyjwt
+
+    from listingjet.config import settings
+
+    try:
+        payload = pyjwt.decode(body.token, settings.jwt_secret, algorithms=["HS256"])
+    except pyjwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if payload.get("type") != "password_reset":
+        raise HTTPException(status_code=400, detail="Invalid token type")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    user = await db.get(User, uuid.UUID(user_id))
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    # Validate new password
+    from listingjet.api.schemas.auth import RegisterRequest
+    try:
+        RegisterRequest.password_complexity(body.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    user.password_hash = hash_password(body.new_password)
+    await db.commit()
+
+    logger.info("auth.password_reset user=%s", user.id)
+    return {"status": "ok", "message": "Password has been reset. You can now log in."}
 
 
 @router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(rate_limit(10, 60))])
