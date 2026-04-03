@@ -43,7 +43,8 @@ async def upsert_brand_kit(
 ):
     """Create or update the tenant's brand kit."""
     result = await db.execute(
-        select(BrandKit).where(BrandKit.tenant_id == current_user.tenant_id).limit(1)
+        select(BrandKit).where(BrandKit.tenant_id == current_user.tenant_id)
+        .limit(1).with_for_update()
     )
     kit = result.scalar_one_or_none()
 

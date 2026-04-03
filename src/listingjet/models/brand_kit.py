@@ -1,4 +1,4 @@
-from sqlalchemy import String
+from sqlalchemy import String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -7,6 +7,7 @@ from .base import TenantScopedModel
 
 class BrandKit(TenantScopedModel):
     __tablename__ = "brand_kits"
+    __table_args__ = (UniqueConstraint("tenant_id", name="uq_brand_kits_tenant_id"),)
     logo_url: Mapped[str | None]
     primary_color: Mapped[str | None] = mapped_column(String(7))
     secondary_color: Mapped[str | None] = mapped_column(String(7))
