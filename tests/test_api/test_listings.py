@@ -60,7 +60,6 @@ async def test_list_listings_returns_own(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Pre-existing: tenant isolation not enforced in test DB session")
 async def test_list_listings_tenant_isolation(async_client: AsyncClient):
     token_a, _ = await _register(async_client)
     token_b, _ = await _register(async_client)
@@ -100,7 +99,6 @@ async def test_get_listing_not_found(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Pre-existing: tenant isolation not enforced in test DB session")
 async def test_get_listing_cross_tenant_404(async_client: AsyncClient):
     token_a, _ = await _register(async_client)
     token_b, _ = await _register(async_client)

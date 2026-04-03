@@ -120,7 +120,6 @@ async def test_api_key_full_lifecycle(_mock_rate_limiter, async_client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Pre-existing: tenant isolation not enforced in test DB session")
 async def test_revoke_other_tenants_key_404(_mock_rate_limiter, async_client):
     """Revoking a key that belongs to another tenant should return 404."""
     token_a, _ = await _register(async_client)
