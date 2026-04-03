@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { ListingCard } from "@/components/listings/listing-card";
@@ -235,25 +236,24 @@ function ListingsDashboard() {
             ))}
           </div>
         ) : listings.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center py-20"
-          >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
-              <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              </svg>
-            </div>
-            <p className="text-lg text-slate-400 mb-4">
-              No listings yet. Create your first one to get started.
-            </p>
-            <button
-              onClick={() => setDialogOpen(true)}
-              className="px-6 py-3 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors shadow-md shadow-orange-200"
-            >
-              Create First Listing
-            </button>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <EmptyState
+              icon={
+                <svg className="w-12 h-12 text-[#F97316]/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                </svg>
+              }
+              title="No listings yet"
+              description="Upload your first property photos and let our AI generate MLS-ready marketing materials in minutes."
+              action={
+                <button
+                  onClick={() => setDialogOpen(true)}
+                  className="px-6 py-3 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors shadow-md shadow-orange-200"
+                >
+                  Create First Listing
+                </button>
+              }
+            />
           </motion.div>
         ) : (
           <motion.div
