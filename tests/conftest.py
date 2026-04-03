@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
 import pytest
@@ -23,12 +23,47 @@ def event_loop():
 
 
 @pytest.fixture(autouse=True)
-def _mock_rate_limiter_global():
-    """Bypass Redis-backed rate limiter in all tests (Redis not available in CI)."""
-    mock_limiter = MagicMock()
-    mock_limiter.acquire.return_value = True
-    with patch("listingjet.middleware.rate_limit._get_limiter", return_value=mock_limiter):
+def _mock_external_services():
+    """Bypass all external services in tests: Redis, Temporal, rate limiters.
+
+    Without this:
+    - Redis calls block for 2s each (socket timeout) or hang indefinitely
+    - Temporal Client.connect() hangs for 60s+ trying to reach localhost:7233
+    - Rate limiter middleware returns 429 on every request
+    """
+    import listingjet.middleware.rate_limit as rl_mod
+    rl_mod._bypass_for_testing = True
+
+    mock_redis = MagicMock()
+    mock_redis.get.return_value = None
+    mock_redis.set.return_value = True
+    mock_redis.incr.return_value = 1
+    mock_redis.expire.return_value = True
+    mock_redis.delete.return_value = 1
+    mock_redis.ttl.return_value = 900
+    mock_redis.pipeline.return_value = MagicMock(
+        __enter__=MagicMock(return_value=MagicMock(
+            incr=MagicMock(), expire=MagicMock(), execute=MagicMock()
+        )),
+        __exit__=MagicMock(return_value=False),
+    )
+
+    # Mock Temporal client so it never tries to connect to localhost:7233
+    mock_temporal = MagicMock()
+    mock_temporal.start_pipeline = AsyncMock(return_value="mock-workflow-id")
+    mock_temporal.signal_review_completed = AsyncMock()
+
+    with (
+        patch("listingjet.services.rate_limiter.RateLimiter", return_value=mock_redis),
+        patch("listingjet.api.auth._get_lockout_redis", return_value=mock_redis),
+        patch("listingjet.services.credits._get_redis", return_value=mock_redis),
+        patch("listingjet.temporal_client.get_temporal_client", return_value=mock_temporal),
+        patch("listingjet.api.listings.get_temporal_client", return_value=mock_temporal),
+        patch("listingjet.api.bulk.get_temporal_client", return_value=mock_temporal),
+    ):
         yield
+
+    rl_mod._bypass_for_testing = False
 
 
 @pytest.fixture(scope="session")
@@ -124,23 +159,15 @@ async def async_client(test_engine):
     original_engine = health_module.engine
     health_module.engine = test_engine
 
-    # Mock both rate limiters globally for all tests (no Redis needed)
-    mock_limiter = MagicMock()
-    mock_limiter.acquire.return_value = True
-    mock_limiter.check.return_value = True
-
     # Mock credit deduction to always succeed (tests don't need real credit enforcement)
+    # Rate limiting + Redis are handled by the autouse _mock_redis_globally fixture.
     async def _noop_deduct(*args, **kwargs):
         import uuid as _uuid
         mock_txn = MagicMock(amount=1)
         mock_txn.id = _uuid.uuid4()
         return mock_txn
 
-    with (
-        patch("listingjet.middleware.rate_limit._get_limiter", return_value=mock_limiter),
-        patch("listingjet.services.rate_limiter.RateLimiter", return_value=mock_limiter),
-        patch("listingjet.services.credits.CreditService.deduct_credits", side_effect=_noop_deduct),
-    ):
+    with patch("listingjet.services.credits.CreditService.deduct_credits", side_effect=_noop_deduct):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:

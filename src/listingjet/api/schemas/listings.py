@@ -2,12 +2,43 @@ import enum
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class AddressPayload(BaseModel):
+    """Validated address structure for listings."""
+    street: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, max_length=100)
+    state: str | None = Field(default=None, max_length=50)
+    zip: str | None = Field(default=None, max_length=20)
+    unit: str | None = Field(default=None, max_length=50)
+    country: str = Field(default="US", max_length=10)
+
+    model_config = {"extra": "allow"}
+
+
+class ListingMetadata(BaseModel):
+    """Validated metadata structure for listings.
+
+    Accepts both short names (beds/baths) and long names (bedrooms/bathrooms).
+    Extra fields are passed through for extensibility.
+    """
+    beds: int | None = Field(default=None, ge=0, le=100)
+    baths: float | None = Field(default=None, ge=0, le=100)
+    sqft: int | None = Field(default=None, ge=0, le=1_000_000)
+    price: int | None = Field(default=None, ge=0)
+    lot_sqft: int | None = Field(default=None, ge=0, le=100_000_000)
+    year_built: int | None = Field(default=None, ge=1600, le=2100)
+    property_type: str | None = Field(default=None, max_length=50)
+    description: str | None = Field(default=None, max_length=5000)
+
+    model_config = {"extra": "allow"}
 
 
 class CreateListingRequest(BaseModel):
-    address: dict
-    metadata: dict = {}
+    address: AddressPayload
+    metadata: ListingMetadata | None = ListingMetadata()
+    idempotency_key: str | None = Field(default=None, max_length=64)
 
     model_config = {
         "json_schema_extra": {
@@ -27,8 +58,8 @@ class CreateListingRequest(BaseModel):
 
 
 class UpdateListingRequest(BaseModel):
-    address: dict | None = None
-    metadata: dict | None = None
+    address: AddressPayload | None = None
+    metadata: ListingMetadata | None = None
 
 
 class ListingResponse(BaseModel):

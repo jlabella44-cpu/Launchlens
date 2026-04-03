@@ -103,6 +103,7 @@ class ApiClient {
     const response = await fetch(`${API_URL}${path}`, {
       ...options,
       headers,
+      credentials: "include",
     });
 
     if (!response.ok) {

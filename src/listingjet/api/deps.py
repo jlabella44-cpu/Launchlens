@@ -9,14 +9,22 @@ from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
 from listingjet.services.auth import decode_token
 
-_bearer = HTTPBearer(auto_error=True)
+_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    payload = decode_token(credentials.credentials)
+    # Prefer httpOnly cookie, fall back to Authorization header
+    token: str | None = request.cookies.get("access_token")
+    if not token and credentials:
+        token = credentials.credentials
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    payload = decode_token(token)
     user_id_str = payload.get("sub")
     if not user_id_str:
         raise HTTPException(status_code=401, detail="Invalid token payload")

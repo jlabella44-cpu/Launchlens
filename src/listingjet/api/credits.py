@@ -99,11 +99,21 @@ async def purchase_credits(
         cancel_url=body.cancel_url,
         metadata={"tenant_id": str(tenant.id), "bundle_size": str(body.bundle_size), "type": "credit_bundle"},
     )
-    if body.idempotency_key:
-        session = stripe.checkout.Session.create(
-            **create_kwargs,
-            idempotency_key=body.idempotency_key,
-        )
-    else:
-        session = stripe.checkout.Session.create(**create_kwargs)
+    try:
+        if body.idempotency_key:
+            session = stripe.checkout.Session.create(
+                **create_kwargs,
+                idempotency_key=body.idempotency_key,
+            )
+        else:
+            session = stripe.checkout.Session.create(**create_kwargs)
+    except stripe.CardError:
+        raise HTTPException(status_code=402, detail="Payment method was declined")
+    except stripe.RateLimitError:
+        raise HTTPException(status_code=503, detail="Payment service is busy — please retry shortly")
+    except stripe.APIConnectionError:
+        raise HTTPException(status_code=503, detail="Payment service is temporarily unavailable")
+    except stripe.StripeError as e:
+        logger.error("stripe_checkout_error type=%s message=%s", type(e).__name__, str(e))
+        raise HTTPException(status_code=502, detail="Payment processing error")
     return CreditPurchaseResponse(checkout_url=session.url)

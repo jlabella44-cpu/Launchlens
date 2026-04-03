@@ -29,7 +29,7 @@ class RateLimiter:
     ):
         if redis_client is None:
             from listingjet.config import settings
-            redis_client = redis_lib.from_url(settings.redis_url)
+            redis_client = redis_lib.from_url(settings.redis_url, socket_connect_timeout=2, socket_timeout=2)
         self._redis = redis_client
         self._prefix = key_prefix
         self._capacity = capacity

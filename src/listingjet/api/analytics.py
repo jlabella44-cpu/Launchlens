@@ -164,6 +164,7 @@ async def analytics_credits(
             CreditTransaction.created_at >= start,
         )
         .order_by(CreditTransaction.created_at.asc())
+        .limit(1000)
     )).scalars().all()
 
     return {

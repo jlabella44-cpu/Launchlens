@@ -40,12 +40,17 @@ class BillingService:
         self._api_key = settings.stripe_secret_key
 
     def create_customer(self, email: str, name: str, tenant_id: str) -> str:
-        customer = stripe.Customer.create(
-            api_key=self._api_key,
-            email=email,
-            name=name,
-            metadata={"tenant_id": tenant_id},
-        )
+        try:
+            customer = stripe.Customer.create(
+                api_key=self._api_key,
+                email=email,
+                name=name,
+                metadata={"tenant_id": tenant_id},
+            )
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_create_customer_failed tenant=%s", tenant_id)
+            raise
         return customer.id
 
     def create_checkout_session(
@@ -56,24 +61,34 @@ class BillingService:
         cancel_url: str,
         tenant_id: str | None = None,
     ) -> str:
-        session = stripe.checkout.Session.create(
-            api_key=self._api_key,
-            customer=customer_id,
-            payment_method_types=["card"],
-            line_items=[{"price": price_id, "quantity": 1}],
-            mode="subscription",
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={"tenant_id": tenant_id} if tenant_id else {},
-        )
+        try:
+            session = stripe.checkout.Session.create(
+                api_key=self._api_key,
+                customer=customer_id,
+                payment_method_types=["card"],
+                line_items=[{"price": price_id, "quantity": 1}],
+                mode="subscription",
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata={"tenant_id": tenant_id} if tenant_id else {},
+            )
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_checkout_failed customer=%s", customer_id)
+            raise
         return session.url
 
     def create_portal_session(self, customer_id: str, return_url: str) -> str:
-        session = stripe.billing_portal.Session.create(
-            api_key=self._api_key,
-            customer=customer_id,
-            return_url=return_url,
-        )
+        try:
+            session = stripe.billing_portal.Session.create(
+                api_key=self._api_key,
+                customer=customer_id,
+                return_url=return_url,
+            )
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_portal_failed customer=%s", customer_id)
+            raise
         return session.url
 
     def construct_webhook_event(self, payload: bytes, sig_header: str) -> stripe.Event:

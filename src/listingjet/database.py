@@ -8,8 +8,8 @@ from listingjet.config import settings
 engine = create_async_engine(
     settings.async_database_url,
     echo=False,
-    pool_size=20,
-    max_overflow=10,
+    pool_size=50,
+    max_overflow=20,
     pool_recycle=300,
     pool_pre_ping=True,
 )

@@ -1,8 +1,9 @@
 """
 API rate limiting middleware.
 
-Uses Redis token bucket (existing RateLimiter service) to enforce
-per-tenant rate limits on authenticated endpoints.
+Uses Redis token bucket (RateLimiter service) to enforce per-tenant rate
+limits.  All state lives in Redis — no Python-side singletons — so limits
+are shared correctly across all Uvicorn worker processes.
 
 Limits:
   - Authenticated: 60 req/min per tenant
@@ -16,6 +17,8 @@ import logging
 
 from fastapi import Request
 from starlette.responses import JSONResponse
+
+from listingjet.services.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +35,6 @@ _TENANT_REFILL = 60 / 60  # 1 token/sec
 _PUBLIC_CAPACITY = 20
 _PUBLIC_REFILL = 20 / 60
 
-_limiter = None
-
 
 def _extract_client_ip(request: Request) -> str:
     """Extract client IP, only trusting X-Forwarded-For when behind known proxies."""
@@ -47,27 +48,39 @@ def _extract_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _get_limiter():
-    global _limiter
-    if _limiter is None:
-        from listingjet.services.rate_limiter import RateLimiter
-        _limiter = RateLimiter(
-            key_prefix="api",
-            capacity=_TENANT_CAPACITY,
-            refill_rate=_TENANT_REFILL,
-        )
-    return _limiter
+# Module-level reference so tests can replace _limiter without walking the
+# ASGI middleware stack.  Set by __init__, patched by conftest.
+_active_middleware: "APIRateLimitMiddleware | None" = None
+
+# Set to True in tests to bypass rate limiting entirely.
+_bypass_for_testing: bool = False
 
 
 class APIRateLimitMiddleware:
+    """Rate-limit middleware.  One RateLimiter instance per *process* is fine
+    because the actual token-bucket state lives in Redis, not in Python
+    memory.  The instance is created once at startup (not lazily) so there
+    is no check-and-set race between concurrent async tasks.
+    """
+
+    def __init__(self):
+        global _active_middleware
+        try:
+            self._limiter = RateLimiter(
+                key_prefix="api",
+                capacity=_TENANT_CAPACITY,
+                refill_rate=_TENANT_REFILL,
+            )
+        except Exception:
+            logger.warning("Redis unavailable at startup — rate limiting disabled")
+            self._limiter = None
+        _active_middleware = self
+
     async def __call__(self, request: Request, call_next):
-        if request.url.path in _SKIP_PATHS:
+        if _bypass_for_testing or request.url.path in _SKIP_PATHS:
             return await call_next(request)
 
-        try:
-            limiter = _get_limiter()
-        except Exception:
-            # If Redis is down, don't block requests
+        if self._limiter is None:
             return await call_next(request)
 
         # Determine rate limit key
@@ -79,7 +92,7 @@ class APIRateLimitMiddleware:
             key = f"ip:{ip}"
 
         try:
-            allowed = limiter.acquire(key=key, cost=1)
+            allowed = self._limiter.acquire(key=key, cost=1)
         except Exception:
             # Redis error — fail open
             return await call_next(request)
