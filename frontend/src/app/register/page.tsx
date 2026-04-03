@@ -287,11 +287,14 @@ function RegisterForm() {
                 />
                 <span className="text-xs text-slate-500">
                   I agree to the{" "}
+                  <Link href="/terms" className="text-[#F97316] hover:underline" target="_blank">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
                   <Link href="/privacy" className="text-[#F97316] hover:underline" target="_blank">
                     Privacy Policy
-                  </Link>{" "}
-                  and consent to my listing data being processed by third-party AI services
-                  as described therein.
+                  </Link>, and consent to my listing data being processed by third-party AI
+                  services as described therein.
                 </span>
               </label>
 
@@ -336,6 +339,9 @@ function RegisterForm() {
             <div className="flex items-center justify-center gap-6 mt-8">
               <Link href="/privacy" className="text-[10px] text-slate-400 uppercase tracking-wider hover:text-slate-600">
                 Privacy Policy
+              </Link>
+              <Link href="/terms" className="text-[10px] text-slate-400 uppercase tracking-wider hover:text-slate-600">
+                Terms of Service
               </Link>
             </div>
           </div>
