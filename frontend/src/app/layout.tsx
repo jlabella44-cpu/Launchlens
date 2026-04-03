@@ -2,11 +2,32 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProviderWrapper } from "./auth-wrapper";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { Footer } from "@/components/layout/footer";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 
 export const metadata: Metadata = {
   title: "ListingJet — Put Your Listings on Autopilot",
   description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
+  metadataBase: new URL("https://app.listingjet.com"),
+  openGraph: {
+    title: "ListingJet — Put Your Listings on Autopilot",
+    description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
+    siteName: "ListingJet",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ListingJet — Put Your Listings on Autopilot",
+    description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -28,7 +49,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ErrorBoundary>
           <OfflineBanner />
-          <AuthProviderWrapper>{children}</AuthProviderWrapper>
+          <AuthProviderWrapper>
+            <div className="flex-1">{children}</div>
+            <Footer />
+          </AuthProviderWrapper>
         </ErrorBoundary>
       </body>
     </html>
