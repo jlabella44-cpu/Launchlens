@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -25,10 +25,7 @@ async def hero_selection(db_session, listing, assets):
 
 
 @pytest.mark.asyncio
-@patch("listingjet.agents.brand.settings")
-async def test_brand_renders_and_uploads_flyer(mock_settings, db_session, listing, assets, hero_selection):
-    mock_settings.canva_default_template_id = "DAGtest123"
-
+async def test_brand_renders_and_uploads_flyer(db_session, listing, assets, hero_selection):
     mock_template = MagicMock()
     mock_template.render = AsyncMock(return_value=b"%PDF-flyer-content")
 
@@ -50,13 +47,10 @@ async def test_brand_renders_and_uploads_flyer(mock_settings, db_session, listin
 
 
 @pytest.mark.asyncio
-@patch("listingjet.agents.brand.settings")
-async def test_brand_emits_event(mock_settings, db_session, listing, assets, hero_selection):
+async def test_brand_emits_event(db_session, listing, assets, hero_selection):
     from sqlalchemy import select
 
     from listingjet.models.outbox import Outbox
-
-    mock_settings.canva_default_template_id = "DAGtest123"
 
     mock_template = MagicMock()
     mock_template.render = AsyncMock(return_value=b"%PDF-content")
