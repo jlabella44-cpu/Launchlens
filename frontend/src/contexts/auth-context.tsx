@@ -27,12 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Try to restore session: check localStorage for token (Bearer auth),
-    // then try /auth/me (which also works with httpOnly cookies).
+    // Only attempt /auth/me if we have a saved token. This avoids a noisy
+    // 401 console error on every unauthenticated page load.
     const savedToken = localStorage.getItem("listingjet_token");
-    if (savedToken) {
-      apiClient.setToken(savedToken);
+    if (!savedToken) {
+      setLoading(false);
+      return;
     }
+    apiClient.setToken(savedToken);
     apiClient
       .me()
       .then((u) => {
