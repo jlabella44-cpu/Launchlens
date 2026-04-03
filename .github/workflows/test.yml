@@ -38,6 +38,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       DATABASE_URL: postgresql+asyncpg://launchlens:password@localhost:5432/launchlens
       DATABASE_URL_SYNC: postgresql://launchlens:password@localhost:5432/launchlens
@@ -73,4 +83,4 @@ jobs:
         run: alembic upgrade head
 
       - name: Run tests
-        run: pytest --tb=short -q
+        run: pytest --tb=short -q --timeout=30

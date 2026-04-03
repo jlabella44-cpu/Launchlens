@@ -20,7 +20,7 @@ def test_send_calls_smtp(mock_settings):
 
         svc.send("agent@test.com", "Test Subject", "<p>Hello</p>")
 
-        mock_smtp.assert_called_once_with("mail.test", 587)
+        mock_smtp.assert_called_once_with("mail.test", 587, timeout=15)
         mock_server.starttls.assert_called_once()
         mock_server.login.assert_called_once_with("user", "pass")
         mock_server.sendmail.assert_called_once()

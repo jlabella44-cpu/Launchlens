@@ -1,6 +1,5 @@
 """Test listing search/filter/pagination."""
 import uuid
-from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
 import pytest
@@ -33,11 +32,8 @@ async def _create_listing(client, token, street, city, state_abbr, listing_state
 
 @pytest.fixture
 def _mock_rate_limiter():
-    """Bypass Redis rate limiter for all tests in this module."""
-    limiter = MagicMock()
-    limiter.acquire.return_value = True
-    with patch("listingjet.middleware.rate_limit._get_limiter", return_value=limiter):
-        yield
+    """Rate limiting is handled by the autouse _mock_redis_globally fixture."""
+    yield
 
 
 @pytest.mark.asyncio
