@@ -7,6 +7,26 @@ import { OfflineBanner } from "@/components/ui/offline-banner";
 export const metadata: Metadata = {
   title: "ListingJet — Put Your Listings on Autopilot",
   description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
+  metadataBase: new URL("https://app.listingjet.com"),
+  openGraph: {
+    title: "ListingJet — Put Your Listings on Autopilot",
+    description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
+    siteName: "ListingJet",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ListingJet — Put Your Listings on Autopilot",
+    description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

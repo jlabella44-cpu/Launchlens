@@ -170,9 +170,9 @@ export default function LoginPage() {
                   <label htmlFor="password" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                     Security Cipher
                   </label>
-                  <button type="button" className="text-[10px] font-semibold uppercase tracking-wider text-[#F97316] hover:text-[#ea580c]">
+                  <Link href="/forgot-password" className="text-[10px] font-semibold uppercase tracking-wider text-[#F97316] hover:text-[#ea580c]">
                     Forgot?
-                  </button>
+                  </Link>
                 </div>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
