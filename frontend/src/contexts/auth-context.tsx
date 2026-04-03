@@ -16,7 +16,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
-  register: (email: string, password: string, name: string, companyName: string, planTier?: string) => Promise<void>;
+  register: (email: string, password: string, name: string, companyName: string, planTier?: string, consent?: boolean) => Promise<void>;
   logout: () => void | Promise<void>;
 }
 
@@ -58,8 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(
-    async (email: string, password: string, name: string, companyName: string, planTier?: string) => {
-      await apiClient.register(email, password, name, companyName, planTier);
+    async (email: string, password: string, name: string, companyName: string, planTier?: string, consent?: boolean) => {
+      await apiClient.register(email, password, name, companyName, planTier, consent ?? true);
       const me = await apiClient.me();
       setUser(me);
       localStorage.setItem("listingjet_logged_in", "1");

@@ -10,6 +10,14 @@ class RegisterRequest(BaseModel):
     name: str | None = None
     company_name: str
     plan_tier: str | None = None
+    consent: bool = False
+
+    @field_validator("consent")
+    @classmethod
+    def consent_required(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError("You must agree to the Privacy Policy to create an account")
+        return v
 
     model_config = {
         "json_schema_extra": {

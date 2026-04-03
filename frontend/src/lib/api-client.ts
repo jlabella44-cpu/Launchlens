@@ -123,6 +123,7 @@ class ApiClient {
     name: string,
     companyName: string,
     planTier?: string,
+    consent: boolean = true,
   ): Promise<TokenResponse> {
     return this.request<TokenResponse>("/auth/register", {
       method: "POST",
@@ -132,6 +133,7 @@ class ApiClient {
         name,
         company_name: companyName,
         plan_tier: planTier || undefined,
+        consent,
       }),
     });
   }

@@ -54,7 +54,7 @@ class DatabaseStack(Stack):
             storage_encrypted=True,
             multi_az=True,
             backup_retention=Duration.days(7),
-            deletion_protection=False,  # beta - flip for production
+            deletion_protection=True,
             removal_policy=RemovalPolicy.SNAPSHOT,
         )
 
