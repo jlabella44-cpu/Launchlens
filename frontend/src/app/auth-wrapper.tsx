@@ -9,7 +9,7 @@ import { HelpChat } from "@/components/ui/help-chat";
 import { ToastProvider } from "@/components/ui/toast";
 import type { ReactNode } from "react";
 
-const PUBLIC_PATHS = ["/login", "/register", "/demo", "/pricing"];
+const PUBLIC_PATHS = ["/", "/login", "/register", "/demo", "/pricing", "/faq", "/privacy", "/terms", "/forgot-password", "/reset-password"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
