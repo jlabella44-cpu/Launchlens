@@ -694,6 +694,47 @@ class ApiClient {
       body: JSON.stringify({ session_id: sessionId, message_index: messageIndex, rating }),
     });
   }
+
+  // CMA Reports
+  async generateCMAReport(listingId: string): Promise<{ listing_id: string; status: string; comparables_count: number; s3_key: string }> {
+    return this.request(`/listings/${listingId}/cma-report`, { method: "POST" });
+  }
+
+  async getCMAReport(listingId: string): Promise<{ listing_id: string; generated_at: string; download_url: string; comparables_count: number; analysis_summary: string | null }> {
+    return this.request(`/listings/${listingId}/cma-report`);
+  }
+
+  // Property Microsites
+  async generateMicrosite(listingId: string): Promise<{ listing_id: string; status: string; s3_key: string; microsite_url: string; qr_code_s3_key: string | null }> {
+    return this.request(`/listings/${listingId}/microsite`, { method: "POST" });
+  }
+
+  async getMicrosite(listingId: string): Promise<{ listing_id: string; microsite_url: string; qr_code_url: string | null; status: string; generated_at: string }> {
+    return this.request(`/listings/${listingId}/microsite`);
+  }
+
+  async deleteMicrosite(listingId: string): Promise<{ listing_id: string; deleted: boolean }> {
+    return this.request(`/listings/${listingId}/microsite`, { method: "DELETE" });
+  }
+
+  // Image Editing
+  async removeObject(listingId: string, assetId: string, objectDescription: string): Promise<{ original_asset_id: string; edited_asset_id: string; s3_key: string; edit_type: string }> {
+    return this.request(`/listings/${listingId}/assets/remove-object`, {
+      method: "POST",
+      body: JSON.stringify({ asset_id: assetId, object_description: objectDescription }),
+    });
+  }
+
+  async enhancePhoto(listingId: string, assetId: string, enhancement: string): Promise<{ original_asset_id: string; edited_asset_id: string; s3_key: string; edit_type: string }> {
+    return this.request(`/listings/${listingId}/assets/enhance`, {
+      method: "POST",
+      body: JSON.stringify({ asset_id: assetId, enhancement }),
+    });
+  }
+
+  async autoFixCompliance(listingId: string): Promise<{ fixed_count: number; edits: Array<{ original_asset_id: string; edited_asset_id: string; issues_fixed: string; s3_key: string }> }> {
+    return this.request(`/listings/${listingId}/assets/auto-fix-compliance`, { method: "POST" });
+  }
 }
 
 export const apiClient = new ApiClient();

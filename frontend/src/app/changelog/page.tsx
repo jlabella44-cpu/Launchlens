@@ -18,6 +18,27 @@ export default function ChangelogPage() {
               <span className="px-2.5 py-0.5 rounded-full bg-[#F97316]/10 text-[#F97316] text-xs font-semibold">
                 New
               </span>
+              <time className="text-xs text-slate-400">April 4, 2026</time>
+            </div>
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
+              Virtual Staging, Image Editing, CMA Reports &amp; More
+            </h2>
+            <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--color-text-secondary)]">
+              <li>Virtual Staging — AI-furnished photos in 6 design styles (modern, coastal, luxury, and more)</li>
+              <li>AI Photo Editing — remove yard signs, fix lighting, declutter, auto-fix MLS compliance</li>
+              <li>CMA Reports — on-demand Comparative Market Analysis with branded comparables</li>
+              <li>Property Microsites — auto-generated landing pages with QR codes for yard signs</li>
+              <li>Multi-Language Descriptions — 10 languages including Spanish, French, Chinese, and Arabic</li>
+              <li>Pipeline integration — virtual staging runs automatically when addon is active</li>
+              <li>Microsites auto-generated after every listing delivery</li>
+            </ul>
+          </article>
+
+          <article className="bg-white rounded-xl shadow-sm p-6 md:p-8">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="px-2.5 py-0.5 rounded-full bg-[#F97316]/10 text-[#F97316] text-xs font-semibold">
+                New
+              </span>
               <time className="text-xs text-slate-400">April 3, 2026</time>
             </div>
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
