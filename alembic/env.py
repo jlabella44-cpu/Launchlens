@@ -12,8 +12,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from listingjet.database import Base
-from listingjet.models import *  # noqa: F401 — import all models so Alembic sees them
+from listingjet.database import Base  # noqa: E402
+from listingjet.models import *  # noqa: E402, F401, F403 — import all models so Alembic sees them
 
 target_metadata = Base.metadata
 

@@ -2,7 +2,6 @@
 
 from aws_cdk import (
     CfnOutput,
-    Duration,
     Stack,
 )
 from aws_cdk import (

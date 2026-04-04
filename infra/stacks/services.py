@@ -1,7 +1,6 @@
 """ECS Fargate cluster, task definitions, ALB, ECR repositories, and S3 media bucket."""
 
 from aws_cdk import (
-    CfnOutput,
     Duration,
     Stack,
 )
@@ -27,13 +26,13 @@ from aws_cdk import (
     aws_elasticloadbalancingv2 as elbv2,
 )
 from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
     aws_logs as logs,
 )
 from aws_cdk import (
     aws_rds as rds,
-)
-from aws_cdk import (
-    aws_iam as iam,
 )
 from aws_cdk import (
     aws_s3 as s3,

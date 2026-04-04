@@ -6,8 +6,9 @@ Create Date: 2026-04-01
 
 """
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+from alembic import op
 
 revision = "025"
 down_revision = "024"
