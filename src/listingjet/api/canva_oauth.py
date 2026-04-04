@@ -5,6 +5,7 @@ Endpoints:
   GET  /auth/canva           — redirect user to Canva authorization (requires auth)
   GET  /auth/canva/callback  — handle Canva redirect, exchange code for tokens (public)
 """
+import asyncio
 import base64
 import hashlib
 import json
@@ -19,11 +20,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from listingjet.api.deps import get_current_user
 from listingjet.config import settings
-from listingjet.database import AsyncSessionLocal
+from listingjet.database import AsyncSessionLocal, get_db
 from listingjet.models.brand_kit import BrandKit
 from listingjet.models.user import User
+from listingjet.services.auth import decode_token
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ async def _store_pkce(
     redis = getattr(redis, "redis", None) if redis else None
     if redis:
         try:
-            redis.setex(f"canva_pkce:{state}", _PKCE_TTL_SECONDS, payload)
+            await asyncio.to_thread(redis.setex, f"canva_pkce:{state}", _PKCE_TTL_SECONDS, payload)
             return
         except Exception:
             logger.warning("canva_oauth.redis_store_failed — falling back to memory")
@@ -76,9 +77,9 @@ async def _load_pkce(request: Request, state: str) -> dict | None:
     redis = getattr(redis, "redis", None) if redis else None
     if redis:
         try:
-            raw = redis.get(f"canva_pkce:{state}")
+            raw = await asyncio.to_thread(redis.get, f"canva_pkce:{state}")
             if raw:
-                redis.delete(f"canva_pkce:{state}")
+                await asyncio.to_thread(redis.delete, f"canva_pkce:{state}")
                 return json.loads(raw)
         except Exception:
             logger.warning("canva_oauth.redis_load_failed — falling back to memory")
@@ -140,9 +141,30 @@ def _decode_jwt_payload(token: str) -> dict:
 @router.get("/canva")
 async def canva_authorize(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    token: str | None = Query(None, description="JWT for browser redirect auth"),
+    db: AsyncSession = Depends(get_db),
 ):
     """Initiate Canva OAuth2 PKCE flow — redirects user to Canva."""
+    # Resolve user manually: query param first (browser redirect), then cookie.
+    jwt_token: str | None = token
+    if not jwt_token:
+        jwt_token = request.cookies.get("access_token")
+    if not jwt_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    payload = decode_token(jwt_token)
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid user ID in token")
+
+    current_user = await db.get(User, user_id)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="User not found")
+
     if not settings.canva_client_id:
         raise HTTPException(status_code=503, detail="Canva OAuth not configured")
 
@@ -213,9 +235,18 @@ async def canva_callback(
         raise HTTPException(status_code=502, detail="Failed to exchange Canva authorization code")
 
     token_data = resp.json()
-    access_token = token_data["access_token"]
+    access_token = token_data.get("access_token")
+    if not access_token:
+        logger.error("canva_oauth.token_missing body=%s", token_data)
+        raise HTTPException(status_code=502, detail="Canva token response missing access_token")
     refresh_token = token_data.get("refresh_token")
-    expires_in = token_data.get("expires_in", 3600)
+    if not refresh_token:
+        logger.error("canva_oauth.refresh_token_missing body=%s", token_data)
+        raise HTTPException(status_code=502, detail="Canva token response missing refresh_token")
+    expires_in = token_data.get("expires_in")
+    if not expires_in:
+        logger.error("canva_oauth.expires_in_missing body=%s", token_data)
+        raise HTTPException(status_code=502, detail="Canva token response missing expires_in")
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
     # Extract Canva user ID from JWT

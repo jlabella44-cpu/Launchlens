@@ -147,6 +147,8 @@ class ApiClient {
       throw err;
     }
 
+    if (response.status === 204) return undefined as T;
+
     return response.json();
   }
 
@@ -348,6 +350,14 @@ class ApiClient {
 
   async getTeamLogoUploadUrl(): Promise<{ key: string; upload: Record<string, unknown> }> {
     return this.request("/brand-kit/team-logo-upload-url", { method: "POST" });
+  }
+
+  async getCanvaStatus(): Promise<{ connected: boolean; canva_user_id: string | null }> {
+    return this.request<{ connected: boolean; canva_user_id: string | null }>("/brand-kit/canva-status");
+  }
+
+  async disconnectCanva(): Promise<void> {
+    return this.request("/brand-kit/canva-disconnect", { method: "DELETE" });
   }
 
   // Upload URLs

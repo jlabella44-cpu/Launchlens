@@ -7,11 +7,15 @@ import { ProtectedRoute } from "@/components/layout/protected-route";
 import apiClient from "@/lib/api-client";
 import type { BrandKitResponse } from "@/lib/types";
 
+import { useSearchParams } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
+
 import BrokerageInfoSection from "./_components/brokerage-info-section";
 import BrandColorsSection from "./_components/brand-colors-section";
 import TypographySection from "./_components/typography-section";
 import BrandVoiceSection from "./_components/brand-voice-section";
 import LogosSection from "./_components/logos-section";
+import CanvaIntegrationSection from "./_components/canva-integration-section";
 import HudPreview from "./_components/hud-preview";
 
 /* ─── Extended form state (includes raw_config fields) ─── */
@@ -90,7 +94,21 @@ function BrandKitSettings() {
   const [teamLogoPreview, setTeamLogoPreview] = useState<string | null>(null);
   const [headshotPreview, setHeadshotPreview] = useState<string | null>(null);
 
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+
   useEffect(() => { document.title = "Brand Kit | ListingJet"; }, []);
+
+  /* ─── Handle ?canva=connected callback ─── */
+  useEffect(() => {
+    if (searchParams.get("canva") === "connected") {
+      toast("Canva account connected successfully!", "success");
+      // Clean the query param from the URL without reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete("canva");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [searchParams, toast]);
 
   /* ─── Load existing brand kit ─── */
   useEffect(() => {
@@ -275,6 +293,7 @@ function BrandKitSettings() {
                 uploadingLogo={uploadingLogo}
                 uploadingTeamLogo={uploadingTeamLogo}
               />
+              <CanvaIntegrationSection />
             </div>
 
             {/* Right: Live HUD Preview */}

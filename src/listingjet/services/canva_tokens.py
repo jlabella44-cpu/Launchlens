@@ -51,7 +51,7 @@ async def get_valid_canva_token(db: AsyncSession, tenant_id) -> str | None:
     expires_in = new_token_data.get("expires_in", 3600)
     kit.canva_token_expires_at = now + timedelta(seconds=expires_in)
 
-    await db.flush()
+    await db.commit()
     logger.info("canva_tokens.refreshed tenant_id=%s", tenant_id)
     return kit.canva_access_token
 
