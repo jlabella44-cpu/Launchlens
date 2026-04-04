@@ -19,7 +19,9 @@ from listingjet.api import (
     health,
     help_agent,
     listing_permissions,
-    listings,
+    listings_core,
+    listings_media,
+    listings_workflow,
     properties,
     sse,
     team,
@@ -130,7 +132,9 @@ def create_app() -> FastAPI:
     app.include_router(canva_oauth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
-    app.include_router(listings.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_core.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_workflow.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_media.router, prefix="/listings", tags=["listings"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
