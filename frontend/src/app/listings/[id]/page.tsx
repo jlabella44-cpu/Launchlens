@@ -36,6 +36,11 @@ function ListingDetail() {
   const [actionDone, setActionDone] = useState("");
   const [showVideoUpload, setShowVideoUpload] = useState(false);
   const [assetView, setAssetView] = useState<"grid" | "list">("grid");
+  const [cmaReport, setCmaReport] = useState<{ download_url: string; comparables_count: number; generated_at: string; analysis_summary: string | null } | null>(null);
+  const [microsite, setMicrosite] = useState<{ microsite_url: string; qr_code_url: string | null; status: string } | null>(null);
+  const [cmaLoading, setCmaLoading] = useState(false);
+  const [micrositeLoading, setMicrositeLoading] = useState(false);
+  const [complianceFixing, setComplianceFixing] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -52,6 +57,11 @@ function ListingDetail() {
       if (packageStates.includes(l.state)) {
         const pkg = await apiClient.getPackage(id);
         setSelections(pkg);
+      }
+      // Load CMA and microsite if listing is far enough along
+      if (["approved", "exporting", "delivered"].includes(l.state)) {
+        apiClient.getCMAReport(id).then(setCmaReport).catch(() => {});
+        apiClient.getMicrosite(id).then(setMicrosite).catch(() => {});
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load listing";
@@ -463,6 +473,142 @@ function ListingDetail() {
             )}
           </div>
         </div>
+
+        {/* New Feature Panels */}
+        {showActions && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            {/* Auto-Fix Compliance */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5">
+              <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2" style={{ fontFamily: "var(--font-heading)" }}>
+                AI Photo Editing
+              </h3>
+              <p className="text-xs text-[var(--color-text-secondary)] mb-3">
+                Auto-detect and fix MLS compliance issues (yard signs, people, branding).
+              </p>
+              <button
+                onClick={async () => {
+                  setComplianceFixing(true);
+                  try {
+                    const result = await apiClient.autoFixCompliance(id);
+                    toast(`Fixed ${result.fixed_count} photo(s)`, result.fixed_count > 0 ? "success" : "info");
+                    if (result.fixed_count > 0) fetchData();
+                  } catch { toast("Compliance fix failed", "error"); }
+                  finally { setComplianceFixing(false); }
+                }}
+                disabled={complianceFixing}
+                className="w-full px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+              >
+                {complianceFixing ? "Scanning..." : "Auto-Fix Compliance"}
+              </button>
+            </div>
+
+            {/* CMA Report */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5">
+              <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2" style={{ fontFamily: "var(--font-heading)" }}>
+                CMA Report
+              </h3>
+              {cmaReport ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    {cmaReport.comparables_count} comparables &middot; Generated {new Date(cmaReport.generated_at).toLocaleDateString()}
+                  </p>
+                  <a
+                    href={cmaReport.download_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block w-full text-center px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold transition-colors"
+                  >
+                    Download Report
+                  </a>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    setCmaLoading(true);
+                    try {
+                      await apiClient.generateCMAReport(id);
+                      const report = await apiClient.getCMAReport(id);
+                      setCmaReport(report);
+                      toast("CMA report generated", "success");
+                    } catch { toast("CMA generation failed", "error"); }
+                    finally { setCmaLoading(false); }
+                  }}
+                  disabled={cmaLoading}
+                  className="w-full px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {cmaLoading ? "Generating..." : "Generate CMA Report"}
+                </button>
+              )}
+            </div>
+
+            {/* Property Microsite */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5">
+              <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2" style={{ fontFamily: "var(--font-heading)" }}>
+                Property Microsite
+              </h3>
+              {microsite ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={microsite.microsite_url}
+                      className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-200 bg-slate-50 truncate"
+                      onClick={(e) => { (e.target as HTMLInputElement).select(); navigator.clipboard.writeText(microsite.microsite_url); toast("URL copied", "success"); }}
+                    />
+                  </div>
+                  {microsite.qr_code_url && (
+                    <a href={microsite.qr_code_url} target="_blank" rel="noopener noreferrer" className="block">
+                      <img src={microsite.qr_code_url} alt="QR Code" className="w-24 h-24 mx-auto rounded border border-slate-200" />
+                    </a>
+                  )}
+                  <div className="flex gap-2">
+                    <a
+                      href={microsite.microsite_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-center px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                    >
+                      Open
+                    </a>
+                    <button
+                      onClick={async () => {
+                        setMicrositeLoading(true);
+                        try {
+                          await apiClient.generateMicrosite(id);
+                          const ms = await apiClient.getMicrosite(id);
+                          setMicrosite(ms);
+                          toast("Microsite regenerated", "success");
+                        } catch { toast("Regeneration failed", "error"); }
+                        finally { setMicrositeLoading(false); }
+                      }}
+                      disabled={micrositeLoading}
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      {micrositeLoading ? "..." : "Regenerate"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    setMicrositeLoading(true);
+                    try {
+                      await apiClient.generateMicrosite(id);
+                      const ms = await apiClient.getMicrosite(id);
+                      setMicrosite(ms);
+                      toast("Microsite created with QR code", "success");
+                    } catch { toast("Microsite generation failed", "error"); }
+                    finally { setMicrositeLoading(false); }
+                  }}
+                  disabled={micrositeLoading}
+                  className="w-full px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {micrositeLoading ? "Generating..." : "Generate Microsite"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Activity Log */}
         <div className="mt-10">
