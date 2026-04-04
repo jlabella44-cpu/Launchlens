@@ -9,7 +9,6 @@ from listingjet.models.asset import Asset
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_vision_provider
 from listingjet.providers.base import VisionLabel
-from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_cost
 from listingjet.services.storage import get_storage
 
@@ -80,14 +79,12 @@ class VisionAgent(BaseAgent):
 
     async def run_tier1(self, context: AgentContext) -> int:
         """Run Google Vision on all ingested assets. Returns count of results written."""
-        listing_id = uuid.UUID(context.listing_id)
-        count = await self._run_tier1_inner(listing_id, context)
+        count = await self._run_tier1_inner(context)
         record_cost(self.agent_name, "google_vision", count)
         return count
 
-    async def _run_tier1_inner(self, listing_id, context) -> int:
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+    async def _run_tier1_inner(self, context) -> int:
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 result = await session.execute(
                     select(Asset).where(
                         Asset.listing_id == listing_id,
@@ -115,13 +112,7 @@ class VisionAgent(BaseAgent):
                     )
 
                 if count > 0:
-                    await emit_event(
-                        session=session,
-                        event_type="vision.tier1.completed",
-                        payload={"asset_count": count},
-                        tenant_id=context.tenant_id,
-                        listing_id=context.listing_id,
-                    )
+                    await self.emit(session, context, "vision.tier1.completed", {"asset_count": count})
 
         return count
 
@@ -138,14 +129,12 @@ class VisionAgent(BaseAgent):
 
     async def run_tier2(self, context: AgentContext) -> int:
         """Run GPT-4V on top hero candidates from Tier 1. Returns count of Tier 2 results."""
-        listing_id = uuid.UUID(context.listing_id)
-        count = await self._run_tier2_inner(listing_id, context)
+        count = await self._run_tier2_inner(context)
         record_cost(self.agent_name, "openai_gpt4v", count)
         return count
 
-    async def _run_tier2_inner(self, listing_id, context) -> int:
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+    async def _run_tier2_inner(self, context) -> int:
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 result = await session.execute(
                     select(VisionResult)
                     .join(Asset, VisionResult.asset_id == Asset.id)
@@ -200,12 +189,6 @@ class VisionAgent(BaseAgent):
                     count += 1
 
                 if count > 0:
-                    await emit_event(
-                        session=session,
-                        event_type="vision.tier2.completed",
-                        payload={"candidate_count": count},
-                        tenant_id=context.tenant_id,
-                        listing_id=context.listing_id,
-                    )
+                    await self.emit(session, context, "vision.tier2.completed", {"candidate_count": count})
 
         return count

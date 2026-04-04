@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { background: #ffffff; }
+
+    /* Outer border frame */
+    .page-frame {
+        width: 8.1in;
+        height: 10.6in;
+        margin: 0.2in auto;
+        border: 3px solid #1a1a1a;
+        padding: 0;
+        overflow: hidden;
+        background: #ffffff;
+    }
+
+    /* Inner header */
+    .header {
+        padding: 14px 24px 10px 24px;
+        border-bottom: 2px solid #1a1a1a;
+        text-align: center;
+    }
+
+    .for-sale-heading {
+        font-size: 22pt;
+        font-weight: bold;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .header-address {
+        font-size: 11pt;
+        color: #333333;
+        margin-top: 3px;
+    }
+
+    /* Two-column layout via table */
+    .main-table {
+        width: 100%;
+        border-collapse: collapse;
+        height: 7.8in;
+    }
+
+    .col-photo {
+        width: 55%;
+        vertical-align: top;
+        border-right: 2px solid #1a1a1a;
+        padding: 0;
+    }
+
+    .col-details {
+        width: 45%;
+        vertical-align: top;
+        padding: 20px 20px 16px 20px;
+    }
+
+    /* Photo column */
+    .photo-container {
+        width: 100%;
+        height: 4.8in;
+        overflow: hidden;
+        background: #d1d5db;
+    }
+
+    .photo-container img {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    /* Details column */
+    .price-block {
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #cccccc;
+    }
+
+    .price {
+        font-size: 24pt;
+        font-weight: bold;
+        color: #1a1a1a;
+        line-height: 1.1;
+    }
+
+    .details-heading {
+        font-size: 10pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #555555;
+        margin-top: 14px;
+        margin-bottom: 8px;
+    }
+
+    /* Property details list */
+    .details-list {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .detail-row-label {
+        font-size: 9pt;
+        color: #666666;
+        padding: 5px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        width: 48%;
+    }
+
+    .detail-row-value {
+        font-size: 11pt;
+        font-weight: bold;
+        color: #1a1a1a;
+        padding: 5px 0;
+        width: 52%;
+    }
+
+    .detail-divider {
+        border-bottom: 1px solid #eeeeee;
+    }
+
+    /* Description in details column */
+    .description-block {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid #cccccc;
+    }
+
+    .description-text {
+        font-size: 8.5pt;
+        color: #555555;
+        line-height: 1.55;
+    }
+
+    /* Bottom section: photo caption + agent */
+    .bottom-section {
+        padding: 10px 20px;
+        border-top: 1px solid #cccccc;
+    }
+
+    .agent-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .agent-info-cell {
+        vertical-align: middle;
+    }
+
+    .logo-cell {
+        text-align: right;
+        vertical-align: middle;
+    }
+
+    .agent-name {
+        font-size: 10.5pt;
+        font-weight: bold;
+        color: #1a1a1a;
+    }
+
+    .brokerage-name {
+        font-size: 8.5pt;
+        color: #666666;
+        margin-top: 1px;
+    }
+
+    .brand-logo {
+        max-height: 34px;
+        max-width: 110px;
+    }
+
+    /* Footer band inside frame */
+    .footer-band {
+        border-top: 2px solid #1a1a1a;
+        padding: 8px 24px;
+        background: #f5f5f5;
+    }
+</style>
+</head>
+<body>
+<div class="page">
+<div class="page-frame">
+
+    <!-- Header -->
+    <div class="header">
+        <div class="for-sale-heading" style="color: {{ primary_color }};">For Sale</div>
+        <div class="header-address">{{ address_line }}</div>
+    </div>
+
+    <!-- Two-column layout -->
+    <table class="main-table">
+        <tr>
+            <!-- Left column: hero photo -->
+            <td class="col-photo">
+                <div class="photo-container">
+                    {% if hero_image_url %}
+                    <img src="{{ hero_image_url }}" alt="Property photo">
+                    {% else %}
+                    <table style="width:100%;height:100%;background:linear-gradient(135deg,#9ca3af,#6b7280);">
+                        <tr><td style="text-align:center;vertical-align:middle;color:#ffffff;font-size:14pt;font-weight:bold;">Property Photo</td></tr>
+                    </table>
+                    {% endif %}
+                </div>
+
+                <!-- Agent info below photo in left column -->
+                <div class="bottom-section">
+                    <table class="agent-table">
+                        <tr>
+                            <td class="agent-info-cell">
+                                {% if agent_name %}
+                                <div class="agent-name">{{ agent_name }}</div>
+                                {% endif %}
+                                {% if brokerage_name %}
+                                <div class="brokerage-name">{{ brokerage_name }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="logo-cell">
+                                {% if logo_url %}
+                                <img src="{{ logo_url }}" alt="Logo" class="brand-logo">
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+
+            <!-- Right column: details -->
+            <td class="col-details">
+
+                <div class="price-block">
+                    <div class="price">{{ price_formatted }}</div>
+                </div>
+
+                <!-- Property specs -->
+                {% if beds or baths or sqft_formatted %}
+                <div class="details-heading">Property Details</div>
+                <table class="details-list">
+                    {% if beds %}
+                    <tr class="detail-divider">
+                        <td class="detail-row-label">Bedrooms</td>
+                        <td class="detail-row-value">{{ beds }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if baths %}
+                    <tr class="detail-divider">
+                        <td class="detail-row-label">Bathrooms</td>
+                        <td class="detail-row-value">{{ baths }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if sqft_formatted %}
+                    <tr class="detail-divider">
+                        <td class="detail-row-label">Square Feet</td>
+                        <td class="detail-row-value">{{ sqft_formatted }} sq ft</td>
+                    </tr>
+                    {% endif %}
+                </table>
+                {% endif %}
+
+                <!-- Description -->
+                {% if description %}
+                <div class="description-block">
+                    <div class="details-heading">About This Home</div>
+                    <p class="description-text">{{ description }}</p>
+                </div>
+                {% endif %}
+
+            </td>
+        </tr>
+    </table>
+
+    <!-- Footer band -->
+    <div class="footer-band">
+        <table style="width:100%;border-collapse:collapse;">
+            <tr>
+                <td style="vertical-align:middle;font-size:8pt;color:#888888;">
+                    Listed by {% if brokerage_name %}{{ brokerage_name }}{% else %}ListingJet{% endif %}
+                </td>
+                <td style="text-align:right;vertical-align:middle;font-size:8pt;color:#888888;">
+                    All information deemed reliable but not guaranteed.
+                </td>
+            </tr>
+        </table>
+    </div>
+
+</div>
+</div>
+</body>
+</html>

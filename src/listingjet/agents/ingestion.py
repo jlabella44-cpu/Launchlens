@@ -1,6 +1,5 @@
 import io
 import logging
-import uuid
 
 from PIL import Image
 from sqlalchemy import select
@@ -8,7 +7,6 @@ from sqlalchemy import select
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing, ListingState
-from listingjet.services.events import emit_event
 from listingjet.services.storage import get_storage
 
 from .base import AgentContext, BaseAgent
@@ -47,11 +45,9 @@ class IngestionAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
         storage = get_storage()
 
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 result = await session.execute(
                     select(Asset).where(
                         Asset.listing_id == listing_id,
@@ -106,17 +102,11 @@ class IngestionAgent(BaseAgent):
                 listing = await session.get(Listing, listing_id)
                 listing.state = ListingState.ANALYZING
 
-                await emit_event(
-                    session=session,
-                    event_type="ingestion.completed",
-                    payload={
-                        "ingested_count": len(ingested),
-                        "duplicate_count": len(duplicates),
-                        "proxy_count": proxy_count,
-                    },
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "ingestion.completed", {
+                    "ingested_count": len(ingested),
+                    "duplicate_count": len(duplicates),
+                    "proxy_count": proxy_count,
+                })
 
         return {
             "ingested_count": len(ingested),

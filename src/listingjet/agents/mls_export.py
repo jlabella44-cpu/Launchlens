@@ -1,7 +1,6 @@
 import csv
 import io
 import json
-import uuid
 import zipfile
 from datetime import datetime, timezone
 
@@ -13,7 +12,6 @@ from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.social_content import SocialContent
 from listingjet.models.vision_result import VisionResult
-from listingjet.services.events import emit_event
 from listingjet.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -75,10 +73,7 @@ class MLSExportAgent(BaseAgent):
         self._flyer_s3_key = flyer_s3_key
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 # 1. Set listing state to EXPORTING
                 listing = await session.get(Listing, listing_id)
                 listing.state = ListingState.EXPORTING
@@ -195,17 +190,11 @@ class MLSExportAgent(BaseAgent):
                 listing.marketing_bundle_path = mkt_key
 
                 # 9. Emit event
-                await emit_event(
-                    session=session,
-                    event_type="mls_export.completed",
-                    payload={
-                        "mls_bundle_path": mls_key,
-                        "marketing_bundle_path": mkt_key,
-                        "photo_count": photo_count,
-                    },
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "mls_export.completed", {
+                    "mls_bundle_path": mls_key,
+                    "marketing_bundle_path": mkt_key,
+                    "photo_count": photo_count,
+                })
 
         # 10. Return result
         return {

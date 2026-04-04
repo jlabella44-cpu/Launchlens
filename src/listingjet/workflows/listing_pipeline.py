@@ -163,8 +163,11 @@ class ListingPipeline:
                     retry_policy=_DEFAULT_RETRY,
                 )
             )
-        results = await asyncio.gather(*parallel_tasks)
+        results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
         brand_result = results[0]
+        if isinstance(brand_result, BaseException):
+            workflow.logger.warning("brand_failed listing=%s error=%s", input.listing_id, brand_result)
+            brand_result = {}
         flyer_key = brand_result.get("flyer_s3_key") if isinstance(brand_result, dict) else None
 
         # Video post-processing (chapters + social cuts)

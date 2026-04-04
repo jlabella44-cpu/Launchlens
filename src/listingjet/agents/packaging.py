@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
@@ -11,7 +11,6 @@ from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.tenant import Tenant
 from listingjet.models.vision_result import VisionResult
-from listingjet.services.events import emit_event
 from listingjet.services.weight_manager import WeightManager
 
 from .base import AgentContext, BaseAgent
@@ -27,10 +26,7 @@ class PackagingAgent(BaseAgent):
         self._wm = weight_manager or WeightManager()
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 # Load best VisionResult per asset (prefer Tier 2 over Tier 1)
                 result = await session.execute(
                     select(VisionResult)
@@ -47,7 +43,6 @@ class PackagingAgent(BaseAgent):
                         seen[vr.asset_id] = vr
 
                 # Load tenant learning weights
-                tenant_id = uuid.UUID(context.tenant_id)
                 lw_result = await session.execute(
                     select(LearningWeight).where(LearningWeight.tenant_id == tenant_id)
                 )
@@ -83,10 +78,15 @@ class PackagingAgent(BaseAgent):
 
                 hero_asset_id = str(top[0][1]) if top else None
 
+                # Clear existing selections (idempotent on retry)
+                await session.execute(
+                    delete(PackageSelection).where(PackageSelection.listing_id == listing_id)
+                )
+
                 # Write PackageSelection rows
                 for position, (score, asset_id, vr) in enumerate(top):
                     ps = PackageSelection(
-                        tenant_id=uuid.UUID(context.tenant_id),
+                        tenant_id=tenant_id,
                         listing_id=listing_id,
                         asset_id=asset_id,
                         channel="mls",
@@ -113,18 +113,12 @@ class PackagingAgent(BaseAgent):
                 else:
                     listing.state = ListingState.AWAITING_REVIEW
 
-                await emit_event(
-                    session=session,
-                    event_type="packaging.completed",
-                    payload={
-                        "hero_asset_id": hero_asset_id,
-                        "total_selected": len(top),
-                        "avg_trust_score": round(avg_score, 2),
-                        "auto_approved": auto_approved,
-                    },
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "packaging.completed", {
+                    "hero_asset_id": hero_asset_id,
+                    "total_selected": len(top),
+                    "avg_trust_score": round(avg_score, 2),
+                    "auto_approved": auto_approved,
+                })
 
                 if not auto_approved:
                     # Send review-ready notification email

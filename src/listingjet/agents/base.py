@@ -1,8 +1,18 @@
+import re
+import uuid
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from listingjet.services.metrics import StepTimer
 from listingjet.telemetry import agent_span
+
+
+def strip_markdown_fences(text: str) -> str:
+    """Remove ```json ... ``` wrappers that LLMs often add around JSON."""
+    text = text.strip()
+    m = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
+    return m.group(1).strip() if m else text
 
 
 @dataclass
@@ -62,3 +72,34 @@ class BaseAgent(ABC):
                     pass  # Don't let notification failure mask the original error
 
         raise error  # Temporal sees the failure and applies retry policy
+
+    @staticmethod
+    def parse_ids(context: "AgentContext") -> tuple["uuid.UUID", "uuid.UUID"]:
+        """Convert context string IDs to UUIDs."""
+        return uuid.UUID(context.listing_id), uuid.UUID(context.tenant_id)
+
+    @asynccontextmanager
+    async def session_scope(self, context: "AgentContext"):
+        """Open a DB session with transaction, yield (session, listing_id, tenant_id).
+
+        Usage::
+
+            async with self.session_scope(context) as (session, listing_id, tenant_id):
+                listing = await session.get(Listing, listing_id)
+                ...
+        """
+        listing_id, tenant_id = self.parse_ids(context)
+        async with self._session_factory() as session:
+            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+                yield session, listing_id, tenant_id
+
+    async def emit(self, session, context: "AgentContext", event_type: str, payload: dict):
+        """Shorthand for emit_event with agent context."""
+        from listingjet.services.events import emit_event
+        await emit_event(
+            session=session,
+            event_type=event_type,
+            payload=payload,
+            tenant_id=context.tenant_id,
+            listing_id=context.listing_id,
+        )

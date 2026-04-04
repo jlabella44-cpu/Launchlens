@@ -1,11 +1,8 @@
-import uuid
-
 from sqlalchemy import select
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.event import Event
 from listingjet.models.learning_weight import LearningWeight
-from listingjet.services.events import emit_event
 from listingjet.services.weight_manager import WeightManager
 
 from .base import AgentContext, BaseAgent
@@ -26,11 +23,7 @@ class LearningAgent(BaseAgent):
         self._wm = weight_manager or WeightManager()
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-        tenant_id = uuid.UUID(context.tenant_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 result = await session.execute(
                     select(Event).where(
                         Event.listing_id == listing_id,
@@ -71,12 +64,6 @@ class LearningAgent(BaseAgent):
                     weights_updated += 1
 
                 if weights_updated > 0:
-                    await emit_event(
-                        session=session,
-                        event_type="learning.completed",
-                        payload={"weights_updated": weights_updated},
-                        tenant_id=context.tenant_id,
-                        listing_id=context.listing_id,
-                    )
+                    await self.emit(session, context, "learning.completed", {"weights_updated": weights_updated})
 
         return {"weights_updated": weights_updated}

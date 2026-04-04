@@ -3,13 +3,13 @@ import uuid
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.dollhouse_scene import DollhouseScene
 from listingjet.models.listing import Listing
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_vision_provider
-from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_cost
 
 from .base import AgentContext, BaseAgent
@@ -66,10 +66,7 @@ class FloorplanAgent(BaseAgent):
         return None
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
                 if not listing:
                     raise ValueError(f"Listing {listing_id} not found")
@@ -89,7 +86,7 @@ class FloorplanAgent(BaseAgent):
                 )
 
                 try:
-                    parsed = json.loads(raw_response)
+                    parsed = json.loads(strip_markdown_fences(raw_response))
                     rooms = parsed.get("rooms", [])
                 except (json.JSONDecodeError, AttributeError):
                     return {"room_count": 0, "skipped": True, "reason": "Failed to parse GPT-4V response"}
@@ -141,16 +138,10 @@ class FloorplanAgent(BaseAgent):
                 )
                 session.add(scene)
 
-                await emit_event(
-                    session=session,
-                    event_type="floorplan.completed",
-                    payload={
-                        "listing_id": str(listing_id),
-                        "room_count": len(scene_rooms),
-                    },
-                    tenant_id=str(context.tenant_id),
-                    listing_id=str(listing_id),
-                )
+                await self.emit(session, context, "floorplan.completed", {
+                    "listing_id": str(listing_id),
+                    "room_count": len(scene_rooms),
+                })
 
         record_cost(self.agent_name, "openai_gpt4v", 1)
         return {

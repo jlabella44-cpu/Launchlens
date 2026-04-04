@@ -302,7 +302,7 @@ async def test_retry_does_not_rededuct(async_client: AsyncClient, db_session):
         await db_session.commit()
 
     # Retry
-    with patch("listingjet.api.listings.get_temporal_client") as mock_temporal:
+    with patch("listingjet.api.listings_workflow.get_temporal_client") as mock_temporal:
         mock_client = MagicMock()
         mock_client.start_pipeline = AsyncMock()
         mock_temporal.return_value = mock_client

@@ -24,7 +24,7 @@ def _auth(token: str) -> dict:
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.get_temporal_client")
+@patch("listingjet.api.listings_media.get_temporal_client")
 async def test_register_assets(mock_get_client, async_client: AsyncClient):
     mock_client = AsyncMock()
     mock_get_client.return_value = mock_client
@@ -90,7 +90,7 @@ async def test_register_assets_requires_auth(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings.get_temporal_client")
+@patch("listingjet.api.listings_media.get_temporal_client")
 async def test_register_assets_triggers_pipeline(mock_get_client, async_client: AsyncClient):
     """Registering assets should start the Temporal pipeline."""
     mock_client = AsyncMock()

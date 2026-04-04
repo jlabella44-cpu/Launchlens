@@ -9,13 +9,16 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "generate-api": "openapi-typescript src/lib/generated/openapi.json -o src/lib/generated/api.d.ts",
+    "generate-api:fetch": "openapi-typescript http://localhost:8000/openapi.json -o src/lib/generated/api.d.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "framer-motion": "^12.38.0",
     "next": "16.2.1",
+    "openapi-fetch": "^0.17.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hotkeys-hook": "^4.5.0",
@@ -36,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "jsdom": "^29.0.1",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.2"

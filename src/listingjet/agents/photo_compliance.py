@@ -8,17 +8,16 @@ Results are stored as compliance events and returned as a per-photo report.
 Non-blocking: flags issues as warnings, does not prevent export.
 """
 import json
-import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
 from listingjet.models.package_selection import PackageSelection
 from listingjet.providers.openai_vision import OpenAIVisionProvider
-from listingjet.services.events import emit_event
 from listingjet.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -69,7 +68,7 @@ class PhotoComplianceAgent(BaseAgent):
         """Analyze a single photo for compliance issues."""
         try:
             raw = await self._vision.analyze_with_prompt(image_url, _COMPLIANCE_PROMPT)
-            data = json.loads(raw)
+            data = json.loads(strip_markdown_fences(raw))
             return PhotoComplianceResult(
                 asset_id=asset_id,
                 file_path=file_path,
@@ -94,10 +93,7 @@ class PhotoComplianceAgent(BaseAgent):
             )
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 await session.get(Listing, listing_id)
 
                 # Get packaged photos
@@ -140,12 +136,6 @@ class PhotoComplianceAgent(BaseAgent):
                     ],
                 }
 
-                await emit_event(
-                    session=session,
-                    event_type="photo_compliance.completed",
-                    payload=report,
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "photo_compliance.completed", report)
 
         return report

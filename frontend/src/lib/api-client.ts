@@ -1,3 +1,6 @@
+import createClient from "openapi-fetch";
+import type { paths } from "./generated/api";
+import type { Middleware } from "openapi-fetch";
 import type {
   TokenResponse,
   UserResponse,
@@ -55,6 +58,8 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
+const fetchClient = createClient<paths>({ baseUrl: API_URL });
+
 interface PropertyLookupResponse {
   source: string;
   found: boolean;
@@ -84,13 +89,42 @@ export type { PropertyLookupResponse };
 
 class ApiClient {
   private token: string | null = null;
+  private _authMiddleware: Middleware | null = null;
 
   setToken(token: string | null) {
     this.token = token;
+    // Remove previous middleware if any
+    if (this._authMiddleware) {
+      fetchClient.eject(this._authMiddleware);
+      this._authMiddleware = null;
+    }
+    // Add new middleware with the updated token
+    if (token) {
+      this._authMiddleware = {
+        async onRequest({ request }) {
+          request.headers.set("Authorization", `Bearer ${token}`);
+          request.headers.set("ngrok-skip-browser-warning", "true");
+          return request;
+        },
+      };
+      fetchClient.use(this._authMiddleware);
+    }
   }
 
   getToken(): string | null {
     return this.token;
+  }
+
+  /** Convert openapi-fetch error payloads to Error with .status, matching existing behaviour */
+  private _toError(error: unknown, response?: Response): Error & { status: number } {
+    const detail =
+      error && typeof error === "object" && "detail" in error
+        ? (error as { detail?: string }).detail
+        : undefined;
+    const status = response?.status ?? 500;
+    const err = new Error(detail || `Request failed: ${status}`) as Error & { status: number };
+    err.status = status;
+    return err;
   }
 
   private async request<T>(
@@ -120,6 +154,8 @@ class ApiClient {
       throw err;
     }
 
+    if (response.status === 204) return undefined as T;
+
     return response.json();
   }
 
@@ -146,14 +182,17 @@ class ApiClient {
   }
 
   async login(email: string, password: string): Promise<TokenResponse> {
-    return this.request<TokenResponse>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
+    const { data, error, response } = await fetchClient.POST("/auth/login", {
+      body: { email, password },
     });
+    if (error) throw this._toError(error, response);
+    return data as TokenResponse;
   }
 
   async me(): Promise<UserResponse> {
-    return this.request<UserResponse>("/auth/me");
+    const { data, error, response } = await fetchClient.GET("/auth/me");
+    if (error) throw this._toError(error, response);
+    return data as UserResponse;
   }
 
   async googleLogin(idToken: string): Promise<TokenResponse> {
@@ -165,14 +204,17 @@ class ApiClient {
 
   // Listings
   async createListing(data: CreateListingRequest): Promise<ListingResponse> {
-    return this.request<ListingResponse>("/listings", {
-      method: "POST",
-      body: JSON.stringify(data),
+    const { data: resp, error, response } = await fetchClient.POST("/listings", {
+      body: data as any,
     });
+    if (error) throw this._toError(error, response);
+    return resp as ListingResponse;
   }
 
   async getListings(): Promise<ListingResponse[]> {
-    const res = await this.request<{ items: ListingResponse[] } | ListingResponse[]>("/listings");
+    const { data, error, response } = await fetchClient.GET("/listings");
+    if (error) throw this._toError(error, response);
+    const res = data as { items: ListingResponse[] } | ListingResponse[];
     return Array.isArray(res) ? res : res.items;
   }
 
@@ -343,6 +385,14 @@ class ApiClient {
     return this.request("/brand-kit/team-logo-upload-url", { method: "POST" });
   }
 
+  async getCanvaStatus(): Promise<{ connected: boolean; canva_user_id: string | null }> {
+    return this.request<{ connected: boolean; canva_user_id: string | null }>("/brand-kit/canva-status");
+  }
+
+  async disconnectCanva(): Promise<void> {
+    return this.request("/brand-kit/canva-disconnect", { method: "DELETE" });
+  }
+
   // Upload URLs
   async getUploadUrls(listingId: string, filenames: string[]): Promise<{
     urls: { filename: string; key: string; upload_url: { url: string; fields: Record<string, string> }; content_type: string }[];
@@ -361,8 +411,11 @@ class ApiClient {
 
   // Review queue
   async getReviewQueue(): Promise<ListingResponse[]> {
-    const res = await this.request<{ items: ListingResponse[] }>("/listings?state=awaiting_review");
-    return res.items;
+    const [awaiting, inReview] = await Promise.all([
+      this.request<{ items: ListingResponse[] }>("/listings?state=awaiting_review"),
+      this.request<{ items: ListingResponse[] }>("/listings?state=in_review"),
+    ]);
+    return [...awaiting.items, ...inReview.items];
   }
 
   // Reject

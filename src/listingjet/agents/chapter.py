@@ -1,15 +1,14 @@
 """ChapterAgent — analyzes video keyframes via GPT-4V to generate chapter markers."""
 
 import json
-import uuid
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.video_asset import VideoAsset
 from listingjet.providers import get_vision_provider
-from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_cost
 
 from .base import AgentContext, BaseAgent
@@ -40,10 +39,7 @@ class ChapterAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
                 if not listing:
                     raise ValueError(f"Listing {listing_id} not found")
@@ -75,24 +71,18 @@ class ChapterAgent(BaseAgent):
                 )
 
                 try:
-                    parsed = json.loads(raw_response)
+                    parsed = json.loads(strip_markdown_fences(raw_response))
                     chapters = parsed.get("chapters", [])
                 except (json.JSONDecodeError, AttributeError):
                     chapters = []
 
                 video.chapters = chapters
 
-                await emit_event(
-                    session=session,
-                    event_type="chapter.completed",
-                    payload={
-                        "listing_id": str(listing_id),
-                        "video_asset_id": str(video.id),
-                        "chapter_count": len(chapters),
-                    },
-                    tenant_id=str(context.tenant_id),
-                    listing_id=str(listing_id),
-                )
+                await self.emit(session, context, "chapter.completed", {
+                    "listing_id": str(listing_id),
+                    "video_asset_id": str(video.id),
+                    "chapter_count": len(chapters),
+                })
 
         record_cost(self.agent_name, "openai_gpt4v", 1)
         return {"chapter_count": len(chapters), "video_asset_id": str(video.id)}

@@ -12,15 +12,15 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from listingjet.database import Base
-from listingjet.models import *  # noqa: F401 — import all models so Alembic sees them
+from listingjet.database import Base  # noqa: E402
+from listingjet.models import *  # noqa: E402, F401, F403 — import all models so Alembic sees them
 
 target_metadata = Base.metadata
 
 
 def get_url():
     # Try DATABASE_URL_SYNC first, then DATABASE_URL, then fallback
-    url = os.getenv("DATABASE_URL_SYNC") or os.getenv("DATABASE_URL") or "postgresql://launchlens:password@localhost/launchlens"
+    url = os.getenv("DATABASE_URL_SYNC") or os.getenv("DATABASE_URL") or "postgresql://listingjet:password@localhost/listingjet"
     # Ensure it's an asyncpg URL for the async engine
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)

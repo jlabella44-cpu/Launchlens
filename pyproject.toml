@@ -22,6 +22,7 @@ dependencies = [
     "redis[hiredis]>=5.0",
     "boto3>=1.34",
     "httpx>=0.27",
+    "attrs>=23.1",
     "anthropic>=0.28",
     "stripe>=8.0",
     "Pillow>=10.0",
@@ -55,10 +56,10 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/launchlens", "src/listingjet"]
+packages = ["src/listingjet"]
 
 [tool.coverage.run]
-source = ["src/launchlens"]
+source = ["src/listingjet"]
 omit = ["*/test*", "*/migrations/*"]
 
 [tool.coverage.report]
@@ -68,6 +69,7 @@ show_missing = true
 [tool.ruff]
 target-version = "py312"
 line-length = 120
+exclude = ["src/listingjet/providers/canva_generated"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]

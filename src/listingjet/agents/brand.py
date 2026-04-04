@@ -1,5 +1,3 @@
-import uuid
-
 from sqlalchemy import select
 
 from listingjet.database import AsyncSessionLocal
@@ -8,7 +6,6 @@ from listingjet.models.brand_kit import BrandKit
 from listingjet.models.listing import Listing
 from listingjet.models.package_selection import PackageSelection
 from listingjet.providers import get_template_provider
-from listingjet.services.events import emit_event
 from listingjet.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -23,11 +20,7 @@ class BrandAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-        tenant_id = uuid.UUID(context.tenant_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
 
                 # Load hero photo
@@ -35,7 +28,7 @@ class BrandAgent(BaseAgent):
                     select(PackageSelection).where(
                         PackageSelection.listing_id == listing_id,
                         PackageSelection.position == 0,
-                    )
+                    ).limit(1)
                 )
                 hero = result.scalar_one_or_none()
                 hero_asset_id = str(hero.asset_id) if hero else None
@@ -50,11 +43,12 @@ class BrandAgent(BaseAgent):
                 # Load brand kit for tenant
                 brand_kit = (await session.execute(
                     select(BrandKit).where(BrandKit.tenant_id == tenant_id)
+                    .limit(1)
                 )).scalar_one_or_none()
 
                 # Determine template ID: tenant override or default
                 template_id = "flyer-standard"
-                if brand_kit and hasattr(brand_kit, "canva_template_id") and brand_kit.canva_template_id:
+                if brand_kit and getattr(brand_kit, "canva_template_id", None):
                     template_id = brand_kit.canva_template_id
 
                 # Build data payload with listing + brand kit fields
@@ -80,12 +74,6 @@ class BrandAgent(BaseAgent):
                 s3_key = f"listings/{listing_id}/flyer.pdf"
                 self._storage.upload(key=s3_key, data=flyer_bytes, content_type="application/pdf")
 
-                await emit_event(
-                    session=session,
-                    event_type="brand.completed",
-                    payload={"flyer_s3_key": s3_key},
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "brand.completed", {"flyer_s3_key": s3_key})
 
         return {"flyer_s3_key": s3_key}

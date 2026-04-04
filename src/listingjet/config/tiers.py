@@ -26,6 +26,14 @@ HELP_AGENT_TOKEN_LIMITS: dict[str, int] = {
     "enterprise": 5_000_000,
 }
 
+def apply_plan_credits(tenant, plan: str) -> None:
+    """Set a tenant's plan and credit tier fields from the plan name."""
+    tenant.plan = plan
+    included, cap = TIER_CREDITS.get(plan, (0, 0))
+    tenant.included_credits = included
+    tenant.rollover_cap = cap
+
+
 CREDIT_BUNDLES = [
     {"size": 5, "price_cents": 9500, "per_credit_cents": 1900},
     {"size": 10, "price_cents": 14000, "per_credit_cents": 1400},

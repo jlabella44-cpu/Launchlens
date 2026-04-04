@@ -12,7 +12,7 @@ from listingjet.config import settings
 from listingjet.database import Base, get_db
 from listingjet.main import app
 
-TEST_DB_URL = "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test"
+TEST_DB_URL = "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
 
 
 @pytest.fixture(scope="session")
@@ -58,7 +58,8 @@ def _mock_external_services():
         patch("listingjet.api.auth._get_lockout_redis", return_value=mock_redis),
         patch("listingjet.services.credits._get_redis", return_value=mock_redis),
         patch("listingjet.temporal_client.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings.get_temporal_client", return_value=mock_temporal),
+        patch("listingjet.api.listings_media.get_temporal_client", return_value=mock_temporal),
+        patch("listingjet.api.listings_workflow.get_temporal_client", return_value=mock_temporal),
         patch("listingjet.api.bulk.get_temporal_client", return_value=mock_temporal),
     ):
         yield
