@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.dollhouse_scene import DollhouseScene
@@ -89,7 +90,7 @@ class FloorplanAgent(BaseAgent):
                 )
 
                 try:
-                    parsed = json.loads(raw_response)
+                    parsed = json.loads(strip_markdown_fences(raw_response))
                     rooms = parsed.get("rooms", [])
                 except (json.JSONDecodeError, AttributeError):
                     return {"room_count": 0, "skipped": True, "reason": "Failed to parse GPT-4V response"}

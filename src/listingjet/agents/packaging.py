@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
@@ -81,6 +81,11 @@ class PackagingAgent(BaseAgent):
                 top = scored[:MLS_MAX_PHOTOS]
 
                 hero_asset_id = str(top[0][1]) if top else None
+
+                # Clear existing selections (idempotent on retry)
+                await session.execute(
+                    delete(PackageSelection).where(PackageSelection.listing_id == listing_id)
+                )
 
                 # Write PackageSelection rows
                 for position, (score, asset_id, vr) in enumerate(top):

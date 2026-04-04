@@ -43,7 +43,8 @@ async def upsert_brand_kit(
 ):
     """Create or update the tenant's brand kit."""
     result = await db.execute(
-        select(BrandKit).where(BrandKit.tenant_id == current_user.tenant_id).limit(1)
+        select(BrandKit).where(BrandKit.tenant_id == current_user.tenant_id)
+        .limit(1).with_for_update()
     )
     kit = result.scalar_one_or_none()
 
@@ -117,3 +118,39 @@ async def get_team_logo_upload_url(
         expires_in=300,
     )
     return {"key": key, "upload": presigned}
+
+
+@router.get("/canva-status")
+async def get_canva_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check whether the tenant has a connected Canva account."""
+    result = await db.execute(
+        select(BrandKit).where(BrandKit.tenant_id == current_user.tenant_id).limit(1)
+    )
+    kit = result.scalar_one_or_none()
+    connected = bool(kit and kit.canva_access_token)
+    canva_user_id = kit.canva_user_id if kit else None
+    return {"connected": connected, "canva_user_id": canva_user_id}
+
+
+@router.delete("/canva-disconnect")
+async def disconnect_canva(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Clear Canva OAuth tokens for the current tenant."""
+    result = await db.execute(
+        select(BrandKit).where(BrandKit.tenant_id == current_user.tenant_id)
+        .limit(1).with_for_update()
+    )
+    kit = result.scalar_one_or_none()
+    if kit:
+        kit.canva_access_token = None
+        kit.canva_refresh_token = None
+        kit.canva_token_expires_at = None
+        kit.canva_user_id = None
+        await db.commit()
+        await db.refresh(kit)
+    return {"disconnected": True}

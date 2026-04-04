@@ -14,6 +14,7 @@ from listingjet.api import (
     billing,
     brand_kit,
     bulk,
+    canva_oauth,
     credits,
     demo,
     health,
@@ -128,6 +129,7 @@ def create_app() -> FastAPI:
     app.middleware("http")(SecurityHeadersMiddleware())
     init_monitoring(app)
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
+    app.include_router(canva_oauth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
     app.include_router(listings.router, prefix="/listings", tags=["listings"])

@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
@@ -107,7 +108,7 @@ class SocialContentAgent(BaseAgent):
                 )
 
                 raw = await self._llm_provider.complete(prompt=prompt, context=metadata)
-                data = json.loads(raw)
+                data = json.loads(strip_markdown_fences(raw))
 
                 # FHA check all captions (handle both hooks and flat format)
                 fha_texts = {}
@@ -125,7 +126,7 @@ class SocialContentAgent(BaseAgent):
                     raw = await self._llm_provider.complete(
                         prompt=prompt + _FHA_RETRY_SUFFIX, context=metadata
                     )
-                    data = json.loads(raw)
+                    data = json.loads(strip_markdown_fences(raw))
                     fha_texts = {}
                     for platform in ("instagram", "facebook"):
                         hooks = data[platform].get("hooks", [])

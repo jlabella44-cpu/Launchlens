@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.brand_kit import BrandKit
@@ -106,6 +107,7 @@ class ContentAgent(BaseAgent):
                 # Load brand kit for voice samples
                 brand_kit = (await session.execute(
                     select(BrandKit).where(BrandKit.tenant_id == tenant_id)
+                    .limit(1)
                 )).scalar_one_or_none()
 
                 voice_section = ""
@@ -168,7 +170,7 @@ class ContentAgent(BaseAgent):
                     temperature=temperature,
                     system_prompt=system_prompt,
                 )
-                parsed = json.loads(raw)
+                parsed = json.loads(strip_markdown_fences(raw))
                 mls_safe = parsed["mls_safe"]
                 marketing = parsed["marketing"]
                 fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
@@ -180,7 +182,7 @@ class ContentAgent(BaseAgent):
                         temperature=max(0.1, temperature - 0.2),  # Lower temp for FHA retry
                         system_prompt=system_prompt,
                     )
-                    parsed = json.loads(raw)
+                    parsed = json.loads(strip_markdown_fences(raw))
                     mls_safe = parsed["mls_safe"]
                     marketing = parsed["marketing"]
                     fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})

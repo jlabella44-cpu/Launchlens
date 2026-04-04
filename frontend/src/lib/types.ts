@@ -1,3 +1,7 @@
+// NOTE: These types are manually maintained for backwards compatibility.
+// The canonical types are generated in ./generated/api.d.ts from the FastAPI OpenAPI spec.
+// Run `npm run generate-api` to regenerate. Over time, imports should migrate to ./generated/api.
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

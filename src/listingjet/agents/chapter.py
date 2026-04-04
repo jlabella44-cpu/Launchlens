@@ -5,6 +5,7 @@ import uuid
 
 from sqlalchemy import select
 
+from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.video_asset import VideoAsset
@@ -75,7 +76,7 @@ class ChapterAgent(BaseAgent):
                 )
 
                 try:
-                    parsed = json.loads(raw_response)
+                    parsed = json.loads(strip_markdown_fences(raw_response))
                     chapters = parsed.get("chapters", [])
                 except (json.JSONDecodeError, AttributeError):
                     chapters = []
