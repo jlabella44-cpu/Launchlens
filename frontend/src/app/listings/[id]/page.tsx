@@ -9,7 +9,6 @@ import { ProtectedRoute } from "@/components/layout/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { PackageViewer } from "@/components/listings/package-viewer";
 import { PipelineStatus } from "@/components/listings/pipeline-status";
-import { PipelineProgress } from "@/components/listings/pipeline-progress";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
 import apiClient from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
@@ -200,9 +199,8 @@ function ListingDetail() {
         <SharePanel listingId={id} isOpen={shareOpen} onClose={() => setShareOpen(false)} />
 
         {/* Pipeline Status */}
-        <div className="mb-8 space-y-4">
+        <div className="mb-8">
           <PipelineStatus state={listing.state} />
-          <PipelineProgress listingId={id} listingState={listing.state} />
         </div>
 
         {/* Two-column layout */}
