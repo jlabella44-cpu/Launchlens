@@ -93,6 +93,7 @@ function BrandKitSettings() {
   const [brokerageLogoPreview, setBrokerageLogoPreview] = useState<string | null>(null);
   const [teamLogoPreview, setTeamLogoPreview] = useState<string | null>(null);
   const [headshotPreview, setHeadshotPreview] = useState<string | null>(null);
+  const [languagePref, setLanguagePref] = useState("en");
 
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -109,6 +110,13 @@ function BrandKitSettings() {
       window.history.replaceState({}, "", url.toString());
     }
   }, [searchParams, toast]);
+
+  /* ─── Load language preference ─── */
+  useEffect(() => {
+    apiClient.request<{ preferred_language?: string }>("/settings")
+      .then((s) => { if (s.preferred_language) setLanguagePref(s.preferred_language); })
+      .catch(() => {});
+  }, []);
 
   /* ─── Load existing brand kit ─── */
   useEffect(() => {
@@ -283,6 +291,39 @@ function BrandKitSettings() {
               <BrandColorsSection form={form} setForm={setForm} />
               <TypographySection form={form} setForm={setForm} />
               <BrandVoiceSection form={form} setForm={setForm} />
+
+              {/* Language Preference (uses tenant settings, not brand kit) */}
+              <section className="bg-white rounded-xl p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-[var(--color-text)] mb-1" style={{ fontFamily: "var(--font-heading)" }}>
+                  Description Language
+                </h2>
+                <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+                  AI-generated listing descriptions will use this language. Override per-listing in metadata.
+                </p>
+                <select
+                  value={languagePref}
+                  onChange={async (e) => {
+                    const lang = e.target.value;
+                    setLanguagePref(lang);
+                    try {
+                      await apiClient.request("/settings", { method: "PATCH", body: JSON.stringify({ preferred_language: lang }) });
+                    } catch { /* silent */ }
+                  }}
+                  className="w-full max-w-xs px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                >
+                  <option value="en">English</option>
+                  <option value="es">Spanish (Espa&#241;ol)</option>
+                  <option value="fr">French (Fran&#231;ais)</option>
+                  <option value="de">German (Deutsch)</option>
+                  <option value="pt">Portuguese (Portugu&#234;s)</option>
+                  <option value="zh">Chinese (&#20013;&#25991;)</option>
+                  <option value="ja">Japanese (&#26085;&#26412;&#35486;)</option>
+                  <option value="ko">Korean (&#54620;&#44397;&#50612;)</option>
+                  <option value="it">Italian (Italiano)</option>
+                  <option value="ar">Arabic (&#1575;&#1604;&#1593;&#1585;&#1576;&#1610;&#1577;)</option>
+                </select>
+              </section>
+
               <LogosSection
                 form={form}
                 setForm={setForm}
