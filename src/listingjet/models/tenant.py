@@ -22,4 +22,5 @@ class Tenant(Base):
     credit_balance: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     included_credits: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     rollover_cap: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    preferred_language: Mapped[str] = mapped_column(String(10), default="en", server_default="en")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
