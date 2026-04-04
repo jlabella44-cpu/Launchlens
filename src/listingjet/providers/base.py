@@ -46,6 +46,29 @@ class LLMProvider(ABC):
         ...
 
 
+class VirtualStagingProvider(ABC):
+    provider_name: str = "base"
+
+    @abstractmethod
+    async def stage_image(
+        self,
+        image_url: str,
+        room_type: str,
+        style: str = "modern",
+    ) -> str:
+        """Transform an empty/unfurnished room photo into a staged version.
+
+        Args:
+            image_url: URL or S3 key of the source image.
+            room_type: Room label from vision analysis (living_room, kitchen, etc.)
+            style: Staging style (modern, contemporary, minimalist, coastal, etc.)
+
+        Returns:
+            URL of the staged image.
+        """
+        ...
+
+
 class TemplateProvider(ABC):
     @abstractmethod
     async def render(self, template_id: str, data: dict) -> bytes:

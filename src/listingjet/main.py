@@ -17,6 +17,7 @@ from listingjet.api import (
     brand_kit,
     bulk,
     canva_oauth,
+    cma,
     credits,
     demo,
     health,
@@ -25,6 +26,7 @@ from listingjet.api import (
     listings_core,
     listings_media,
     listings_workflow,
+    microsite,
     properties,
     sse,
     team,
@@ -150,6 +152,8 @@ def create_app() -> FastAPI:
     app.include_router(credits.router, prefix="/credits", tags=["credits"])
     app.include_router(addons.router, prefix="/addons", tags=["addons"])
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
+    app.include_router(cma.router, prefix="/listings", tags=["listings"])
+    app.include_router(microsite.router, prefix="/listings", tags=["listings"])
     app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])

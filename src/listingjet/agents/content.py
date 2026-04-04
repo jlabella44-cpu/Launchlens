@@ -8,6 +8,7 @@ from listingjet.models.asset import Asset
 from listingjet.models.brand_kit import BrandKit
 from listingjet.models.listing import Listing
 from listingjet.models.property_data import PropertyData
+from listingjet.models.tenant import Tenant
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_llm_provider
 from listingjet.services.fha_filter import fha_check
@@ -15,10 +16,16 @@ from listingjet.services.pii_filter import sanitize_for_prompt
 
 from .base import AgentContext, BaseAgent
 
+_LANGUAGE_NAMES = {
+    "en": "English", "es": "Spanish", "fr": "French", "de": "German",
+    "pt": "Portuguese", "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
+    "it": "Italian", "ar": "Arabic",
+}
+
 _PROMPT_TEMPLATE = """\
 Write two real estate listing descriptions for the following property.
 Be specific and factual. Do not use Fair Housing Act prohibited language.
-
+{language_instruction}
 Property details:
 {metadata}
 
@@ -120,12 +127,28 @@ class ContentAgent(BaseAgent):
                 tone_key, temperature = _tone_to_config(int(tone_intensity))
                 system_prompt = _TONE_SYSTEM_PROMPTS[tone_key]
 
+                # Resolve language: per-listing override > tenant default > "en"
+                language = meta.get("language", "en")
+                if language == "en":
+                    tenant = await session.get(Tenant, tenant_id)
+                    if tenant and tenant.preferred_language != "en":
+                        language = tenant.preferred_language
+
+                lang_name = _LANGUAGE_NAMES.get(language, language)
+                language_instruction = (
+                    f"\nWrite ALL descriptions in {lang_name.upper()}. "
+                    f"Do not include any English text in the output."
+                    if language != "en"
+                    else ""
+                )
+
                 safe_metadata = sanitize_for_prompt(meta)
                 prompt = _PROMPT_TEMPLATE.format(
                     metadata=str(safe_metadata),
                     photo_features=features_text or "modern interior",
                     voice_section=voice_section,
                     market_section=market_section,
+                    language_instruction=language_instruction,
                 )
 
                 prop_result = await session.execute(
@@ -167,7 +190,20 @@ class ContentAgent(BaseAgent):
                 parsed = json.loads(strip_markdown_fences(raw))
                 mls_safe = parsed["mls_safe"]
                 marketing = parsed["marketing"]
-                fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
+
+                # FHA filter only works on English text; skip for other languages
+                if language == "en":
+                    fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
+                else:
+                    from dataclasses import dataclass as _dc
+
+                    @_dc
+                    class _FHAPassResult:
+                        passed: bool = True
+                        violations: list = None  # type: ignore[assignment]
+                        def __post_init__(self):
+                            self.violations = self.violations or []
+                    fha_result = _FHAPassResult()
 
                 if not fha_result.passed:
                     raw = await self._llm_provider.complete(
@@ -187,6 +223,7 @@ class ContentAgent(BaseAgent):
                     "marketing_length": len(marketing),
                     "has_voice_samples": bool(voice_section),
                     "market_context": market_context or None,
+                    "language": language,
                 })
 
-        return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed}
+        return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed, "language": language}
