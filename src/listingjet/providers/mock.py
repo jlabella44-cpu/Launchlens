@@ -1,6 +1,6 @@
 # src/listingjet/providers/mock.py
 """Mock provider implementations for tests and local development."""
-from .base import LLMProvider, TemplateProvider, VirtualStagingProvider, VisionLabel, VisionProvider
+from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider, VisionLabel, VisionProvider
 
 
 class MockVisionProvider(VisionProvider):
@@ -28,6 +28,16 @@ class MockVisionProvider(VisionProvider):
 class MockLLMProvider(LLMProvider):
     async def complete(self, prompt: str, context: dict, temperature: float | None = None, system_prompt: str | None = None) -> str:
         return "Stunning home with modern finishes and abundant natural light."
+
+
+class MockImageEditProvider(ImageEditProvider):
+    provider_name = "mock"
+
+    async def remove_object(self, image_url: str, object_description: str) -> bytes:
+        return b"\xff\xd8\xff\xe0mock-edited-jpeg"
+
+    async def enhance(self, image_url: str, enhancement: str) -> bytes:
+        return b"\xff\xd8\xff\xe0mock-enhanced-jpeg"
 
 
 class MockVirtualStagingProvider(VirtualStagingProvider):
