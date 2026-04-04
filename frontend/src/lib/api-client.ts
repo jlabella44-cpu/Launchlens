@@ -25,6 +25,7 @@ import type {
   SocialCut,
   VideoUploadRequest,
   VideoUploadResponse,
+  DemoCreateResponse,
   DemoUploadRequest,
   DemoUploadResponse,
   DemoViewResponse,
@@ -243,6 +244,20 @@ class ApiClient {
   }
 
   // Demo (no auth required)
+  async demoCreate(photoCount: number): Promise<DemoCreateResponse> {
+    return this.request<DemoCreateResponse>("/demo/create", {
+      method: "POST",
+      body: JSON.stringify({ photo_count: photoCount }),
+    });
+  }
+
+  async demoFinalize(demoId: string, filePaths: string[]): Promise<DemoUploadResponse> {
+    return this.request<DemoUploadResponse>(`/demo/${demoId}/finalize`, {
+      method: "POST",
+      body: JSON.stringify({ file_paths: filePaths }),
+    });
+  }
+
   async demoUpload(data: DemoUploadRequest): Promise<DemoUploadResponse> {
     return this.request<DemoUploadResponse>("/demo/upload", {
       method: "POST",

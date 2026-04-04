@@ -119,6 +119,17 @@ export interface DemoUploadRequest {
   file_paths: string[];
 }
 
+export interface DemoCreateResponse {
+  demo_id: string;
+  upload_urls: Array<{
+    index: number;
+    key: string;
+    upload_url: { url: string; fields: Record<string, string> } | null;
+    content_type: string;
+  }>;
+  expires_at: string;
+}
+
 export interface DemoUploadResponse {
   demo_id: string;
   photo_count: number;

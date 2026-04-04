@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_db_admin
 from listingjet.api.schemas.demo import (
+    DemoCreateRequest,
+    DemoCreateResponse,
     DemoUploadRequest,
     DemoUploadResponse,
     DemoViewResponse,
@@ -15,6 +17,7 @@ from listingjet.api.schemas.demo import (
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing, ListingState
 from listingjet.services.rate_limiter import RateLimiter
+from listingjet.services.storage import get_storage
 
 router = APIRouter()
 
@@ -47,6 +50,122 @@ def _get_client_ip(request: Request) -> str:
             idx = max(0, len(parts) - TRUSTED_PROXY_COUNT)
             return parts[idx]
     return request.client.host if request.client else "unknown"
+
+
+@router.post("/create", status_code=201, response_model=DemoCreateResponse)
+async def demo_create(
+    body: DemoCreateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Create a demo listing and return presigned S3 upload URLs. No auth required."""
+    ip = _get_client_ip(request)
+    limiter = _get_demo_limiter()
+    if not limiter.acquire(key=ip, cost=1):
+        raise HTTPException(
+            status_code=429,
+            detail="Demo upload limit reached. Try again tomorrow.",
+        )
+
+    count = body.photo_count
+    if count < _DEMO_PHOTO_MIN or count > _DEMO_PHOTO_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Photo count must be between {_DEMO_PHOTO_MIN} and {_DEMO_PHOTO_MAX}, got {count}",
+        )
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=_DEMO_TTL_HOURS)
+
+    listing = Listing(
+        tenant_id=_DEMO_TENANT_ID,
+        address={},
+        metadata_={},
+        state=ListingState.DEMO,
+        is_demo=True,
+        demo_expires_at=expires_at,
+    )
+    db.add(listing)
+    await db.flush()
+
+    storage = get_storage()
+    upload_urls = []
+    for i in range(count):
+        key = f"demos/{listing.id}/{i:03d}.jpg"
+        try:
+            presigned = storage.presigned_upload_url(
+                key=key,
+                content_type="image/jpeg",
+                expires_in=900,
+            )
+            upload_urls.append({
+                "index": i,
+                "key": key,
+                "upload_url": presigned,
+                "content_type": "image/jpeg",
+            })
+        except Exception:
+            # Also accept PNG
+            try:
+                presigned = storage.presigned_upload_url(
+                    key=key.replace(".jpg", ".png"),
+                    content_type="image/png",
+                    expires_in=900,
+                )
+                upload_urls.append({
+                    "index": i,
+                    "key": key.replace(".jpg", ".png"),
+                    "upload_url": presigned,
+                    "content_type": "image/png",
+                })
+            except Exception:
+                upload_urls.append({
+                    "index": i,
+                    "key": key,
+                    "upload_url": None,
+                    "content_type": "image/jpeg",
+                })
+
+    await db.commit()
+
+    return DemoCreateResponse(
+        demo_id=listing.id,
+        upload_urls=upload_urls,
+        expires_at=expires_at,
+    )
+
+
+@router.post("/{demo_id}/finalize", status_code=200, response_model=DemoUploadResponse)
+async def demo_finalize(
+    demo_id: uuid.UUID,
+    body: DemoUploadRequest,
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Finalize a demo listing after files have been uploaded to S3."""
+    listing = await db.get(Listing, demo_id)
+    if not listing or not listing.is_demo:
+        raise HTTPException(status_code=404, detail="Demo listing not found")
+
+    if listing.demo_expires_at and listing.demo_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Demo listing expired")
+
+    for fp in body.file_paths:
+        asset = Asset(
+            tenant_id=_DEMO_TENANT_ID,
+            listing_id=listing.id,
+            file_path=fp,
+            file_hash=hashlib.sha256(fp.encode()).hexdigest(),
+            state="uploaded",
+        )
+        db.add(asset)
+
+    await db.commit()
+
+    return DemoUploadResponse(
+        demo_id=listing.id,
+        photo_count=len(body.file_paths),
+        expires_at=listing.demo_expires_at,
+    )
 
 
 @router.post("/upload", status_code=201, response_model=DemoUploadResponse)

@@ -383,13 +383,15 @@ async def list_assets(
         try:
             return storage.presigned_url(file_path, expires_in=3600)
         except Exception:
+            logger.warning("presigned_url_failed path=%s", file_path, exc_info=True)
             return None
 
     with ThreadPoolExecutor(max_workers=10) as pool:
         urls = list(pool.map(_gen_url, [a.file_path for a in assets]))
 
-    for data, url in zip(response, urls):
-        data.thumbnail_url = url
+    for data, asset_obj, url in zip(response, assets, urls):
+        # Use presigned URL if available, fall back to proxy_path
+        data.thumbnail_url = url or asset_obj.proxy_path
 
     return response
 
