@@ -14,7 +14,10 @@ from http import HTTPStatus
 import httpx
 
 from .base import TemplateProvider
-from .canva_generated.canva_connect_api_client.client import AuthenticatedClient
+from .canva_generated.canva_connect_api_client.api.asset import (
+    create_url_asset_upload_job,
+    get_url_asset_upload_job,
+)
 from .canva_generated.canva_connect_api_client.api.autofill import (
     create_design_autofill_job,
     get_design_autofill_job,
@@ -23,10 +26,7 @@ from .canva_generated.canva_connect_api_client.api.export import (
     create_design_export_job,
     get_design_export_job,
 )
-from .canva_generated.canva_connect_api_client.api.asset import (
-    create_url_asset_upload_job,
-    get_url_asset_upload_job,
-)
+from .canva_generated.canva_connect_api_client.client import AuthenticatedClient
 from .canva_generated.canva_connect_api_client.models.create_design_autofill_job_request import (
     CreateDesignAutofillJobRequest,
 )
@@ -39,9 +39,9 @@ from .canva_generated.canva_connect_api_client.models.create_design_export_job_r
 from .canva_generated.canva_connect_api_client.models.create_url_asset_upload_job_request import (
     CreateUrlAssetUploadJobRequest,
 )
+from .canva_generated.canva_connect_api_client.models.error import Error
 from .canva_generated.canva_connect_api_client.models.pdf_export_format import PdfExportFormat
 from .canva_generated.canva_connect_api_client.models.pdf_export_format_type import PdfExportFormatType
-from .canva_generated.canva_connect_api_client.models.error import Error
 
 logger = logging.getLogger(__name__)
 
