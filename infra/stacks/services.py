@@ -90,7 +90,7 @@ class ServicesStack(Stack):
             "ENVIRONMENT": "production",
             "AWS_REGION": Stack.of(self).region,
             "REDIS_URL": f"redis://{redis_cluster.attr_primary_end_point_address}:{redis_cluster.attr_primary_end_point_port}/0",
-            "CORS_ORIGINS": "http://localhost:3000,https://listingjet.ai,https://www.listingjet.ai,https://launchlens-7bvngk56b-jlabella44-5360s-projects.vercel.app",
+            "CORS_ORIGINS": "http://localhost:3000,https://listingjet.ai,https://www.listingjet.ai",
             "TEMPORAL_HOST": "temporal.listingjet.local:7233",
             "S3_BUCKET_NAME": "listingjet-dev",
         }

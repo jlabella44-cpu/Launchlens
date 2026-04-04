@@ -39,7 +39,7 @@ def _validate_redirect_url(url: str) -> None:
     if origin in allowed:
         return
     # Also allow the same Vercel pattern used in CORS middleware
-    if re.fullmatch(r"https://launchlens[a-z0-9-]*\.vercel\.app", origin):
+    if re.fullmatch(r"https://listingjet[a-z0-9-]*\.vercel\.app", origin):
         return
     raise HTTPException(status_code=400, detail="Redirect URL not allowed")
 

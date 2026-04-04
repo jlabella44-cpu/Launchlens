@@ -56,10 +56,10 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/launchlens", "src/listingjet"]
+packages = ["src/listingjet"]
 
 [tool.coverage.run]
-source = ["src/launchlens"]
+source = ["src/listingjet"]
 omit = ["*/test*", "*/migrations/*"]
 
 [tool.coverage.report]

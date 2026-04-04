@@ -20,7 +20,7 @@ target_metadata = Base.metadata
 
 def get_url():
     # Try DATABASE_URL_SYNC first, then DATABASE_URL, then fallback
-    url = os.getenv("DATABASE_URL_SYNC") or os.getenv("DATABASE_URL") or "postgresql://launchlens:password@localhost/launchlens"
+    url = os.getenv("DATABASE_URL_SYNC") or os.getenv("DATABASE_URL") or "postgresql://listingjet:password@localhost/listingjet"
     # Ensure it's an asyncpg URL for the async engine
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)

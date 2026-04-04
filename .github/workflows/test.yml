@@ -13,13 +13,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: launchlens
+          POSTGRES_USER: listingjet
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: launchlens_test
+          POSTGRES_DB: listingjet_test
         ports:
           - 5433:5432
         options: >-
-          --health-cmd "pg_isready -U launchlens"
+          --health-cmd "pg_isready -U listingjet"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -27,13 +27,13 @@ jobs:
       postgres-dev:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: launchlens
+          POSTGRES_USER: listingjet
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: launchlens
+          POSTGRES_DB: listingjet
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U launchlens"
+          --health-cmd "pg_isready -U listingjet"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -49,8 +49,8 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://launchlens:password@localhost:5432/launchlens
-      DATABASE_URL_SYNC: postgresql://launchlens:password@localhost:5432/launchlens
+      DATABASE_URL: postgresql+asyncpg://listingjet:password@localhost:5432/listingjet
+      DATABASE_URL_SYNC: postgresql://listingjet:password@localhost:5432/listingjet
       JWT_SECRET: ci-test-secret-minimum-32-characters-long
       REDIS_URL: redis://localhost:6379/0
       USE_MOCK_PROVIDERS: "true"
@@ -78,8 +78,8 @@ jobs:
 
       - name: Run Alembic migrations (test DB)
         env:
-          DATABASE_URL_SYNC: postgresql://launchlens:password@localhost:5433/launchlens_test
-          DATABASE_URL: postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test
+          DATABASE_URL_SYNC: postgresql://listingjet:password@localhost:5433/listingjet_test
+          DATABASE_URL: postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test
         run: alembic upgrade head
 
       - name: Run tests

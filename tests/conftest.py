@@ -12,7 +12,7 @@ from listingjet.config import settings
 from listingjet.database import Base, get_db
 from listingjet.main import app
 
-TEST_DB_URL = "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test"
+TEST_DB_URL = "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
 
 
 @pytest.fixture(scope="session")
