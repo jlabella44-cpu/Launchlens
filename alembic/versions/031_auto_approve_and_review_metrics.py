@@ -7,8 +7,8 @@ Revises: 028_add_user_consent_fields
 from alembic import op
 import sqlalchemy as sa
 
-revision = "029_auto_approve_and_review_metrics"
-down_revision = "028_add_user_consent_fields"
+revision = "031_auto_approve"
+down_revision = "030"
 branch_labels = None
 depends_on = None
 
