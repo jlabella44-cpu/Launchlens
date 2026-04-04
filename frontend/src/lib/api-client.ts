@@ -44,6 +44,7 @@ import type {
   AnalyticsOverview,
   AnalyticsTimeline,
   AnalyticsCredits,
+  ReviewAnalytics,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -188,6 +189,18 @@ class ApiClient {
   // Package
   async getPackage(listingId: string): Promise<PackageSelection[]> {
     return this.request<PackageSelection[]>(`/listings/${listingId}/package`);
+  }
+
+  async reorderPackage(listingId: string, swaps: Array<{ from_position: number; to_position: number }>): Promise<{ swaps_applied: number }> {
+    return this.request(`/listings/${listingId}/package/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ swaps }),
+    });
+  }
+
+  // Review analytics
+  async getReviewAnalytics(): Promise<ReviewAnalytics> {
+    return this.request<ReviewAnalytics>(`/listings/review/analytics`);
   }
 
   // Review flow

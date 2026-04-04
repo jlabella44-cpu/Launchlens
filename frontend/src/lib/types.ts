@@ -251,6 +251,21 @@ export interface ReviewQueueItem {
   created_at: string;
 }
 
+export interface ReviewAnalytics {
+  override_rate: number;
+  avg_trust_score: number;
+  total_selections: number;
+  human_overrides: number;
+  total_reviewed: number;
+  total_auto_approved: number;
+  override_trend: Array<{
+    month: string;
+    override_rate: number;
+    total_selections: number;
+    human_overrides: number;
+  }>;
+}
+
 export interface RejectRequest {
   reason: "quality" | "incomplete" | "non_compliant" | "other";
   detail?: string;

@@ -32,12 +32,16 @@ class TenantSettingsResponse(BaseModel):
     name: str
     plan: str
     webhook_url: str | None
+    auto_approve_enabled: bool
+    auto_approve_threshold: float
 
     model_config = {"from_attributes": True}
 
 
 class UpdateSettingsRequest(BaseModel):
     webhook_url: str | None = None
+    auto_approve_enabled: bool | None = None
+    auto_approve_threshold: float | None = None
 
     @field_validator("webhook_url")
     @classmethod
@@ -69,6 +73,8 @@ async def get_settings(
         name=tenant.name,
         plan=tenant.plan,
         webhook_url=tenant.webhook_url,
+        auto_approve_enabled=tenant.auto_approve_enabled,
+        auto_approve_threshold=tenant.auto_approve_threshold,
     )
 
 
@@ -78,13 +84,19 @@ async def update_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update tenant settings such as the outbound webhook URL."""
+    """Update tenant settings such as the outbound webhook URL and auto-approval config."""
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     if body.webhook_url is not None:
         tenant.webhook_url = body.webhook_url or None
+    if body.auto_approve_enabled is not None:
+        tenant.auto_approve_enabled = body.auto_approve_enabled
+    if body.auto_approve_threshold is not None:
+        if not (50.0 <= body.auto_approve_threshold <= 100.0):
+            raise HTTPException(400, "auto_approve_threshold must be between 50 and 100")
+        tenant.auto_approve_threshold = body.auto_approve_threshold
 
     await db.commit()
     await db.refresh(tenant)
@@ -93,6 +105,8 @@ async def update_settings(
         name=tenant.name,
         plan=tenant.plan,
         webhook_url=tenant.webhook_url,
+        auto_approve_enabled=tenant.auto_approve_enabled,
+        auto_approve_threshold=tenant.auto_approve_threshold,
     )
 
 
