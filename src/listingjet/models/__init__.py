@@ -5,14 +5,11 @@ from .vision_result import VisionResult                       # noqa
 from .package_selection import PackageSelection               # noqa
 from .event import Event                                      # noqa
 from .outbox import Outbox                                    # noqa
-from .label_mapping import LabelMapping                       # noqa
 from .performance_event import PerformanceEvent               # noqa
 from .learning_weight import LearningWeight                   # noqa
 from .global_baseline_weight import GlobalBaselineWeight      # noqa
 from .brand_kit import BrandKit                               # noqa
-from .compliance_event import ComplianceEvent                 # noqa
 from .user import User                                        # noqa
-from .prompt_version import PromptVersion                     # noqa
 from .social_content import SocialContent                     # noqa
 from .video_asset import VideoAsset                          # noqa
 from .dollhouse_scene import DollhouseScene                  # noqa

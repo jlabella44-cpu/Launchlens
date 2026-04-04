@@ -1,5 +1,4 @@
 import json
-import uuid
 
 from sqlalchemy import select
 
@@ -11,7 +10,6 @@ from listingjet.models.listing import Listing
 from listingjet.models.property_data import PropertyData
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_llm_provider
-from listingjet.services.events import emit_event
 from listingjet.services.fha_filter import fha_check
 from listingjet.services.pii_filter import sanitize_for_prompt
 
@@ -82,11 +80,7 @@ class ContentAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-        tenant_id = uuid.UUID(context.tenant_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
 
                 result = await session.execute(
@@ -187,18 +181,12 @@ class ContentAgent(BaseAgent):
                     marketing = parsed["marketing"]
                     fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
 
-                await emit_event(
-                    session=session,
-                    event_type="content.completed",
-                    payload={
-                        "fha_passed": fha_result.passed,
-                        "mls_safe_length": len(mls_safe),
-                        "marketing_length": len(marketing),
-                        "has_voice_samples": bool(voice_section),
-                        "market_context": market_context or None,
-                    },
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "content.completed", {
+                    "fha_passed": fha_result.passed,
+                    "mls_safe_length": len(mls_safe),
+                    "marketing_length": len(marketing),
+                    "has_voice_samples": bool(voice_section),
+                    "market_context": market_context or None,
+                })
 
         return {"mls_safe": mls_safe, "marketing": marketing, "fha_passed": fha_result.passed}

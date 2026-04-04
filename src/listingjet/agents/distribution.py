@@ -1,12 +1,10 @@
 import logging
-import uuid
 
 from sqlalchemy import select
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.performance_event import PerformanceEvent
-from listingjet.services.events import emit_event
 
 from .base import AgentContext, BaseAgent
 
@@ -20,24 +18,15 @@ class DistributionAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
                 listing.state = ListingState.DELIVERED
 
-                await emit_event(
-                    session=session,
-                    event_type="pipeline.completed",
-                    payload={"listing_id": context.listing_id},
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "pipeline.completed", {"listing_id": context.listing_id})
 
                 # Record performance event for learning loop
                 session.add(PerformanceEvent(
-                    tenant_id=uuid.UUID(context.tenant_id),
+                    tenant_id=tenant_id,
                     listing_id=listing_id,
                     signal_type="listing_delivered",
                     value=1.0,
@@ -55,7 +44,7 @@ class DistributionAgent(BaseAgent):
                     from listingjet.services.notifications import _listing_address_str
                     admin_result = await session.execute(
                         select(User).where(
-                            User.tenant_id == uuid.UUID(context.tenant_id),
+                            User.tenant_id == tenant_id,
                             User.role == UserRole.ADMIN,
                         ).limit(1)
                     )

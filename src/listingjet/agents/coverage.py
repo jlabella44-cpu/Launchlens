@@ -1,4 +1,3 @@
-import uuid
 from collections import Counter
 
 from sqlalchemy import select
@@ -8,7 +7,6 @@ from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
 from listingjet.models.property_data import PropertyData
 from listingjet.models.vision_result import VisionResult
-from listingjet.services.events import emit_event
 
 from .base import AgentContext, BaseAgent
 
@@ -26,10 +24,7 @@ class CoverageAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
 
                 # Load Tier 1 VisionResults for this listing
@@ -73,22 +68,10 @@ class CoverageAgent(BaseAgent):
                         })
 
                 if missing:
-                    await emit_event(
-                        session=session,
-                        event_type="coverage.gap",
-                        payload={"missing_shots": missing},
-                        tenant_id=context.tenant_id,
-                        listing_id=context.listing_id,
-                    )
+                    await self.emit(session, context, "coverage.gap", {"missing_shots": missing})
 
                 if mismatches:
-                    await emit_event(
-                        session=session,
-                        event_type="coverage.mismatch",
-                        payload={"mismatches": mismatches},
-                        tenant_id=context.tenant_id,
-                        listing_id=context.listing_id,
-                    )
+                    await self.emit(session, context, "coverage.mismatch", {"mismatches": mismatches})
 
                 prop_result = await session.execute(
                     select(PropertyData).where(PropertyData.listing_id == listing_id)
@@ -119,13 +102,7 @@ class CoverageAgent(BaseAgent):
                         })
 
                 if record_mismatches:
-                    await emit_event(
-                        session=session,
-                        event_type="coverage.record_mismatch",
-                        payload={"mismatches": record_mismatches},
-                        tenant_id=context.tenant_id,
-                        listing_id=context.listing_id,
-                    )
+                    await self.emit(session, context, "coverage.record_mismatch", {"mismatches": record_mismatches})
 
         return {
             "missing_shots": missing,

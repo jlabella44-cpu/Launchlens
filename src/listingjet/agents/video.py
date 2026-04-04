@@ -6,7 +6,6 @@ import asyncio
 import logging
 import os
 import tempfile
-import uuid
 
 import httpx
 from sqlalchemy import select
@@ -28,7 +27,6 @@ from listingjet.models.vision_result import VisionResult
 from listingjet.providers.elevenlabs import get_voiceover_provider
 from listingjet.providers.kling import KlingProvider
 from listingjet.services.endcard import ENDCARD_DURATION, generate_endcard
-from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_cost
 from listingjet.services.storage import StorageService
 from listingjet.services.video_stitcher import VideoStitcher
@@ -57,10 +55,7 @@ class VideoAgent(BaseAgent):
         self._semaphore = asyncio.Semaphore(3)  # max 3 concurrent Kling calls
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
                 if not listing:
                     raise ValueError(f"Listing {listing_id} not found")
@@ -141,18 +136,12 @@ class VideoAgent(BaseAgent):
                 )
                 session.add(video_asset)
 
-                await emit_event(
-                    session=session,
-                    event_type="video.completed",
-                    payload={
-                        "listing_id": str(listing_id),
-                        "video_type": "ai_generated",
-                        "clip_count": len(successful),
-                        "s3_key": s3_key,
-                    },
-                    tenant_id=str(context.tenant_id),
-                    listing_id=str(listing_id),
-                )
+                await self.emit(session, context, "video.completed", {
+                    "listing_id": str(listing_id),
+                    "video_type": "ai_generated",
+                    "clip_count": len(successful),
+                    "s3_key": s3_key,
+                })
 
                 # Clean up temp files
                 for p in clip_paths:

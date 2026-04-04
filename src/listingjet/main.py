@@ -7,9 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from listingjet.api import (
     addons,
-    admin,
+    admin_dashboard,
+    admin_listings,
+    admin_tenants,
+    admin_users,
     analytics,
-    assets,
     auth,
     billing,
     brand_kit,
@@ -20,7 +22,9 @@ from listingjet.api import (
     health,
     help_agent,
     listing_permissions,
-    listings,
+    listings_core,
+    listings_media,
+    listings_workflow,
     properties,
     sse,
     team,
@@ -86,7 +90,6 @@ _TAG_METADATA = [
     {"name": "billing", "description": "Stripe checkout, subscriptions, invoices, webhooks"},
     {"name": "brand-kit", "description": "Tenant branding configuration (colors, logo, fonts)"},
     {"name": "admin", "description": "Platform administration, tenant management, analytics"},
-    {"name": "assets", "description": "Photo asset management"},
     {"name": "settings", "description": "Tenant settings and preferences"},
     {"name": "analytics", "description": "Usage metrics and reporting"},
     {"name": "demo", "description": "Public demo listing upload"},
@@ -132,9 +135,13 @@ def create_app() -> FastAPI:
     app.include_router(canva_oauth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
-    app.include_router(listings.router, prefix="/listings", tags=["listings"])
-    app.include_router(assets.router, prefix="/assets", tags=["assets"])
-    app.include_router(admin.router, prefix="/admin", tags=["admin"])
+    app.include_router(listings_core.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_workflow.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_media.router, prefix="/listings", tags=["listings"])
+    app.include_router(admin_dashboard.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_tenants.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_users.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_listings.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])

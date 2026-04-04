@@ -2,14 +2,12 @@
 
 import subprocess
 import tempfile
-import uuid
 
 from sqlalchemy import select
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.video_asset import VideoAsset
-from listingjet.services.events import emit_event
 from listingjet.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -89,10 +87,7 @@ class SocialCutAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
                 if not listing:
                     raise ValueError(f"Listing {listing_id} not found")
@@ -135,17 +130,11 @@ class SocialCutAgent(BaseAgent):
 
                 video.social_cuts = cuts
 
-                await emit_event(
-                    session=session,
-                    event_type="social_cuts.completed",
-                    payload={
-                        "listing_id": str(listing_id),
-                        "video_asset_id": str(video.id),
-                        "cut_count": len(cuts),
-                        "platforms": [c["platform"] for c in cuts],
-                    },
-                    tenant_id=str(context.tenant_id),
-                    listing_id=str(listing_id),
-                )
+                await self.emit(session, context, "social_cuts.completed", {
+                    "listing_id": str(listing_id),
+                    "video_asset_id": str(video.id),
+                    "cut_count": len(cuts),
+                    "platforms": [c["platform"] for c in cuts],
+                })
 
         return {"cut_count": len(cuts), "video_asset_id": str(video.id)}

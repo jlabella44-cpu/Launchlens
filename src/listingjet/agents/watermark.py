@@ -1,5 +1,4 @@
 import io
-import uuid
 
 from sqlalchemy import select
 
@@ -7,7 +6,6 @@ from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
 from listingjet.models.package_selection import PackageSelection
-from listingjet.services.events import emit_event
 from listingjet.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -21,11 +19,9 @@ class WatermarkAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
         watermarked_count = 0
 
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
                 if listing is None:
                     raise ValueError(f"Listing {listing_id} not found")
@@ -49,16 +45,10 @@ class WatermarkAgent(BaseAgent):
                     except Exception:
                         continue
 
-                await emit_event(
-                    session=session,
-                    event_type="watermark.completed",
-                    payload={
-                        "watermarked_count": watermarked_count,
-                        "listing_id": str(listing_id),
-                    },
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "watermark.completed", {
+                    "watermarked_count": watermarked_count,
+                    "listing_id": str(listing_id),
+                })
 
         return {"watermarked_count": watermarked_count, "listing_id": str(listing_id)}
 

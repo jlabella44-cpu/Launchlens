@@ -17,7 +17,7 @@ from listingjet.api.schemas.billing import (
     PortalResponse,
 )
 from listingjet.config import settings
-from listingjet.config.tiers import TIER_CREDITS
+from listingjet.config.tiers import apply_plan_credits
 from listingjet.database import get_db
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
@@ -303,10 +303,7 @@ async def _handle_checkout_completed(
             logger.error("Could not fetch subscription %s for plan resolution — leaving plan unchanged", sub_id)
 
     if resolved_plan:
-        tenant.plan = resolved_plan
-        included, cap = TIER_CREDITS.get(resolved_plan, (0, 0))
-        tenant.included_credits = included
-        tenant.rollover_cap = cap
+        apply_plan_credits(tenant, resolved_plan)
 
     await db.commit()
 
@@ -338,11 +335,7 @@ async def _handle_subscription_created(
     if items:
         price_id = items[0].get("price", {}).get("id", "")
         new_plan = svc.resolve_plan(price_id)
-        tenant.plan = new_plan
-
-        included, cap = TIER_CREDITS.get(new_plan, (0, 0))
-        tenant.included_credits = included
-        tenant.rollover_cap = cap
+        apply_plan_credits(tenant, new_plan)
 
     await db.commit()
 
@@ -364,12 +357,7 @@ async def _handle_subscription_updated(
     if items:
         price_id = items[0].get("price", {}).get("id", "")
         new_plan = svc.resolve_plan(price_id)
-        tenant.plan = new_plan
-
-        # Update credit tier
-        included, cap = TIER_CREDITS.get(new_plan, (0, 0))
-        tenant.included_credits = included
-        tenant.rollover_cap = cap
+        apply_plan_credits(tenant, new_plan)
 
     await db.commit()
 
@@ -387,9 +375,7 @@ async def _handle_subscription_deleted(
         return
 
     # Downgrade to lite — preserve credit_balance (purchased credits are theirs)
-    tenant.plan = "lite"
-    tenant.included_credits = 0
-    tenant.rollover_cap = 0
+    apply_plan_credits(tenant, "lite")
     tenant.stripe_subscription_id = None
     await db.commit()
 
