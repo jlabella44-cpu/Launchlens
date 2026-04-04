@@ -7,11 +7,11 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPO_API: launchlens-api
-  ECR_REPO_WORKER: launchlens-worker
-  ECS_CLUSTER: launchlens
-  ECS_SERVICE_API: launchlens-api
-  ECS_SERVICE_WORKER: launchlens-worker
+  ECR_REPO_API: listingjet-api
+  ECR_REPO_WORKER: listingjet-worker
+  ECS_CLUSTER: listingjet
+  ECS_SERVICE_API: listingjet-api
+  ECS_SERVICE_WORKER: listingjet-worker
 
 permissions:
   id-token: write
@@ -24,9 +24,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: launchlens
+          POSTGRES_USER: listingjet
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: launchlens_test
+          POSTGRES_DB: listingjet_test
         ports: ["5433:5432"]
         options: >-
           --health-cmd pg_isready
@@ -34,8 +34,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: "postgresql+asyncpg://launchlens:password@localhost:5433/launchlens_test"
-      DATABASE_URL_SYNC: "postgresql://launchlens:password@localhost:5433/launchlens_test"
+      DATABASE_URL: "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
+      DATABASE_URL_SYNC: "postgresql://listingjet:password@localhost:5433/listingjet_test"
       JWT_SECRET: "test-secret"
       REDIS_URL: "redis://localhost:6379/0"
     steps:
@@ -80,7 +80,7 @@ jobs:
         run: |
           aws ecs run-task \
             --cluster $ECS_CLUSTER \
-            --task-definition launchlens-migrate \
+            --task-definition listingjet-migrate \
             --launch-type FARGATE \
             --network-configuration "$(aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_SERVICE_API --query 'services[0].networkConfiguration' --output json)" \
             --overrides '{"containerOverrides":[{"name":"migrate","command":["python","-m","alembic","upgrade","head"]}]}'
@@ -98,4 +98,4 @@ jobs:
           curl -sL https://sentry.io/api/0/organizations/${{ secrets.SENTRY_ORG }}/releases/ \
             -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"version":"${{ github.sha }}","projects":["launchlens"]}' || true
+            -d '{"version":"${{ github.sha }}","projects":["listingjet"]}' || true

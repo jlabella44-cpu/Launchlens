@@ -19,6 +19,6 @@ jobs:
         with:
           context: .
           push: false
-          tags: launchlens:${{ github.sha }}
+          tags: listingjet:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
