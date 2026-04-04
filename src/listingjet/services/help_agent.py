@@ -133,8 +133,12 @@ When the user asks about their listings, credits, billing, or account:
 2. Summarise the results clearly and concisely.
 3. If the user asks about a specific listing, use search or detail tools.
 4. For billing questions, check their plan info and credit balance.
-5. If you can't resolve an issue, offer to escalate to human support using the \
-   request_human_support tool.
+5. BEFORE escalating to human support, ALWAYS use search_resolved_tickets first to \
+   check if a similar issue was already resolved. If you find a match, share the \
+   resolution with the user instead of escalating.
+6. If you still can't resolve the issue after checking resolved tickets, use the \
+   request_human_support tool to create a tracked support ticket. The full chat \
+   transcript will be attached so the support team has full context.
 </tool-guidance>
 
 <rules-reminder>
@@ -418,6 +422,7 @@ class HelpAgentService:
                         tenant_id=tenant_id,
                         user_email=user_email,
                         user_name=user_name,
+                        session_id=session_id,
                     )
 
                     # Append assistant message + tool result for next round

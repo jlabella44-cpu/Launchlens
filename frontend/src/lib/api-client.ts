@@ -46,6 +46,11 @@ import type {
   AnalyticsTimeline,
   AnalyticsCredits,
   ReviewAnalytics,
+  SupportTicket,
+  SupportTicketDetail,
+  SupportTicketList,
+  SupportMessage,
+  SupportTicketStats,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -668,6 +673,47 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId, message_index: messageIndex, rating }),
     });
+  }
+
+  // Support Tickets (user)
+  async createSupportTicket(data: { subject: string; description: string; category: string; priority?: string }): Promise<SupportTicket> {
+    return this.request("/support", { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async getSupportTickets(status?: string): Promise<SupportTicketList> {
+    const qs = status ? `?status=${status}` : "";
+    return this.request(`/support${qs}`);
+  }
+
+  async getSupportTicket(ticketId: string): Promise<SupportTicketDetail> {
+    return this.request(`/support/${ticketId}`);
+  }
+
+  async addSupportMessage(ticketId: string, content: string): Promise<SupportMessage> {
+    return this.request(`/support/${ticketId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  }
+
+  // Support Tickets (admin)
+  async adminSupportTickets(params?: { status?: string; category?: string; limit?: number; offset?: number }): Promise<SupportTicketList> {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+    return this.request(`/support/admin/tickets?${qs}`);
+  }
+
+  async adminSupportTicketDetail(ticketId: string): Promise<SupportTicketDetail> {
+    return this.request(`/support/admin/tickets/${ticketId}`);
+  }
+
+  async adminUpdateTicket(ticketId: string, data: { status?: string; resolution_note?: string }): Promise<SupportTicket> {
+    return this.request(`/support/admin/tickets/${ticketId}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+
+  async adminReplyToTicket(ticketId: string, content: string): Promise<SupportMessage> {
+    return this.request(`/support/admin/tickets/${ticketId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  }
+
+  async adminSupportStats(): Promise<SupportTicketStats> {
+    return this.request("/support/admin/tickets/stats");
   }
 }
 

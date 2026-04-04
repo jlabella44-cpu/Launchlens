@@ -47,6 +47,7 @@ export function Nav() {
           {user && <Link href="/billing" className={linkClass}>Billing</Link>}
           <Link href="/pricing" className={linkClass}>Pricing</Link>
           <Link href="/demo" className={linkClass}>Demo</Link>
+          {user && <Link href="/support" className={linkClass}>Support</Link>}
           {user && <Link href="/settings" className={linkClass}>Settings</Link>}
           {user && user.role === "superadmin" && (
             <Link href="/admin" className="text-sm font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary)]/80 transition-colors">
@@ -74,6 +75,7 @@ export function Nav() {
           {user && <Link href="/billing" className={linkClass} onClick={() => setMenuOpen(false)}>Billing</Link>}
           <Link href="/pricing" className={linkClass} onClick={() => setMenuOpen(false)}>Pricing</Link>
           <Link href="/demo" className={linkClass} onClick={() => setMenuOpen(false)}>Demo</Link>
+          {user && <Link href="/support" className={linkClass} onClick={() => setMenuOpen(false)}>Support</Link>}
           {user && <Link href="/settings" className={linkClass} onClick={() => setMenuOpen(false)}>Settings</Link>}
           {user && user.role === "superadmin" && (
             <Link href="/admin" className="text-sm font-semibold text-[var(--color-primary)]" onClick={() => setMenuOpen(false)}>Admin</Link>

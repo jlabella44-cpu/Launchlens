@@ -474,6 +474,49 @@ export interface CreditDataPoint {
   description: string | null;
 }
 
+// Support Tickets
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  category: string;
+  priority: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  user_email?: string;
+  user_name?: string;
+  chat_session_id?: string;
+  resolution_note?: string;
+}
+
+export interface SupportMessage {
+  id: string;
+  user_id: string;
+  content: string;
+  is_admin_reply: boolean;
+  created_at: string;
+  user_name?: string;
+  user_email?: string;
+  chat_transcript?: Array<{ role: string; content: string }>;
+}
+
+export interface SupportTicketDetail extends SupportTicket {
+  messages: SupportMessage[];
+}
+
+export interface SupportTicketList {
+  items: SupportTicket[];
+  total: number;
+}
+
+export interface SupportTicketStats {
+  open_count: number;
+  in_progress_count: number;
+  resolved_today: number;
+  avg_response_hours: number | null;
+}
+
 export interface AnalyticsCredits {
   days: number;
   data: CreditDataPoint[];

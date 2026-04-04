@@ -22,6 +22,7 @@ from listingjet.api import (
     listings,
     properties,
     sse,
+    support,
     team,
     tenant_settings,
 )
@@ -92,6 +93,7 @@ _TAG_METADATA = [
     {"name": "sse", "description": "Server-Sent Events for real-time pipeline updates"},
     {"name": "team", "description": "Team member management within a tenant"},
     {"name": "help-agent", "description": "AI help agent for product support and data lookups"},
+    {"name": "support", "description": "Support tickets and customer service"},
 ]
 
 
@@ -144,6 +146,7 @@ def create_app() -> FastAPI:
     app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
+    app.include_router(support.router, prefix="/support", tags=["support"])
     app.include_router(health.router)
 
     from fastapi.responses import JSONResponse
