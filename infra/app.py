@@ -2,11 +2,11 @@
 """ListingJet CDK application — instantiates all infrastructure stacks."""
 
 import aws_cdk as cdk
+from stacks.cdn import ListingJetCDN
 from stacks.ci import CIStack
 from stacks.database import DatabaseStack
 from stacks.monitoring import MonitoringStack
 from stacks.network import NetworkStack
-from stacks.cdn import ListingJetCDN
 from stacks.services import ServicesStack
 
 app = cdk.App()
