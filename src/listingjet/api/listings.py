@@ -14,7 +14,7 @@ from listingjet.api.schemas.assets import (
     CreateAssetsRequest,
     CreateAssetsResponse,
 )
-from listingjet.api.schemas.errors import ErrorResponse
+from listingjet.api.schemas import ErrorResponse
 from listingjet.api.schemas.listings import (
     ActionResponse,
     BundleMetadata,
