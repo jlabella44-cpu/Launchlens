@@ -1,5 +1,4 @@
 import json
-import uuid
 
 from sqlalchemy import select
 
@@ -11,7 +10,6 @@ from listingjet.models.package_selection import PackageSelection
 from listingjet.models.social_content import SocialContent
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_llm_provider
-from listingjet.services.events import emit_event
 from listingjet.services.fha_filter import fha_check
 from listingjet.services.pii_filter import sanitize_for_prompt
 
@@ -70,10 +68,7 @@ class SocialContentAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
-        listing_id = uuid.UUID(context.listing_id)
-
-        async with self._session_factory() as session:
-            async with (session.begin() if not session.in_transaction() else session.begin_nested()):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
                 listing = await session.get(Listing, listing_id)
 
                 # Get hero photo's VisionResult via PackageSelection (position=0) -> Asset -> VisionResult
@@ -164,12 +159,6 @@ class SocialContentAgent(BaseAgent):
                     cta=fb.get("cta"),
                 ))
 
-                await emit_event(
-                    session=session,
-                    event_type="social_content.completed",
-                    payload={"platforms": ["instagram", "facebook"], "fha_passed": fha_result.passed},
-                    tenant_id=context.tenant_id,
-                    listing_id=context.listing_id,
-                )
+                await self.emit(session, context, "social_content.completed", {"platforms": ["instagram", "facebook"], "fha_passed": fha_result.passed})
 
         return {"platforms": ["instagram", "facebook"], "fha_passed": fha_result.passed}

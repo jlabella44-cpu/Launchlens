@@ -159,7 +159,7 @@ class TestPhotoComplianceVisionFailure:
             storage_service=mock_storage,
             session_factory=factory,
         )
-        with patch("listingjet.agents.photo_compliance.emit_event", new_callable=AsyncMock):
+        with patch("listingjet.services.events.emit_event", new_callable=AsyncMock):
             result = await agent.execute(ctx)
 
         assert result["all_compliant"] is True
@@ -198,7 +198,7 @@ class TestPhotoComplianceVisionFailure:
             storage_service=mock_storage,
             session_factory=factory,
         )
-        with patch("listingjet.agents.photo_compliance.emit_event", new_callable=AsyncMock):
+        with patch("listingjet.services.events.emit_event", new_callable=AsyncMock):
             result = await agent.execute(ctx)
 
         assert result["all_compliant"] is True
