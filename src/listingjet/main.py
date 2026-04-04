@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from listingjet.api import (
     addons,
-    admin,
+    admin_dashboard,
+    admin_listings,
+    admin_tenants,
+    admin_users,
     analytics,
     auth,
     billing,
@@ -135,7 +138,10 @@ def create_app() -> FastAPI:
     app.include_router(listings_core.router, prefix="/listings", tags=["listings"])
     app.include_router(listings_workflow.router, prefix="/listings", tags=["listings"])
     app.include_router(listings_media.router, prefix="/listings", tags=["listings"])
-    app.include_router(admin.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_dashboard.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_tenants.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_users.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_listings.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
