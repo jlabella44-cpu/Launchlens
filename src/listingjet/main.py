@@ -22,6 +22,7 @@ from listingjet.api import (
     demo,
     health,
     help_agent,
+    image_edit,
     listing_permissions,
     listings_core,
     listings_media,
@@ -154,6 +155,7 @@ def create_app() -> FastAPI:
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
     app.include_router(cma.router, prefix="/listings", tags=["listings"])
     app.include_router(microsite.router, prefix="/listings", tags=["listings"])
+    app.include_router(image_edit.router, prefix="/listings", tags=["image-editing"])
     app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])

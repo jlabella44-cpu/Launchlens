@@ -7,7 +7,7 @@ Returns real providers otherwise (requires API keys in environment).
 """
 from listingjet.config import settings
 
-from .base import LLMProvider, TemplateProvider, VirtualStagingProvider, VisionProvider
+from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider, VisionProvider
 
 
 def get_vision_provider() -> VisionProvider:
@@ -24,6 +24,14 @@ def get_llm_provider() -> LLMProvider:
         return MockLLMProvider()
     from .claude import ClaudeProvider
     return ClaudeProvider()
+
+
+def get_image_edit_provider() -> ImageEditProvider:
+    if settings.use_mock_providers:
+        from .mock import MockImageEditProvider
+        return MockImageEditProvider()
+    from .openai_image_edit import OpenAIImageEditProvider
+    return OpenAIImageEditProvider()
 
 
 def get_virtual_staging_provider() -> VirtualStagingProvider:
