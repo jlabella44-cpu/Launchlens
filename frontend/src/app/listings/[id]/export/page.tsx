@@ -6,7 +6,9 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
+import { usePlan } from "@/contexts/plan-context";
 import apiClient from "@/lib/api-client";
+import { trackEvent, AnalyticsEvents } from "@/lib/analytics";
 
 type Mode = "mls" | "marketing";
 
@@ -36,6 +38,8 @@ const MODE_INFO: Record<Mode, { title: string; badge: string; items: { label: st
 function ExportPage() {
   const params = useParams();
   const id = params.id as string;
+  const { tier } = usePlan();
+  const isFreeTier = !tier || tier === "free" || tier === "starter";
   useEffect(() => { document.title = "Export | ListingJet"; }, []);
 
   const [mode, setMode] = useState<Mode>("mls");
@@ -47,6 +51,7 @@ function ExportPage() {
     setDownloading(true);
     try {
       const res = await apiClient.getExport(id, mode);
+      trackEvent(AnalyticsEvents.FIRST_EXPORT, { listing_id: id, mode, tier: tier || "free" });
       window.open(res.download_url, "_blank");
     } catch (err: any) {
       setError(err.message || "Export not available yet");
@@ -189,6 +194,29 @@ function ExportPage() {
             </>
           )}
         </button>
+
+        {/* Free-tier watermark notice */}
+        {isFreeTier && (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                Exports include &ldquo;Powered by ListingJet&rdquo; watermark
+              </p>
+              <p className="text-xs text-amber-600 mt-1">
+                Upgrade to any paid plan to remove watermarks and unlock full white-label branding.
+              </p>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#F97316] hover:text-[#EA580C] mt-2 transition-colors"
+              >
+                View plans →
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Status Footer */}
         <p className="text-center text-[10px] text-slate-400 uppercase tracking-wider mt-4">
