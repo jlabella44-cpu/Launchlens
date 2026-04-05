@@ -31,6 +31,7 @@ export interface ListingResponse {
     price?: number;
   };
   state: string;
+  thumbnail_url: string | null;
   created_at: string;
   updated_at: string;
 }
