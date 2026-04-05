@@ -1,7 +1,7 @@
 """Add support tickets and messages tables.
 
-Revision ID: 032_support_tickets
-Revises: 031_auto_approve
+Revision ID: 036_support_tickets
+Revises: 035_auto_approve
 """
 
 import sqlalchemy as sa
@@ -9,8 +9,8 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision = "032_support_tickets"
-down_revision = "031_auto_approve"
+revision = "036_support_tickets"
+down_revision = "035_auto_approve"
 branch_labels = None
 depends_on = None
 
