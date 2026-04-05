@@ -35,12 +35,20 @@ export function ListingCard({ listing, onDeleted }: ListingCardProps) {
     >
       {/* Photo Thumbnail */}
       <div className="relative aspect-[4/3] bg-gradient-to-br from-slate-200 to-slate-100 overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 22V12h6v10" />
-          </svg>
-        </div>
+        {listing.thumbnail_url ? (
+          <img
+            src={listing.thumbnail_url}
+            alt={address.street || "Property photo"}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 22V12h6v10" />
+            </svg>
+          </div>
+        )}
         <div className="absolute top-3 left-3">
           <Badge state={state} />
         </div>

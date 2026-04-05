@@ -68,6 +68,7 @@ class ListingResponse(BaseModel):
     address: dict
     metadata: dict
     state: str
+    thumbnail_url: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -89,13 +90,14 @@ class ListingResponse(BaseModel):
     }
 
     @classmethod
-    def from_orm_listing(cls, listing):
+    def from_orm_listing(cls, listing, thumbnail_url: str | None = None):
         return cls(
             id=listing.id,
             tenant_id=listing.tenant_id,
             address=listing.address,
             metadata=listing.metadata_,
             state=listing.state.value if hasattr(listing.state, 'value') else listing.state,
+            thumbnail_url=thumbnail_url,
             created_at=listing.created_at,
             updated_at=listing.updated_at,
         )
