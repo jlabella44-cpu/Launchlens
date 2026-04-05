@@ -59,12 +59,22 @@ def _extract_usage(body: dict) -> tuple[int, int]:
 
 
 class GemmaProvider(LLMProvider):
-    """Gemma 4 LLM provider via Gemini API OpenAI-compatible endpoint."""
+    """Gemma 4 LLM provider via Gemini API OpenAI-compatible endpoint.
 
-    def __init__(self, api_key: str | None = None, model: str = _MODEL):
+    Set ``base_url`` (or GEMMA_BASE_URL env) to point at a self-hosted
+    OpenAI-compatible server (Ollama, vLLM, TGI) without code changes.
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
+    ):
         self._api_key = api_key or settings.gemini_api_key
-        self._model = model
-        self._endpoint = f"{_BASE_URL}/chat/completions"
+        self._model = model or settings.gemma_model
+        base = base_url or settings.gemma_base_url or _BASE_URL
+        self._endpoint = f"{base.rstrip('/')}/chat/completions"
 
     async def complete(
         self,
@@ -106,12 +116,14 @@ class GemmaVisionProvider(VisionProvider):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = _MODEL,
+        model: str | None = None,
+        base_url: str | None = None,
         max_concurrent: int = 10,
     ):
         self._api_key = api_key or settings.gemini_api_key
-        self._model = model
-        self._endpoint = f"{_BASE_URL}/chat/completions"
+        self._model = model or settings.gemma_model
+        base = base_url or settings.gemma_base_url or _BASE_URL
+        self._endpoint = f"{base.rstrip('/')}/chat/completions"
         self._semaphore = asyncio.Semaphore(max_concurrent)
 
     async def analyze(self, image_url: str) -> list[VisionLabel]:

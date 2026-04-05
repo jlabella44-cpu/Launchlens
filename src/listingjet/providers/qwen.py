@@ -61,10 +61,18 @@ def _extract_usage(body: dict) -> tuple[int, int]:
 class QwenProvider(LLMProvider):
     """Qwen 3.6-Plus LLM provider via DashScope OpenAI-compatible API."""
 
-    def __init__(self, api_key: str | None = None, model: str = _MODEL):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = _MODEL,
+        enable_cache: bool | None = None,
+    ):
         self._api_key = api_key or settings.qwen_api_key
         self._model = model
         self._endpoint = f"{_BASE_URL}/chat/completions"
+        self._enable_cache = (
+            enable_cache if enable_cache is not None else settings.qwen_enable_cache
+        )
 
     async def complete(
         self,
@@ -86,6 +94,9 @@ class QwenProvider(LLMProvider):
         }
         if temperature is not None:
             payload["temperature"] = max(0.0, min(1.0, temperature))
+        if self._enable_cache:
+            # DashScope context-cache hint; the system message is cached between calls
+            payload["enable_cache"] = True
 
         try:
             body = await _post(self._endpoint, self._api_key, payload, "qwen")

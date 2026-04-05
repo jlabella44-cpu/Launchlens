@@ -35,18 +35,20 @@ def _build_vision(name: str) -> VisionProvider:
     return GoogleVisionProvider()
 
 
-def get_vision_provider(agent: str | None = None) -> VisionProvider:
-    """Return a vision provider, optionally routed by agent name."""
+def get_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
+    """Return a vision provider, optionally routed by agent name and tenant."""
     if settings.use_mock_providers:
         from .mock import MockVisionProvider
         return MockVisionProvider()
     from ._routing import resolve_vision_provider
-    name = resolve_vision_provider(agent, default=settings.vision_provider_tier1)
+    name = resolve_vision_provider(
+        agent, default=settings.vision_provider_tier1, tenant_id=tenant_id,
+    )
     return _build_vision(name)
 
 
-def get_llm_provider(agent: str | None = None) -> LLMProvider:
-    """Return an LLM provider, optionally routed by agent name.
+def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
+    """Return an LLM provider, optionally routed by agent name and tenant.
 
     When LLM_FALLBACK_ENABLED=true the returned provider transparently
     falls back to Claude if the primary call fails.
@@ -55,7 +57,7 @@ def get_llm_provider(agent: str | None = None) -> LLMProvider:
         from .mock import MockLLMProvider
         return MockLLMProvider()
     from ._routing import resolve_llm_provider
-    name = resolve_llm_provider(agent)
+    name = resolve_llm_provider(agent, tenant_id=tenant_id)
     primary = _build_llm(name)
     if settings.llm_fallback_enabled and name != "claude":
         from .claude import ClaudeProvider

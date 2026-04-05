@@ -13,7 +13,11 @@ def _patched_settings(**overrides):
         "llm_provider": "claude",
         "vision_provider_tier1": "google",
         "agent_model_routing": "",
+        "tenant_model_routing": "",
         "llm_fallback_enabled": False,
+        "qwen_enable_cache": False,
+        "gemma_base_url": "",
+        "gemma_model": "gemma-4-31b-it",
         "anthropic_api_key": "test",
         "google_vision_api_key": "test",
         "qwen_api_key": "test",
@@ -120,6 +124,53 @@ def test_resolve_llm_provider_falls_back_to_global():
         s.llm_provider = "gemma"
         assert _routing.resolve_llm_provider("floorplan") == "gemma"
         assert _routing.resolve_llm_provider(None) == "gemma"
+
+
+def test_tenant_override_beats_agent_override():
+    routing = {
+        "tenant_model_routing": '{"t-1": {"llm": "claude"}}',
+        "agent_model_routing": '{"llm": {"floorplan": "qwen"}}',
+        "llm_provider": "gemma",
+    }
+    patches = _patch(**routing)
+    try:
+        # tenant default "claude" beats global "gemma" AND agent override "qwen"
+        assert type(get_llm_provider("floorplan", tenant_id="t-1")).__name__ == "ClaudeProvider"
+        # no tenant -> agent override still wins over global
+        assert type(get_llm_provider("floorplan")).__name__ == "QwenProvider"
+    finally:
+        for p in patches:
+            p.stop()
+
+
+def test_tenant_per_agent_override():
+    routing = {
+        "tenant_model_routing": '{"t-2": {"llm": "claude", "llm_per_agent": {"social_content": "gemma"}}}',
+        "llm_provider": "qwen",
+    }
+    patches = _patch(**routing)
+    try:
+        assert type(get_llm_provider("social_content", tenant_id="t-2")).__name__ == "GemmaProvider"
+        assert type(get_llm_provider("content", tenant_id="t-2")).__name__ == "ClaudeProvider"
+        # unknown tenant falls through to global
+        assert type(get_llm_provider("content", tenant_id="t-unknown")).__name__ == "QwenProvider"
+    finally:
+        for p in patches:
+            p.stop()
+
+
+def test_tenant_vision_override():
+    routing = {
+        "tenant_model_routing": '{"t-3": {"vision": "qwen"}}',
+        "vision_provider_tier1": "google",
+    }
+    patches = _patch(**routing)
+    try:
+        assert type(get_vision_provider("vision", tenant_id="t-3")).__name__ == "QwenVisionProvider"
+        assert type(get_vision_provider("vision")).__name__ == "GoogleVisionProvider"
+    finally:
+        for p in patches:
+            p.stop()
 
 
 def test_resolve_vision_provider_uses_default():

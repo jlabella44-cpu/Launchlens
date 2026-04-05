@@ -116,6 +116,40 @@ async def test_qwen_retries_on_500_then_succeeds():
 
 
 @pytest.mark.asyncio
+async def test_qwen_enable_cache_sets_flag():
+    provider = QwenProvider(api_key="k", enable_cache=True)
+    fake = _FakeResponse(_chat_response())
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=fake)) as post, \
+         patch("listingjet.providers.qwen.record_token_usage"), \
+         patch("listingjet.providers.qwen.record_provider_call"):
+        await provider.complete("p", {})
+    assert post.call_args.kwargs["json"]["enable_cache"] is True
+
+
+@pytest.mark.asyncio
+async def test_qwen_cache_disabled_omits_flag():
+    provider = QwenProvider(api_key="k", enable_cache=False)
+    fake = _FakeResponse(_chat_response())
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=fake)) as post, \
+         patch("listingjet.providers.qwen.record_token_usage"), \
+         patch("listingjet.providers.qwen.record_provider_call"):
+        await provider.complete("p", {})
+    assert "enable_cache" not in post.call_args.kwargs["json"]
+
+
+@pytest.mark.asyncio
+async def test_gemma_custom_base_url():
+    provider = GemmaProvider(api_key="k", base_url="http://localhost:11434/v1")
+    fake = _FakeResponse(_chat_response("local"))
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=fake)) as post, \
+         patch("listingjet.providers.gemma.record_token_usage"), \
+         patch("listingjet.providers.gemma.record_provider_call"):
+        result = await provider.complete("p", {})
+    assert result == "local"
+    assert post.call_args.args[0] == "http://localhost:11434/v1/chat/completions"
+
+
+@pytest.mark.asyncio
 async def test_qwen_does_not_retry_on_400():
     provider = QwenProvider(api_key="k")
     err = _FakeResponse({}, status_code=400)

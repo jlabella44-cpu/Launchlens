@@ -9,6 +9,7 @@ from listingjet.api import (
     addons,
     admin_dashboard,
     admin_listings,
+    admin_providers,
     admin_tenants,
     admin_users,
     analytics,
@@ -147,6 +148,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_tenants.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_users.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_listings.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_providers.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])

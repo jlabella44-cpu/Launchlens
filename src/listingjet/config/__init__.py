@@ -92,8 +92,15 @@ class Settings(BaseSettings):
     vision_provider_tier2: str = "openai"  # "openai" | "qwen" | "gemma"
     # Per-agent overrides, JSON: {"llm": {"floorplan": "qwen"}, "vision": {"photo_compliance": "gemma"}}
     agent_model_routing: str = ""
+    # Per-tenant overrides, JSON: {"<tenant_uuid>": {"llm": "claude"}}
+    tenant_model_routing: str = ""
     # Enable fallback chain: try primary provider, fall back to Claude on failure
     llm_fallback_enabled: bool = False
+    # Self-host / alt endpoint for Gemma (e.g. http://localhost:11434/v1 for Ollama)
+    gemma_base_url: str = ""
+    gemma_model: str = "gemma-4-31b-it"
+    # Qwen DashScope context caching (discounts repeated system prompts)
+    qwen_enable_cache: bool = False
 
     # Google OAuth
     google_oauth_client_id: str = ""

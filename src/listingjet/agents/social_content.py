@@ -64,7 +64,7 @@ class SocialContentAgent(BaseAgent):
     agent_name = "social_content"
 
     def __init__(self, llm_provider=None, session_factory=None):
-        self._llm_provider = llm_provider or get_llm_provider()
+        self._llm_provider = llm_provider or get_llm_provider(agent=self.agent_name)
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:

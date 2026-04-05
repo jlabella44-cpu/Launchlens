@@ -35,7 +35,7 @@ class ChapterAgent(BaseAgent):
     agent_name = "chapter"
 
     def __init__(self, vision_provider=None, session_factory=None):
-        self._vision_provider = vision_provider or get_vision_provider()
+        self._vision_provider = vision_provider or get_vision_provider(agent=self.agent_name)
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
