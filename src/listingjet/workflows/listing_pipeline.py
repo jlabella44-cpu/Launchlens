@@ -112,7 +112,7 @@ class ListingPipeline:
             start_to_close_timeout=_VISION_TIER2_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
-        await workflow.execute_activity(
+        packaging_result = await workflow.execute_activity(
             run_packaging, ctx,
             start_to_close_timeout=_DEFAULT_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
@@ -132,8 +132,14 @@ class ListingPipeline:
                 retry_policy=_DEFAULT_RETRY,
             )
 
-        # Wait for human review (listing is now AWAITING_REVIEW)
-        await workflow.wait_condition(lambda: self._review_completed)
+        # Skip review wait if auto-approved by packaging agent
+        auto_approved = (
+            isinstance(packaging_result, dict)
+            and packaging_result.get("auto_approved") is True
+        )
+        if not auto_approved:
+            # Wait for human review (listing is now AWAITING_REVIEW)
+            await workflow.wait_condition(lambda: self._review_completed)
 
         # Collect video result (may already be done) — don't block pipeline on failure
         if video_task:

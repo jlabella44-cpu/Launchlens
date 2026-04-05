@@ -11,7 +11,7 @@ import { KeyboardNav } from "@/components/keyboard-nav";
 import { ToastProvider } from "@/components/ui/toast";
 import type { ReactNode } from "react";
 
-const PUBLIC_PATHS = ["/", "/login", "/register", "/demo", "/pricing", "/privacy", "/terms", "/changelog", "/forgot-password", "/reset-password"];
+const PUBLIC_PATHS = ["/", "/login", "/register", "/demo", "/pricing", "/faq", "/privacy", "/terms", "/changelog", "/forgot-password", "/reset-password"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));

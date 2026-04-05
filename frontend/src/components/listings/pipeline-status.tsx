@@ -1,103 +1,115 @@
 "use client";
 
-const PHASES = [
+/**
+ * Simplified 5-stage horizontal pipeline tracker.
+ *
+ * Upload → Analyze → Review → Create → Delivered
+ */
+
+const STAGES = [
   {
-    label: "Phase 1",
-    color: "#6366F1",
-    steps: [
-      { key: "uploading", label: "Ingest" },
-      { key: "analyzing", label: "Vision" },
-      { key: "coverage", label: "Coverage" },
-      { key: "floorplan", label: "Floorplan" },
-      { key: "packaging", label: "Package" },
-      { key: "compliance", label: "Comply" },
-    ],
+    key: "upload",
+    label: "Upload",
+    states: ["new", "uploading"],
   },
   {
+    key: "analyze",
+    label: "Analyze",
+    states: ["analyzing", "coverage", "floorplan", "packaging", "compliance"],
+  },
+  {
+    key: "review",
     label: "Review",
-    color: "#F59E0B",
-    steps: [
-      { key: "awaiting_review", label: "Queue" },
-      { key: "in_review", label: "Review" },
-      { key: "approved", label: "Approved" },
-    ],
+    states: ["awaiting_review", "in_review", "approved"],
   },
   {
-    label: "Phase 2",
-    color: "#10B981",
-    steps: [
-      { key: "content", label: "Content" },
-      { key: "brand_social", label: "Brand" },
-      { key: "chapters", label: "Chapters" },
-      { key: "social_cuts", label: "Cuts" },
-      { key: "mls_export", label: "MLS" },
-      { key: "exporting", label: "Export" },
-      { key: "delivered", label: "Done" },
-    ],
+    key: "create",
+    label: "Create",
+    states: ["content", "brand_social", "chapters", "social_cuts", "mls_export", "exporting"],
+  },
+  {
+    key: "delivered",
+    label: "Delivered",
+    states: ["delivered"],
   },
 ];
 
-const ALL_STEPS = PHASES.flatMap((p) => p.steps);
+const ERROR_STATES = new Set(["failed", "pipeline_timeout", "cancelled"]);
+
+function getStageIndex(state: string): number {
+  for (let i = 0; i < STAGES.length; i++) {
+    if (STAGES[i].states.includes(state)) return i;
+  }
+  return -1;
+}
 
 interface PipelineStatusProps {
   state: string;
 }
 
 export function PipelineStatus({ state }: PipelineStatusProps) {
-  const currentIndex = ALL_STEPS.findIndex((s) => s.key === state);
+  const isError = ERROR_STATES.has(state);
+  const activeIndex = getStageIndex(state);
+  // For delivered, all stages are complete
+  const isDelivered = state === "delivered";
 
   return (
-    <div className="w-full rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4">
-      <div className="flex gap-6">
-        {PHASES.map((phase) => (
-          <div key={phase.label} className="flex-1">
-            <div
-              className="text-xs font-medium mb-2"
-              style={{ color: phase.color }}
-            >
-              {phase.label}
-            </div>
-            <div className="flex items-center gap-1">
-              {phase.steps.map((step, i) => {
-                const globalIndex = ALL_STEPS.indexOf(step);
-                const isActive = globalIndex === currentIndex;
-                const isPast = globalIndex < currentIndex;
+    <div className="w-full rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] px-5 py-4">
+      <div className="flex items-center">
+        {STAGES.map((stage, i) => {
+          const isActive = i === activeIndex;
+          const isPast = isDelivered || i < activeIndex;
+          const isCurrent = isActive && !isDelivered;
 
-                return (
-                  <div key={step.key} className="flex items-center gap-1 flex-1">
-                    <div className="flex flex-col items-center gap-1 flex-1">
-                      <div
-                        className={`w-3 h-3 rounded-full transition-all ${isActive ? "ring-2 ring-offset-1 scale-125" : ""}`}
-                        style={{
-                          backgroundColor: isPast || isActive ? phase.color : "var(--color-border)",
-                          opacity: isPast ? 0.5 : isActive ? 1 : 0.3,
-                          outlineColor: isActive ? phase.color : undefined,
-                        }}
-                      />
-                      <span
-                        className="text-[10px] leading-tight text-center"
-                        style={{
-                          color: isActive ? phase.color : isPast ? "var(--color-text-secondary)" : "var(--color-text-tertiary)",
-                        }}
-                      >
-                        {step.label}
-                      </span>
-                    </div>
-                    {i < phase.steps.length - 1 && (
-                      <div
-                        className="h-0.5 flex-1 rounded-full -mt-4"
-                        style={{
-                          backgroundColor: isPast ? phase.color : "var(--color-border)",
-                          opacity: isPast ? 0.5 : 0.2,
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+          let dotColor: string;
+          let dotScale = "";
+          let labelColor: string;
+
+          if (isError && isActive) {
+            dotColor = "bg-red-500";
+            dotScale = "ring-2 ring-red-200 ring-offset-1";
+            labelColor = "text-red-600";
+          } else if (isPast) {
+            dotColor = "bg-emerald-500";
+            labelColor = "text-[var(--color-text-secondary)]";
+          } else if (isCurrent) {
+            dotColor = "bg-blue-500";
+            dotScale = "ring-2 ring-blue-200 ring-offset-1 scale-125";
+            labelColor = "text-blue-600 font-semibold";
+          } else {
+            dotColor = "bg-slate-200 dark:bg-slate-600";
+            labelColor = "text-[var(--color-text-tertiary)]";
+          }
+
+          return (
+            <div key={stage.key} className="flex items-center flex-1 last:flex-none">
+              {/* Stage dot + label */}
+              <div className="flex flex-col items-center gap-1.5">
+                <div className={`w-3.5 h-3.5 rounded-full transition-all duration-300 ${dotColor} ${dotScale}`}>
+                  {isPast && !isCurrent && (
+                    <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 14 14" fill="none">
+                      <path d="M3.5 7L6 9.5L10.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-[11px] leading-tight whitespace-nowrap ${labelColor}`}>
+                  {stage.label}
+                </span>
+              </div>
+
+              {/* Connector line */}
+              {i < STAGES.length - 1 && (
+                <div className="flex-1 mx-2 -mt-5">
+                  <div
+                    className={`h-0.5 rounded-full transition-all duration-300 ${
+                      isPast ? "bg-emerald-400" : "bg-slate-200 dark:bg-slate-600"
+                    }`}
+                  />
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
