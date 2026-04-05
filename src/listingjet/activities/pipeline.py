@@ -207,6 +207,24 @@ async def run_link_import(params: LinkImportParams) -> dict:
             }
 
 
+@activity.defn
+async def run_virtual_staging(context: AgentContext) -> dict:
+    from listingjet.agents.virtual_staging import VirtualStagingAgent
+    return await VirtualStagingAgent().instrumented_execute(context)
+
+
+@activity.defn
+async def run_cma_report(context: AgentContext) -> dict:
+    from listingjet.agents.cma_report import CMAReportAgent
+    return await CMAReportAgent().instrumented_execute(context)
+
+
+@activity.defn
+async def run_microsite_generator(context: AgentContext) -> dict:
+    from listingjet.agents.microsite_generator import MicrositeGeneratorAgent
+    return await MicrositeGeneratorAgent().instrumented_execute(context)
+
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
@@ -214,4 +232,5 @@ ALL_ACTIVITIES = [
     run_social_content, run_photo_compliance, run_mls_export, run_distribution,
     run_video, run_chapters, run_social_cuts, run_learning,
     run_link_import, run_property_verification,
+    run_virtual_staging, run_cma_report, run_microsite_generator,
 ]

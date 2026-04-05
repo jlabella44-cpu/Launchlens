@@ -15,12 +15,14 @@ with workflow.unsafe.imports_passed_through():
         run_floorplan,
         run_ingestion,
         run_learning,
+        run_microsite_generator,
         run_mls_export,
         run_packaging,
         run_property_verification,
         run_social_content,
         run_social_cuts,
         run_video,
+        run_virtual_staging,
         run_vision_tier1,
         run_vision_tier2,
     )
@@ -63,6 +65,7 @@ class ListingPipeline:
     @workflow.run
     async def run(self, input: ListingPipelineInput) -> str:
         ctx = AgentContext(listing_id=input.listing_id, tenant_id=input.tenant_id)
+        addons = input.enabled_addons or []
 
         # Phase 1: Analysis pipeline
         await workflow.execute_activity(
@@ -92,6 +95,18 @@ class ListingPipeline:
             start_to_close_timeout=_DEFAULT_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
+
+        # Virtual staging (addon-gated): stage empty rooms before packaging
+        if "virtual_staging" in addons:
+            try:
+                await workflow.execute_activity(
+                    run_virtual_staging, ctx,
+                    start_to_close_timeout=timedelta(minutes=15),
+                    retry_policy=_DEFAULT_RETRY,
+                )
+            except Exception as exc:
+                workflow.logger.warning("virtual_staging_failed listing=%s error=%s", input.listing_id, exc)
+
         await workflow.execute_activity(
             run_floorplan, ctx,
             start_to_close_timeout=_VISION_TIER2_TIMEOUT,
@@ -105,7 +120,6 @@ class ListingPipeline:
 
         # Start video generation in parallel with human review
         # For credit users, only run if video add-on is enabled
-        addons = input.enabled_addons or []
         run_video_step = True
         if input.billing_model == "credit" and "ai_video_tour" not in addons:
             run_video_step = False
@@ -196,7 +210,17 @@ class ListingPipeline:
             retry_policy=_DEFAULT_RETRY,
         )
 
-        # Step 5: Learn from human overrides for this listing
+        # Step 5: Auto-generate property microsite (non-blocking)
+        try:
+            await workflow.execute_activity(
+                run_microsite_generator, ctx,
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except Exception as exc:
+            workflow.logger.warning("microsite_failed listing=%s error=%s", input.listing_id, exc)
+
+        # Step 6: Learn from human overrides for this listing
         await workflow.execute_activity(
             run_learning, ctx,
             start_to_close_timeout=_DEFAULT_TIMEOUT,

@@ -64,6 +64,11 @@ and agents upload raw property photos, and a 15-agent AI pipeline automatically:
 - Writes social media captions for Instagram and Facebook
 - Builds 3D floor plan visualizations
 - Produces cinematic video tours and social clips
+- Virtual staging: AI-furnished photos for empty rooms (addon, 15 credits, 6 styles: modern, contemporary, minimalist, coastal, traditional, luxury)
+- AI image editing: remove objects (yard signs, people, watermarks), enhance lighting, declutter rooms, auto-fix MLS compliance issues (addon, 5 credits)
+- CMA reports: on-demand Comparative Market Analysis with comparable sales, price/sqft analysis, and AI narrative (addon, 10 credits)
+- Property microsites: auto-generated single-property landing pages with photo gallery, video tour, details, and downloadable QR codes for yard signs
+- Multi-language descriptions: listing descriptions in 10 languages (English, Spanish, French, German, Portuguese, Chinese, Japanese, Korean, Italian, Arabic). Set default in Settings or override per-listing.
 
 ## Listing Pipeline & States
 A listing goes through these stages:

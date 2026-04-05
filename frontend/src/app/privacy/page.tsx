@@ -8,7 +8,7 @@ export default function PrivacyPolicyPage() {
         >
           Privacy Policy for ListingJet
         </h1>
-        <p className="text-sm text-slate-400 mb-8">Last updated: April 2, 2026</p>
+        <p className="text-sm text-slate-400 mb-8">Last updated: April 4, 2026</p>
 
         <div className="prose prose-slate prose-sm max-w-none space-y-6 text-[var(--color-text-secondary)]">
           <section>
@@ -65,9 +65,10 @@ export default function PrivacyPolicyPage() {
                 scoring.
               </li>
               <li>
-                <strong>OpenAI (GPT-4V)</strong> &mdash; Deep image analysis, automated 3D floorplan JSON generation,
-                chapter marker extraction, and compliance detection (identifying MLS violations such as visible yard
-                signs or people).
+                <strong>OpenAI (GPT-4V / DALL-E 3)</strong> &mdash; Deep image analysis, automated 3D floorplan JSON generation,
+                chapter marker extraction, compliance detection (identifying MLS violations such as visible yard
+                signs or people), virtual staging of empty rooms, AI image editing (object removal, lighting
+                enhancement), and CMA report narrative generation.
               </li>
               <li>
                 <strong>Anthropic (Claude 3)</strong> &mdash; Dual-tone property descriptions (MLS-compliant and
