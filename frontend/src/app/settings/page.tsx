@@ -113,7 +113,7 @@ function BrandKitSettings() {
 
   /* ─── Load language preference ─── */
   useEffect(() => {
-    apiClient.request<{ preferred_language?: string }>("/settings")
+    apiClient.getSettings()
       .then((s) => { if (s.preferred_language) setLanguagePref(s.preferred_language); })
       .catch(() => {});
   }, []);
@@ -306,7 +306,7 @@ function BrandKitSettings() {
                     const lang = e.target.value;
                     setLanguagePref(lang);
                     try {
-                      await apiClient.request("/settings", { method: "PATCH", body: JSON.stringify({ preferred_language: lang }) });
+                      await apiClient.updateSettings({ preferred_language: lang });
                     } catch { /* silent */ }
                   }}
                   className="w-full max-w-xs px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"

@@ -292,6 +292,15 @@ class ApiClient {
     return this.request<BillingStatusResponse>("/billing/status");
   }
 
+  // Tenant Settings
+  async getSettings(): Promise<{ tenant_id: string; name: string; plan: string; webhook_url: string | null; preferred_language: string }> {
+    return this.request("/settings");
+  }
+
+  async updateSettings(data: { webhook_url?: string | null; preferred_language?: string }): Promise<{ tenant_id: string; name: string; plan: string; webhook_url: string | null; preferred_language: string }> {
+    return this.request("/settings", { method: "PATCH", body: JSON.stringify(data) });
+  }
+
   async billingCheckout(priceId: string, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
     return this.request<{ checkout_url: string }>("/billing/checkout", {
       method: "POST",
