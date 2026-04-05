@@ -82,7 +82,14 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
+    qwen_api_key: str = ""
+    gemini_api_key: str = ""
     use_mock_providers: bool = False
+
+    # LLM / Vision provider routing (values: "claude", "qwen", "gemma")
+    llm_provider: str = "claude"
+    vision_provider_tier1: str = "google"  # "google" | "gemma" | "qwen"
+    vision_provider_tier2: str = "openai"  # "openai" | "qwen" | "gemma"
 
     # Google OAuth
     google_oauth_client_id: str = ""

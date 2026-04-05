@@ -14,6 +14,13 @@ def get_vision_provider() -> VisionProvider:
     if settings.use_mock_providers:
         from .mock import MockVisionProvider
         return MockVisionProvider()
+    tier = settings.vision_provider_tier1
+    if tier == "gemma":
+        from .gemma import GemmaVisionProvider
+        return GemmaVisionProvider()
+    if tier == "qwen":
+        from .qwen import QwenVisionProvider
+        return QwenVisionProvider()
     from .google_vision import GoogleVisionProvider
     return GoogleVisionProvider()
 
@@ -22,6 +29,13 @@ def get_llm_provider() -> LLMProvider:
     if settings.use_mock_providers:
         from .mock import MockLLMProvider
         return MockLLMProvider()
+    provider = settings.llm_provider
+    if provider == "qwen":
+        from .qwen import QwenProvider
+        return QwenProvider()
+    if provider == "gemma":
+        from .gemma import GemmaProvider
+        return GemmaProvider()
     from .claude import ClaudeProvider
     return ClaudeProvider()
 
