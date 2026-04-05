@@ -119,7 +119,55 @@ async def list_listings(
     query = base_query.order_by(Listing.created_at.desc()).limit(page_size).offset(offset)
     result = await db.execute(query)
     listings = result.scalars().all()
-    items = [ListingResponse.from_orm_listing(listing) for listing in listings]
+
+    # Fetch thumbnails: hero photo (PackageSelection pos 0) or first uploaded asset
+    listing_ids = [item.id for item in listings]
+    thumbnail_map: dict[uuid.UUID, str | None] = {}
+    if listing_ids:
+        try:
+            from sqlalchemy import and_
+
+            from listingjet.services.storage import get_storage
+            storage = get_storage()
+
+            # Hero photos from PackageSelection
+            hero_rows = (await db.execute(
+                select(PackageSelection.listing_id, Asset.file_path)
+                .join(Asset, PackageSelection.asset_id == Asset.id)
+                .where(PackageSelection.listing_id.in_(listing_ids), PackageSelection.position == 0)
+            )).all()
+            for lid, fpath in hero_rows:
+                try:
+                    thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+                except Exception:
+                    pass
+
+            # Fallback: first asset for listings without hero
+            missing = [lid for lid in listing_ids if lid not in thumbnail_map]
+            if missing:
+                subq = (
+                    select(Asset.listing_id, func.min(Asset.created_at).label("min_created"))
+                    .where(Asset.listing_id.in_(missing))
+                    .group_by(Asset.listing_id)
+                    .subquery()
+                )
+                first_assets = (await db.execute(
+                    select(Asset.listing_id, Asset.file_path)
+                    .join(subq, and_(Asset.listing_id == subq.c.listing_id, Asset.created_at == subq.c.min_created))
+                )).all()
+                for lid, fpath in first_assets:
+                    if lid not in thumbnail_map:
+                        try:
+                            thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+                        except Exception:
+                            pass
+        except Exception:
+            logger.exception("thumbnail_fetch_failed")
+
+    items = [
+        ListingResponse.from_orm_listing(listing, thumbnail_url=thumbnail_map.get(listing.id))
+        for listing in listings
+    ]
 
     return {
         "items": items,
