@@ -10,34 +10,58 @@ from listingjet.config import settings
 from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider, VisionProvider
 
 
-def get_vision_provider() -> VisionProvider:
-    if settings.use_mock_providers:
-        from .mock import MockVisionProvider
-        return MockVisionProvider()
-    tier = settings.vision_provider_tier1
-    if tier == "gemma":
-        from .gemma import GemmaVisionProvider
-        return GemmaVisionProvider()
-    if tier == "qwen":
-        from .qwen import QwenVisionProvider
-        return QwenVisionProvider()
-    from .google_vision import GoogleVisionProvider
-    return GoogleVisionProvider()
-
-
-def get_llm_provider() -> LLMProvider:
-    if settings.use_mock_providers:
-        from .mock import MockLLMProvider
-        return MockLLMProvider()
-    provider = settings.llm_provider
-    if provider == "qwen":
+def _build_llm(name: str) -> LLMProvider:
+    if name == "qwen":
         from .qwen import QwenProvider
         return QwenProvider()
-    if provider == "gemma":
+    if name == "gemma":
         from .gemma import GemmaProvider
         return GemmaProvider()
     from .claude import ClaudeProvider
     return ClaudeProvider()
+
+
+def _build_vision(name: str) -> VisionProvider:
+    if name == "gemma":
+        from .gemma import GemmaVisionProvider
+        return GemmaVisionProvider()
+    if name == "qwen":
+        from .qwen import QwenVisionProvider
+        return QwenVisionProvider()
+    if name == "openai":
+        from .openai_vision import OpenAIVisionProvider
+        return OpenAIVisionProvider()
+    from .google_vision import GoogleVisionProvider
+    return GoogleVisionProvider()
+
+
+def get_vision_provider(agent: str | None = None) -> VisionProvider:
+    """Return a vision provider, optionally routed by agent name."""
+    if settings.use_mock_providers:
+        from .mock import MockVisionProvider
+        return MockVisionProvider()
+    from ._routing import resolve_vision_provider
+    name = resolve_vision_provider(agent, default=settings.vision_provider_tier1)
+    return _build_vision(name)
+
+
+def get_llm_provider(agent: str | None = None) -> LLMProvider:
+    """Return an LLM provider, optionally routed by agent name.
+
+    When LLM_FALLBACK_ENABLED=true the returned provider transparently
+    falls back to Claude if the primary call fails.
+    """
+    if settings.use_mock_providers:
+        from .mock import MockLLMProvider
+        return MockLLMProvider()
+    from ._routing import resolve_llm_provider
+    name = resolve_llm_provider(agent)
+    primary = _build_llm(name)
+    if settings.llm_fallback_enabled and name != "claude":
+        from .claude import ClaudeProvider
+        from .fallback import FallbackLLMProvider
+        return FallbackLLMProvider(primary=primary, fallback=ClaudeProvider())
+    return primary
 
 
 def get_image_edit_provider() -> ImageEditProvider:

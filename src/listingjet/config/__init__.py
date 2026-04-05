@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     llm_provider: str = "claude"
     vision_provider_tier1: str = "google"  # "google" | "gemma" | "qwen"
     vision_provider_tier2: str = "openai"  # "openai" | "qwen" | "gemma"
+    # Per-agent overrides, JSON: {"llm": {"floorplan": "qwen"}, "vision": {"photo_compliance": "gemma"}}
+    agent_model_routing: str = ""
+    # Enable fallback chain: try primary provider, fall back to Claude on failure
+    llm_fallback_enabled: bool = False
 
     # Google OAuth
     google_oauth_client_id: str = ""

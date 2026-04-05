@@ -11,12 +11,26 @@ from listingjet.monitoring.metrics import emit_metric
 
 logger = logging.getLogger(__name__)
 
-# Estimated cost per provider call in USD
+# Estimated cost per provider call in USD (flat per-call heuristic)
 PROVIDER_COSTS: dict[str, float] = {
     "google_vision": 0.02,
     "claude": 0.05,
     "openai_gpt4v": 0.03,
     "kling": 0.50,
+    "qwen": 0.01,
+    "qwen_vision": 0.01,
+    "gemma": 0.003,
+    "gemma_vision": 0.003,
+}
+
+# Per-1M-token cost in USD: (input_rate, output_rate)
+TOKEN_COSTS: dict[str, tuple[float, float]] = {
+    "claude": (3.00, 15.00),
+    "qwen": (0.26, 1.56),      # estimated from Qwen3.5-Plus rates
+    "qwen_vision": (0.26, 1.56),
+    "gemma": (0.14, 0.40),     # Gemma 4 31B via Gemini API
+    "gemma_vision": (0.14, 0.40),
+    "openai_gpt4v": (2.50, 10.00),
 }
 
 
@@ -48,6 +62,26 @@ def record_provider_call(provider_name: str, success: bool) -> None:
         unit="Count",
         dimensions={"provider": provider_name, "success": str(success)},
     )
+
+
+def record_token_usage(
+    provider_name: str,
+    input_tokens: int,
+    output_tokens: int,
+    agent_name: str | None = None,
+) -> None:
+    """Record token counts and compute estimated cost from TOKEN_COSTS."""
+    rates = TOKEN_COSTS.get(provider_name)
+    if rates is None:
+        return
+    in_rate, out_rate = rates
+    cost = (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
+    dims = {"provider": provider_name}
+    if agent_name:
+        dims["agent"] = agent_name
+    emit_metric("TokensInput", input_tokens, unit="Count", dimensions=dims)
+    emit_metric("TokensOutput", output_tokens, unit="Count", dimensions=dims)
+    emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
 
 
 def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> None:

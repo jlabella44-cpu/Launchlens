@@ -15,8 +15,9 @@ import json
 import httpx
 
 from listingjet.config import settings
-from listingjet.services.metrics import record_provider_call
+from listingjet.services.metrics import record_provider_call, record_token_usage
 
+from ._retry import with_retries
 from .base import LLMProvider, VisionLabel, VisionProvider
 
 _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -33,6 +34,28 @@ _VISION_SYSTEM_PROMPT = (
     "and 'category' (one of: shot_type, quality, feature, room) fields. "
     "Return only valid JSON, no markdown."
 )
+
+
+async def _post(
+    endpoint: str, api_key: str, payload: dict, provider_label: str
+) -> dict:
+    async def _do() -> dict:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                endpoint,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+                timeout=60.0,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    return await with_retries(_do, provider=provider_label)
+
+
+def _extract_usage(body: dict) -> tuple[int, int]:
+    usage = body.get("usage") or {}
+    return int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
 
 
 class GemmaProvider(LLMProvider):
@@ -65,16 +88,12 @@ class GemmaProvider(LLMProvider):
             payload["temperature"] = max(0.0, min(1.0, temperature))
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self._endpoint,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                    json=payload,
-                    timeout=60.0,
-                )
-                response.raise_for_status()
-                result = response.json()["choices"][0]["message"]["content"]
+            body = await _post(self._endpoint, self._api_key, payload, "gemma")
+            result = body["choices"][0]["message"]["content"]
+            input_tokens, output_tokens = _extract_usage(body)
             record_provider_call("gemma", True)
+            if input_tokens or output_tokens:
+                record_token_usage("gemma", input_tokens, output_tokens)
             return result
         except Exception:
             record_provider_call("gemma", False)
@@ -112,20 +131,16 @@ class GemmaVisionProvider(VisionProvider):
         }
         try:
             async with self._semaphore:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        self._endpoint,
-                        headers={"Authorization": f"Bearer {self._api_key}"},
-                        json=payload,
-                        timeout=60.0,
-                    )
-                    response.raise_for_status()
-                    content = response.json()["choices"][0]["message"]["content"]
-                    try:
-                        data = json.loads(content)
-                    except json.JSONDecodeError as e:
-                        raise ValueError(f"Gemma returned unparseable JSON: {content!r}") from e
+                body = await _post(self._endpoint, self._api_key, payload, "gemma_vision")
+            content = body["choices"][0]["message"]["content"]
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Gemma returned unparseable JSON: {content!r}") from e
+            input_tokens, output_tokens = _extract_usage(body)
             record_provider_call("gemma_vision", True)
+            if input_tokens or output_tokens:
+                record_token_usage("gemma_vision", input_tokens, output_tokens)
         except Exception:
             record_provider_call("gemma_vision", False)
             raise
@@ -155,16 +170,12 @@ class GemmaVisionProvider(VisionProvider):
         }
         try:
             async with self._semaphore:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        self._endpoint,
-                        headers={"Authorization": f"Bearer {self._api_key}"},
-                        json=payload,
-                        timeout=60.0,
-                    )
-                    response.raise_for_status()
-                    result = response.json()["choices"][0]["message"]["content"]
+                body = await _post(self._endpoint, self._api_key, payload, "gemma_vision")
+            result = body["choices"][0]["message"]["content"]
+            input_tokens, output_tokens = _extract_usage(body)
             record_provider_call("gemma_vision", True)
+            if input_tokens or output_tokens:
+                record_token_usage("gemma_vision", input_tokens, output_tokens)
             return result
         except Exception:
             record_provider_call("gemma_vision", False)
