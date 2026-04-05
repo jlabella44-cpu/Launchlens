@@ -37,9 +37,17 @@ export function PackageViewer({ selections }: PackageViewerProps) {
               <span className="text-sm font-mono text-[var(--color-text-secondary)] w-6">
                 #{sel.position + 1}
               </span>
-              <span className="text-sm text-[var(--color-text)] truncate max-w-[200px]">
-                {sel.asset_id.slice(0, 8)}...
-              </span>
+              {sel.thumbnail_url ? (
+                <img
+                  src={sel.thumbnail_url}
+                  alt={`Photo ${sel.position + 1}`}
+                  className="w-12 h-9 object-cover rounded"
+                />
+              ) : (
+                <div className="w-12 h-9 rounded bg-slate-100 flex items-center justify-center">
+                  <span className="text-[10px] text-slate-400">{sel.asset_id.slice(0, 6)}</span>
+                </div>
+              )}
               {sel.position === 0 && (
                 <span className="text-xs font-bold text-[var(--color-cta)] bg-orange-50 px-2 py-0.5 rounded-full">
                   HERO

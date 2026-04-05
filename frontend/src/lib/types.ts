@@ -52,6 +52,7 @@ export interface PackageSelection {
   position: number;
   composite_score: number;
   selected_by: string;
+  thumbnail_url: string | null;
 }
 
 export interface ExportResponse {

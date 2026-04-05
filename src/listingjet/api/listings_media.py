@@ -227,21 +227,30 @@ async def get_package(
         raise HTTPException(status_code=404, detail="Listing not found")
 
     result = await db.execute(
-        select(PackageSelection)
+        select(PackageSelection, Asset.file_path)
+        .join(Asset, PackageSelection.asset_id == Asset.id)
         .where(PackageSelection.listing_id == listing.id)
         .order_by(PackageSelection.position)
     )
-    selections = result.scalars().all()
-    return [
-        {
+    rows = result.all()
+
+    storage = get_storage()
+    items = []
+    for s, file_path in rows:
+        thumb = None
+        try:
+            thumb = storage.presigned_url(file_path, expires_in=3600)
+        except Exception:
+            pass
+        items.append({
             "asset_id": str(s.asset_id),
             "channel": s.channel,
             "position": s.position,
             "composite_score": s.composite_score,
             "selected_by": s.selected_by,
-        }
-        for s in selections
-    ]
+            "thumbnail_url": thumb,
+        })
+    return items
 
 
 @router.post("/{listing_id}/package/reorder")
