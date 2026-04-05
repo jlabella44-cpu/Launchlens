@@ -124,39 +124,53 @@ async def list_listings(
     listing_ids = [item.id for item in listings]
     thumbnail_map: dict[uuid.UUID, str | None] = {}
     if listing_ids:
-        from listingjet.services.storage import get_storage
-        storage = get_storage()
+        try:
+            from listingjet.services.storage import get_storage
+            storage = get_storage()
 
-        # Try PackageSelection hero (position 0) first
-        hero_rows = (await db.execute(
-            select(PackageSelection.listing_id, Asset.file_path)
-            .join(Asset, PackageSelection.asset_id == Asset.id)
-            .where(
-                PackageSelection.listing_id.in_(listing_ids),
-                PackageSelection.position == 0,
-            )
-        )).all()
-        for lid, fpath in hero_rows:
-            try:
-                thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
-            except Exception:
-                pass
-
-        # Fall back to first uploaded asset for listings without a hero
-        missing = [lid for lid in listing_ids if lid not in thumbnail_map]
-        if missing:
-            first_assets = (await db.execute(
-                select(Asset.listing_id, Asset.file_path)
-                .where(Asset.listing_id.in_(missing))
-                .distinct(Asset.listing_id)
-                .order_by(Asset.listing_id, Asset.created_at.asc())
+            # Try PackageSelection hero (position 0) first
+            hero_rows = (await db.execute(
+                select(PackageSelection.listing_id, Asset.file_path)
+                .join(Asset, PackageSelection.asset_id == Asset.id)
+                .where(
+                    PackageSelection.listing_id.in_(listing_ids),
+                    PackageSelection.position == 0,
+                )
             )).all()
-            for lid, fpath in first_assets:
-                if lid not in thumbnail_map:
-                    try:
-                        thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
-                    except Exception:
-                        pass
+            for lid, fpath in hero_rows:
+                try:
+                    thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+                except Exception:
+                    logger.warning("thumbnail_presign_failed listing=%s path=%s", lid, fpath)
+
+            # Fall back to first uploaded asset for listings without a hero
+            missing = [lid for lid in listing_ids if lid not in thumbnail_map]
+            if missing:
+                # Use a subquery to get min created_at per listing, then join back
+                from sqlalchemy import and_
+                subq = (
+                    select(Asset.listing_id, func.min(Asset.created_at).label("min_created"))
+                    .where(Asset.listing_id.in_(missing))
+                    .group_by(Asset.listing_id)
+                    .subquery()
+                )
+                first_assets = (await db.execute(
+                    select(Asset.listing_id, Asset.file_path)
+                    .join(subq, and_(
+                        Asset.listing_id == subq.c.listing_id,
+                        Asset.created_at == subq.c.min_created,
+                    ))
+                )).all()
+                for lid, fpath in first_assets:
+                    if lid not in thumbnail_map:
+                        try:
+                            thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+                        except Exception:
+                            logger.warning("thumbnail_presign_failed listing=%s path=%s", lid, fpath)
+
+            logger.info("thumbnails_resolved count=%d total_listings=%d", len(thumbnail_map), len(listing_ids))
+        except Exception:
+            logger.exception("thumbnail_fetch_failed")
 
     items = [
         ListingResponse.from_orm_listing(listing, thumbnail_url=thumbnail_map.get(listing.id))

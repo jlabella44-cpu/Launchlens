@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
@@ -382,17 +382,28 @@ async def shared_with_me(
 
     thumbnail_map: dict = {}
     if listing_ids:
-        first_assets = (await db.execute(
-            select(Asset.listing_id, Asset.file_path)
-            .where(Asset.listing_id.in_(listing_ids))
-            .distinct(Asset.listing_id)
-            .order_by(Asset.listing_id, Asset.created_at.asc())
-        )).all()
-        for lid, fpath in first_assets:
-            try:
-                thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
-            except Exception:
-                pass
+        try:
+            from sqlalchemy import and_
+            subq = (
+                select(Asset.listing_id, func.min(Asset.created_at).label("min_created"))
+                .where(Asset.listing_id.in_(listing_ids))
+                .group_by(Asset.listing_id)
+                .subquery()
+            )
+            first_assets = (await db.execute(
+                select(Asset.listing_id, Asset.file_path)
+                .join(subq, and_(
+                    Asset.listing_id == subq.c.listing_id,
+                    Asset.created_at == subq.c.min_created,
+                ))
+            )).all()
+            for lid, fpath in first_assets:
+                try:
+                    thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     results = []
     for listing, perm in rows.all():

@@ -53,19 +53,30 @@ async def admin_list_listings(
     listing_ids = [listing.id for listing, _ in rows]
     thumbnail_map: dict = {}
     if listing_ids:
-        from listingjet.services.storage import get_storage
-        storage = get_storage()
-        first_assets = (await db.execute(
-            select(Asset.listing_id, Asset.file_path)
-            .where(Asset.listing_id.in_(listing_ids))
-            .distinct(Asset.listing_id)
-            .order_by(Asset.listing_id, Asset.created_at.asc())
-        )).all()
-        for lid, fpath in first_assets:
-            try:
-                thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
-            except Exception:
-                pass
+        try:
+            from listingjet.services.storage import get_storage
+            storage = get_storage()
+            subq = (
+                select(Asset.listing_id, func.min(Asset.created_at).label("min_created"))
+                .where(Asset.listing_id.in_(listing_ids))
+                .group_by(Asset.listing_id)
+                .subquery()
+            )
+            from sqlalchemy import and_
+            first_assets = (await db.execute(
+                select(Asset.listing_id, Asset.file_path)
+                .join(subq, and_(
+                    Asset.listing_id == subq.c.listing_id,
+                    Asset.created_at == subq.c.min_created,
+                ))
+            )).all()
+            for lid, fpath in first_assets:
+                try:
+                    thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     return [
         AdminListingResponse(
