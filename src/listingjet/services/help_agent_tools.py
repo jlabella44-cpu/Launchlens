@@ -157,12 +157,31 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "search_resolved_tickets",
+        "description": (
+            "Search previously resolved support tickets for similar issues. "
+            "Use this BEFORE escalating to check if a similar problem was already solved. "
+            "Returns matching tickets with their resolution notes."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search keywords describing the issue.",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    {
         "name": "request_human_support",
         "description": (
-            "Escalate to human support when you cannot resolve the user's issue. "
-            "This sends an email to the ListingJet support team with a summary. "
+            "Escalate to human support by creating a support ticket. "
+            "This creates a tracked ticket with the full chat transcript attached. "
             "Use this when the user is frustrated, asks the same question 3+ times, "
-            "or when the issue requires human intervention."
+            "or when the issue requires human intervention. "
+            "Always search_resolved_tickets first to check if a similar issue was already solved."
         ),
         "input_schema": {
             "type": "object",
@@ -422,28 +441,131 @@ async def get_listing_addons(
     }
 
 
-async def request_human_support(
-    db: AsyncSession, tenant_id: uuid.UUID, summary: str, user_email: str, user_name: str
+async def search_resolved_tickets(
+    db: AsyncSession, tenant_id: uuid.UUID, query: str
 ) -> dict:
-    from listingjet.services.email import get_email_service
+    """Search resolved support tickets for similar issues."""
+    from listingjet.models.support_ticket import SupportTicket, TicketStatus
 
-    email_svc = get_email_service()
+    query = query.strip()[:200]
+    if len(query) < 2:
+        return {"results": [], "count": 0}
+
+    from sqlalchemy import String as SAString
+    from sqlalchemy import cast, or_
+
+    result = await db.execute(
+        select(SupportTicket)
+        .where(
+            SupportTicket.tenant_id == tenant_id,
+            SupportTicket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED]),
+            or_(
+                cast(SupportTicket.subject, SAString).ilike(f"%{query}%"),
+                cast(SupportTicket.resolution_note, SAString).ilike(f"%{query}%"),
+            ),
+        )
+        .order_by(SupportTicket.updated_at.desc())
+        .limit(3)
+    )
+    tickets = result.scalars().all()
+    return {
+        "results": [
+            {
+                "id": str(t.id),
+                "subject": t.subject,
+                "resolution": t.resolution_note or "(no resolution note)",
+                "resolved_at": _serialise_datetime(t.updated_at),
+            }
+            for t in tickets
+        ],
+        "count": len(tickets),
+    }
+
+
+async def request_human_support(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    summary: str,
+    user_email: str,
+    user_name: str,
+    session_id: str = "",
+) -> dict:
+    """Create a support ticket with the chat transcript attached."""
+    from listingjet.models.support_ticket import (
+        SupportMessage,
+        SupportTicket,
+        TicketCategory,
+        TicketPriority,
+        TicketStatus,
+    )
+
+    # Look up user ID
+    user_result = await db.execute(
+        select(User).where(User.email == user_email, User.tenant_id == tenant_id)
+    )
+    user = user_result.scalar_one_or_none()
+    if not user:
+        return {"status": "failed", "message": "Could not find your account. Please email support@listingjet.com directly."}
+
+    # Load chat transcript from Redis
+    chat_transcript = None
+    if session_id:
+        try:
+            from listingjet.services.help_agent import _load_history
+            chat_transcript = _load_history(user.id, session_id)
+        except Exception:
+            pass
+
     try:
+        ticket = SupportTicket(
+            tenant_id=tenant_id,
+            user_id=user.id,
+            subject=f"AI Agent Escalation: {summary[:80]}",
+            category=TicketCategory.OTHER,
+            priority=TicketPriority.NORMAL,
+            status=TicketStatus.OPEN,
+            chat_session_id=session_id or None,
+        )
+        db.add(ticket)
+        await db.flush()
+
+        metadata = {}
+        if chat_transcript:
+            metadata["chat_transcript"] = chat_transcript
+
+        message = SupportMessage(
+            ticket_id=ticket.id,
+            user_id=user.id,
+            content=summary,
+            is_admin_reply=False,
+            metadata_=metadata if metadata else None,
+        )
+        db.add(message)
+
+        # Also send email notification
+        from listingjet.services.email import get_email_service
+        email_svc = get_email_service()
         email_svc.send(
             to="support@listingjet.com",
             subject=f"Help Agent Escalation — {user_name or user_email}",
             html_body=(
-                f"<h3>Support Request via AI Help Agent</h3>"
+                f"<h3>Support Ticket Created via AI Help Agent</h3>"
+                f"<p><strong>Ticket ID:</strong> {ticket.id}</p>"
                 f"<p><strong>User:</strong> {user_name} ({user_email})</p>"
-                f"<p><strong>Tenant ID:</strong> {tenant_id}</p>"
                 f"<p><strong>Summary:</strong></p>"
                 f"<p>{summary}</p>"
             ),
         )
-        return {"status": "sent", "message": "Your request has been sent to our support team. They'll be in touch shortly."}
+
+        ticket_short = str(ticket.id)[:8]
+        return {
+            "status": "created",
+            "ticket_id": str(ticket.id),
+            "message": f"I've created support ticket #{ticket_short} for you. Our team will respond shortly. You can track it on the Support page.",
+        }
     except Exception:
-        logger.exception("help_agent.escalation_failed tenant=%s", tenant_id)
-        return {"status": "failed", "message": "We couldn't send the support request right now. Please try again or email support@listingjet.com directly."}
+        logger.exception("help_agent.ticket_creation_failed tenant=%s", tenant_id)
+        return {"status": "failed", "message": "We couldn't create the support ticket right now. Please try again or email support@listingjet.com directly."}
 
 
 # ---------------------------------------------------------------------------
@@ -473,6 +595,7 @@ async def execute_tool(
     tenant_id: uuid.UUID,
     user_email: str = "",
     user_name: str = "",
+    session_id: str = "",
 ) -> str:
     """Execute a tool by name and return JSON string result.
 
@@ -483,12 +606,18 @@ async def execute_tool(
             result = await get_credit_pricing()
         elif tool_name == "get_addon_catalog":
             result = await get_addon_catalog(db)
+        elif tool_name == "search_resolved_tickets":
+            result = await search_resolved_tickets(
+                db, tenant_id,
+                query=str(tool_input.get("query", ""))[:200],
+            )
         elif tool_name == "request_human_support":
             result = await request_human_support(
                 db, tenant_id,
                 summary=str(tool_input.get("summary", ""))[:1000],
                 user_email=user_email,
                 user_name=user_name,
+                session_id=session_id,
             )
         elif tool_name in _TENANT_TOOLS:
             fn = _TENANT_TOOLS[tool_name]

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import UUID, DateTime, Integer, String, func
+from sqlalchemy import UUID, Boolean, DateTime, Float, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from listingjet.database import Base
@@ -22,4 +22,8 @@ class Tenant(Base):
     credit_balance: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     included_credits: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     rollover_cap: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    preferred_language: Mapped[str] = mapped_column(String(10), default="en", server_default="en")
+    # Review settings
+    auto_approve_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    auto_approve_threshold: Mapped[float] = mapped_column(Float, default=85.0, server_default="85.0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

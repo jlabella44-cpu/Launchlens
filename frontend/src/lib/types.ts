@@ -31,6 +31,7 @@ export interface ListingResponse {
     price?: number;
   };
   state: string;
+  thumbnail_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -121,6 +122,17 @@ export interface VideoUploadResponse {
 
 export interface DemoUploadRequest {
   file_paths: string[];
+}
+
+export interface DemoCreateResponse {
+  demo_id: string;
+  upload_urls: Array<{
+    index: number;
+    key: string;
+    upload_url: { url: string; fields: Record<string, string> } | null;
+    content_type: string;
+  }>;
+  expires_at: string;
 }
 
 export interface DemoUploadResponse {
@@ -253,6 +265,21 @@ export interface ReviewQueueItem {
   state: string;
   asset_count: number;
   created_at: string;
+}
+
+export interface ReviewAnalytics {
+  override_rate: number;
+  avg_trust_score: number;
+  total_selections: number;
+  human_overrides: number;
+  total_reviewed: number;
+  total_auto_approved: number;
+  override_trend: Array<{
+    month: string;
+    override_rate: number;
+    total_selections: number;
+    human_overrides: number;
+  }>;
 }
 
 export interface RejectRequest {
@@ -450,6 +477,49 @@ export interface CreditDataPoint {
   balance_after: number;
   type: string;
   description: string | null;
+}
+
+// Support Tickets
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  category: string;
+  priority: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  user_email?: string;
+  user_name?: string;
+  chat_session_id?: string;
+  resolution_note?: string;
+}
+
+export interface SupportMessage {
+  id: string;
+  user_id: string;
+  content: string;
+  is_admin_reply: boolean;
+  created_at: string;
+  user_name?: string;
+  user_email?: string;
+  chat_transcript?: Array<{ role: string; content: string }>;
+}
+
+export interface SupportTicketDetail extends SupportTicket {
+  messages: SupportMessage[];
+}
+
+export interface SupportTicketList {
+  items: SupportTicket[];
+  total: number;
+}
+
+export interface SupportTicketStats {
+  open_count: number;
+  in_progress_count: number;
+  resolved_today: number;
+  avg_response_hours: number | null;
 }
 
 export interface AnalyticsCredits {

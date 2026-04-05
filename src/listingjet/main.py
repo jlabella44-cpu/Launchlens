@@ -17,16 +17,20 @@ from listingjet.api import (
     brand_kit,
     bulk,
     canva_oauth,
+    cma,
     credits,
     demo,
     health,
     help_agent,
+    image_edit,
     listing_permissions,
     listings_core,
     listings_media,
     listings_workflow,
+    microsite,
     properties,
     sse,
+    support,
     team,
     tenant_settings,
 )
@@ -96,6 +100,7 @@ _TAG_METADATA = [
     {"name": "sse", "description": "Server-Sent Events for real-time pipeline updates"},
     {"name": "team", "description": "Team member management within a tenant"},
     {"name": "help-agent", "description": "AI help agent for product support and data lookups"},
+    {"name": "support", "description": "Support tickets and customer service"},
 ]
 
 
@@ -150,9 +155,13 @@ def create_app() -> FastAPI:
     app.include_router(credits.router, prefix="/credits", tags=["credits"])
     app.include_router(addons.router, prefix="/addons", tags=["addons"])
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
+    app.include_router(cma.router, prefix="/listings", tags=["listings"])
+    app.include_router(microsite.router, prefix="/listings", tags=["listings"])
+    app.include_router(image_edit.router, prefix="/listings", tags=["image-editing"])
     app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
+    app.include_router(support.router, prefix="/support", tags=["support"])
     app.include_router(health.router)
 
     from fastapi.responses import JSONResponse

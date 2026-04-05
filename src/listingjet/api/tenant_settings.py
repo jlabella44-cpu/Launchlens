@@ -27,17 +27,33 @@ from listingjet.services.plan_limits import get_limits
 router = APIRouter()
 
 
+SUPPORTED_LANGUAGES = {"en", "es", "fr", "de", "pt", "zh", "ja", "ko", "it", "ar"}
+
+
 class TenantSettingsResponse(BaseModel):
     tenant_id: uuid.UUID
     name: str
     plan: str
     webhook_url: str | None
+    preferred_language: str = "en"
+    auto_approve_enabled: bool = False
+    auto_approve_threshold: float = 85.0
 
     model_config = {"from_attributes": True}
 
 
 class UpdateSettingsRequest(BaseModel):
     webhook_url: str | None = None
+    preferred_language: str | None = None
+    auto_approve_enabled: bool | None = None
+    auto_approve_threshold: float | None = None
+
+    @field_validator("preferred_language")
+    @classmethod
+    def validate_language(cls, v: str | None) -> str | None:
+        if v is not None and v not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"Unsupported language. Choose from: {', '.join(sorted(SUPPORTED_LANGUAGES))}")
+        return v
 
     @field_validator("webhook_url")
     @classmethod
@@ -69,6 +85,9 @@ async def get_settings(
         name=tenant.name,
         plan=tenant.plan,
         webhook_url=tenant.webhook_url,
+        preferred_language=tenant.preferred_language,
+        auto_approve_enabled=tenant.auto_approve_enabled,
+        auto_approve_threshold=tenant.auto_approve_threshold,
     )
 
 
@@ -85,6 +104,14 @@ async def update_settings(
 
     if body.webhook_url is not None:
         tenant.webhook_url = body.webhook_url or None
+    if body.preferred_language is not None:
+        tenant.preferred_language = body.preferred_language
+    if body.auto_approve_enabled is not None:
+        tenant.auto_approve_enabled = body.auto_approve_enabled
+    if body.auto_approve_threshold is not None:
+        if not (50.0 <= body.auto_approve_threshold <= 100.0):
+            raise HTTPException(400, "auto_approve_threshold must be between 50 and 100")
+        tenant.auto_approve_threshold = body.auto_approve_threshold
 
     await db.commit()
     await db.refresh(tenant)
@@ -93,6 +120,9 @@ async def update_settings(
         name=tenant.name,
         plan=tenant.plan,
         webhook_url=tenant.webhook_url,
+        preferred_language=tenant.preferred_language,
+        auto_approve_enabled=tenant.auto_approve_enabled,
+        auto_approve_threshold=tenant.auto_approve_threshold,
     )
 
 

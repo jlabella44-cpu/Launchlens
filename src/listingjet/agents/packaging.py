@@ -9,6 +9,7 @@ from listingjet.models.asset import Asset
 from listingjet.models.learning_weight import LearningWeight
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
+from listingjet.models.tenant import Tenant
 from listingjet.models.vision_result import VisionResult
 from listingjet.services.weight_manager import WeightManager
 
@@ -95,14 +96,38 @@ class PackagingAgent(BaseAgent):
                     )
                     session.add(ps)
 
-                # Transition listing state
+                # Compute average trust score
+                avg_score = sum(s[0] for s in top) / len(top) if top else 0.0
+
+                # Check if auto-approval is enabled and score meets threshold
                 listing = await session.get(Listing, listing_id)
-                listing.state = ListingState.AWAITING_REVIEW
+                tenant = await session.get(Tenant, tenant_id)
+                auto_approved = False
+                if (
+                    tenant
+                    and tenant.auto_approve_enabled
+                    and avg_score >= tenant.auto_approve_threshold
+                ):
+                    listing.state = ListingState.APPROVED
+                    auto_approved = True
+                else:
+                    listing.state = ListingState.AWAITING_REVIEW
 
-                await self.emit(session, context, "packaging.completed", {"hero_asset_id": hero_asset_id, "total_selected": len(top)})
+                await self.emit(session, context, "packaging.completed", {
+                    "hero_asset_id": hero_asset_id,
+                    "total_selected": len(top),
+                    "avg_trust_score": round(avg_score, 2),
+                    "auto_approved": auto_approved,
+                })
 
-                # Send review-ready notification email
-                from listingjet.services.notifications import notify_review_ready
-                await notify_review_ready(session, listing, context.tenant_id)
+                if not auto_approved:
+                    # Send review-ready notification email
+                    from listingjet.services.notifications import notify_review_ready
+                    await notify_review_ready(session, listing, context.tenant_id)
 
-        return {"hero_asset_id": hero_asset_id, "total_selected": len(top)}
+        return {
+            "hero_asset_id": hero_asset_id,
+            "total_selected": len(top),
+            "avg_trust_score": round(avg_score, 2),
+            "auto_approved": auto_approved,
+        }

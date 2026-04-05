@@ -73,6 +73,9 @@ const ADDONS = [
   { name: "AI Video Tour", cost: "from $24", icon: "🎬" },
   { name: "3D Floorplan", cost: "from $24", icon: "🏠" },
   { name: "Social Content Pack", cost: "1 credit", icon: "📱" },
+  { name: "Virtual Staging", cost: "15 credits", icon: "🛋️" },
+  { name: "AI Photo Editing", cost: "5 credits", icon: "✨" },
+  { name: "CMA Report", cost: "10 credits", icon: "📊" },
 ];
 
 export default function PricingPage() {

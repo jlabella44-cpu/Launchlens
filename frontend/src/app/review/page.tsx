@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/contexts/auth-context";
 import apiClient from "@/lib/api-client";
-import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
+import type { ListingResponse, AssetResponse, PackageSelection, ReviewAnalytics } from "@/lib/types";
 
 const REASON_CODES = [
   { value: "quality", label: "Quality Issues" },
@@ -25,6 +25,183 @@ interface ExpandedData {
   assets: AssetResponse[];
   selections: PackageSelection[];
 }
+
+// --- Draggable Photo Grid ---
+
+function DraggablePhotoGrid({
+  selections,
+  assets,
+  onReorder,
+}: {
+  selections: PackageSelection[];
+  assets: AssetResponse[];
+  onReorder: (fromPos: number, toPos: number) => void;
+}) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+
+  function handleDragStart(idx: number) {
+    setDragIdx(idx);
+  }
+
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    setOverIdx(idx);
+  }
+
+  function handleDrop(idx: number) {
+    if (dragIdx !== null && dragIdx !== idx) {
+      onReorder(dragIdx, idx);
+    }
+    setDragIdx(null);
+    setOverIdx(null);
+  }
+
+  function handleDragEnd() {
+    setDragIdx(null);
+    setOverIdx(null);
+  }
+
+  return (
+    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 mb-4">
+      {selections.map((sel, idx) => {
+        const asset = assets.find((a) => a.id === sel.asset_id);
+        const isDragging = dragIdx === idx;
+        const isOver = overIdx === idx && dragIdx !== idx;
+        const isHumanOverride = sel.selected_by === "human";
+
+        return (
+          <div
+            key={`${sel.asset_id}-${sel.position}`}
+            draggable
+            onDragStart={() => handleDragStart(idx)}
+            onDragOver={(e) => handleDragOver(e, idx)}
+            onDrop={() => handleDrop(idx)}
+            onDragEnd={handleDragEnd}
+            className={`aspect-square rounded-xl overflow-hidden flex items-center justify-center relative cursor-grab active:cursor-grabbing transition-all ${
+              isDragging ? "opacity-40 scale-95" : ""
+            } ${isOver ? "ring-2 ring-[#F97316] scale-105" : ""} ${
+              isHumanOverride
+                ? "ring-2 ring-blue-400"
+                : "bg-gradient-to-br from-slate-100 to-slate-50"
+            }`}
+          >
+            {asset?.thumbnail_url ? (
+              <img
+                src={asset.thumbnail_url}
+                alt={`Photo ${sel.position + 1}`}
+                className="w-full h-full object-cover"
+                draggable={false}
+              />
+            ) : (
+              <svg
+                className="w-5 h-5 text-slate-200"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            )}
+            {/* Position badge */}
+            <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+              {idx === 0 ? "HERO" : idx + 1}
+            </span>
+            {/* Human override indicator */}
+            {isHumanOverride && (
+              <span className="absolute top-1 right-1 bg-blue-500 text-white text-[8px] font-bold px-1 py-0.5 rounded">
+                EDITED
+              </span>
+            )}
+            {/* Score */}
+            <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded">
+              {sel.composite_score?.toFixed(0) ?? "—"}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- Analytics Panel ---
+
+function ReviewAnalyticsPanel() {
+  const [analytics, setAnalytics] = useState<ReviewAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient.getReviewAnalytics().then(setAnalytics).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="h-32 bg-[var(--color-surface)] rounded-2xl animate-pulse border border-[var(--color-card-border)]" />;
+  if (!analytics) return null;
+
+  const trend = analytics.override_trend;
+  const maxRate = Math.max(...trend.map((t) => t.override_rate), 1);
+
+  return (
+    <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-5 mb-6">
+      <h2 className="text-sm font-semibold text-[var(--color-text)] mb-4">Review Intelligence</h2>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">Override Rate</p>
+          <p className={`text-2xl font-bold ${analytics.override_rate < 5 ? "text-green-500" : analytics.override_rate < 15 ? "text-yellow-500" : "text-red-500"}`}>
+            {analytics.override_rate}%
+          </p>
+          <p className="text-[10px] text-[var(--color-text-secondary)]">
+            {analytics.human_overrides} of {analytics.total_selections} photos
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">Avg Trust Score</p>
+          <p className="text-2xl font-bold text-[var(--color-text)]">{analytics.avg_trust_score}%</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">Human Reviewed</p>
+          <p className="text-2xl font-bold text-[var(--color-text)]">{analytics.total_reviewed}</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">Auto-Approved</p>
+          <p className="text-2xl font-bold text-green-500">{analytics.total_auto_approved}</p>
+        </div>
+      </div>
+
+      {/* Override rate trend */}
+      {trend.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold mb-2">Override Rate Trend</p>
+          <div className="flex items-end gap-1 h-16">
+            {trend.map((t) => (
+              <div key={t.month} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className={`w-full rounded-t transition-all ${t.override_rate < 5 ? "bg-green-400" : t.override_rate < 15 ? "bg-yellow-400" : "bg-red-400"}`}
+                  style={{ height: `${Math.max((t.override_rate / maxRate) * 100, 4)}%` }}
+                  title={`${t.month}: ${t.override_rate}% (${t.human_overrides}/${t.total_selections})`}
+                />
+                <span className="text-[8px] text-[var(--color-text-secondary)]">{t.month.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+          {analytics.override_rate < 5 && analytics.total_reviewed >= 20 && (
+            <p className="text-xs text-green-600 mt-2 font-medium">
+              AI confidence is high. Consider enabling auto-approval in Settings.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Main Review Queue ---
 
 function ReviewQueue() {
   const { toast } = useToast();
@@ -101,6 +278,39 @@ function ReviewQueue() {
     }
   }
 
+  async function handleReorder(listingId: string, fromIdx: number, toIdx: number) {
+    const data = expandedData[listingId];
+    if (!data) return;
+
+    const fromPos = data.selections[fromIdx]?.position;
+    const toPos = data.selections[toIdx]?.position;
+    if (fromPos === undefined || toPos === undefined) return;
+
+    // Optimistic update
+    setExpandedData((prev) => {
+      const updated = { ...prev };
+      const sels = [...updated[listingId].selections];
+      // Swap positions
+      const temp = sels[fromIdx];
+      sels[fromIdx] = { ...sels[toIdx], position: fromPos, selected_by: "human" };
+      sels[toIdx] = { ...temp, position: toPos, selected_by: "human" };
+      updated[listingId] = { ...updated[listingId], selections: sels };
+      return updated;
+    });
+
+    try {
+      await apiClient.reorderPackage(listingId, [{ from_position: fromPos, to_position: toPos }]);
+    } catch {
+      toast("Failed to reorder photos", "error");
+      // Reload on error
+      const [assets, selections] = await Promise.all([
+        apiClient.getAssets(listingId),
+        apiClient.getPackage(listingId),
+      ]);
+      setExpandedData((prev) => ({ ...prev, [listingId]: { assets, selections } }));
+    }
+  }
+
   async function handleApprove(id: string) {
     setActionLoading(id);
     try {
@@ -152,15 +362,18 @@ function ReviewQueue() {
           </div>
           <div className="flex items-center justify-between">
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Process pending listings for pre-flight altitude clearance
+              Review AI photo selections. Drag to reorder, then approve or reject.
             </p>
             <div className="hidden sm:flex items-center gap-4">
               <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">
-                j/k navigate · a approve · s reject · space toggle
+                j/k navigate · a approve · s reject · drag to reorder
               </span>
             </div>
           </div>
         </div>
+
+        {/* Analytics Panel */}
+        <ReviewAnalyticsPanel />
 
         {/* Content */}
         {loading ? (
@@ -178,7 +391,6 @@ function ReviewQueue() {
             <p className="text-lg text-[var(--color-text-secondary)]">
               No listings awaiting review. Queue refreshes every 30s.
             </p>
-            <p className="text-xs text-[var(--color-text-secondary)] mt-2 uppercase tracking-wider">Load More Flights</p>
           </motion.div>
         ) : (
           <div className="space-y-3">
@@ -227,7 +439,6 @@ function ReviewQueue() {
                         <Badge state={listing.state} />
                       </div>
                       <div className="w-24 flex justify-center gap-2">
-                        {/* Approve */}
                         <button
                           onClick={(e) => { e.stopPropagation(); handleApprove(listing.id); }}
                           disabled={actionLoading === listing.id}
@@ -238,7 +449,6 @@ function ReviewQueue() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         </button>
-                        {/* Reject */}
                         <button
                           onClick={(e) => { e.stopPropagation(); setRejectingId(listing.id); }}
                           className="w-8 h-8 rounded-full border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
@@ -251,7 +461,7 @@ function ReviewQueue() {
                       </div>
                     </div>
 
-                    {/* Expanded photo grid */}
+                    {/* Expanded photo grid with drag-and-drop */}
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -272,41 +482,14 @@ function ReviewQueue() {
                               </p>
                             ) : (
                               <>
-                                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-4">
-                                  {data.selections.map((sel) => {
-                                    const asset = data.assets.find(
-                                      (a) => a.id === sel.asset_id,
-                                    );
-                                    return (
-                                      <div
-                                        key={`${sel.asset_id}-${sel.position}`}
-                                        className="aspect-square bg-gradient-to-br from-slate-100 to-slate-50 rounded-xl overflow-hidden flex items-center justify-center relative"
-                                      >
-                                        {asset?.thumbnail_url ? (
-                                          <img
-                                            src={asset.thumbnail_url}
-                                            alt={`Photo ${sel.position + 1}`}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        ) : (
-                                          <svg
-                                            className="w-5 h-5 text-slate-200"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth={1.5}
-                                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                            />
-                                          </svg>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold mb-2">
+                                  Drag photos to reorder. Blue border = human edit.
+                                </p>
+                                <DraggablePhotoGrid
+                                  selections={data.selections}
+                                  assets={data.assets}
+                                  onReorder={(from, to) => handleReorder(listing.id, from, to)}
+                                />
 
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-6">
@@ -319,8 +502,10 @@ function ReviewQueue() {
                                       </p>
                                     </div>
                                     <div>
-                                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">Glamour Score</p>
-                                      <p className="text-lg font-bold text-[var(--color-text)]">None</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">Human Edits</p>
+                                      <p className="text-lg font-bold text-[var(--color-text)]">
+                                        {data.selections.filter((s) => s.selected_by === "human").length} / {data.selections.length}
+                                      </p>
                                     </div>
                                   </div>
                                   <Link href={`/listings/${listing.id}`}>
@@ -394,11 +579,6 @@ function ReviewQueue() {
                 </motion.div>
               );
             })}
-
-            {/* Load more */}
-            <div className="text-center pt-4">
-              <span className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider">Load More Flights</span>
-            </div>
           </div>
         )}
 

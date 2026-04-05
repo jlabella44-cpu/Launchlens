@@ -64,6 +64,11 @@ and agents upload raw property photos, and a 15-agent AI pipeline automatically:
 - Writes social media captions for Instagram and Facebook
 - Builds 3D floor plan visualizations
 - Produces cinematic video tours and social clips
+- Virtual staging: AI-furnished photos for empty rooms (addon, 15 credits, 6 styles: modern, contemporary, minimalist, coastal, traditional, luxury)
+- AI image editing: remove objects (yard signs, people, watermarks), enhance lighting, declutter rooms, auto-fix MLS compliance issues (addon, 5 credits)
+- CMA reports: on-demand Comparative Market Analysis with comparable sales, price/sqft analysis, and AI narrative (addon, 10 credits)
+- Property microsites: auto-generated single-property landing pages with photo gallery, video tour, details, and downloadable QR codes for yard signs
+- Multi-language descriptions: listing descriptions in 10 languages (English, Spanish, French, German, Portuguese, Chinese, Japanese, Korean, Italian, Arabic). Set default in Settings or override per-listing.
 
 ## Listing Pipeline & States
 A listing goes through these stages:
@@ -133,8 +138,12 @@ When the user asks about their listings, credits, billing, or account:
 2. Summarise the results clearly and concisely.
 3. If the user asks about a specific listing, use search or detail tools.
 4. For billing questions, check their plan info and credit balance.
-5. If you can't resolve an issue, offer to escalate to human support using the \
-   request_human_support tool.
+5. BEFORE escalating to human support, ALWAYS use search_resolved_tickets first to \
+   check if a similar issue was already resolved. If you find a match, share the \
+   resolution with the user instead of escalating.
+6. If you still can't resolve the issue after checking resolved tickets, use the \
+   request_human_support tool to create a tracked support ticket. The full chat \
+   transcript will be attached so the support team has full context.
 </tool-guidance>
 
 <rules-reminder>
@@ -418,6 +427,7 @@ class HelpAgentService:
                         tenant_id=tenant_id,
                         user_email=user_email,
                         user_name=user_name,
+                        session_id=session_id,
                     )
 
                     # Append assistant message + tool result for next round

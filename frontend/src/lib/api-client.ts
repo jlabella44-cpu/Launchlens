@@ -28,6 +28,7 @@ import type {
   SocialCut,
   VideoUploadRequest,
   VideoUploadResponse,
+  DemoCreateResponse,
   DemoUploadRequest,
   DemoUploadResponse,
   DemoViewResponse,
@@ -47,6 +48,12 @@ import type {
   AnalyticsOverview,
   AnalyticsTimeline,
   AnalyticsCredits,
+  ReviewAnalytics,
+  SupportTicket,
+  SupportTicketDetail,
+  SupportTicketList,
+  SupportMessage,
+  SupportTicketStats,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -232,6 +239,18 @@ class ApiClient {
     return this.request<PackageSelection[]>(`/listings/${listingId}/package`);
   }
 
+  async reorderPackage(listingId: string, swaps: Array<{ from_position: number; to_position: number }>): Promise<{ swaps_applied: number }> {
+    return this.request(`/listings/${listingId}/package/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ swaps }),
+    });
+  }
+
+  // Review analytics
+  async getReviewAnalytics(): Promise<ReviewAnalytics> {
+    return this.request<ReviewAnalytics>(`/listings/review/analytics`);
+  }
+
   // Review flow
   async startReview(listingId: string): Promise<{ listing_id: string; state: string }> {
     return this.request(`/listings/${listingId}/review`, { method: "POST" });
@@ -272,6 +291,20 @@ class ApiClient {
   }
 
   // Demo (no auth required)
+  async demoCreate(photoCount: number): Promise<DemoCreateResponse> {
+    return this.request<DemoCreateResponse>("/demo/create", {
+      method: "POST",
+      body: JSON.stringify({ photo_count: photoCount }),
+    });
+  }
+
+  async demoFinalize(demoId: string, filePaths: string[]): Promise<DemoUploadResponse> {
+    return this.request<DemoUploadResponse>(`/demo/${demoId}/finalize`, {
+      method: "POST",
+      body: JSON.stringify({ file_paths: filePaths }),
+    });
+  }
+
   async demoUpload(data: DemoUploadRequest): Promise<DemoUploadResponse> {
     return this.request<DemoUploadResponse>("/demo/upload", {
       method: "POST",
@@ -290,6 +323,15 @@ class ApiClient {
   // Billing
   async billingStatus(): Promise<BillingStatusResponse> {
     return this.request<BillingStatusResponse>("/billing/status");
+  }
+
+  // Tenant Settings
+  async getSettings(): Promise<{ tenant_id: string; name: string; plan: string; webhook_url: string | null; preferred_language: string }> {
+    return this.request("/settings");
+  }
+
+  async updateSettings(data: { webhook_url?: string | null; preferred_language?: string }): Promise<{ tenant_id: string; name: string; plan: string; webhook_url: string | null; preferred_language: string }> {
+    return this.request("/settings", { method: "PATCH", body: JSON.stringify(data) });
   }
 
   async billingCheckout(priceId: string, successUrl: string, cancelUrl: string): Promise<{ checkout_url: string }> {
@@ -693,6 +735,88 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId, message_index: messageIndex, rating }),
     });
+  }
+
+  // CMA Reports
+  async generateCMAReport(listingId: string): Promise<{ listing_id: string; status: string; comparables_count: number; s3_key: string }> {
+    return this.request(`/listings/${listingId}/cma-report`, { method: "POST" });
+  }
+
+  async getCMAReport(listingId: string): Promise<{ listing_id: string; generated_at: string; download_url: string; comparables_count: number; analysis_summary: string | null }> {
+    return this.request(`/listings/${listingId}/cma-report`);
+  }
+
+  // Property Microsites
+  async generateMicrosite(listingId: string): Promise<{ listing_id: string; status: string; s3_key: string; microsite_url: string; qr_code_s3_key: string | null }> {
+    return this.request(`/listings/${listingId}/microsite`, { method: "POST" });
+  }
+
+  async getMicrosite(listingId: string): Promise<{ listing_id: string; microsite_url: string; qr_code_url: string | null; status: string; generated_at: string }> {
+    return this.request(`/listings/${listingId}/microsite`);
+  }
+
+  async deleteMicrosite(listingId: string): Promise<{ listing_id: string; deleted: boolean }> {
+    return this.request(`/listings/${listingId}/microsite`, { method: "DELETE" });
+  }
+
+  // Image Editing
+  async removeObject(listingId: string, assetId: string, objectDescription: string): Promise<{ original_asset_id: string; edited_asset_id: string; s3_key: string; edit_type: string }> {
+    return this.request(`/listings/${listingId}/assets/remove-object`, {
+      method: "POST",
+      body: JSON.stringify({ asset_id: assetId, object_description: objectDescription }),
+    });
+  }
+
+  async enhancePhoto(listingId: string, assetId: string, enhancement: string): Promise<{ original_asset_id: string; edited_asset_id: string; s3_key: string; edit_type: string }> {
+    return this.request(`/listings/${listingId}/assets/enhance`, {
+      method: "POST",
+      body: JSON.stringify({ asset_id: assetId, enhancement }),
+    });
+  }
+
+  async autoFixCompliance(listingId: string): Promise<{ fixed_count: number; edits: Array<{ original_asset_id: string; edited_asset_id: string; issues_fixed: string; s3_key: string }> }> {
+    return this.request(`/listings/${listingId}/assets/auto-fix-compliance`, { method: "POST" });
+  }
+
+  // Support Tickets (user)
+  async createSupportTicket(data: { subject: string; description: string; category: string; priority?: string }): Promise<SupportTicket> {
+    return this.request("/support", { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async getSupportTickets(status?: string): Promise<SupportTicketList> {
+    const qs = status ? `?status=${status}` : "";
+    return this.request(`/support${qs}`);
+  }
+
+  async getSupportTicket(ticketId: string): Promise<SupportTicketDetail> {
+    return this.request(`/support/${ticketId}`);
+  }
+
+  async addSupportMessage(ticketId: string, content: string): Promise<SupportMessage> {
+    return this.request(`/support/${ticketId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  }
+
+  // Support Tickets (admin)
+  async adminSupportTickets(params?: { status?: string; category?: string; limit?: number; offset?: number }): Promise<SupportTicketList> {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+    return this.request(`/support/admin/tickets?${qs}`);
+  }
+
+  async adminSupportTicketDetail(ticketId: string): Promise<SupportTicketDetail> {
+    return this.request(`/support/admin/tickets/${ticketId}`);
+  }
+
+  async adminUpdateTicket(ticketId: string, data: { status?: string; resolution_note?: string }): Promise<SupportTicket> {
+    return this.request(`/support/admin/tickets/${ticketId}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+
+  async adminReplyToTicket(ticketId: string, content: string): Promise<SupportMessage> {
+    return this.request(`/support/admin/tickets/${ticketId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  }
+
+  async adminSupportStats(): Promise<SupportTicketStats> {
+    return this.request("/support/admin/tickets/stats");
   }
 }
 

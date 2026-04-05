@@ -8,6 +8,16 @@ class DemoUploadRequest(BaseModel):
     file_paths: list[str]
 
 
+class DemoCreateRequest(BaseModel):
+    photo_count: int
+
+
+class DemoCreateResponse(BaseModel):
+    demo_id: uuid.UUID
+    upload_urls: list[dict]
+    expires_at: datetime
+
+
 class DemoUploadResponse(BaseModel):
     demo_id: uuid.UUID
     photo_count: int

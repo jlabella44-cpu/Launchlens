@@ -17,7 +17,7 @@ import type {
   TenantCreditsResponse,
 } from "@/lib/types";
 
-type Tab = "overview" | "tenants" | "listings" | "credits" | "audit";
+type Tab = "overview" | "tenants" | "listings" | "credits" | "audit" | "support";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -25,6 +25,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "listings", label: "Listings" },
   { key: "credits", label: "Credits" },
   { key: "audit", label: "Audit Log" },
+  { key: "support", label: "Support" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -73,6 +74,7 @@ export default function AdminPage() {
         {tab === "listings" && <ListingsTab />}
         {tab === "credits" && <CreditsTab />}
         {tab === "audit" && <AuditTab />}
+        {tab === "support" && <SupportTab />}
       </main>
     </ProtectedRoute>
   );
@@ -735,6 +737,152 @@ function AuditTab() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB: Support
+// ═══════════════════════════════════════════════════════════════════════════
+
+function SupportTab() {
+  const [stats, setStats] = useState<{ open_count: number; in_progress_count: number; resolved_today: number; avg_response_hours: number | null } | null>(null);
+  const [tickets, setTickets] = useState<Array<{ id: string; subject: string; category: string; priority: string; status: string; created_at: string; updated_at: string; user_email?: string; chat_session_id?: string; resolution_note?: string }>>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<{ id: string; subject: string; status: string; category: string; priority: string; resolution_note?: string; messages: Array<{ id: string; user_id: string; content: string; is_admin_reply: boolean; created_at: string; user_name?: string; user_email?: string; chat_transcript?: Array<{ role: string; content: string }> }> } | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [reply, setReply] = useState("");
+  const [resolution, setResolution] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient.adminSupportStats().then(setStats).catch(() => {});
+  }, []);
+
+  useEffect(() => { fetchTickets(); }, [statusFilter]);
+
+  async function fetchTickets() {
+    setLoading(true);
+    try {
+      const res = await apiClient.adminSupportTickets({ status: statusFilter === "all" ? undefined : statusFilter, limit: 50 });
+      setTickets(res.items);
+    } catch { /* silently handle */ } finally { setLoading(false); }
+  }
+
+  async function selectTicket(id: string) {
+    setSelectedId(id);
+    try {
+      const d = await apiClient.adminSupportTicketDetail(id);
+      setDetail(d);
+      setResolution(d.resolution_note || "");
+    } catch { /* silently handle */ }
+  }
+
+  async function handleReply() {
+    if (!reply.trim() || !selectedId) return;
+    try { await apiClient.adminReplyToTicket(selectedId, reply); setReply(""); selectTicket(selectedId); } catch { /* silently handle */ }
+  }
+
+  async function handleStatusChange(newStatus: string) {
+    if (!selectedId) return;
+    const updates: { status?: string; resolution_note?: string } = { status: newStatus };
+    if (newStatus === "resolved" && resolution.trim()) updates.resolution_note = resolution;
+    try { await apiClient.adminUpdateTicket(selectedId, updates); fetchTickets(); selectTicket(selectedId); } catch { /* silently handle */ }
+  }
+
+  const sc: Record<string, string> = { open: "bg-orange-100 text-orange-700", in_progress: "bg-blue-100 text-blue-700", resolved: "bg-green-100 text-green-700", closed: "bg-slate-100 text-slate-500" };
+
+  return (
+    <div>
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "Open", value: stats.open_count, color: "text-orange-500" },
+            { label: "In Progress", value: stats.in_progress_count, color: "text-blue-500" },
+            { label: "Resolved Today", value: stats.resolved_today, color: "text-green-500" },
+            { label: "Avg Response", value: stats.avg_response_hours != null ? `${stats.avg_response_hours}h` : "—", color: "text-[var(--color-text)]" },
+          ].map((s) => (
+            <div key={s.label} className="p-4 rounded-xl border border-[var(--color-card-border)] bg-[var(--color-surface)]">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold">{s.label}</p>
+              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 mb-4">
+        {["all", "open", "in_progress", "resolved", "closed"].map((s) => (
+          <button key={s} onClick={() => setStatusFilter(s)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${statusFilter === s ? "bg-[#F97316] text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+            {s === "all" ? "All" : s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6">
+        <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          {loading ? <div className="text-center py-8 text-[var(--color-text-secondary)] text-sm">Loading...</div>
+          : tickets.length === 0 ? <div className="text-center py-8 text-[var(--color-text-secondary)] text-sm">No tickets</div>
+          : tickets.map((t) => (
+            <div key={t.id} onClick={() => selectTicket(t.id)}
+              className={`p-3 rounded-xl border cursor-pointer transition-all ${selectedId === t.id ? "border-[#F97316]/40 bg-orange-50/30" : "border-[var(--color-card-border)] bg-[var(--color-surface)]"}`}>
+              <p className="text-sm font-medium text-[var(--color-text)] truncate">{t.subject}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${sc[t.status] || sc.open}`}>{t.status.replace(/_/g, " ")}</span>
+                <span className="text-[10px] text-[var(--color-text-secondary)]">{t.user_email}</span>
+                {t.chat_session_id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">AI</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-2xl border border-[var(--color-card-border)] bg-[var(--color-surface)] min-h-[400px]">
+          {!detail ? <div className="flex items-center justify-center h-full text-sm text-[var(--color-text-secondary)]">Select a ticket</div> : (
+            <div className="flex flex-col h-full">
+              <div className="p-4 border-b border-[var(--color-card-border)]">
+                <h3 className="text-base font-semibold text-[var(--color-text)]">{detail.subject}</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <select value={detail.status} onChange={(e) => handleStatusChange(e.target.value)}
+                    className="px-2 py-1 rounded text-xs font-semibold border border-[var(--color-card-border)] bg-[var(--color-bg)] text-[var(--color-text)]">
+                    <option value="open">Open</option><option value="in_progress">In Progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option>
+                  </select>
+                  <span className="text-xs text-[var(--color-text-secondary)]">{detail.category} / {detail.priority}</span>
+                </div>
+                {(detail.status === "resolved" || detail.status === "closed") && (
+                  <input type="text" value={resolution} onChange={(e) => setResolution(e.target.value)} placeholder="Resolution note..."
+                    onBlur={() => { if (resolution !== (detail.resolution_note || "")) apiClient.adminUpdateTicket(detail.id, { resolution_note: resolution }); }}
+                    className="w-full mt-2 px-2 py-1 rounded text-xs border border-[var(--color-card-border)] bg-[var(--color-bg)] text-[var(--color-text)]" />
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[350px]">
+                {detail.messages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.is_admin_reply ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${msg.is_admin_reply ? "bg-blue-50 dark:bg-blue-900/20 rounded-br-md" : "bg-[var(--color-bg)] border border-[var(--color-card-border)] rounded-bl-md"}`}>
+                      <p className="text-[10px] font-semibold text-[var(--color-text-secondary)] mb-1">{msg.is_admin_reply ? "Admin" : msg.user_name || msg.user_email || "User"} — {new Date(msg.created_at).toLocaleString()}</p>
+                      <p className="whitespace-pre-wrap text-[var(--color-text)]">{msg.content}</p>
+                      {msg.chat_transcript && msg.chat_transcript.length > 0 && (
+                        <details className="mt-2 pt-2 border-t border-[var(--color-card-border)]">
+                          <summary className="text-[10px] text-blue-600 cursor-pointer font-semibold">AI Chat Transcript ({msg.chat_transcript.length} messages)</summary>
+                          <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                            {msg.chat_transcript.map((m, i) => (
+                              <p key={i} className="text-[11px] text-[var(--color-text-secondary)]"><span className="font-semibold">{m.role === "user" ? "User" : "AI"}:</span> {m.content.slice(0, 300)}{m.content.length > 300 ? "..." : ""}</p>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 border-t border-[var(--color-card-border)]">
+                <div className="flex gap-2">
+                  <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} placeholder="Admin reply..."
+                    className="flex-1 px-3 py-2 rounded-lg border border-[var(--color-card-border)] bg-[var(--color-bg)] text-[var(--color-text)] text-sm resize-none" />
+                  <button onClick={handleReply} disabled={!reply.trim()}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white self-end disabled:opacity-50" style={{ background: "linear-gradient(135deg, #F97316, #FB923C)" }}>Reply</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
