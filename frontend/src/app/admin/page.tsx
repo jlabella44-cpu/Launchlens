@@ -478,7 +478,20 @@ function ListingsTab() {
           <tbody>
             {listings.map((l) => (
               <tr key={l.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                <td className="px-4 py-3 font-medium truncate max-w-[200px]">{l.address?.street || "—"}</td>
+                <td className="px-4 py-3 font-medium truncate max-w-[250px]">
+                  <div className="flex items-center gap-2">
+                    {l.thumbnail_url ? (
+                      <img src={l.thumbnail_url} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        </svg>
+                      </div>
+                    )}
+                    <span className="truncate">{l.address?.street || "—"}</span>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-slate-500 text-xs">{l.tenant_name}</td>
                 <td className="px-4 py-3"><Badge state={l.state} /></td>
                 <td className="px-4 py-3 text-right font-mono text-xs">{l.credit_cost ?? "—"}</td>

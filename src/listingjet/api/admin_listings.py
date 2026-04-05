@@ -9,6 +9,7 @@ from listingjet.api.schemas.admin import (
     AdminListingResponse,
     AdminUpdateListingRequest,
 )
+from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
@@ -48,6 +49,24 @@ async def admin_list_listings(
     query = query.order_by(Listing.updated_at.desc()).offset(offset).limit(limit)
     rows = (await db.execute(query)).all()
 
+    # Fetch thumbnails for admin listing rows
+    listing_ids = [listing.id for listing, _ in rows]
+    thumbnail_map: dict = {}
+    if listing_ids:
+        from listingjet.services.storage import get_storage
+        storage = get_storage()
+        first_assets = (await db.execute(
+            select(Asset.listing_id, Asset.file_path)
+            .where(Asset.listing_id.in_(listing_ids))
+            .distinct(Asset.listing_id)
+            .order_by(Asset.listing_id, Asset.created_at.asc())
+        )).all()
+        for lid, fpath in first_assets:
+            try:
+                thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+            except Exception:
+                pass
+
     return [
         AdminListingResponse(
             id=listing.id,
@@ -59,6 +78,7 @@ async def admin_list_listings(
             analysis_tier=listing.analysis_tier or "standard",
             credit_cost=listing.credit_cost,
             is_demo=listing.is_demo,
+            thumbnail_url=thumbnail_map.get(listing.id),
             created_at=listing.created_at,
             updated_at=listing.updated_at,
         )

@@ -370,6 +370,30 @@ async def shared_with_me(
         )
     )
     rows = await db.execute(stmt)
+
+    # Build thumbnail map for shared listings
+    from listingjet.models.asset import Asset
+    from listingjet.services.storage import get_storage
+    storage = get_storage()
+
+    listing_ids = [listing.id for listing, _ in rows.all()]
+    # Re-execute since .all() consumes the cursor
+    rows = await db.execute(stmt)
+
+    thumbnail_map: dict = {}
+    if listing_ids:
+        first_assets = (await db.execute(
+            select(Asset.listing_id, Asset.file_path)
+            .where(Asset.listing_id.in_(listing_ids))
+            .distinct(Asset.listing_id)
+            .order_by(Asset.listing_id, Asset.created_at.asc())
+        )).all()
+        for lid, fpath in first_assets:
+            try:
+                thumbnail_map[lid] = storage.presigned_url(fpath, expires_in=3600)
+            except Exception:
+                pass
+
     results = []
     for listing, perm in rows.all():
         results.append({
@@ -380,5 +404,6 @@ async def shared_with_me(
             "permission": perm.permission,
             "shared_at": perm.created_at,
             "expires_at": perm.expires_at,
+            "thumbnail_url": thumbnail_map.get(listing.id),
         })
     return results

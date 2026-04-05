@@ -292,6 +292,7 @@ export interface AdminListingItem {
   analysis_tier: string;
   credit_cost: number | null;
   is_demo: boolean;
+  thumbnail_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -414,6 +415,7 @@ export interface SharedListingResponse {
   permission: string;
   shared_at: string;
   expires_at: string | null;
+  thumbnail_url: string | null;
 }
 
 export interface BlanketGrantResponse {

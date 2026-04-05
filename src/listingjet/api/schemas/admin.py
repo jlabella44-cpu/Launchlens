@@ -117,6 +117,7 @@ class AdminListingResponse(BaseModel):
     analysis_tier: str
     credit_cost: int | None
     is_demo: bool
+    thumbnail_url: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -180,11 +180,21 @@ function ListingsDashboard() {
                   }}
                 >
                   <Link href={`/listings/${shared.listing_id}`}>
-                    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden hover:shadow-md transition-shadow">
-                      <div className="aspect-[4/3] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-                        <svg className="w-12 h-12 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        </svg>
+                    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden hover:shadow-md transition-shadow group">
+                      <div className="aspect-[4/3] bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
+                        {shared.thumbnail_url ? (
+                          <img
+                            src={shared.thumbnail_url}
+                            alt={typeof shared.address === "string" ? shared.address : "Shared listing"}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg className="w-12 h-12 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
                       <div className="p-4">
                         <p className="text-sm font-semibold text-slate-900 truncate">
