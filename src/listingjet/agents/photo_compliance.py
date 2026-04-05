@@ -17,7 +17,7 @@ from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
 from listingjet.models.package_selection import PackageSelection
-from listingjet.providers.openai_vision import OpenAIVisionProvider
+from listingjet.providers import get_vision_provider
 from listingjet.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
@@ -60,7 +60,9 @@ class PhotoComplianceAgent(BaseAgent):
     agent_name = "photo_compliance"
 
     def __init__(self, vision_provider=None, storage_service=None, session_factory=None):
-        self._vision = vision_provider or OpenAIVisionProvider()
+        self._vision = vision_provider or get_vision_provider(
+            agent=self.agent_name, tier="tier2",
+        )
         self._storage = storage_service or StorageService()
         self._session_factory = session_factory or AsyncSessionLocal
 

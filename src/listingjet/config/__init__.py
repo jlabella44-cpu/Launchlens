@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     tenant_model_routing: str = ""
     # Enable fallback chain: try primary provider, fall back to Claude on failure
     llm_fallback_enabled: bool = False
+    # Shadow mode: serve the primary response, quietly run Claude and log divergences
+    llm_shadow_mode: bool = False
+    llm_shadow_similarity_threshold: float = 0.5
     # Self-host / alt endpoint for Gemma (e.g. http://localhost:11434/v1 for Ollama)
     gemma_base_url: str = ""
     gemma_model: str = "gemma-4-31b-it"

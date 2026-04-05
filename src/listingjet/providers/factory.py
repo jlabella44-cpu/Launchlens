@@ -35,15 +35,26 @@ def _build_vision(name: str) -> VisionProvider:
     return GoogleVisionProvider()
 
 
-def get_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
-    """Return a vision provider, optionally routed by agent name and tenant."""
+def get_vision_provider(
+    agent: str | None = None,
+    tenant_id=None,
+    tier: str = "tier1",
+) -> VisionProvider:
+    """Return a vision provider, optionally routed by agent name and tenant.
+
+    ``tier`` selects the default when no per-agent/tenant override applies:
+    "tier1" -> VISION_PROVIDER_TIER1 (cheap bulk, default)
+    "tier2" -> VISION_PROVIDER_TIER2 (higher-quality analysis)
+    """
     if settings.use_mock_providers:
         from .mock import MockVisionProvider
         return MockVisionProvider()
     from ._routing import resolve_vision_provider
-    name = resolve_vision_provider(
-        agent, default=settings.vision_provider_tier1, tenant_id=tenant_id,
+    default = (
+        settings.vision_provider_tier2 if tier == "tier2"
+        else settings.vision_provider_tier1
     )
+    name = resolve_vision_provider(agent, default=default, tenant_id=tenant_id)
     return _build_vision(name)
 
 
@@ -59,6 +70,15 @@ def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
     from ._routing import resolve_llm_provider
     name = resolve_llm_provider(agent, tenant_id=tenant_id)
     primary = _build_llm(name)
+    if settings.llm_shadow_mode and name != "claude":
+        from .claude import ClaudeProvider
+        from .shadow import ShadowLLMProvider
+        primary = ShadowLLMProvider(
+            primary=primary,
+            truth=ClaudeProvider(),
+            similarity_threshold=settings.llm_shadow_similarity_threshold,
+            label=agent or name,
+        )
     if settings.llm_fallback_enabled and name != "claude":
         from .claude import ClaudeProvider
         from .fallback import FallbackLLMProvider

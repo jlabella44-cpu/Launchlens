@@ -15,6 +15,8 @@ def _patched_settings(**overrides):
         "agent_model_routing": "",
         "tenant_model_routing": "",
         "llm_fallback_enabled": False,
+        "llm_shadow_mode": False,
+        "llm_shadow_similarity_threshold": 0.5,
         "qwen_enable_cache": False,
         "gemma_base_url": "",
         "gemma_model": "gemma-4-31b-it",
