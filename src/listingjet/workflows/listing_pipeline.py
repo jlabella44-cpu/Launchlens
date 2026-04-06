@@ -197,8 +197,9 @@ class ListingPipeline:
         )
 
         # Step 3: MLS Export (builds both bundles)
+        from listingjet.activities.pipeline import MLSExportParams
         await workflow.execute_activity(
-            run_mls_export, ctx, content_result, flyer_key,
+            run_mls_export, MLSExportParams(ctx, content_result, flyer_key),
             start_to_close_timeout=timedelta(minutes=15),
             retry_policy=_DEFAULT_RETRY,
         )
