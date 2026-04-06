@@ -8,8 +8,6 @@ Endpoints:
 """
 
 import logging
-import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
