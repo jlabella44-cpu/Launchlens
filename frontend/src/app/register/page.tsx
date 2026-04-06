@@ -8,15 +8,15 @@ import apiClient from "@/lib/api-client";
 import { trackEvent, AnalyticsEvents } from "@/lib/analytics";
 
 const PLAN_DISPLAY: Record<string, { name: string; price: string; features: string[] }> = {
-  lite: { name: "Lite", price: "$9/mo", features: ["Basic AI Listing Descriptions", "Standard Photo Curation", "MLS-Ready Exports"] },
-  active_agent: { name: "Active Agent", price: "$29/mo", features: ["Unlimited AI Listing Descriptions", "Advanced Market Analytics HUD", "Priority Cloud Rendering"] },
-  team: { name: "Team", price: "$99/mo", features: ["Everything in Active Agent", "Team Collaboration", "API Access"] },
+  lite: { name: "Lite", price: "$19/mo", features: ["25 credits/month", "Permanent Hosting", "Your Logo & Branding"] },
+  active_agent: { name: "Active Agent", price: "$49/mo", features: ["75 credits/month (~6 listings)", "Full White-Label", "All Integrations"] },
+  team: { name: "Team", price: "$99/mo", features: ["250 credits/month (~20 listings)", "Unlimited Seats", "Priority Support"] },
 };
 
 const ADDONS = [
-  { id: "video_tour", name: "AI Video Tour", description: "Automated cinematic fly-throughs", price: 49, priceLabel: "+$49" },
-  { id: "floorplan", name: "3D Floorplan", description: "Interactive spatial visualization", price: 79, priceLabel: "+$79" },
-  { id: "social_pack", name: "Social Pack", description: "Multi-platform campaign delivery", price: 39, priceLabel: "+$39" },
+  { id: "video_tour", name: "AI Video Tour", description: "Automated cinematic fly-throughs", price: 20, priceLabel: "20 credits" },
+  { id: "floorplan", name: "3D Floorplan", description: "Interactive spatial visualization", price: 8, priceLabel: "8 credits" },
+  { id: "social_pack", name: "Social Pack", description: "Multi-platform campaign delivery", price: 2, priceLabel: "2 credits" },
 ];
 
 export default function RegisterPage() {

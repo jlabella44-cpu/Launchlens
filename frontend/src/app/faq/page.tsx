@@ -53,23 +53,27 @@ const FAQ_DATA = [
     items: [
       {
         q: "How do credits work?",
-        a: "Each listing costs 1 credit to process. Credits are included monthly with your plan and can also be purchased in bundles. Unused credits roll over to the next month (up to your plan's rollover cap).",
+        a: "Credits are the currency for all ListingJet services. Each service costs a different number of credits based on its complexity: a base listing is 12 credits, an AI video tour is 20 credits, virtual staging is 15 credits, a 3D floorplan is 8 credits, and so on. Credits are included monthly with your plan and can also be purchased in top-up bundles. Unused plan credits roll over to the next month (up to your plan's rollover cap). Purchased credits never expire.",
       },
       {
         q: "What plans are available?",
-        a: "Starter: 5 credits/month, $0 rollover. Pro: 50 credits/month, 25 rollover cap. Enterprise: 500 credits/month, 100 rollover cap. All plans include the full AI pipeline.",
+        a: "Free: $0/mo, pay-as-you-go credits at $0.50 each. Lite: $19/mo with 25 credits included (rollover cap 15). Active Agent: $49/mo with 75 credits included (rollover cap 50). Team: $99/mo with 250 credits included (rollover cap 150). Higher tiers get better per-credit rates on top-up bundles.",
       },
       {
         q: "How do I buy more credits?",
-        a: "Go to Billing > Buy Credits. We offer bundles of 5 ($95), 10 ($140), 25 ($300), or 50 ($500) credits. Larger bundles have a lower per-credit cost.",
+        a: "Go to Billing > Buy Credits. We offer bundles of 25, 50, 100, or 250 credits. Pricing is locked to your membership tier — higher tiers get lower per-credit rates. For example, on Active Agent a 100-credit bundle is $33.99 ($0.34/credit).",
       },
       {
         q: "What happens if I run out of credits?",
-        a: "You won't be able to start new listings until you purchase more credits or your monthly allocation renews. Existing listings in progress will continue to completion.",
+        a: "You won't be able to start new listings or activate add-ons until you purchase more credits or your monthly allocation renews. Existing listings in progress will continue to completion.",
       },
       {
         q: "How does the rollover cap work?",
-        a: "At the end of each billing period, unused credits carry over to the next month — up to your plan's rollover cap. Credits above the cap expire. For example, on Pro with a 25 rollover cap: if you have 30 unused credits, 25 roll over and 5 expire.",
+        a: "At the end of each billing period, unused plan-granted credits carry over to the next month — up to your plan's rollover cap. Credits above the cap expire. Purchased (top-up) credits never expire and are not subject to the rollover cap. Plan-granted credits are always consumed first.",
+      },
+      {
+        q: "How much does each service cost in credits?",
+        a: "Base Listing: 12 credits. AI Video Tour: 20 credits. Virtual Staging: 15 credits. 3D Floorplan: 8 credits. AI Image Editing: 6 credits. CMA Report: 5 credits. Photo Compliance: 3 credits. Social Media Cuts: 3 credits. Social Content Pack: 2 credits. Microsite: 2 credits.",
       },
     ],
   },
@@ -95,7 +99,7 @@ const FAQ_DATA = [
     items: [
       {
         q: "What premium add-ons are available?",
-        a: "Video tours (AI-generated cinematic walkthroughs), social content packs (Instagram/Facebook captions and clips), 3D floor plan visualizations, and branded PDF flyers. Each add-on costs additional credits per listing.",
+        a: "AI Video Tour (20 credits): cinematic walkthroughs with narration. Virtual Staging (15 credits): furnish empty rooms in 6 styles. 3D Floorplan (8 credits): interactive dollhouse visualization. AI Image Editing (6 credits): remove objects, fix lighting. CMA Report (5 credits): AI-generated market analysis. Social Media Cuts (3 credits): platform-ready clips for TikTok, Instagram, and Facebook. Social Content Pack (2 credits): captions and hashtags. Microsite (2 credits): branded single-property website.",
       },
       {
         q: "What is the Brand Kit?",

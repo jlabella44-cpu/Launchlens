@@ -160,11 +160,11 @@ const faqs = [
   },
   {
     q: "How do credits work?",
-    a: "Each listing costs one credit. Plans include monthly credits, and you can purchase additional bundles at volume discounts.",
+    a: "Services cost different amounts of credits based on complexity. A base listing is 12 credits, a video tour is 20 credits, virtual staging is 15 credits. Plans include monthly credits, and you can buy top-up bundles at tier-locked rates.",
   },
   {
     q: "Is there a free trial?",
-    a: "Our Free tier lets you process listings at $34 each with no subscription. Upgrade anytime for lower per-listing costs.",
+    a: "Our Free tier lets you buy credits as needed with no subscription. Upgrade to Lite ($19/mo), Active Agent ($49/mo), or Team ($99/mo) for included monthly credits and better per-credit rates.",
   },
   {
     q: "Can you edit or stage listing photos?",
@@ -307,7 +307,7 @@ export default function Home() {
                 title: "RE/MAX, Austin",
               },
               {
-                quote: "I used to pay $400 per listing for photos and marketing. Now it's $29/month for unlimited. No brainer.",
+                quote: "I used to pay $400 per listing for photos and marketing. Now my Active Agent plan covers 6 listings a month for $49. No brainer.",
                 name: "Jennifer L.",
                 title: "Coldwell Banker, Miami",
               },
@@ -522,28 +522,39 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-5xl mx-auto">
             {[
               {
                 name: "Free",
                 price: "$0",
                 period: "/mo",
-                desc: "$34/listing, AI analysis, 30-day hosting",
+                desc: "Pay-as-you-go credits, AI analysis, 30-day hosting",
+                credits: "0 credits",
                 highlighted: false,
               },
               {
                 name: "Lite",
-                price: "$9",
+                price: "$19",
                 period: "/mo",
-                desc: "$24/listing, permanent hosting, your branding",
+                desc: "25 credits/mo, permanent hosting, your branding",
+                credits: "25 credits",
                 highlighted: false,
               },
               {
                 name: "Active Agent",
-                price: "$29",
+                price: "$49",
                 period: "/mo",
-                desc: "1 included listing, $17 additional, full white-label",
+                desc: "75 credits/mo, ~6 listings included, full white-label",
+                credits: "75 credits",
                 highlighted: true,
+              },
+              {
+                name: "Team",
+                price: "$99",
+                period: "/mo",
+                desc: "250 credits/mo, ~20 listings, unlimited seats",
+                credits: "250 credits",
+                highlighted: false,
               },
             ].map((plan, i) => (
               <motion.div
@@ -558,6 +569,9 @@ export default function Home() {
                     : "border border-slate-100"
                 }`}
               >
+                {plan.highlighted && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#F97316] mb-2 block">Most Popular</span>
+                )}
                 <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
                 <div className="mt-4">
                   <span className="text-4xl font-bold text-slate-900" style={{ fontFamily: "var(--font-heading)" }}>
@@ -565,7 +579,8 @@ export default function Home() {
                   </span>
                   <span className="text-slate-400">{plan.period}</span>
                 </div>
-                <p className="mt-4 text-sm text-slate-500">{plan.desc}</p>
+                <p className="mt-2 text-xs font-semibold text-[#F97316]">{plan.credits}</p>
+                <p className="mt-3 text-sm text-slate-500">{plan.desc}</p>
               </motion.div>
             ))}
           </div>

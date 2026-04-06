@@ -344,9 +344,10 @@ function TenantsTab() {
               <div className="space-y-2 mb-3">
                 <input className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
                 <select className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2" value={editPlan} onChange={(e) => setEditPlan(e.target.value)}>
-                  <option value="starter">Starter</option>
-                  <option value="pro">Pro</option>
-                  <option value="enterprise">Enterprise</option>
+                  <option value="free">Free</option>
+                  <option value="lite">Lite</option>
+                  <option value="active_agent">Active Agent</option>
+                  <option value="team">Team</option>
                 </select>
                 <input className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2" value={editWebhook} onChange={(e) => setEditWebhook(e.target.value)} placeholder="Webhook URL" />
                 <button onClick={handleUpdateTenant} className="w-full text-xs font-semibold py-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors">Save Changes</button>

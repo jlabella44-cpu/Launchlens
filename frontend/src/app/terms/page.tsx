@@ -57,10 +57,11 @@ export default function TermsOfServicePage() {
                 ListingJet to charge your selected payment method.
               </li>
               <li>
-                <strong>Credits &amp; Usage:</strong> Processing properties through our AI pipelines consumes
-                credits. Credits are deducted upon the successful initiation of a property workflow. Unused credits
-                roll over month-to-month subject to your plan&apos;s rollover cap. Cancelled listings receive a
-                credit refund.
+                <strong>Credits &amp; Usage:</strong> Services on ListingJet consume credits at different rates
+                based on their computational complexity (e.g., a base listing costs 12 credits, an AI video tour
+                costs 20 credits). Credits are deducted upon the successful initiation of a service. Plan-granted
+                credits roll over month-to-month subject to your plan&apos;s rollover cap. Purchased (top-up)
+                credits never expire. Cancelled listings receive a credit refund.
               </li>
               <li>
                 <strong>Refunds:</strong> Due to the direct computational costs incurred by third-party AI vendors

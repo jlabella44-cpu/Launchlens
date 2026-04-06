@@ -56,10 +56,19 @@ export function Nav() {
             </Link>
           )}
           <ThemeToggle />
-          {user && (
+          {user ? (
             <>
               <span className="text-sm text-[var(--color-text-secondary)]">{user.email}</span>
               <Button variant="secondary" onClick={logout}>Sign Out</Button>
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button variant="secondary">Sign In</Button>
+              </Link>
+              <Link href="/register">
+                <Button>Get Started</Button>
+              </Link>
             </>
           )}
         </div>
@@ -84,10 +93,19 @@ export function Nav() {
           )}
           <div className="flex items-center gap-3 pt-2">
             <ThemeToggle />
-            {user && (
+            {user ? (
               <>
                 <span className="text-sm text-[var(--color-text-secondary)] truncate">{user.email}</span>
                 <Button variant="secondary" onClick={logout}>Sign Out</Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" onClick={() => setMenuOpen(false)}>
+                  <Button variant="secondary">Sign In</Button>
+                </Link>
+                <Link href="/register" onClick={() => setMenuOpen(false)}>
+                  <Button>Get Started</Button>
+                </Link>
               </>
             )}
           </div>

@@ -87,11 +87,13 @@ export async function setupAuth(page: import("@playwright/test").Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        balance: 10,
+        balance: 75,
+        granted_balance: 50,
+        purchased_balance: 25,
         billing_model: "credit",
-        tier: "pro",
-        listing_credit_cost: 1,
-        rollover_cap: 10,
+        tier: "active_agent",
+        listing_credit_cost: 12,
+        rollover_cap: 50,
       }),
     })
   );

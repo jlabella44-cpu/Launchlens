@@ -68,11 +68,11 @@ test.describe("Billing Page", () => {
 
   test("should display the credit balance", async ({ page }) => {
     await expect(page.getByText("Credit Balance")).toBeVisible();
-    await expect(page.getByText("10")).toBeVisible();
+    await expect(page.getByText("75")).toBeVisible();
   });
 
   test("should display the tier label", async ({ page }) => {
-    // The mock returns tier "pro" which maps to "Active Agent".
+    // The mock returns tier "active_agent" which displays as "Active Agent".
     await expect(page.getByText(/Active Agent/)).toBeVisible();
   });
 
