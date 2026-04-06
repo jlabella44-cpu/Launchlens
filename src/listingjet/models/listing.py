@@ -11,6 +11,7 @@ from .base import TenantScopedModel
 
 
 class ListingState(str, enum.Enum):
+    DRAFT = "draft"
     NEW = "new"
     UPLOADING = "uploading"
     ANALYZING = "analyzing"

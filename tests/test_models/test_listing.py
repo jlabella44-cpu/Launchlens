@@ -2,8 +2,22 @@
 from listingjet.models.listing import ListingState
 
 
+def test_draft_state_exists():
+    """DRAFT state should exist and have value 'draft'."""
+    assert ListingState.DRAFT == "draft"
+    assert ListingState.DRAFT.value == "draft"
+
+
+def test_draft_state_ordering():
+    """DRAFT should be a valid state that comes before NEW."""
+    states = list(ListingState)
+    draft_idx = states.index(ListingState.DRAFT)
+    new_idx = states.index(ListingState.NEW)
+    assert draft_idx < new_idx, f"DRAFT (index {draft_idx}) should come before NEW (index {new_idx})"
+
+
 def test_listing_state_enum_has_required_states():
-    required = {"new", "uploading", "analyzing", "awaiting_review", "in_review",
+    required = {"draft", "new", "uploading", "analyzing", "awaiting_review", "in_review",
                 "approved", "delivered", "failed", "cancelled", "exporting", "demo",
                 "pipeline_timeout"}
     actual = {s.value for s in ListingState}
