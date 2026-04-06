@@ -265,12 +265,15 @@ class VideoAgent(BaseAgent):
             prompt = get_prompt_for_room(room, metadata)
             camera = get_camera_control(room)
 
+            # Convert S3 key to presigned URL for Kling API
+            image_url = self._storage.presigned_url(asset.file_path)
+
             async with self._semaphore:
                 if index > 0:
                     await asyncio.sleep(3)  # Stagger to avoid rate limits
                 try:
                     task_id = await self._kling.generate_clip(
-                        image_url=asset.file_path,
+                        image_url=image_url,
                         prompt=prompt,
                         negative_prompt=NEGATIVE_PROMPT,
                         camera_control=camera,
