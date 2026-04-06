@@ -50,4 +50,4 @@ class BillingStatusResponse(BaseModel):
 
 
 class ChangePlanRequest(BaseModel):
-    plan: str  # "starter", "pro", "enterprise"
+    plan: str  # "free", "lite", "active_agent", "team"

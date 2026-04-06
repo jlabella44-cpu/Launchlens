@@ -12,7 +12,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from listingjet.config.tiers import CREDIT_BUNDLES, TIER_CREDITS, TIER_DEFAULTS
+from listingjet.config.tiers import CREDIT_BUNDLES, TIER_DEFAULTS, get_bundles_for_tier
 from listingjet.models.addon_catalog import AddonCatalog
 from listingjet.models.addon_purchase import AddonPurchase
 from listingjet.models.listing import Listing, ListingState
@@ -344,21 +344,22 @@ async def get_plan_info(db: AsyncSession, tenant_id: uuid.UUID) -> dict:
     if not tenant:
         return {"error": "Tenant not found."}
 
-    tier_info = TIER_DEFAULTS.get(tenant.plan_tier, {})
-    plan_credits = TIER_CREDITS.get(tenant.plan, (0, 0))
+    tier_info = TIER_DEFAULTS.get(tenant.plan, TIER_DEFAULTS.get(tenant.plan_tier, {}))
 
     return {
         "plan": tenant.plan,
         "plan_tier": tenant.plan_tier,
-        "included_credits_per_month": plan_credits[0],
-        "rollover_cap": plan_credits[1],
-        "per_listing_credit_cost": tier_info.get("per_listing_credit_cost", 1),
+        "included_credits_per_month": tier_info.get("included_credits", 0),
+        "rollover_cap": tier_info.get("rollover_cap", 0),
+        "per_listing_credit_cost": tier_info.get("per_listing_credit_cost", 12),
         "billing_model": tenant.billing_model,
         "has_stripe_subscription": bool(tenant.stripe_subscription_id),
     }
 
 
 async def get_credit_pricing(**kwargs) -> dict:
+    # Return bundles for the free tier as a baseline reference
+    bundles = get_bundles_for_tier("free")
     return {
         "bundles": [
             {
@@ -366,9 +367,9 @@ async def get_credit_pricing(**kwargs) -> dict:
                 "price": f"${b['price_cents'] / 100:.2f}",
                 "per_credit": f"${b['per_credit_cents'] / 100:.2f}",
             }
-            for b in CREDIT_BUNDLES
+            for b in bundles
         ],
-        "note": "Credits can be purchased from the Billing page.",
+        "note": "Credits can be purchased from the Billing page. Prices vary by tier.",
     }
 
 

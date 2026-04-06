@@ -6,6 +6,8 @@ from pydantic import BaseModel
 
 class CreditBalanceResponse(BaseModel):
     balance: int
+    granted_balance: int
+    purchased_balance: int
     rollover_balance: int
     rollover_cap: int
     period_start: datetime
@@ -15,9 +17,11 @@ class CreditBalanceResponse(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "balance": 12,
-                    "rollover_balance": 2,
-                    "rollover_cap": 5,
+                    "balance": 75,
+                    "granted_balance": 50,
+                    "purchased_balance": 25,
+                    "rollover_balance": 10,
+                    "rollover_cap": 50,
                     "period_start": "2024-01-01T00:00:00Z",
                     "period_end": "2024-02-01T00:00:00Z",
                 }
@@ -40,19 +44,19 @@ class CreditTransactionResponse(BaseModel):
 
 
 class CreditPurchaseRequest(BaseModel):
-    bundle_size: int  # 5, 10, 25, or 50
+    bundle_size: int  # 25, 50, 100, or 250
     success_url: str
     cancel_url: str
-    idempotency_key: str | None = None  # Client-generated key to prevent duplicate purchases
+    idempotency_key: str | None = None
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "bundle_size": 10,
+                    "bundle_size": 50,
                     "success_url": "https://app.listingjet.com/credits?success=1",
                     "cancel_url": "https://app.listingjet.com/credits?cancelled=1",
-                    "idempotency_key": "buy-10-credits-2024-01-15",
+                    "idempotency_key": "buy-50-credits-2026-04-06",
                 }
             ]
         }
@@ -64,4 +68,17 @@ class CreditPurchaseResponse(BaseModel):
 
 
 class CreditPricingResponse(BaseModel):
-    bundles: list[dict]  # [{size: 5, price_cents: 9500, per_credit_cents: 1900}, ...]
+    tier: str
+    bundles: list[dict]  # [{size, price_cents, per_credit_cents}, ...]
+
+
+class ServiceCreditCost(BaseModel):
+    slug: str
+    name: str
+    credits: int
+
+
+class ServiceCostsResponse(BaseModel):
+    tier: str
+    per_credit_dollar_value: float
+    services: list[ServiceCreditCost]

@@ -44,7 +44,7 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         raise HTTPException(status_code=400, detail=f"Invalid plan tier: {tier}. Must be one of: {', '.join(TIER_DEFAULTS)}")
 
     tier_config = TIER_DEFAULTS[tier]
-    plan = _TIER_TO_PLAN.get(tier, "starter")
+    plan = _TIER_TO_PLAN.get(tier, "free")
 
     tenant = Tenant(id=uuid.uuid4(), name=body.company_name, plan=plan, billing_model="credit")
     db.add(tenant)
@@ -55,6 +55,8 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         balance=tier_config["included_credits"],
+        granted_balance=tier_config["included_credits"],
+        purchased_balance=0,
         rollover_cap=tier_config["rollover_cap"],
     )
     db.add(credit_account)
@@ -467,7 +469,7 @@ async def google_login(
         return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
 
     # New user — auto-register with default plan
-    tenant = Tenant(id=uuid.uuid4(), name=name or email.split("@")[0], plan="starter", billing_model="credit")
+    tenant = Tenant(id=uuid.uuid4(), name=name or email.split("@")[0], plan="free", billing_model="credit")
     db.add(tenant)
     await db.flush()
 
@@ -477,7 +479,9 @@ async def google_login(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         balance=0,
-        rollover_cap=5,
+        granted_balance=0,
+        purchased_balance=0,
+        rollover_cap=0,
     )
     db.add(credit_account)
 
@@ -493,7 +497,7 @@ async def google_login(
     await emit_event(
         session=db,
         event_type="user.registered",
-        payload={"email": email, "user_id": str(user.id), "provider": "google", "plan": "starter"},
+        payload={"email": email, "user_id": str(user.id), "provider": "google", "plan": "free"},
         tenant_id=str(tenant.id),
     )
     await db.commit()

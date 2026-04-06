@@ -12,27 +12,27 @@ PLAN_TO_PRICE: dict[str, str] = {}
 def _init_price_map():
     """Build price-to-plan map from config. Called lazily so settings are loaded."""
     if not PRICE_TO_PLAN:
-        # Primary plan names (stripe_price_starter, stripe_price_pro, stripe_price_enterprise)
-        if settings.stripe_price_starter:
-            PRICE_TO_PLAN[settings.stripe_price_starter] = "starter"
-            PLAN_TO_PRICE["starter"] = settings.stripe_price_starter
-        if settings.stripe_price_pro:
-            PRICE_TO_PLAN[settings.stripe_price_pro] = "pro"
-            PLAN_TO_PRICE["pro"] = settings.stripe_price_pro
-        if settings.stripe_price_enterprise:
-            PRICE_TO_PLAN[settings.stripe_price_enterprise] = "enterprise"
-            PLAN_TO_PRICE["enterprise"] = settings.stripe_price_enterprise
-
-        # Tier-based names (stripe_price_lite, stripe_price_active_agent, stripe_price_team)
+        # v3 tier names (stripe_price_lite, stripe_price_active_agent, stripe_price_team)
         if settings.stripe_price_lite:
-            PRICE_TO_PLAN[settings.stripe_price_lite] = "starter"
-            PLAN_TO_PRICE.setdefault("starter", settings.stripe_price_lite)
+            PRICE_TO_PLAN[settings.stripe_price_lite] = "lite"
+            PLAN_TO_PRICE["lite"] = settings.stripe_price_lite
         if settings.stripe_price_active_agent:
-            PRICE_TO_PLAN[settings.stripe_price_active_agent] = "pro"
-            PLAN_TO_PRICE.setdefault("pro", settings.stripe_price_active_agent)
+            PRICE_TO_PLAN[settings.stripe_price_active_agent] = "active_agent"
+            PLAN_TO_PRICE["active_agent"] = settings.stripe_price_active_agent
         if settings.stripe_price_team:
-            PRICE_TO_PLAN[settings.stripe_price_team] = "enterprise"
-            PLAN_TO_PRICE.setdefault("enterprise", settings.stripe_price_team)
+            PRICE_TO_PLAN[settings.stripe_price_team] = "team"
+            PLAN_TO_PRICE["team"] = settings.stripe_price_team
+
+        # Legacy plan names (for existing subscriptions during transition)
+        if settings.stripe_price_starter:
+            PRICE_TO_PLAN[settings.stripe_price_starter] = "free"
+            PLAN_TO_PRICE.setdefault("free", settings.stripe_price_starter)
+        if settings.stripe_price_pro:
+            PRICE_TO_PLAN[settings.stripe_price_pro] = "active_agent"
+            PLAN_TO_PRICE.setdefault("active_agent", settings.stripe_price_pro)
+        if settings.stripe_price_enterprise:
+            PRICE_TO_PLAN[settings.stripe_price_enterprise] = "team"
+            PLAN_TO_PRICE.setdefault("team", settings.stripe_price_enterprise)
 
 
 class BillingService:
@@ -106,7 +106,7 @@ class BillingService:
                 "Add the price to settings if this is a new product tier.",
                 price_id,
             )
-            return "starter"
+            return "free"
         return plan
 
     def get_price_for_plan(self, plan: str) -> str | None:
