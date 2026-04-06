@@ -818,6 +818,27 @@ class ApiClient {
   async adminSupportStats(): Promise<SupportTicketStats> {
     return this.request("/support/admin/tickets/stats");
   }
+
+  async setStagingTags(listingId: string, assetIds: string[]): Promise<{ tagged_count: number; listing_id: string }> {
+    const { data, error } = await fetchClient.POST("/listings/{listing_id}/staging-tags" as any, {
+      params: { path: { listing_id: listingId } },
+      body: { asset_ids: assetIds },
+    });
+    if (error) throw this._toError(error);
+    return data as any;
+  }
+
+  async startPipeline(
+    listingId: string,
+    selectedAddons: string[] = [],
+  ): Promise<{ listing_id: string; state: string; credits_deducted: number; workflow_id: string }> {
+    const { data, error } = await fetchClient.POST("/listings/{listing_id}/start-pipeline" as any, {
+      params: { path: { listing_id: listingId } },
+      body: { selected_addons: selectedAddons },
+    });
+    if (error) throw this._toError(error);
+    return data as any;
+  }
 }
 
 export const apiClient = new ApiClient();
