@@ -74,7 +74,7 @@ async def test_register_creates_user_and_returns_token(async_client: AsyncClient
 @pytest.mark.asyncio
 async def test_register_duplicate_email_returns_409(async_client: AsyncClient):
     email = f"test-{uuid.uuid4()}@example.com"
-    payload = {"email": email, "password": "StrongPass1!", "name": "Bob", "company_name": "Corp"}
+    payload = {"email": email, "password": "StrongPass1!", "name": "Bob", "company_name": "Corp", "plan_tier": "free"}
     await async_client.post("/auth/register", json=payload)
     resp = await async_client.post("/auth/register", json=payload)
     assert resp.status_code == 409
