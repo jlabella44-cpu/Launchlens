@@ -30,6 +30,11 @@ class VideoStitcher:
             with open(clip_paths[0], "rb") as f:
                 return f.read()
 
+        # Hard-cut path: when all transitions are "cut" (or none provided),
+        # re-encode via concat filter for uniform output (clips may differ in codec/res).
+        if not transitions or all(t == "cut" for t in transitions):
+            return self._stitch_hard_cuts(clip_paths, output_width, output_height)
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "output.mp4")
 
@@ -78,6 +83,48 @@ class VideoStitcher:
 
             cmd.extend([output_path])
 
+            subprocess.run(cmd, capture_output=True, check=True)
+
+            with open(output_path, "rb") as f:
+                return f.read()
+
+    def _stitch_hard_cuts(
+        self,
+        clip_paths: list[str],
+        output_width: int,
+        output_height: int,
+    ) -> bytes:
+        """Stitch clips with hard cuts (no transitions) via ffmpeg concat filter.
+
+        Re-encodes to normalize resolution/fps across heterogeneous clips
+        (Kling clips + endcard rendered at different sizes).
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = os.path.join(tmpdir, "output.mp4")
+
+            inputs = []
+            for clip in clip_paths:
+                inputs.extend(["-i", clip])
+
+            filter_parts = []
+            for i in range(len(clip_paths)):
+                filter_parts.append(
+                    f"[{i}:v]scale={output_width}:{output_height}:force_original_aspect_ratio=decrease,"
+                    f"pad={output_width}:{output_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}];"
+                )
+            concat_inputs = "".join(f"[v{i}]" for i in range(len(clip_paths)))
+            filter_parts.append(f"{concat_inputs}concat=n={len(clip_paths)}:v=1:a=0[out]")
+            filter_graph = "".join(filter_parts)
+
+            cmd = ["ffmpeg", "-y"] + inputs + [
+                "-filter_complex", filter_graph,
+                "-map", "[out]",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "23",
+                "-pix_fmt", "yuv420p",
+                output_path,
+            ]
             subprocess.run(cmd, capture_output=True, check=True)
 
             with open(output_path, "rb") as f:

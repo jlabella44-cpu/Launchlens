@@ -173,9 +173,7 @@ class Settings(BaseSettings):
     kling_access_key: str = ""
     kling_secret_key: str = ""
     kling_api_base_url: str = "https://api.klingai.com"
-    video_max_photos: int = 8
     video_score_floor: float = 0.65
-    video_clip_duration: int = 5
 
     # Property Lookup
     attom_api_key: str = ""

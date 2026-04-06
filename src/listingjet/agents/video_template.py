@@ -1,6 +1,6 @@
-"""Room-specific prompts and camera controls for Kling AI video generation.
-Ported from Juke Marketing Engine.
-"""
+"""Video template definitions + room-specific prompts and camera controls for Kling AI."""
+
+from dataclasses import dataclass
 
 ROOM_PROMPTS: dict[str, str] = {
     "drone": "Slow cinematic aerial drift over property, stable horizon, golden hour light",
@@ -42,7 +42,6 @@ ROOM_CAMERA_CONTROLS: dict[str, dict[str, int]] = {
 
 NEGATIVE_PROMPT = "shaky camera, fast cuts, blurry, distorted, excessive movement, hallucinated spaces, morphing, artifacts"
 
-# Feature tags that enhance prompts when detected in listing metadata
 FEATURE_TAGS: dict[str, list[str]] = {
     "kitchen": ["island", "quartz_counters", "granite_counters", "stainless_appliances"],
     "bathroom": ["soaking_tub", "walk_in_shower", "double_vanity"],
@@ -52,25 +51,30 @@ FEATURE_TAGS: dict[str, list[str]] = {
     "basement": ["theater", "gym", "wet_bar"],
 }
 
-# Transition types between clips (ported from Juke)
-TRANSITION_SEQUENCE = [
-    "fade",        # drone/exterior → first interior
-    "fadeblack",   # exterior → interior transition
-    "wipeleft",    # interior → interior
-    "wipeleft",    # interior → interior
-    "wipeleft",    # interior → interior
-    "wipeleft",    # interior → interior
-    "fade",        # penultimate → last
-    "fade",        # last clip fade out
-]
+# Room buckets for template-based photo selection
+DRONE_ROOMS: frozenset[str] = frozenset({"drone"})
+EXTERIOR_ROOMS: frozenset[str] = frozenset({"exterior", "exterior_rear"})
 
-# Photo selection slot order (which rooms get priority)
-SLOT_ORDER = [
-    "drone", "exterior", "entryway", "living_room", "kitchen",
-    "primary_bedroom", "primary_bathroom", "dining_room",
-    "office", "bedroom", "bathroom", "basement",
-    "backyard", "pool", "garage",
-]
+
+@dataclass(frozen=True)
+class VideoTemplate:
+    """Defines the shape of a generated video: clip count, length, model, structure."""
+    name: str
+    clip_duration_s: int
+    clip_count: int
+    kling_model: str = "kling-v2-5-turbo"
+    kling_mode: str = "pro"
+    transition: str = "cut"  # "cut" = hard cut (no xfade)
+
+
+STANDARD_60S = VideoTemplate(
+    name="standard_60s",
+    clip_duration_s=5,
+    clip_count=12,
+    kling_model="kling-v2-5-turbo",
+    kling_mode="pro",
+    transition="cut",
+)
 
 
 def get_prompt_for_room(room_label: str, metadata: dict | None = None) -> str:
@@ -86,10 +90,3 @@ def get_prompt_for_room(room_label: str, metadata: dict | None = None) -> str:
 def get_camera_control(room_label: str) -> dict[str, int]:
     """Get camera control settings for a room."""
     return ROOM_CAMERA_CONTROLS.get(room_label, {"zoom": 3, "horizontal": 0})
-
-
-def get_transition(clip_index: int, total_clips: int) -> str:
-    """Get the transition type for a given clip position."""
-    if clip_index >= len(TRANSITION_SEQUENCE):
-        return "wipeleft"
-    return TRANSITION_SEQUENCE[clip_index]

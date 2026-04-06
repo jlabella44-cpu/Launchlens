@@ -45,10 +45,11 @@ class KlingProvider:
         camera_control: dict | None = None,
         duration: int = 5,
         mode: str = "pro",
+        model_name: str = "kling-v2-5-turbo",
     ) -> str:
         """Submit an image-to-video task to Kling. Returns task_id."""
         body: dict = {
-            "model_name": "kling-v1",
+            "model_name": model_name,
             "image": image_url,
             "prompt": prompt,
             "negative_prompt": negative_prompt,
@@ -56,7 +57,8 @@ class KlingProvider:
             "mode": mode,
             "duration": str(duration),
         }
-        if camera_control:
+        # Camera control is only supported on kling-v1 / kling-v1-6
+        if camera_control and not model_name.startswith("kling-v2"):
             body["camera_control"] = {
                 "type": "simple",
                 "config": {
