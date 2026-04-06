@@ -36,7 +36,7 @@ jobs:
     env:
       DATABASE_URL: "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
       DATABASE_URL_SYNC: "postgresql://listingjet:password@localhost:5433/listingjet_test"
-      JWT_SECRET: "test-secret"
+      JWT_SECRET: "test-secret-that-is-at-least-32-characters-long"
       REDIS_URL: "redis://localhost:6379/0"
     steps:
       - uses: actions/checkout@v4
