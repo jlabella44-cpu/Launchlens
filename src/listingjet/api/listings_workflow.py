@@ -268,7 +268,7 @@ async def cancel_listing(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    cancellable = {ListingState.NEW, ListingState.UPLOADING, ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    cancellable = {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
     if listing.state not in cancellable:
         raise HTTPException(409, f"Cannot cancel: listing is {listing.state.value}")
 

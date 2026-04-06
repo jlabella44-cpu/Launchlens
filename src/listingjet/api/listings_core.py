@@ -97,6 +97,10 @@ async def list_listings(
     if state != "cancelled":
         base_query = base_query.where(Listing.state != ListingState.CANCELLED)
 
+    # Hide draft listings unless explicitly requested
+    if state != "draft":
+        base_query = base_query.where(Listing.state != ListingState.DRAFT)
+
     if state:
         try:
             validated_state = ListingState(state)
@@ -246,7 +250,7 @@ async def delete_listing(
 
     # Refund credits only if no significant pipeline work was done
     credits_refunded = 0
-    refundable_states = {ListingState.NEW, ListingState.UPLOADING, ListingState.ANALYZING, ListingState.FAILED}
+    refundable_states = {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.ANALYZING, ListingState.FAILED}
     tenant = await db.get(Tenant, current_user.tenant_id)
     if tenant and tenant.billing_model == "credit" and listing.credit_cost and listing.state in refundable_states:
         from listingjet.services.credits import CreditService
