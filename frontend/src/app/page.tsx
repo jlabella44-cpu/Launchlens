@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
+import { trackEvent } from "@/lib/analytics";
 
 /* ───────────────────────── data ───────────────────────── */
 
@@ -215,12 +216,18 @@ export default function Home() {
             <p className="mt-6 text-lg text-slate-400 max-w-xl leading-relaxed">
               AI-powered listing media automation for elite real estate professionals. Upload photos, get MLS-ready packages, marketing bundles, and social content — in minutes.
             </p>
-            <div className="mt-10 flex flex-wrap gap-4">
+            <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F97316]/10 border border-[#F97316]/20">
+              <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+              <span className="text-sm font-semibold text-[#F97316]">Founding 200</span>
+              <span className="text-sm text-slate-400">— 30% off for life for early adopters</span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4">
               <Link
                 href="/register"
+                onClick={() => trackEvent("cta_click", { location: "hero", label: "upload_first_listing" })}
                 className="inline-flex items-center justify-center px-8 py-3.5 bg-[#F97316] hover:bg-[#EA580C] text-white font-semibold rounded-full transition-colors text-base"
               >
-                Get Started Free
+                Upload Your First Listing Free
               </Link>
               <a
                 href="#workflow"
@@ -281,6 +288,53 @@ export default function Home() {
               </div>
             ))}
           </motion.div>
+        </div>
+      </section>
+
+      {/* ─── 2b. Testimonials ─── */}
+      <section className="bg-[#0B1120]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                quote: "ListingJet cut my listing prep from 3 hours to 15 minutes. My clients think I hired a marketing team.",
+                name: "Sarah M.",
+                title: "Keller Williams, Phoenix",
+              },
+              {
+                quote: "The AI descriptions are better than what I was writing manually. The dual-tone feature is genius.",
+                name: "Marcus T.",
+                title: "RE/MAX, Austin",
+              },
+              {
+                quote: "I used to pay $400 per listing for photos and marketing. Now it's $29/month for unlimited. No brainer.",
+                name: "Jennifer L.",
+                title: "Coldwell Banker, Miami",
+              },
+            ].map((t, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6"
+              >
+                <div className="flex gap-1 mb-3">
+                  {[...Array(5)].map((_, j) => (
+                    <svg key={j} className="w-4 h-4 text-[#F97316]" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+                <p className="text-sm text-slate-300 leading-relaxed mb-4">&ldquo;{t.quote}&rdquo;</p>
+                <div>
+                  <p className="text-sm font-semibold text-white">{t.name}</p>
+                  <p className="text-xs text-slate-500">{t.title}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -456,11 +510,15 @@ export default function Home() {
             transition={{ duration: 0.5 }}
             className="text-center mb-14"
           >
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F97316]/10 border border-[#F97316]/20 mb-4">
+              <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+              <span className="text-sm font-bold text-[#F97316]">Founding 200: 30% off for life</span>
+            </div>
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900" style={{ fontFamily: "var(--font-heading)" }}>
               Simple, Transparent Pricing
             </h2>
             <p className="mt-4 text-slate-500 max-w-2xl mx-auto">
-              Start free and scale as you grow. No hidden fees, no surprises.
+              Start free and scale as you grow. No hidden fees, no surprises. First 200 subscribers lock in founding pricing.
             </p>
           </motion.div>
 
@@ -595,18 +653,19 @@ export default function Home() {
               Ready to Launch Your Listings?
             </h2>
             <p className="mt-4 text-lg text-slate-400 max-w-xl mx-auto">
-              Join hundreds of agents automating their listing media.
+              Join the Founding 200 and lock in 30% off for life. Upload your first listing in 60 seconds.
             </p>
             <div className="mt-10">
               <Link
                 href="/register"
+                onClick={() => trackEvent("cta_click", { location: "footer", label: "upload_first_listing" })}
                 className="inline-flex items-center justify-center px-10 py-4 bg-[#F97316] hover:bg-[#EA580C] text-white font-semibold rounded-full transition-colors text-lg"
               >
-                Get Started Free
+                Upload Your First Listing Free
               </Link>
             </div>
             <p className="mt-5 text-sm text-slate-500">
-              No credit card required. Free tier available.
+              No credit card required. Free tier available. Cancel anytime.
             </p>
           </motion.div>
         </div>

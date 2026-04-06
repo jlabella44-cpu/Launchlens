@@ -24,6 +24,7 @@ from listingjet.api import (
     health,
     help_agent,
     image_edit,
+    launch,
     listing_permissions,
     listings_core,
     listings_media,
@@ -164,6 +165,7 @@ def create_app() -> FastAPI:
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
     app.include_router(support.router, prefix="/support", tags=["support"])
+    app.include_router(launch.router, tags=["launch"])
     app.include_router(health.router)
 
     from fastapi.responses import JSONResponse

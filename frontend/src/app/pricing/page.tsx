@@ -151,6 +151,10 @@ export default function PricingPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-10"
         >
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F97316]/10 border border-[#F97316]/20 mb-4">
+            <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+            <span className="text-sm font-bold text-[#F97316]">Founding 200: 30% off for life</span>
+          </div>
           <h1
             className="text-4xl font-bold text-[var(--color-text)]"
             style={{ fontFamily: "var(--font-heading)" }}

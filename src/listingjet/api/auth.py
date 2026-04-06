@@ -80,15 +80,18 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     await db.commit()
     await db.refresh(user)
 
-    # Send welcome email (fire-and-forget)
+    # Send welcome drip email #1 (fire-and-forget)
+    # Full drip sequence: welcome_drip_1 (now), _2 (day 1), _3 (day 3), _4 (day 5), _5 (day 10)
+    # Subsequent drips are triggered by a scheduled task (see services/drip_scheduler.py)
     try:
         from listingjet.services.email import get_email_service
         email_svc = get_email_service()
-        await email_svc.send_template(user.email, "welcome", {
-            "name": user.name or "there",
-            "plan": tier,
-            "app_url": "https://app.listingjet.com",
-        })
+        email_svc.send_notification(
+            user.email,
+            "welcome_drip_1",
+            name=user.name or "there",
+            upload_url="https://app.listingjet.com/listings",
+        )
     except Exception:
         logger.exception("welcome email failed for %s", email)
 
