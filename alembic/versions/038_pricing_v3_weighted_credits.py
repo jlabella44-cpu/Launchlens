@@ -1,15 +1,15 @@
 """pricing v3 — weighted credit system, dual-pool balances, updated service costs
 
-Revision ID: 037
-Revises: 036
+Revision ID: 038_pricing_v3
+Revises: 037_scoring_events
 Create Date: 2026-04-06
 """
 import sqlalchemy as sa
 
 from alembic import op
 
-revision = "037_pricing_v3"
-down_revision = "036_support_tickets"
+revision = "038_pricing_v3"
+down_revision = "037_scoring_events"
 branch_labels = None
 depends_on = None
 
