@@ -73,10 +73,17 @@ async def run_social_content(context: AgentContext) -> dict:
     return await SocialContentAgent().instrumented_execute(context)
 
 
+@dataclasses.dataclass
+class MLSExportParams:
+    context: AgentContext
+    content_result: dict
+    flyer_s3_key: str | None = None
+
+
 @activity.defn
-async def run_mls_export(context: AgentContext, content_result: dict, flyer_s3_key: str | None) -> dict:
+async def run_mls_export(params: MLSExportParams) -> dict:
     from listingjet.agents.mls_export import MLSExportAgent
-    return await MLSExportAgent(content_result=content_result, flyer_s3_key=flyer_s3_key).instrumented_execute(context)
+    return await MLSExportAgent(content_result=params.content_result, flyer_s3_key=params.flyer_s3_key).instrumented_execute(params.context)
 
 
 @activity.defn
