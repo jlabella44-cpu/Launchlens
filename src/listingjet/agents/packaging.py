@@ -9,6 +9,7 @@ from listingjet.models.asset import Asset
 from listingjet.models.learning_weight import LearningWeight
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
+from listingjet.models.scoring_event import ScoringEvent
 from listingjet.models.tenant import Tenant
 from listingjet.models.vision_result import VisionResult
 from listingjet.services.weight_manager import WeightManager
@@ -83,7 +84,7 @@ class PackagingAgent(BaseAgent):
                     delete(PackageSelection).where(PackageSelection.listing_id == listing_id)
                 )
 
-                # Write PackageSelection rows
+                # Write PackageSelection + ScoringEvent rows
                 for position, (score, asset_id, vr) in enumerate(top):
                     ps = PackageSelection(
                         tenant_id=tenant_id,
@@ -95,6 +96,25 @@ class PackagingAgent(BaseAgent):
                         composite_score=score,
                     )
                     session.add(ps)
+
+                    # Log features for XGBoost training data
+                    lw = weight_map.get(vr.room_label) if vr.room_label else None
+                    session.add(ScoringEvent(
+                        tenant_id=tenant_id,
+                        listing_id=listing_id,
+                        asset_id=asset_id,
+                        room_label=vr.room_label,
+                        features={
+                            "quality_score": vr.quality_score,
+                            "commercial_score": vr.commercial_score,
+                            "hero_candidate": vr.hero_candidate or False,
+                            "room_weight": lw.weight if lw else 1.0,
+                            "tier": vr.tier,
+                            "labeled_listing_count": lw.labeled_listing_count if lw else 0,
+                        },
+                        composite_score=score,
+                        position=position,
+                    ))
 
                 # Compute average trust score
                 avg_score = sum(s[0] for s in top) / len(top) if top else 0.0

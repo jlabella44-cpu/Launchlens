@@ -21,3 +21,4 @@ from .addon_catalog import AddonCatalog                      # noqa
 from .addon_purchase import AddonPurchase                    # noqa
 from .listing_permission import ListingPermission            # noqa
 from .listing_permission import ListingAuditLog              # noqa
+from .scoring_event import ScoringEvent                      # noqa
