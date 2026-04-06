@@ -124,9 +124,11 @@ class ListingPipeline:
         if input.billing_model == "credit" and "ai_video_tour" not in addons:
             run_video_step = False
 
-        video_task = None
+        # Build parallel tasks: video generation + human review wait
+        parallel = []
+
         if run_video_step:
-            video_task = asyncio.create_task(
+            parallel.append(
                 workflow.execute_activity(
                     run_video, ctx,
                     start_to_close_timeout=timedelta(minutes=30),
@@ -140,15 +142,14 @@ class ListingPipeline:
             and packaging_result.get("auto_approved") is True
         )
         if not auto_approved:
-            # Wait for human review (listing is now AWAITING_REVIEW)
-            await workflow.wait_condition(lambda: self._review_completed)
+            parallel.append(workflow.wait_condition(lambda: self._review_completed))
 
-        # Collect video result (may already be done) — don't block pipeline on failure
-        if video_task:
-            try:
-                await video_task
-            except Exception as exc:
-                workflow.logger.warning("video_task_failed listing=%s error=%s", input.listing_id, exc)
+        # Run video + review wait concurrently; don't fail pipeline on video errors
+        if parallel:
+            results = await asyncio.gather(*parallel, return_exceptions=True)
+            for r in results:
+                if isinstance(r, Exception):
+                    workflow.logger.warning("parallel_task_failed listing=%s error=%s", input.listing_id, r)
 
         # Phase 2: Post-approval pipeline
         # Step 1: Content (dual-tone)
