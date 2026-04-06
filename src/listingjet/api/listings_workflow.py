@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
@@ -17,6 +17,7 @@ from listingjet.api.schemas.listings import (
 from listingjet.database import get_db
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing, ListingState
+from listingjet.models.scoring_event import ScoringEvent
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.endpoint_rate_limit import rate_limit
@@ -91,6 +92,17 @@ async def approve_listing(
         record_review_turnaround(turnaround)
 
     listing.state = ListingState.APPROVED
+
+    # Backfill "approval" outcome on all un-labeled ScoringEvent rows for this listing
+    await db.execute(
+        update(ScoringEvent)
+        .where(
+            ScoringEvent.listing_id == listing_id,
+            ScoringEvent.outcome.is_(None),
+        )
+        .values(outcome="approval", outcome_at=datetime.now(timezone.utc))
+    )
+
     await db.commit()
     await db.refresh(listing)
 
@@ -152,6 +164,16 @@ async def reject_listing(
         raise HTTPException(status_code=400, detail=f"Invalid reason. Must be one of: {valid_reasons}")
 
     listing.state = ListingState.FAILED
+
+    # Backfill "rejection" outcome on all un-labeled ScoringEvent rows for this listing
+    await db.execute(
+        update(ScoringEvent)
+        .where(
+            ScoringEvent.listing_id == listing_id,
+            ScoringEvent.outcome.is_(None),
+        )
+        .values(outcome="rejection", outcome_at=datetime.now(timezone.utc))
+    )
 
     # Emit event BEFORE commit — outbox atomicity
     from listingjet.services.events import emit_event

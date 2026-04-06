@@ -1,8 +1,11 @@
-from sqlalchemy import select
+from datetime import datetime, timezone
+
+from sqlalchemy import select, update
 
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.event import Event
 from listingjet.models.learning_weight import LearningWeight
+from listingjet.models.scoring_event import ScoringEvent
 from listingjet.services.weight_manager import WeightManager
 
 from .base import AgentContext, BaseAgent
@@ -60,6 +63,20 @@ class LearningAgent(BaseAgent):
                             weight=new_weight,
                             labeled_listing_count=1,
                         ))
+
+                    # Backfill outcome on ScoringEvent rows for XGBoost training data
+                    asset_id = event.payload.get("asset_id")
+                    now = datetime.now(timezone.utc)
+                    if asset_id:
+                        await session.execute(
+                            update(ScoringEvent)
+                            .where(
+                                ScoringEvent.listing_id == listing_id,
+                                ScoringEvent.asset_id == asset_id,
+                                ScoringEvent.outcome.is_(None),
+                            )
+                            .values(outcome=action, outcome_at=now)
+                        )
 
                     weights_updated += 1
 
