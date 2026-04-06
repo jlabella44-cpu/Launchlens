@@ -44,7 +44,7 @@ async def test_change_plan_no_subscription(_mock_rate_limiter, async_client):
     token, _ = await _register(async_client)
     resp = await async_client.post(
         "/billing/change-plan",
-        json={"plan": "pro"},
+        json={"plan": "active_agent"},
         headers=_auth(token),
     )
     assert resp.status_code == 400
