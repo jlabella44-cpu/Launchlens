@@ -67,8 +67,9 @@ export function trackEvent(event: string, properties: EventProperties = {}): voi
   });
 
   // Meta Pixel (if loaded)
-  if (typeof window !== "undefined" && (window as any).fbq) {
-    (window as any).fbq("trackCustom", event, properties);
+  if (typeof window !== "undefined" && "fbq" in window) {
+    const fbq = (window as unknown as { fbq: (...args: unknown[]) => void }).fbq;
+    fbq("trackCustom", event, properties);
   }
 }
 

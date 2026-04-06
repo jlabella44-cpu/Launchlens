@@ -96,8 +96,8 @@ function RegisterForm() {
       }
 
       router.push("/onboarding");
-    } catch (err: any) {
-      setError(err.message || "Registration failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }

@@ -53,8 +53,8 @@ function ExportPage() {
       const res = await apiClient.getExport(id, mode);
       trackEvent(AnalyticsEvents.FIRST_EXPORT, { listing_id: id, mode, tier: tier || "free" });
       window.open(res.download_url, "_blank");
-    } catch (err: any) {
-      setError(err.message || "Export not available yet");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Export not available yet");
     } finally {
       setDownloading(false);
     }
