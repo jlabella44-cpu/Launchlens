@@ -10,16 +10,18 @@ dollar value that decreases (= better deal) at higher tiers.
 # ---------------------------------------------------------------------------
 
 SERVICE_CREDIT_COSTS: dict[str, int] = {
-    "base_listing": 12,
+    "base_listing": 15,
     "ai_video_tour": 20,
     "virtual_staging": 15,
     "3d_floorplan": 8,
-    "image_editing": 6,
-    "cma_report": 5,
-    "photo_compliance": 3,
-    "social_media_cuts": 3,
-    "microsite": 2,
-    "social_content_pack": 2,
+}
+
+BUNDLE_PRICING: dict[str, dict] = {
+    "all_addons_bundle": {
+        "credit_cost": 30,
+        "includes": ["ai_video_tour", "virtual_staging", "3d_floorplan"],
+        "savings": 13,
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -30,28 +32,28 @@ TIER_DEFAULTS: dict[str, dict] = {
     "free": {
         "included_credits": 0,
         "rollover_cap": 0,
-        "per_listing_credit_cost": 12,
+        "per_listing_credit_cost": 15,
         "per_credit_dollar_value": 0.50,
         "monthly_price_cents": 0,
     },
     "lite": {
         "included_credits": 25,
         "rollover_cap": 15,
-        "per_listing_credit_cost": 12,
+        "per_listing_credit_cost": 15,
         "per_credit_dollar_value": 0.45,
         "monthly_price_cents": 1900,
     },
     "active_agent": {
         "included_credits": 75,
         "rollover_cap": 50,
-        "per_listing_credit_cost": 12,
+        "per_listing_credit_cost": 15,
         "per_credit_dollar_value": 0.40,
         "monthly_price_cents": 4900,
     },
     "team": {
         "included_credits": 250,
         "rollover_cap": 150,
-        "per_listing_credit_cost": 12,
+        "per_listing_credit_cost": 15,
         "per_credit_dollar_value": 0.35,
         "monthly_price_cents": 9900,
     },

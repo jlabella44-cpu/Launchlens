@@ -53,7 +53,7 @@ class ListingPipeline:
     |                                                               |
     |              [wait for human_review_completed]                 |
     |                                                               |
-    |  Content -> [Brand + Social (plan-gated)] -> MLS Export       |
+    |  Content -> [Brand + Social (always)] -> MLS Export           |
     |          -> Distribution                                      |
     +---------------------------------------------------------------+
     """
@@ -126,10 +126,12 @@ class ListingPipeline:
 
         video_task = None
         if run_video_step:
-            video_task = workflow.execute_activity(
-                run_video, ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=_DEFAULT_RETRY,
+            video_task = asyncio.create_task(
+                workflow.execute_activity(
+                    run_video, ctx,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    retry_policy=_DEFAULT_RETRY,
+                )
             )
 
         # Skip review wait if auto-approved by packaging agent
@@ -156,27 +158,19 @@ class ListingPipeline:
             retry_policy=_DEFAULT_RETRY,
         )
 
-        # Step 2: Brand + Social in parallel (social is plan-gated)
+        # Step 2: Brand + Social in parallel (social ALWAYS runs — included in base)
         parallel_tasks = [
             workflow.execute_activity(
                 run_brand, ctx,
                 start_to_close_timeout=_DEFAULT_TIMEOUT,
                 retry_policy=_DEFAULT_RETRY,
-            )
+            ),
+            workflow.execute_activity(
+                run_social_content, ctx,
+                start_to_close_timeout=_DEFAULT_TIMEOUT,
+                retry_policy=_DEFAULT_RETRY,
+            ),
         ]
-        # Social content: plan-gated for legacy, addon-gated for credit users
-        run_social = (
-            (input.billing_model == "credit" and "social_content_pack" in addons)
-            or (input.billing_model != "credit" and input.plan in ("pro", "enterprise"))
-        )
-        if run_social:
-            parallel_tasks.append(
-                workflow.execute_activity(
-                    run_social_content, ctx,
-                    start_to_close_timeout=_DEFAULT_TIMEOUT,
-                    retry_policy=_DEFAULT_RETRY,
-                )
-            )
         results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
         brand_result = results[0]
         if isinstance(brand_result, BaseException):

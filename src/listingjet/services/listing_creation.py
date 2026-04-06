@@ -73,21 +73,11 @@ class ListingCreationService:
             tenant_id=tenant_id,
             address=address,
             metadata_={**metadata, **({"idempotency_key": idempotency_key} if idempotency_key else {})},
-            state=ListingState.NEW,
+            state=ListingState.DRAFT if tenant.billing_model == "credit" else ListingState.NEW,
         )
 
-        if tenant.billing_model == "credit":
-            cost = tenant.per_listing_credit_cost
-            await self._credit_svc.deduct_credits(
-                session, tenant.id, cost,
-                transaction_type="listing_debit",
-                reference_type="listing",
-                reference_id=str(listing_id),
-                description=f"Listing at {address.get('street', 'new listing')}",
-            )
-            listing.credit_cost = cost
-        else:
-            # Legacy billing: monthly quota check
+        if tenant.billing_model != "credit":
+            # Legacy billing: monthly quota check (credits deferred to start-pipeline for credit users)
             now = datetime.now(timezone.utc)
             month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             count_result = await session.execute(

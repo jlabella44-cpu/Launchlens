@@ -33,7 +33,7 @@ interface PlanContextValue {
 
 const PlanContext = createContext<PlanContextValue | null>(null);
 
-const LISTING_CREDIT_COST = 12; // v3: weighted credit cost for base listing
+const LISTING_CREDIT_COST = 15; // v3: weighted credit cost for base listing
 
 export function PlanProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
