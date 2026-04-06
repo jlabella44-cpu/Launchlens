@@ -90,8 +90,9 @@ async def update_tenant(
         changes["name"] = {"old": tenant.name, "new": body.name}
         tenant.name = body.name
     if body.plan is not None:
-        if body.plan not in ("starter", "pro", "enterprise"):
-            raise HTTPException(status_code=400, detail="Invalid plan. Must be: starter, pro, enterprise")
+        valid_admin_plans = ("free", "lite", "active_agent", "team", "starter", "pro", "enterprise")
+        if body.plan not in valid_admin_plans:
+            raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {', '.join(valid_admin_plans)}")
         changes["plan"] = {"old": tenant.plan, "new": body.plan}
         tenant.plan = body.plan
     if body.webhook_url is not None:

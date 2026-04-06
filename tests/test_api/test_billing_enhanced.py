@@ -11,7 +11,8 @@ from listingjet.config import settings
 async def _register(client: AsyncClient) -> tuple[str, str]:
     email = f"billing-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "Biller", "company_name": "BillCo"
+        "email": email, "password": "TestPass1!", "name": "Biller", "company_name": "BillCo",
+        "plan_tier": "free",
     })
     token = resp.json()["access_token"]
     payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
@@ -64,11 +65,11 @@ async def test_change_plan_invalid(_mock_rate_limiter, async_client):
 
 @pytest.mark.asyncio
 async def test_change_plan_same_plan(_mock_rate_limiter, async_client):
-    """Already on starter → can't change to starter."""
+    """Already on free → can't change to free."""
     token, _ = await _register(async_client)
     resp = await async_client.post(
         "/billing/change-plan",
-        json={"plan": "starter"},
+        json={"plan": "free"},
         headers=_auth(token),
     )
     assert resp.status_code == 400
@@ -81,6 +82,6 @@ async def test_status_returns_plan(_mock_rate_limiter, async_client):
     resp = await async_client.get("/billing/status", headers=_auth(token))
     assert resp.status_code == 200
     data = resp.json()
-    assert data["plan"] == "starter"
+    assert data["plan"] == "free"
     assert data["has_payment_method"] is False
     assert data["has_subscription"] is False

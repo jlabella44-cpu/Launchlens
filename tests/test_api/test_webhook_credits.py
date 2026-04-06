@@ -129,7 +129,7 @@ async def test_webhook_subscription_deleted_preserves_credits(async_client: Asyn
     assert status == 200
 
     t = await _get_tenant(db_session, tenant.id)
-    assert t.plan == "lite"
+    assert t.plan == "free"
     assert t.included_credits == 0
     assert t.credit_balance == 20  # preserved
 
@@ -146,9 +146,9 @@ async def test_webhook_subscription_updated_changes_tier(async_client: AsyncClie
     assert status == 200
 
     t = await _get_tenant(db_session, tenant.id)
-    assert t.plan == "enterprise"
-    assert t.included_credits == 500
-    assert t.rollover_cap == 100
+    assert t.plan == "team"
+    assert t.included_credits == 250
+    assert t.rollover_cap == 150
 
 
 @pytest.mark.asyncio

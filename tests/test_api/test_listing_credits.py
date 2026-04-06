@@ -11,7 +11,8 @@ from listingjet.config import settings
 async def _register(client: AsyncClient) -> tuple[str, str]:
     email = f"listcred-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "CreditUser", "company_name": "CreditCo"
+        "email": email, "password": "TestPass1!", "name": "CreditUser", "company_name": "CreditCo",
+        "plan_tier": "free",
     })
     token = resp.json()["access_token"]
     payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
