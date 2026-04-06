@@ -13,6 +13,8 @@ class CreditAccount(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     balance: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    granted_balance: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    purchased_balance: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     rollover_balance: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     rollover_cap: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

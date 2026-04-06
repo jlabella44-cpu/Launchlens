@@ -13,13 +13,15 @@ import { useAuth } from "@/contexts/auth-context";
 import type { CreditBalance, BillingStatus } from "@/lib/types";
 
 interface PlanContextValue {
-  // Legacy plan fields
+  // Plan fields
   plan: string;
   tier: string;
 
   // Credit billing fields
   billingModel: "legacy" | "credit";
   creditBalance: number | null;
+  grantedBalance: number | null;
+  purchasedBalance: number | null;
   canAffordListing: boolean;
   listingCreditCost: number;
   rolloverCap: number | null;
@@ -30,6 +32,8 @@ interface PlanContextValue {
 }
 
 const PlanContext = createContext<PlanContextValue | null>(null);
+
+const LISTING_CREDIT_COST = 12; // v3: weighted credit cost for base listing
 
 export function PlanProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -62,11 +66,13 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     fetchPlanData();
   }, [fetchPlanData]);
 
-  const plan = billingStatus?.plan ?? "starter";
+  const plan = billingStatus?.plan ?? "free";
   const tier = billingStatus?.tier ?? creditData?.tier ?? plan;
   const billingModel = (billingStatus?.billing_model ?? "legacy") as "legacy" | "credit";
-  const listingCreditCost = creditData?.per_listing_credit_cost ?? 1;
+  const listingCreditCost = LISTING_CREDIT_COST;
   const creditBalance = creditData?.balance ?? null;
+  const grantedBalance = creditData?.granted_balance ?? null;
+  const purchasedBalance = creditData?.purchased_balance ?? null;
   const canAffordListing = creditBalance !== null ? creditBalance >= listingCreditCost : true;
   const rolloverCap = creditData?.rollover_cap ?? null;
 
@@ -77,6 +83,8 @@ export function PlanProvider({ children }: { children: ReactNode }) {
         tier,
         billingModel,
         creditBalance,
+        grantedBalance,
+        purchasedBalance,
         canAffordListing,
         listingCreditCost,
         rolloverCap,

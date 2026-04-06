@@ -14,7 +14,8 @@ async def _register(client: AsyncClient) -> tuple[str, str]:
 
     email = f"sse-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "SSE Tester", "company_name": "SSE Co"
+        "email": email, "password": "TestPass1!", "name": "SSE Tester", "company_name": "SSE Co",
+        "plan_tier": "free",
     })
     assert resp.status_code == 200, resp.text
     token = resp.json()["access_token"]

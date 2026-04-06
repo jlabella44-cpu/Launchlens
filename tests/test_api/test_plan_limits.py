@@ -13,12 +13,25 @@ from listingjet.services.plan_limits import PLAN_LIMITS, get_limits
 
 
 def test_plan_limits_has_all_tiers():
+    assert "free" in PLAN_LIMITS
+    assert "lite" in PLAN_LIMITS
+    assert "active_agent" in PLAN_LIMITS
+    assert "team" in PLAN_LIMITS
+    # Legacy aliases
     assert "starter" in PLAN_LIMITS
     assert "pro" in PLAN_LIMITS
     assert "enterprise" in PLAN_LIMITS
 
 
+def test_free_limits():
+    limits = get_limits("free")
+    assert limits["max_listings_per_month"] == 5
+    assert limits["max_assets_per_listing"] == 25
+    assert limits["tier2_vision"] is False
+
+
 def test_starter_limits():
+    """Legacy alias — same as free."""
     limits = get_limits("starter")
     assert limits["max_listings_per_month"] == 5
     assert limits["max_assets_per_listing"] == 25
@@ -26,19 +39,21 @@ def test_starter_limits():
 
 
 def test_pro_limits():
+    """Legacy alias — same as active_agent."""
     limits = get_limits("pro")
-    assert limits["max_listings_per_month"] == 50
+    assert limits["max_listings_per_month"] == 75
     assert limits["max_assets_per_listing"] == 50
     assert limits["tier2_vision"] is True
 
 
 def test_enterprise_limits():
+    """Legacy alias — same as team."""
     limits = get_limits("enterprise")
-    assert limits["max_listings_per_month"] == 500
+    assert limits["max_listings_per_month"] == 999999
     assert limits["tier2_vision"] is True
 
 
-def test_unknown_plan_returns_starter():
+def test_unknown_plan_returns_free():
     limits = get_limits("unknown")
     assert limits["max_listings_per_month"] == 5
 
@@ -66,7 +81,8 @@ def test_check_asset_quota_over_limit():
 async def _register(client: AsyncClient) -> tuple[str, str]:
     email = f"test-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "Tester", "company_name": "TestCo"
+        "email": email, "password": "TestPass1!", "name": "Tester", "company_name": "TestCo",
+        "plan_tier": "free",
     })
     token = resp.json()["access_token"]
     payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])

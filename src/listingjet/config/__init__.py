@@ -120,17 +120,35 @@ class Settings(BaseSettings):
     canva_api_key: str = ""
     canva_default_template_id: str = ""  # Canva Brand Template ID used when tenant has no override
 
-    # Credit bundles (Stripe price IDs for one-time purchases)
+    # Legacy credit bundles (kept for backward compat)
     stripe_price_credit_bundle_5: str = ""
     stripe_price_credit_bundle_10: str = ""
     stripe_price_credit_bundle_25: str = ""
     stripe_price_credit_bundle_50: str = ""
 
-    # New tier pricing (Stripe price IDs)
+    # v3 tier pricing (Stripe subscription price IDs)
     stripe_price_lite: str = ""
     stripe_price_active_agent: str = ""
     stripe_price_team: str = ""
-    stripe_price_annual: str = ""
+
+    # v3 tier-locked credit bundles (Stripe one-time price IDs)
+    # Format: stripe_price_credit_bundle_{tier}_{size}
+    stripe_price_credit_bundle_free_25: str = ""
+    stripe_price_credit_bundle_free_50: str = ""
+    stripe_price_credit_bundle_free_100: str = ""
+    stripe_price_credit_bundle_free_250: str = ""
+    stripe_price_credit_bundle_lite_25: str = ""
+    stripe_price_credit_bundle_lite_50: str = ""
+    stripe_price_credit_bundle_lite_100: str = ""
+    stripe_price_credit_bundle_lite_250: str = ""
+    stripe_price_credit_bundle_active_agent_25: str = ""
+    stripe_price_credit_bundle_active_agent_50: str = ""
+    stripe_price_credit_bundle_active_agent_100: str = ""
+    stripe_price_credit_bundle_active_agent_250: str = ""
+    stripe_price_credit_bundle_team_25: str = ""
+    stripe_price_credit_bundle_team_50: str = ""
+    stripe_price_credit_bundle_team_100: str = ""
+    stripe_price_credit_bundle_team_250: str = ""
 
     # Canva OAuth2 (Phase 2 — per-tenant access)
     canva_client_id: str = ""

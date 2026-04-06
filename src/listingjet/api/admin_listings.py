@@ -151,7 +151,7 @@ async def admin_retry_listing(
         await client.start_pipeline(
             listing_id=str(listing.id),
             tenant_id=str(listing.tenant_id),
-            plan=tenant.plan if tenant else "starter",
+            plan=tenant.plan if tenant else "free",
         )
     except Exception:
         logger.exception("Admin pipeline retry trigger failed for listing %s", listing.id)

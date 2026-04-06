@@ -11,7 +11,12 @@ import { trackEvent, AnalyticsEvents } from "@/lib/analytics";
 import type { CreditTransaction, CreditBundle } from "@/lib/types";
 
 const TIER_LABELS: Record<string, string> = {
-  starter: "Lite",
+  free: "Free",
+  lite: "Lite",
+  active_agent: "Active Agent",
+  team: "Team",
+  // Legacy
+  starter: "Free",
   pro: "Active Agent",
   enterprise: "Team",
 };
@@ -109,7 +114,7 @@ function ReferralShareWidget() {
 }
 
 function BillingContent() {
-  const { billingModel, creditBalance, tier, rolloverCap } = usePlan();
+  const { billingModel, creditBalance, grantedBalance, purchasedBalance, tier, rolloverCap } = usePlan();
   const { toast } = useToast();
 
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
@@ -190,12 +195,26 @@ function BillingContent() {
                   {creditBalance ?? 0}
                   <span className="text-lg font-normal text-[var(--color-text-secondary)] ml-2 uppercase tracking-wider">Credits</span>
                 </motion.p>
-                {rolloverCap != null && (
-                  <p className="text-xs text-[var(--color-text-secondary)] mt-1 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-border)]" />
-                    {rolloverCap} credits rollover cap
-                  </p>
-                )}
+                <div className="flex items-center gap-4 mt-2">
+                  {grantedBalance != null && (
+                    <p className="text-xs text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                      {grantedBalance} granted
+                    </p>
+                  )}
+                  {purchasedBalance != null && (
+                    <p className="text-xs text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                      {purchasedBalance} purchased
+                    </p>
+                  )}
+                  {rolloverCap != null && rolloverCap > 0 && (
+                    <p className="text-xs text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-border)]" />
+                      {rolloverCap} rollover cap
+                    </p>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => {

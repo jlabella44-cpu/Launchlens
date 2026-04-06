@@ -328,6 +328,7 @@ async def test_api_contracts_auth(async_client: AsyncClient):
     email = f"contract-{uuid.uuid4().hex[:8]}@test.com"
     resp = await async_client.post("/auth/register", json={
         "email": email, "password": "StrongPass1!", "name": "Contract Test", "company_name": "Test Co",
+        "plan_tier": "free",
     })
     assert resp.status_code == 200
     body = resp.json()
