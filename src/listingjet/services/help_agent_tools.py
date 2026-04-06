@@ -12,7 +12,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from listingjet.config.tiers import CREDIT_BUNDLES, TIER_DEFAULTS, get_bundles_for_tier
+from listingjet.config.tiers import TIER_DEFAULTS, get_bundles_for_tier
 from listingjet.models.addon_catalog import AddonCatalog
 from listingjet.models.addon_purchase import AddonPurchase
 from listingjet.models.listing import Listing, ListingState
