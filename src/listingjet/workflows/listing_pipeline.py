@@ -126,10 +126,12 @@ class ListingPipeline:
 
         video_task = None
         if run_video_step:
-            video_task = workflow.execute_activity(
-                run_video, ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=_DEFAULT_RETRY,
+            video_task = asyncio.create_task(
+                workflow.execute_activity(
+                    run_video, ctx,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    retry_policy=_DEFAULT_RETRY,
+                )
             )
 
         # Skip review wait if auto-approved by packaging agent
