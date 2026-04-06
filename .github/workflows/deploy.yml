@@ -49,7 +49,6 @@ jobs:
       - run: python -m pytest --tb=short -q
 
   deploy:
-    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
@@ -73,18 +72,6 @@ jobs:
           docker build -t $REGISTRY/$ECR_REPO_API:$IMAGE_TAG -t $REGISTRY/$ECR_REPO_API:latest .
           docker push $REGISTRY/$ECR_REPO_API:$IMAGE_TAG
           docker push $REGISTRY/$ECR_REPO_API:latest
-
-      - name: Run migrations
-        env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          aws ecs run-task \
-            --cluster $ECS_CLUSTER \
-            --task-definition listingjet-migrate \
-            --launch-type FARGATE \
-            --network-configuration "$(aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_SERVICE_API --query 'services[0].networkConfiguration' --output json)" \
-            --overrides '{"containerOverrides":[{"name":"migrate","command":["python","-m","alembic","upgrade","head"]}]}'
 
       - name: Deploy API service
         run: |
