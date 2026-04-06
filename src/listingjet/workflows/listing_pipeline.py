@@ -26,6 +26,7 @@ with workflow.unsafe.imports_passed_through():
         run_vision_tier1,
         run_vision_tier2,
     )
+    from listingjet.activities.social_event import run_social_event
     from listingjet.agents.base import AgentContext
 
 
@@ -222,6 +223,16 @@ class ListingPipeline:
             start_to_close_timeout=_DEFAULT_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
+
+        # Step 7: Create social event for reminders (non-blocking)
+        try:
+            await workflow.execute_activity(
+                run_social_event, ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except Exception as exc:
+            workflow.logger.warning("social_event_failed listing=%s error=%s", input.listing_id, exc)
 
         return f"pipeline_complete:{input.listing_id}"
 
