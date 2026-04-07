@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { Badge } from "@/components/ui/badge";
@@ -480,12 +481,24 @@ function ListingsTab() {
           <tbody>
             {listings.map((l) => (
               <tr key={l.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                <td className="px-4 py-3 font-medium truncate max-w-[200px]">{l.address?.street || "—"}</td>
+                <td className="px-4 py-3 font-medium truncate max-w-[200px]">
+                  <Link href={`/listings/${l.id}`} className="text-[#F97316] hover:underline">
+                    {l.address?.street || "—"}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 text-slate-500 text-xs">{l.tenant_name}</td>
                 <td className="px-4 py-3"><Badge state={l.state} /></td>
                 <td className="px-4 py-3 text-right font-mono text-xs">{l.credit_cost ?? "—"}</td>
                 <td className="px-4 py-3 text-right text-xs text-slate-400">{new Date(l.updated_at).toLocaleDateString()}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right flex gap-2 justify-end">
+                  {["awaiting_review", "in_review"].includes(l.state) && (
+                    <Link
+                      href={`/listings/${l.id}`}
+                      className="text-[10px] font-semibold px-3 py-1 rounded-full bg-[#F97316] text-white hover:bg-[#ea580c]"
+                    >
+                      Review
+                    </Link>
+                  )}
                   {["failed", "pipeline_timeout"].includes(l.state) && (
                     <button
                       onClick={() => handleRetry(l.id)}
