@@ -219,8 +219,10 @@ class ApiClient {
   async getListings(): Promise<ListingResponse[]> {
     const { data, error, response } = await fetchClient.GET("/listings");
     if (error) throw this._toError(error, response);
-    const res = data as { items: ListingResponse[] } | ListingResponse[];
-    return Array.isArray(res) ? res : res.items;
+    if (!data) return [];
+    const res = data as { items?: ListingResponse[] } | ListingResponse[];
+    if (Array.isArray(res)) return res;
+    return Array.isArray(res.items) ? res.items : [];
   }
 
   async getListing(id: string): Promise<ListingResponse> {
