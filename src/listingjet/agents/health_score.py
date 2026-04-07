@@ -6,8 +6,6 @@ Emits health.score.updated event and health.score.alert if below threshold.
 """
 import logging
 
-from sqlalchemy import select
-
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.tenant import Tenant
 from listingjet.services import health_score as hs

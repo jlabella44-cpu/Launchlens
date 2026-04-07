@@ -6,7 +6,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-
 # -- Health Score Schemas --
 
 class HealthSubScoreDetail(BaseModel):

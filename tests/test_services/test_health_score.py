@@ -2,22 +2,19 @@
 import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from listingjet.services.health_score import (
-    DEFAULT_WEIGHTS,
-    PLAN_SUBSCORES,
     _clamp,
     _resolve_weights,
-    calculate_media_score,
     calculate_content_score,
-    calculate_velocity_score,
-    calculate_syndication_score,
     calculate_market_score,
+    calculate_media_score,
+    calculate_syndication_score,
+    calculate_velocity_score,
 )
-
 
 # -- Weight resolution tests --
 

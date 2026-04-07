@@ -40,7 +40,6 @@ from listingjet.models.listing_health_score import ListingHealthScore
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services import health_score as hs
-from listingjet.services.plan_limits import get_limits
 
 router = APIRouter()
 
@@ -175,7 +174,6 @@ async def admin_health_overview(
     db: AsyncSession = Depends(get_db),
 ):
     """Cross-tenant health stats (admin only). Uses admin DB session."""
-    from listingjet.api.deps import get_db_admin
     from listingjet.database import AsyncSessionLocal
 
     async with AsyncSessionLocal() as admin_db:
