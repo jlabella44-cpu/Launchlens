@@ -26,7 +26,7 @@ export function ListingCard({ listing, onDeleted }: ListingCardProps) {
     : null;
 
   const isDelivered = state === "delivered" || state === "approved";
-  const canDelete = !isDelivered && state !== "processing";
+  const canDelete = true;
 
   return (
     <div
