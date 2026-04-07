@@ -55,9 +55,9 @@ async def test_list_addons_catalog(async_client: AsyncClient):
     # Migration seeds 3 add-ons
     assert len(addons) >= 3
     slugs = {a["slug"] for a in addons}
+    # virtual_staging is seeded in migration 034; ai_video_tour in 038
     assert "virtual_staging" in slugs
-    assert "image_editing" in slugs
-    assert "cma_report" in slugs
+    assert "ai_video_tour" in slugs
     for addon in addons:
         assert addon["credit_cost"] > 0
         assert addon["is_active"] is True
@@ -170,7 +170,7 @@ async def test_list_listing_addons(async_client: AsyncClient, db_session):
     )
     await async_client.post(
         f"/addons/listings/{listing_id}/addons",
-        json={"addon_slug": "image_editing"},
+        json={"addon_slug": "ai_video_tour"},
         headers=_auth(token),
     )
 
@@ -180,7 +180,7 @@ async def test_list_listing_addons(async_client: AsyncClient, db_session):
     assert len(addons) == 2
     slugs = {a["addon_slug"] for a in addons}
     assert "virtual_staging" in slugs
-    assert "image_editing" in slugs
+    assert "ai_video_tour" in slugs
 
 
 # --- DELETE /listings/{id}/addons/{slug} ---
