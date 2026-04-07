@@ -182,13 +182,29 @@ class VideoAgent(BaseAgent):
         """
         total = self._template.clip_count
 
+        # Deduplicate by asset_id — keep highest-scored entry per photo
+        seen: dict[str, tuple] = {}
+        for ps, asset, vr in selections:
+            aid = str(asset.id)
+            score = vr.quality_score / 100.0 if vr else 0.0
+            if aid not in seen or score > seen[aid][3]:
+                room = vr.room_label if vr else None
+                # Detect drones/exteriors from filename when room label is missing
+                if not room:
+                    fname = (asset.file_path or "").lower()
+                    if "dji" in fname or "drone" in fname:
+                        room = "drone"
+                    elif not (vr and vr.is_interior):
+                        room = "exterior"
+                    else:
+                        room = "unknown"
+                seen[aid] = (ps, asset, vr, score, room)
+
         # Bucket photos by room category, each sorted by score desc
         drones: list[tuple] = []
         exteriors: list[tuple] = []
         interiors: list[tuple] = []
-        for ps, asset, vr in selections:
-            room = vr.room_label if vr else "unknown"
-            score = vr.quality_score / 100.0 if vr else 0.0
+        for aid, (ps, asset, vr, score, room) in seen.items():
             entry = (ps, asset, vr, score)
             if room in DRONE_ROOMS:
                 drones.append(entry)
