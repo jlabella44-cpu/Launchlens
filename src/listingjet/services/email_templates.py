@@ -197,6 +197,36 @@ def welcome_drip_5(*, name: str, upgrade_url: str) -> tuple[str, str]:
     return subject, body
 
 
+# ── Social reminder templates ──
+
+
+def _social_reminder(**kwargs) -> tuple[str, str]:
+    address = kwargs.get("address", "your listing")
+    social_url = kwargs.get("social_url", "#")
+    subject = f"Time to share: {address} on social media"
+    html_body = f"""
+    <h2>Your listing is ready to share!</h2>
+    <p>Your listing at <strong>{address}</strong> has content ready for Instagram, Facebook, and TikTok.</p>
+    <p>Now is a great time to post — your captions, hashtags, and video cuts are all prepared.</p>
+    <p><a href="{social_url}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:8px;">View & Post Now</a></p>
+    <p style="color:#6B7280;font-size:14px;">Tip: Post during peak engagement hours for maximum visibility.</p>
+    """
+    return subject, html_body
+
+
+def _social_reminder_followup(**kwargs) -> tuple[str, str]:
+    address = kwargs.get("address", "your listing")
+    social_url = kwargs.get("social_url", "#")
+    subject = f"Reminder: Share {address} — engagement window closing"
+    html_body = f"""
+    <h2>Don't miss the engagement window</h2>
+    <p>Your listing at <strong>{address}</strong> still hasn't been shared on social media.</p>
+    <p>Listings shared within 48 hours of going live get significantly more engagement.</p>
+    <p><a href="{social_url}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:8px;">Share Now</a></p>
+    """
+    return subject, html_body
+
+
 # Registry mapping template names to functions
 TEMPLATES: dict[str, callable] = {
     "listing_delivered": listing_delivered,
@@ -209,4 +239,6 @@ TEMPLATES: dict[str, callable] = {
     "welcome_drip_3": welcome_drip_3,
     "welcome_drip_4": welcome_drip_4,
     "welcome_drip_5": welcome_drip_5,
+    "social_reminder": _social_reminder,
+    "social_reminder_followup": _social_reminder_followup,
 }

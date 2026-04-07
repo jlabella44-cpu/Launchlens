@@ -22,3 +22,6 @@ from .addon_purchase import AddonPurchase                    # noqa
 from .listing_permission import ListingPermission            # noqa
 from .listing_permission import ListingAuditLog              # noqa
 from .scoring_event import ScoringEvent                      # noqa
+from .listing_event import ListingEvent                      # noqa
+from .social_account import SocialAccount                    # noqa
+from .notification import Notification                       # noqa

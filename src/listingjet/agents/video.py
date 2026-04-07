@@ -78,12 +78,20 @@ class VideoAgent(BaseAgent):
                     return {"skipped": True, "reason": "No photos above score floor"}
 
                 # Generate clips via Kling
-                clip_urls = await self._generate_clips(selected, listing.metadata_)
+                clip_results = await self._generate_clips(selected, listing.metadata_)
 
-                # Filter out failed clips
-                successful = [(s, url) for s, url in zip(selected, clip_urls) if url]
+                # Filter out failed clips (poll_task returns dict or None)
+                successful = [(s, r) for s, r in zip(selected, clip_results) if r]
                 if not successful:
                     return {"status": "failed", "reason": "All clips failed to generate"}
+
+                total_credits = sum(
+                    float(r.get("credits") or 0) for _, r in successful
+                )
+                logger.info(
+                    "video_clips_generated listing=%s clips=%d/%d credits=%.1f",
+                    listing_id, len(successful), self._template.clip_count, total_credits,
+                )
 
                 if len(successful) < self._template.clip_count:
                     logger.warning(
@@ -92,7 +100,7 @@ class VideoAgent(BaseAgent):
                     )
 
                 # Download clips to temp files
-                clip_paths = await self._download_clips([url for _, url in successful])
+                clip_paths = await self._download_clips([r["url"] for _, r in successful])
 
                 # Generate branded end-card from tenant's BrandKit
                 from listingjet.models.brand_kit import BrandKit
@@ -141,6 +149,7 @@ class VideoAgent(BaseAgent):
                     "listing_id": str(listing_id),
                     "video_type": "ai_generated",
                     "clip_count": len(successful),
+                    "total_credits": total_credits,
                     "s3_key": s3_key,
                 })
 
@@ -258,8 +267,11 @@ class VideoAgent(BaseAgent):
                 return entry
         return pool[0]
 
-    async def _generate_clips(self, selected, metadata) -> list[str | None]:
-        """Generate Kling clips concurrently with rate limiting."""
+    async def _generate_clips(self, selected, metadata) -> list[dict | None]:
+        """Generate Kling clips concurrently with rate limiting.
+
+        Returns list of dicts {url, duration, credits} or None for failed clips.
+        """
         async def generate_one(index, ps, asset, vr):
             room = vr.room_label if vr else "living_room"
             prompt = get_prompt_for_room(room, metadata)
@@ -281,8 +293,8 @@ class VideoAgent(BaseAgent):
                         mode=self._template.kling_mode,
                         model_name=self._template.kling_model,
                     )
-                    url = await self._kling.poll_task(task_id)
-                    return url
+                    result = await self._kling.poll_task(task_id)
+                    return result
                 except Exception as exc:
                     logger.warning(
                         "video_clip_failed room=%s asset=%s error=%s",
