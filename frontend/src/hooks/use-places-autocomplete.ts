@@ -72,6 +72,13 @@ function loadGoogleMapsScript(): Promise<void> {
       loadCallbacks.forEach((cb) => cb());
       loadCallbacks.length = 0;
     };
+    script.onerror = (err) => {
+      console.error("[Places] Failed to load Google Maps script", err);
+      scriptLoading = false;
+      resolve(); // resolve so callers don't hang
+      loadCallbacks.forEach((cb) => cb());
+      loadCallbacks.length = 0;
+    };
     document.head.appendChild(script);
   });
 }
@@ -85,8 +92,15 @@ export function usePlacesAutocomplete() {
   const attrRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!GOOGLE_PLACES_API_KEY) return;
+    if (!GOOGLE_PLACES_API_KEY) {
+      console.warn("[Places] NEXT_PUBLIC_GOOGLE_PLACES_API_KEY is not set — autocomplete disabled");
+      return;
+    }
     loadGoogleMapsScript().then(() => {
+      if (!window.google?.maps?.places) {
+        console.error("[Places] Google Maps loaded but places library not available");
+        return;
+      }
       serviceRef.current = new window.google!.maps.places.AutocompleteService();
       // PlacesService needs a DOM element (can be hidden)
       const el = document.createElement("div");
