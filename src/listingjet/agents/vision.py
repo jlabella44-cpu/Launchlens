@@ -17,17 +17,40 @@ from .base import AgentContext, BaseAgent
 logger = logging.getLogger(__name__)
 
 ROOM_LABEL_MAP = {
+    # Interior rooms
     "living room": "living_room",
+    "interior design": "living_room",
     "bedroom": "bedroom",
     "kitchen": "kitchen",
     "bathroom": "bathroom",
     "dining room": "dining_room",
+    "garage": "garage",
+    "office": "office",
+    "laundry room": "basement",
+    "basement": "basement",
+    # Exterior / outdoor
     "building exterior": "exterior",
     "facade": "exterior",
-    "garage": "garage",
+    "house": "exterior",
+    "home": "exterior",
+    "residential area": "exterior",
+    "property": "exterior",
+    "real estate": "exterior",
     "swimming pool": "pool",
     "backyard": "backyard",
-    "office": "office",
+    "garden": "backyard",
+    "patio": "backyard",
+    "yard": "backyard",
+    # Non-photo content — mapped so downstream agents can filter them out
+    "floor plan": "floorplan",
+    "floorplan": "floorplan",
+    "blueprint": "blueprint",
+    "diagram": "diagram",
+    "map": "map",
+    "site plan": "site_plan",
+    "document": "document",
+    "text": "document",
+    "screenshot": "screenshot",
 }
 
 COMMERCIAL_LABELS = {
