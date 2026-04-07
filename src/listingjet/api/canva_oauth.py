@@ -228,24 +228,23 @@ async def canva_callback(
 
     if resp.status_code != 200:
         logger.error(
-            "canva_oauth.token_exchange_failed status=%s body=%s",
+            "canva_oauth.token_exchange_failed status=%s",
             resp.status_code,
-            resp.text,
         )
         raise HTTPException(status_code=502, detail="Failed to exchange Canva authorization code")
 
     token_data = resp.json()
     access_token = token_data.get("access_token")
     if not access_token:
-        logger.error("canva_oauth.token_missing body=%s", token_data)
+        logger.error("canva_oauth.token_missing keys=%s", list(token_data.keys()))
         raise HTTPException(status_code=502, detail="Canva token response missing access_token")
     refresh_token = token_data.get("refresh_token")
     if not refresh_token:
-        logger.error("canva_oauth.refresh_token_missing body=%s", token_data)
+        logger.error("canva_oauth.refresh_token_missing keys=%s", list(token_data.keys()))
         raise HTTPException(status_code=502, detail="Canva token response missing refresh_token")
     expires_in = token_data.get("expires_in")
     if not expires_in:
-        logger.error("canva_oauth.expires_in_missing body=%s", token_data)
+        logger.error("canva_oauth.expires_in_missing keys=%s", list(token_data.keys()))
         raise HTTPException(status_code=502, detail="Canva token response missing expires_in")
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 

@@ -25,7 +25,7 @@ router = APIRouter()
 _DEMO_TTL_HOURS = 24
 _DEMO_PHOTO_MIN = 5
 _DEMO_PHOTO_MAX = 50
-_DEMO_RATE_LIMIT_PER_DAY = 3
+_DEMO_RATE_LIMIT_PER_WEEK = 1
 _DEMO_TENANT_ID = uuid.UUID(int=0)  # placeholder tenant for demo listings
 
 _demo_limiter: RateLimiter | None = None
@@ -39,8 +39,8 @@ def _get_demo_limiter() -> RateLimiter:
             if _demo_limiter is None:
                 _demo_limiter = RateLimiter(
                     key_prefix="demo",
-                    capacity=_DEMO_RATE_LIMIT_PER_DAY,
-                    refill_rate=_DEMO_RATE_LIMIT_PER_DAY / 86400,
+                    capacity=_DEMO_RATE_LIMIT_PER_WEEK,
+                    refill_rate=_DEMO_RATE_LIMIT_PER_WEEK / (7 * 86400),
                 )
     return _demo_limiter
 
@@ -68,7 +68,7 @@ async def demo_create(
     if not limiter.acquire(key=ip, cost=1):
         raise HTTPException(
             status_code=429,
-            detail="Demo upload limit reached. Try again tomorrow.",
+            detail="Demo limit reached. Try again next week.",
         )
 
     count = body.photo_count
@@ -178,13 +178,13 @@ async def demo_upload(
     request: Request,
     db: AsyncSession = Depends(get_db_admin),
 ):
-    """Create a demo listing with uploaded photos. No auth required. Rate limited: 3/IP/day."""
+    """Create a demo listing with uploaded photos. No auth required. Rate limited: 1/IP/week."""
     ip = _get_client_ip(request)
     limiter = _get_demo_limiter()
     if not limiter.acquire(key=ip, cost=1):
         raise HTTPException(
             status_code=429,
-            detail="Demo upload limit reached. Try again tomorrow.",
+            detail="Demo limit reached. Try again next week.",
         )
 
     count = len(body.file_paths)

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.vision_result import VisionResult
-from listingjet.providers import get_vision_provider
+from listingjet.providers import get_tier2_vision_provider, get_vision_provider
 from listingjet.providers.base import VisionLabel
 from listingjet.services.metrics import record_cost
 from listingjet.services.storage import get_storage
@@ -96,8 +96,9 @@ def _labels_to_vision_result(asset_id: uuid.UUID, labels: list[VisionLabel]) -> 
 class VisionAgent(BaseAgent):
     agent_name = "vision"
 
-    def __init__(self, vision_provider=None, session_factory=None):
+    def __init__(self, vision_provider=None, tier2_vision_provider=None, session_factory=None):
         self._vision_provider = vision_provider or get_vision_provider(agent=self.agent_name)
+        self._tier2_vision_provider = tier2_vision_provider or get_tier2_vision_provider()
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def run_tier1(self, context: AgentContext) -> int:
@@ -151,9 +152,9 @@ class VisionAgent(BaseAgent):
         return {"tier1_count": tier1_count, "tier2_count": tier2_count}
 
     async def run_tier2(self, context: AgentContext) -> int:
-        """Run GPT-4V on top hero candidates from Tier 1. Returns count of Tier 2 results."""
+        """Run Qwen 3.6 Plus (or GPT-4V fallback) on top hero candidates from Tier 1."""
         count = await self._run_tier2_inner(context)
-        record_cost(self.agent_name, "openai_gpt4v", count)
+        record_cost(self.agent_name, "qwen_vision", count)
         return count
 
     async def _run_tier2_inner(self, context) -> int:
@@ -184,7 +185,7 @@ class VisionAgent(BaseAgent):
                         count + 1, len(candidates), asset.id,
                         "yes" if asset.proxy_path else "no",
                     )
-                    labels = await self._vision_provider.analyze(image_url=image_url)
+                    labels = await self._tier2_vision_provider.analyze(image_url=image_url)
 
                     quality_labels = [lbl for lbl in labels if lbl.category == "quality"]
                     shot_labels = [lbl for lbl in labels if lbl.category == "shot_type"]
