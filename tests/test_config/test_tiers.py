@@ -1,4 +1,4 @@
-from listingjet.config.tiers import SERVICE_CREDIT_COSTS, TIER_DEFAULTS, BUNDLE_PRICING
+from listingjet.config.tiers import BUNDLE_PRICING, SERVICE_CREDIT_COSTS, TIER_DEFAULTS
 
 
 def test_base_listing_cost_is_15():
