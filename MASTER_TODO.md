@@ -1,0 +1,178 @@
+# LaunchLens / ListingJet — Master TODO List
+
+Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, all `HANDOFF-SESSION-*` files, plan docs, and inline code TODOs.
+
+---
+
+## P0 — Production Blockers
+
+### Critical Bugs (from Session 17)
+- [ ] **Temporal Worker registers zero activities** — import `ALL_ACTIVITIES` list
+- [ ] **Alembic migration chain broken** — four migrations share the same revision number; merge into single migration
+- [ ] **No CORS middleware** — add `CORSMiddleware` to FastAPI app
+
+### Pre-Launch Audit — Critical
+- [ ] **CRITICAL-1: No GDPR/CCPA account deletion or data export** — implement `DELETE /account` and `GET /export-data` with cascade deletion
+- [ ] **CRITICAL-2: Missing database indexes** — add indexes on `listing.state`, `listing.created_at`, `asset.listing_id`, `event.listing_id`, `property_data` composite
+- [ ] **CRITICAL-3: Stripe API calls unguarded** — add `try/catch` for `stripe.error.*` exceptions
+- [ ] **CRITICAL-4: Global singleton race conditions** — add `threading.Lock` for `_limiter` singleton, TTL eviction for `_low_credit_sent`
+- [ ] **CRITICAL-5: Debug tracebacks exposed to clients** — ensure `APP_ENV` doesn't leak tracebacks
+- [ ] **CRITICAL-6: WCAG 2.1 accessibility violations** — add `htmlFor` to labels, `role="alert"` to toasts, proper ARIA attributes
+- [ ] **CRITICAL-7: Worker health check misconfigured** — add health endpoint to worker or use process-based health check
+
+### Infrastructure
+- [ ] **SES production access** — wait for AWS approval, then verify
+- [ ] **Run `cdk deploy`** to apply IAM changes permanently (currently inline policies)
+- [ ] **Apply `property_data` table migration** (blocker — obs #1028)
+- [ ] **Run missing migrations on prod DB**
+- [ ] **Separate dev/prod S3 buckets** — both currently use `listingjet-dev`
+- [ ] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*`
+
+---
+
+## P1 — High Priority (First Sprint Post-Launch)
+
+### Security (from Pre-Launch Audit)
+- [ ] **HIGH-1: JWT tokens stored in localStorage** — XSS vulnerable; move to httpOnly cookies
+- [ ] **HIGH-2: PII (email addresses) logged in plaintext** — add PII masking
+- [ ] **HIGH-3: No token revocation** — logout is currently a no-op
+- [ ] **HIGH-4: No account lockout after failed login attempts**
+- [ ] **HIGH-7: No consent management for third-party AI processing**
+- [ ] **Rate limiting on auth endpoints** — Redis rate limiter exists but not applied
+
+### Data Integrity
+- [ ] **HIGH-5: Outbox poller can duplicate webhook deliveries** — add deduplication
+- [ ] **HIGH-6: Unbounded analytics queries** — add pagination
+- [ ] **Dual credit systems (Audit #8)** — `CreditAccount` table vs `Tenant.credit_balance` are two sources of truth; needs product decision
+
+### Deployment
+- [ ] **Deploy backend with new analytics endpoints** (ECR push + ECS redeploy)
+- [ ] **Test analytics page on production**
+- [ ] **Investigate stuck Lenexa listing** (`uploading` since Apr 1)
+- [ ] **Review and approve Parkville listing** through review queue
+- [ ] **Merge PR #109** once CI passes
+- [ ] **4 unpushed commits on local master** — decide: PR these or reset to origin
+
+### Vision Pipeline
+- [ ] **Add per-image logging** to vision agent (log before/after S3 download and Google Vision API call)
+- [ ] **Add timeouts** — per-image download (30s) and per-API-call (30s)
+- [ ] **Build proxy image pipeline** — generate 1024px proxies during ingestion (4x speedup, 90MB → 3MB); plan at `docs/PROXY-IMAGE-PIPELINE.md`
+
+---
+
+## P2 — Feature Work (Sessions 11–22)
+
+### Credit System Frontend (Session 11)
+- [ ] Credit system frontend integration
+
+### Credit System Tests (Session 12)
+- [ ] Credit service test coverage gaps
+
+### Registration (Session 13)
+- [ ] Complete registration flow tasks
+
+### Webhooks (Session 14)
+- [ ] Webhook expansion for credit bundle fulfillment
+
+### Admin Dashboard (Session 15 + Progress Doc)
+- [ ] **Overview tab** — listings by state table, "Attention Required" alert, revenue summary, recent events feed
+- [ ] **Tenants tab** — click tenant → detail panel with edit form, webhook test, user management
+- [ ] **Listings tab** — filters (state, tenant, address search), actions (retry, edit)
+- [ ] **Credits tab** — global credit ledger, tenant credit table
+- [ ] **Audit Log tab** — filters and expandable JSON details
+- [ ] Lint & verify (ruff + TypeScript checks)
+
+### E2E Tests (Session 16)
+- [ ] Integration test cases (run after sessions 11–15 are merged)
+
+### Stub Fixes (Session 18)
+- [ ] **Implement real video cutting** — replace stub in `VideoCutter.create_cut()` with FFmpeg
+- [ ] **Wire Canva provider into factory** — replace `MockTemplateProvider` with `CanvaTemplateProvider` when key is set
+- [ ] **Improve mock vision provider** — return realistic mock data instead of `"{}"`
+
+### Test Coverage (Session 19)
+- [ ] ChapterAgent tests
+- [ ] LearningAgent tests
+- [ ] WatermarkAgent tests
+- [ ] Fix PackagingAgent weight loading — replace hardcoded `room_weight: 1.0` with actual `LearningWeight` query
+- [ ] SSE endpoint tests (`/listings/{id}/events` returns `text/event-stream`)
+- [ ] Middleware tests (security headers)
+- [ ] Provider tests (canva.py, kling.py, claude.py)
+
+### API Polish (Session 20)
+- [ ] OpenAPI documentation / FastAPI metadata
+- [ ] Response models for all endpoints (ActionResponse, CancelResponse, PipelineStatusResponse)
+- [ ] Standardize pagination — `PaginatedResponse` generic for `/listings`, `/credits/transactions`, `/admin/tenants`
+- [ ] Rate limit headers (`X-RateLimit-*`)
+- [ ] API versioning — `/api/v1/` prefix (optional)
+
+### Documentation (Session 21)
+- [ ] Create `README.md`
+- [ ] Update `.env.example` with all config settings
+- [ ] Create `CHANGELOG.md`
+- [ ] Update `PROJECT_OVERVIEW_FOR_LLM.md`
+- [ ] Add CI badge to README
+
+### Learning Loop (Session 22)
+- [ ] Wire `LearningAgent` into pipeline (add `run_learning` activity after distribution step)
+- [ ] Photo reorder endpoint — `POST /listings/{id}/package/reorder`
+- [ ] Performance event ingestion — write to `PerformanceEvent` table on listing delivery and export download
+- [ ] Weight decay — add `apply_decay` method to `weight_manager.py`
+- [ ] XGBoost model upgrade (Phase 2 of weight manager)
+
+### Listing Permissions — Remaining Phases
+- [ ] Phase C: Cross-tenant email invitations (needs SES production access)
+- [ ] Phase E: Email notifications (share/revoke/edit digest — templates built, needs SES)
+- [ ] Blanket per-agent grant (Phase B) — `deps_permissions.py:50`
+
+### Frontend Remaining Pages
+- [ ] Demo dropzone page
+- [ ] Pricing page
+- [ ] Export download page
+- [ ] Video player
+- [ ] Video upload
+- [ ] Social preview cards
+
+---
+
+## P3 — Low Priority / Deferred
+
+### Code Cleanup (from TODO.md)
+- [ ] **Listings.py monolith** — split 800+ line file into sub-routers (CRUD, review, export, video, package)
+- [ ] **CSP blocks frontend** — `SecurityHeadersMiddleware` sets overly restrictive CSP; needs frontend audit
+- [ ] **Pipeline status endpoint expensive** — `get_pipeline_status` recomputes on every request; needs caching
+- [ ] Dead comment in listings.py (Audit #18)
+- [ ] Unused listing states: `SHADOW_REVIEW`, `GENERATING`, `DELIVERING`, `TRACKING` (Audit #19)
+- [ ] Test JWT fixture doesn't create User rows (Audit #20)
+- [ ] `upload-urls` endpoint uses `body: dict` — no Pydantic schema (Audit #12)
+- [ ] Cancel listing reuses `FAILED` state — add `CANCELLED` enum value (Audit #16)
+- [ ] Brand Kit migration gap — verify migration numbering/chain (Audit #22)
+- [ ] **10 service modules have zero test coverage** (HIGH-8)
+
+### Deferred to Post-Launch
+- [ ] Password reset flow
+- [ ] OAuth / SSO (enterprise tier)
+- [ ] User invitation flow (invite to existing tenant)
+- [ ] Dark mode (Phase 2)
+- [ ] Stripe Connect (marketplace payouts)
+- [ ] Usage-based billing / metering
+- [ ] Tenant deletion / deactivation (soft-delete pattern)
+- [ ] Workflow cancellation / compensation
+- [ ] Shadow review signal flow (implemented but not triggered by API)
+- [ ] LearningAgent as separate Temporal workflow
+- [ ] Workflow versioning / migration strategy
+- [ ] Security scanning (Trivy, Snyk)
+- [ ] Coverage reporting (codecov)
+- [ ] Release automation (semantic-release)
+- [ ] Frontend CI (npm test, next build)
+- [ ] Docker image push to registry (ECR/GHCR)
+- [ ] Deployment workflows (staging, production)
+- [ ] 3D dollhouse viewer component
+- [ ] Email blast generation
+- [ ] Property website generation
+- [ ] Image resizing for MLS specs
+- [ ] Per-user limits (only per-tenant for now)
+- [ ] Real-time usage dashboard
+- [ ] Configurable limits via admin API
+- [ ] Admin override to bypass limits
+- [ ] S3 local mock (LocalStack)
