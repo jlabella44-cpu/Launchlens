@@ -28,6 +28,16 @@ ROOM_LABEL_MAP = {
     "swimming pool": "pool",
     "backyard": "backyard",
     "office": "office",
+    # Non-photo content — mapped so downstream agents can filter them out
+    "floor plan": "floorplan",
+    "floorplan": "floorplan",
+    "blueprint": "blueprint",
+    "diagram": "diagram",
+    "map": "map",
+    "site plan": "site_plan",
+    "document": "document",
+    "text": "document",
+    "screenshot": "screenshot",
 }
 
 COMMERCIAL_LABELS = {

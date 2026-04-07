@@ -13,8 +13,8 @@ from listingjet.agents.video_template import (
     EXTERIOR_ROOMS,
     NEGATIVE_PROMPT,
     STANDARD_60S,
+    VIDEO_EXCLUDED_LABELS,
     VideoTemplate,
-    get_camera_control,
     get_prompt_for_room,
 )
 from listingjet.config import settings
@@ -187,11 +187,27 @@ class VideoAgent(BaseAgent):
         for ps, asset, vr in selections:
             aid = str(asset.id)
             score = vr.quality_score / 100.0 if vr else 0.0
+            room = vr.room_label if vr else None
+
+            # Skip non-photo content (floorplans, diagrams, documents, etc.)
+            if room and room.lower() in VIDEO_EXCLUDED_LABELS:
+                logger.info("video_skip_excluded room=%s asset=%s", room, aid)
+                continue
+
+            # Skip assets with filenames that indicate non-photo content
+            fname = (asset.file_path or "").lower()
+            if any(kw in fname for kw in ("floorplan", "floor_plan", "diagram", "blueprint", "sitemap", "site_plan")):
+                logger.info("video_skip_filename asset=%s path=%s", aid, fname)
+                continue
+
+            # Skip very low quality photos (below 30% threshold)
+            if score < 0.30:
+                logger.info("video_skip_low_quality score=%.2f asset=%s", score, aid)
+                continue
+
             if aid not in seen or score > seen[aid][3]:
-                room = vr.room_label if vr else None
                 # Detect drones/exteriors from filename when room label is missing
                 if not room:
-                    fname = (asset.file_path or "").lower()
                     if "dji" in fname or "drone" in fname:
                         room = "drone"
                     elif not (vr and vr.is_interior):
@@ -291,10 +307,14 @@ class VideoAgent(BaseAgent):
         async def generate_one(index, ps, asset, vr):
             room = vr.room_label if vr else "living_room"
             prompt = get_prompt_for_room(room, metadata)
-            camera = get_camera_control(room)
 
             # Convert S3 key to presigned URL for Kling API
             image_url = self._storage.presigned_url(asset.file_path)
+
+            logger.info(
+                "video_clip_start slot=%d/%d room=%s asset=%s prompt_len=%d",
+                index + 1, len(selected), room, asset.file_path, len(prompt),
+            )
 
             async with self._semaphore:
                 if index > 0:
@@ -304,12 +324,16 @@ class VideoAgent(BaseAgent):
                         image_url=image_url,
                         prompt=prompt,
                         negative_prompt=NEGATIVE_PROMPT,
-                        camera_control=camera,
                         duration=self._template.clip_duration_s,
                         mode=self._template.kling_mode,
                         model_name=self._template.kling_model,
                     )
                     result = await self._kling.poll_task(task_id)
+                    if result:
+                        logger.info(
+                            "video_clip_done slot=%d room=%s credits=%s",
+                            index + 1, room, result.get("credits"),
+                        )
                     return result
                 except Exception as exc:
                     logger.warning(
