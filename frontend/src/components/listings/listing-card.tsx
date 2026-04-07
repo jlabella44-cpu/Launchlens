@@ -30,7 +30,11 @@ export function ListingCard({ listing, onDeleted }: ListingCardProps) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => router.push(`/listings/${listing.id}`)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/listings/${listing.id}`); } }}
+      aria-label={`View listing at ${address.street || "New Listing"}`}
       className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer group border border-slate-100"
     >
       {/* Photo Thumbnail */}

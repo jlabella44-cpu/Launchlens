@@ -12,12 +12,12 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] **No CORS middleware** — `CORSMiddleware` already configured in `main.py`
 
 ### Pre-Launch Audit — Critical
-- [ ] **CRITICAL-1: No GDPR/CCPA account deletion or data export** — implement `DELETE /account` and `GET /export-data` with cascade deletion
+- [x] **CRITICAL-1: No GDPR/CCPA account deletion or data export** — cascade deletion via `account_lifecycle.py` + `GET /export-data`
 - [x] **CRITICAL-2: Missing database indexes** — already added via migrations 020 and 027
 - [x] **CRITICAL-3: Stripe API calls unguarded** — wrapped all calls in `try/except stripe.StripeError`
 - [x] **CRITICAL-4: Global singleton race conditions** — added `threading.Lock` for `_demo_limiter`; `_low_credit_sent` uses atomic Redis `SET NX`
 - [x] **CRITICAL-5: Debug tracebacks exposed to clients** — global exception handler returns generic message
-- [ ] **CRITICAL-6: WCAG 2.1 accessibility violations** — add `htmlFor` to labels, `role="alert"` to toasts, proper ARIA attributes
+- [x] **CRITICAL-6: WCAG 2.1 accessibility violations** — added `htmlFor` to Input/Select/ColorPicker, `role="alert"` to error messages, `aria-label`/`role="button"` to listing card
 - [x] **CRITICAL-7: Worker health check misconfigured** — heartbeat file + `_heartbeat_loop` already configured
 
 ### Infrastructure
@@ -33,16 +33,16 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ## P1 — High Priority (First Sprint Post-Launch)
 
 ### Security (from Pre-Launch Audit)
-- [ ] **HIGH-1: JWT tokens stored in localStorage** — XSS vulnerable; move to httpOnly cookies
-- [ ] **HIGH-2: PII (email addresses) logged in plaintext** — add PII masking
-- [ ] **HIGH-3: No token revocation** — logout is currently a no-op
-- [ ] **HIGH-4: No account lockout after failed login attempts**
+- [x] **HIGH-1: JWT tokens stored in localStorage** — already using httpOnly cookies via `set_auth_cookies()`
+- [x] **HIGH-2: PII (email addresses) logged in plaintext** — masked as `u***@e***.com` in all log output
+- [x] **HIGH-3: No token revocation** — Redis-backed blocklist on logout; TTL matches token lifetime
+- [x] **HIGH-4: No account lockout after failed login attempts** — Redis-based lockout (5 attempts / 15min)
 - [ ] **HIGH-7: No consent management for third-party AI processing**
-- [ ] **Rate limiting on auth endpoints** — Redis rate limiter exists but not applied
+- [x] **Rate limiting on auth endpoints** — Redis rate limiter already applied via `rate_limit()` dependency
 
 ### Data Integrity
-- [ ] **HIGH-5: Outbox poller can duplicate webhook deliveries** — add deduplication
-- [ ] **HIGH-6: Unbounded analytics queries** — add pagination
+- [x] **HIGH-5: Outbox poller can duplicate webhook deliveries** — `X-ListingJet-Idempotency-Key` header added
+- [x] **HIGH-6: Unbounded analytics queries** — pagination with offset/limit on `/analytics/credits`
 - [ ] **Dual credit systems (Audit #8)** — `CreditAccount` table vs `Tenant.credit_balance` are two sources of truth; needs product decision
 
 ### Deployment
