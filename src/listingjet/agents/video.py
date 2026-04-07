@@ -133,17 +133,32 @@ class VideoAgent(BaseAgent):
                     content_type="video/mp4",
                 )
 
-                # Create VideoAsset record
-                video_asset = VideoAsset(
-                    tenant_id=listing.tenant_id,
-                    listing_id=listing_id,
-                    s3_key=s3_key,
-                    video_type="ai_generated",
-                    duration_seconds=len(successful) * self._template.clip_duration_s,
-                    status="ready",
-                    clip_count=len(successful),
-                )
-                session.add(video_asset)
+                # Upsert VideoAsset — replace any previous ai_generated record
+                existing = (await session.execute(
+                    select(VideoAsset).where(
+                        VideoAsset.listing_id == listing_id,
+                        VideoAsset.video_type == "ai_generated",
+                    ).order_by(VideoAsset.created_at.desc()).limit(1)
+                )).scalar_one_or_none()
+
+                if existing:
+                    existing.s3_key = s3_key
+                    existing.duration_seconds = len(successful) * self._template.clip_duration_s
+                    existing.status = "ready"
+                    existing.clip_count = len(successful)
+                    video_asset = existing
+                    logger.info("video_asset_updated listing=%s asset=%s", listing_id, existing.id)
+                else:
+                    video_asset = VideoAsset(
+                        tenant_id=listing.tenant_id,
+                        listing_id=listing_id,
+                        s3_key=s3_key,
+                        video_type="ai_generated",
+                        duration_seconds=len(successful) * self._template.clip_duration_s,
+                        status="ready",
+                        clip_count=len(successful),
+                    )
+                    session.add(video_asset)
 
                 await self.emit(session, context, "video.completed", {
                     "listing_id": str(listing_id),

@@ -105,6 +105,16 @@ async def test_video_agent_creates_video_asset(db_session, listing_for_video):
     assert videos[0].status == "ready"
     assert videos[0].clip_count == 12
     assert videos[0].duration_seconds == 60
+    first_video_id = videos[0].id
+
+    # Run again — should update existing record, not create a duplicate
+    with patch("listingjet.agents.video.httpx.AsyncClient", return_value=mock_http_client):
+        result2 = await agent.execute(ctx)
+
+    assert result2["status"] == "ready"
+    assert result2["video_asset_id"] == str(first_video_id)
+    videos2 = (await db_session.execute(select(VideoAsset))).scalars().all()
+    assert len(videos2) == 1  # Still only one record
 
 
 @pytest.mark.asyncio
