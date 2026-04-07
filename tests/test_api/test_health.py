@@ -1,6 +1,5 @@
 """Test listing health score and IDX feed config API endpoints."""
 import uuid
-from unittest.mock import patch
 
 import jwt as pyjwt
 import pytest

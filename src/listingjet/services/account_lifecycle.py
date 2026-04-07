@@ -92,12 +92,12 @@ async def export_tenant_data(
     )).scalars().all()
     listings_data = [
         {
-            "id": str(l.id),
-            "address": l.address,
-            "state": l.state.value if l.state else None,
-            "created_at": _dt(l.created_at),
+            "id": str(listing.id),
+            "address": listing.address,
+            "state": listing.state.value if listing.state else None,
+            "created_at": _dt(listing.created_at),
         }
-        for l in listings
+        for listing in listings
     ]
 
     # Credit transactions
