@@ -2,11 +2,9 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from listingjet.api.deps import get_current_user
 from listingjet.api.schemas.social import CreateListingEventRequest, ListingEventResponse, MarkPostedRequest
 from listingjet.database import get_db

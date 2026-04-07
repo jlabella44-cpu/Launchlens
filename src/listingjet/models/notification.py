@@ -1,11 +1,8 @@
 import uuid
 from datetime import datetime
-
 from sqlalchemy import UUID, DateTime, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
-
 from listingjet.database import Base
-
 
 class Notification(Base):
     __tablename__ = "notifications"

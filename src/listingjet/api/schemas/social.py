@@ -1,7 +1,6 @@
 """Schemas for social features: listing events, notifications, social accounts."""
 import uuid
 from datetime import datetime
-
 from pydantic import BaseModel, Field
 
 

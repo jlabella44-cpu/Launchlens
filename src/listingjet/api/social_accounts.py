@@ -1,10 +1,8 @@
 """Social accounts CRUD router — stubbed for future OAuth."""
 import uuid
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from listingjet.api.deps import get_current_user
 from listingjet.api.schemas.social import CreateSocialAccountRequest, SocialAccountResponse
 from listingjet.database import get_db

@@ -234,6 +234,7 @@ async def run_microsite_generator(context: AgentContext) -> dict:
 
 from listingjet.activities.social_event import run_social_event  # noqa: E402
 
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,

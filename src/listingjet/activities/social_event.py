@@ -1,8 +1,6 @@
 """Pipeline activity: create a just_listed event after pipeline completion."""
 import logging
-
 from temporalio import activity
-
 from listingjet.agents.base import AgentContext
 
 logger = logging.getLogger(__name__)
@@ -10,17 +8,14 @@ logger = logging.getLogger(__name__)
 @activity.defn
 async def run_social_event(context: AgentContext) -> dict:
     """Create a just_listed listing event and trigger social reminders."""
-    from datetime import datetime
-    from datetime import timezone as tz_mod
-
-    from sqlalchemy import select
-
     from listingjet.database import get_async_session
     from listingjet.models.listing import Listing
     from listingjet.models.listing_event import ListingEvent
     from listingjet.models.user import User, UserRole
     from listingjet.services.post_time_config import find_next_post_window, get_listing_timezone
     from listingjet.services.social_reminder import SocialReminderService
+    from sqlalchemy import select
+    from datetime import datetime, timezone as tz_mod
 
     async with get_async_session() as session:
         listing = (await session.execute(

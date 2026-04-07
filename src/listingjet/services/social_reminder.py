@@ -1,10 +1,8 @@
 """Social reminder service — creates notifications and sends emails for listing events."""
 import logging
 import uuid
-from datetime import datetime, timedelta
-
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from listingjet.models.notification import Notification
 
 logger = logging.getLogger(__name__)
