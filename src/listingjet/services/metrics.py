@@ -16,10 +16,9 @@ PROVIDER_COSTS: dict[str, float] = {
     "google_vision": 0.02,
     "claude": 0.05,
     "openai_gpt4v": 0.03,
-    "qwen_vision": 0.005,
     "kling": 0.50,
     "qwen": 0.01,
-    "qwen_vision": 0.01,
+    "qwen_vision": 0.005,
     "gemma": 0.003,
     "gemma_vision": 0.003,
 }

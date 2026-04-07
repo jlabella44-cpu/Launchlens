@@ -1,7 +1,12 @@
 from unittest.mock import patch
 
 from listingjet.providers.base import VisionProvider
-from listingjet.providers.factory import get_llm_provider, get_template_provider, get_tier2_vision_provider, get_vision_provider
+from listingjet.providers.factory import (
+    get_llm_provider,
+    get_template_provider,
+    get_tier2_vision_provider,
+    get_vision_provider,
+)
 from listingjet.providers.mock import MockLLMProvider, MockTemplateProvider, MockVisionProvider
 
 
