@@ -17,6 +17,7 @@ from listingjet.services.weight_manager import WeightManager
 from .base import AgentContext, BaseAgent
 
 MLS_MAX_PHOTOS = 25  # 1 hero + 24 supporting
+DEFAULT_ROOM_WEIGHT = 1.0  # Neutral weight when no LearningWeight data exists
 
 
 class PackagingAgent(BaseAgent):
@@ -53,7 +54,7 @@ class PackagingAgent(BaseAgent):
                 now = datetime.now(timezone.utc)
                 scored = []
                 for asset_id, vr in seen.items():
-                    room_weight = 1.0
+                    room_weight = DEFAULT_ROOM_WEIGHT
                     lw = weight_map.get(vr.room_label) if vr.room_label else None
                     if lw:
                         room_weight = self._wm.blend(
@@ -108,7 +109,7 @@ class PackagingAgent(BaseAgent):
                             "quality_score": vr.quality_score,
                             "commercial_score": vr.commercial_score,
                             "hero_candidate": vr.hero_candidate or False,
-                            "room_weight": lw.weight if lw else 1.0,
+                            "room_weight": lw.weight if lw else DEFAULT_ROOM_WEIGHT,
                             "tier": vr.tier,
                             "labeled_listing_count": lw.labeled_listing_count if lw else 0,
                         },

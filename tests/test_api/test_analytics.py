@@ -55,7 +55,8 @@ async def test_overview_with_listings(_mock_rate_limiter, async_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_listings"] == 3
-    assert data["by_state"]["new"] == 3
+    # Credit-billed tenants start in "draft" state
+    assert data["by_state"]["draft"] == 3
 
 
 @pytest.mark.asyncio

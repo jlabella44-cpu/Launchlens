@@ -37,6 +37,11 @@ class RateLimiter:
 
     def acquire(self, key: str, cost: int = 1) -> bool:
         """Attempt to consume `cost` tokens. Returns True if allowed."""
+        allowed, _ = self.acquire_with_remaining(key, cost)
+        return allowed
+
+    def acquire_with_remaining(self, key: str, cost: int = 1) -> tuple[bool, int]:
+        """Attempt to consume tokens. Returns (allowed, remaining_tokens)."""
         bucket_key = f"{self._prefix}:{key}"
         now = time.time()
 
@@ -69,7 +74,7 @@ class RateLimiter:
                     })
                     pipe.expire(bucket_key, 3600)
                     pipe.execute()
-                    return allowed
+                    return allowed, max(0, int(new_tokens))
 
                 except redis_lib.WatchError:
                     # Another client modified the key; retry

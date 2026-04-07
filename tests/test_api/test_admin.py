@@ -153,7 +153,8 @@ async def test_platform_stats(async_client: AsyncClient):
     assert body["total_users"] >= 1
     assert body["total_listings"] >= 1
     assert isinstance(body["listings_by_state"], dict)
-    assert "new" in body["listings_by_state"]
+    # Credit-billed tenants create listings in "draft" state
+    assert "draft" in body["listings_by_state"] or "new" in body["listings_by_state"]
 
 
 @pytest.mark.asyncio

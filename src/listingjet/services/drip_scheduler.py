@@ -63,8 +63,8 @@ async def run_drip_emails(db: AsyncSession) -> int:
                 }
                 email_svc.send_notification(user.email, template_name, **context)
                 sent_count += 1
-                logger.info("drip_sent template=%s user=%s", template_name, user.email)
+                logger.info("drip_sent template=%s user=%s", template_name, user.id)
             except Exception:
-                logger.exception("drip_failed template=%s user=%s", template_name, user.email)
+                logger.exception("drip_failed template=%s user=%s", template_name, user.id)
 
     return sent_count

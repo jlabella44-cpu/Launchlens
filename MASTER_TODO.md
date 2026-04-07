@@ -7,18 +7,18 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ## P0 — Production Blockers
 
 ### Critical Bugs (from Session 17)
-- [ ] **Temporal Worker registers zero activities** — import `ALL_ACTIVITIES` list
-- [ ] **Alembic migration chain broken** — four migrations share the same revision number; merge into single migration
-- [ ] **No CORS middleware** — add `CORSMiddleware` to FastAPI app
+- [x] **Temporal Worker registers zero activities** — `ALL_ACTIVITIES` import already in place
+- [x] **Alembic migration chain broken** — chain is linear and correct (001→041), no duplicate revisions
+- [x] **No CORS middleware** — `CORSMiddleware` already configured in `main.py`
 
 ### Pre-Launch Audit — Critical
-- [ ] **CRITICAL-1: No GDPR/CCPA account deletion or data export** — implement `DELETE /account` and `GET /export-data` with cascade deletion
-- [ ] **CRITICAL-2: Missing database indexes** — add indexes on `listing.state`, `listing.created_at`, `asset.listing_id`, `event.listing_id`, `property_data` composite
-- [ ] **CRITICAL-3: Stripe API calls unguarded** — add `try/catch` for `stripe.error.*` exceptions
-- [ ] **CRITICAL-4: Global singleton race conditions** — add `threading.Lock` for `_limiter` singleton, TTL eviction for `_low_credit_sent`
-- [ ] **CRITICAL-5: Debug tracebacks exposed to clients** — ensure `APP_ENV` doesn't leak tracebacks
-- [ ] **CRITICAL-6: WCAG 2.1 accessibility violations** — add `htmlFor` to labels, `role="alert"` to toasts, proper ARIA attributes
-- [ ] **CRITICAL-7: Worker health check misconfigured** — add health endpoint to worker or use process-based health check
+- [x] **CRITICAL-1: No GDPR/CCPA account deletion or data export** — cascade deletion via `account_lifecycle.py` + `GET /export-data`
+- [x] **CRITICAL-2: Missing database indexes** — already added via migrations 020 and 027
+- [x] **CRITICAL-3: Stripe API calls unguarded** — wrapped all calls in `try/except stripe.StripeError`
+- [x] **CRITICAL-4: Global singleton race conditions** — added `threading.Lock` for `_demo_limiter`; `_low_credit_sent` uses atomic Redis `SET NX`
+- [x] **CRITICAL-5: Debug tracebacks exposed to clients** — global exception handler returns generic message
+- [x] **CRITICAL-6: WCAG 2.1 accessibility violations** — added `htmlFor` to Input/Select/ColorPicker, `role="alert"` to error messages, `aria-label`/`role="button"` to listing card
+- [x] **CRITICAL-7: Worker health check misconfigured** — heartbeat file + `_heartbeat_loop` already configured
 
 ### Infrastructure
 - [ ] **SES production access** — wait for AWS approval, then verify
@@ -33,16 +33,16 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ## P1 — High Priority (First Sprint Post-Launch)
 
 ### Security (from Pre-Launch Audit)
-- [ ] **HIGH-1: JWT tokens stored in localStorage** — XSS vulnerable; move to httpOnly cookies
-- [ ] **HIGH-2: PII (email addresses) logged in plaintext** — add PII masking
-- [ ] **HIGH-3: No token revocation** — logout is currently a no-op
-- [ ] **HIGH-4: No account lockout after failed login attempts**
+- [x] **HIGH-1: JWT tokens stored in localStorage** — already using httpOnly cookies via `set_auth_cookies()`
+- [x] **HIGH-2: PII (email addresses) logged in plaintext** — masked as `u***@e***.com` in all log output
+- [x] **HIGH-3: No token revocation** — Redis-backed blocklist on logout; TTL matches token lifetime
+- [x] **HIGH-4: No account lockout after failed login attempts** — Redis-based lockout (5 attempts / 15min)
 - [ ] **HIGH-7: No consent management for third-party AI processing**
-- [ ] **Rate limiting on auth endpoints** — Redis rate limiter exists but not applied
+- [x] **Rate limiting on auth endpoints** — Redis rate limiter already applied via `rate_limit()` dependency
 
 ### Data Integrity
-- [ ] **HIGH-5: Outbox poller can duplicate webhook deliveries** — add deduplication
-- [ ] **HIGH-6: Unbounded analytics queries** — add pagination
+- [x] **HIGH-5: Outbox poller can duplicate webhook deliveries** — `X-ListingJet-Idempotency-Key` header added
+- [x] **HIGH-6: Unbounded analytics queries** — pagination with offset/limit on `/analytics/credits`
 - [ ] **Dual credit systems (Audit #8)** — `CreditAccount` table vs `Tenant.credit_balance` are two sources of truth; needs product decision
 
 ### Deployment
@@ -87,23 +87,23 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 
 ### Stub Fixes (Session 18)
 - [ ] **Implement real video cutting** — replace stub in `VideoCutter.create_cut()` with FFmpeg
-- [ ] **Wire Canva provider into factory** — replace `MockTemplateProvider` with `CanvaTemplateProvider` when key is set
-- [ ] **Improve mock vision provider** — return realistic mock data instead of `"{}"`
+- [x] **Wire Canva provider into factory** — factory already selects `CanvaTemplateProvider` when `canva_api_key` is set
+- [x] **Improve mock vision provider** — returns deterministic varied data based on image URL hash
 
 ### Test Coverage (Session 19)
-- [ ] ChapterAgent tests
-- [ ] LearningAgent tests
-- [ ] WatermarkAgent tests
-- [ ] Fix PackagingAgent weight loading — replace hardcoded `room_weight: 1.0` with actual `LearningWeight` query
-- [ ] SSE endpoint tests (`/listings/{id}/events` returns `text/event-stream`)
-- [ ] Middleware tests (security headers)
+- [x] ChapterAgent tests — already exist in `tests/test_agents/test_chapter.py`
+- [x] LearningAgent tests — already exist in `tests/test_agents/test_learning.py`
+- [x] WatermarkAgent tests — already exist in `tests/test_agents/test_watermark.py`
+- [x] Fix PackagingAgent weight loading — replaced magic `1.0` with `DEFAULT_ROOM_WEIGHT` constant; LearningWeight query already wired
+- [x] SSE endpoint tests — already exist in `tests/test_api/test_sse.py`
+- [x] Middleware tests (security headers) — added `tests/test_monitoring/test_security_headers.py`
 - [ ] Provider tests (canva.py, kling.py, claude.py)
 
 ### API Polish (Session 20)
-- [ ] OpenAPI documentation / FastAPI metadata
+- [x] OpenAPI documentation / FastAPI metadata — already configured (title, version, description, 14 tag groups)
 - [ ] Response models for all endpoints (ActionResponse, CancelResponse, PipelineStatusResponse)
 - [ ] Standardize pagination — `PaginatedResponse` generic for `/listings`, `/credits/transactions`, `/admin/tenants`
-- [ ] Rate limit headers (`X-RateLimit-*`)
+- [x] Rate limit headers (`X-RateLimit-*`) — `X-RateLimit-Limit` and `X-RateLimit-Remaining` on all responses
 - [ ] API versioning — `/api/v1/` prefix (optional)
 
 ### Documentation (Session 21)
@@ -114,10 +114,10 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] Add CI badge to README
 
 ### Learning Loop (Session 22)
-- [ ] Wire `LearningAgent` into pipeline (add `run_learning` activity after distribution step)
-- [ ] Photo reorder endpoint — `POST /listings/{id}/package/reorder`
-- [ ] Performance event ingestion — write to `PerformanceEvent` table on listing delivery and export download
-- [ ] Weight decay — add `apply_decay` method to `weight_manager.py`
+- [x] Wire `LearningAgent` into pipeline — already in Step 6 of `listing_pipeline.py` after distribution
+- [x] Photo reorder endpoint — `POST /{listing_id}/package/reorder` already in `listings_media.py`
+- [x] Performance event ingestion — already writes to `PerformanceEvent` on delivery (`distribution.py`) and export (`listings_media.py`)
+- [x] Weight decay — `apply_decay` method already exists in `weight_manager.py` (90-day decay toward 1.0)
 - [ ] XGBoost model upgrade (Phase 2 of weight manager)
 
 ### Listing Permissions — Remaining Phases
