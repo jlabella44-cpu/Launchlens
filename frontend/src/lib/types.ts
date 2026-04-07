@@ -527,3 +527,78 @@ export interface AnalyticsCredits {
   days: number;
   data: CreditDataPoint[];
 }
+
+// -- Listing Health Score --
+
+export interface HealthSubScoreDetail {
+  score: number;
+  weight: number;
+  details: Record<string, unknown>;
+}
+
+export interface HealthBreakdown {
+  media_quality?: HealthSubScoreDetail;
+  content_readiness?: HealthSubScoreDetail;
+  pipeline_velocity?: HealthSubScoreDetail;
+  syndication?: HealthSubScoreDetail;
+  market_signal?: HealthSubScoreDetail;
+}
+
+export interface HealthTrendPoint {
+  date: string;
+  overall: number;
+  media: number;
+  content: number;
+  velocity: number;
+  syndication: number;
+  market: number;
+}
+
+export interface ListingHealthResponse {
+  listing_id: string;
+  overall_score: number;
+  breakdown: HealthBreakdown;
+  trend: HealthTrendPoint[];
+  calculated_at: string | null;
+}
+
+export interface HealthSummaryListing {
+  listing_id: string;
+  address: Record<string, string>;
+  overall_score: number;
+}
+
+export interface HealthSummaryResponse {
+  average_score: number;
+  total_scored: number;
+  distribution: { green: number; yellow: number; red: number };
+  top_listings: HealthSummaryListing[];
+  bottom_listings: HealthSummaryListing[];
+}
+
+export interface IdxFeedConfig {
+  id: string;
+  name: string;
+  base_url: string;
+  board_id: string | null;
+  poll_interval_minutes: number;
+  last_polled_at: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface IdxFeedConfigCreate {
+  name: string;
+  base_url: string;
+  api_key: string;
+  board_id?: string;
+  poll_interval_minutes?: number;
+}
+
+export interface HealthWeights {
+  media: number;
+  content: number;
+  velocity: number;
+  syndication: number;
+  market: number;
+}

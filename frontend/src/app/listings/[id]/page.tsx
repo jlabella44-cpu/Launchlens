@@ -18,6 +18,7 @@ import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
 import { SharePanel } from "@/components/listings/share-panel";
 import { ActivityLog } from "@/components/listings/activity-log";
+import { HealthPanel } from "@/components/listings/health-panel";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 function ListingDetail() {
@@ -607,6 +608,11 @@ function ListingDetail() {
             </div>
           </div>
         )}
+
+        {/* Listing Health Score */}
+        <div className="mt-10">
+          <HealthPanel listingId={id} />
+        </div>
 
         {/* Activity Log */}
         <div className="mt-10">

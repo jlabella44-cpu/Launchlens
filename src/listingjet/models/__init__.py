@@ -21,3 +21,6 @@ from .addon_catalog import AddonCatalog                      # noqa
 from .addon_purchase import AddonPurchase                    # noqa
 from .listing_permission import ListingPermission            # noqa
 from .listing_permission import ListingAuditLog              # noqa
+from .listing_health_score import ListingHealthScore         # noqa
+from .health_score_history import HealthScoreHistory          # noqa
+from .idx_feed_config import IdxFeedConfig                   # noqa

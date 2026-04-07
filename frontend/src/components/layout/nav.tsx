@@ -41,6 +41,7 @@ export function Nav() {
           {user && <Link href="/dashboard" className={linkClass}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass}>Listings</Link>}
           {user && <Link href="/analytics" className={linkClass}>Analytics</Link>}
+          {user && <Link href="/health" className={linkClass}>Health</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass}>Review</Link>
           )}
@@ -70,6 +71,7 @@ export function Nav() {
           {user && <Link href="/dashboard" className={linkClass} onClick={() => setMenuOpen(false)}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass} onClick={() => setMenuOpen(false)}>Listings</Link>}
           {user && <Link href="/analytics" className={linkClass} onClick={() => setMenuOpen(false)}>Analytics</Link>}
+          {user && <Link href="/health" className={linkClass} onClick={() => setMenuOpen(false)}>Health</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass} onClick={() => setMenuOpen(false)}>Review</Link>
           )}

@@ -23,6 +23,7 @@ from listingjet.api import (
     health,
     help_agent,
     image_edit,
+    listing_health,
     listing_permissions,
     listings_core,
     listings_media,
@@ -42,6 +43,7 @@ from listingjet.middleware.request_id import RequestIDMiddleware
 from listingjet.middleware.security_headers import SecurityHeadersMiddleware
 from listingjet.middleware.tenant import TenantMiddleware
 from listingjet.monitoring import init_monitoring
+from listingjet.services.idx_feed_poller import IdxFeedPoller
 from listingjet.services.outbox_poller import OutboxPoller
 
 setup_logging(app_env=settings.app_env, log_level=settings.log_level)
@@ -65,22 +67,33 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).warning("Redis unavailable at startup — features degraded")
         app.state.redis = None
 
-    task = None
+    outbox_task = None
+    idx_task = None
+    outbox_poller = None
+    idx_poller = None
     try:
-        poller = OutboxPoller(session_factory=AsyncSessionLocal)
-        task = asyncio.create_task(poller.run())
+        outbox_poller = OutboxPoller(session_factory=AsyncSessionLocal)
+        outbox_task = asyncio.create_task(outbox_poller.run())
     except Exception:
         logging.getLogger(__name__).warning("Outbox poller failed to start — running without it")
 
+    try:
+        idx_poller = IdxFeedPoller(session_factory=AsyncSessionLocal)
+        idx_task = asyncio.create_task(idx_poller.run())
+    except Exception:
+        logging.getLogger(__name__).warning("IDX feed poller failed to start — running without it")
+
     yield
 
-    if task:
-        try:
-            poller.stop()
-            task.cancel()
-            await task
-        except (asyncio.CancelledError, Exception):
-            pass
+    for poller_obj, task_obj in [(outbox_poller, outbox_task), (idx_poller, idx_task)]:
+        if task_obj:
+            try:
+                if poller_obj:
+                    poller_obj.stop()
+                task_obj.cancel()
+                await task_obj
+            except (asyncio.CancelledError, Exception):
+                pass
 
     if app.state.redis:
         app.state.redis.close()
@@ -101,6 +114,7 @@ _TAG_METADATA = [
     {"name": "team", "description": "Team member management within a tenant"},
     {"name": "help-agent", "description": "AI help agent for product support and data lookups"},
     {"name": "support", "description": "Support tickets and customer service"},
+    {"name": "listing-health", "description": "Listing health scores, IDX feed config, and weights"},
 ]
 
 
@@ -162,6 +176,7 @@ def create_app() -> FastAPI:
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
     app.include_router(support.router, prefix="/support", tags=["support"])
+    app.include_router(listing_health.router, tags=["listing-health"])
     app.include_router(health.router)
 
     from fastapi.responses import JSONResponse

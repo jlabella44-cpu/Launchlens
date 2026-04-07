@@ -54,6 +54,11 @@ import type {
   SupportTicketList,
   SupportMessage,
   SupportTicketStats,
+  ListingHealthResponse,
+  HealthSummaryResponse,
+  IdxFeedConfig,
+  IdxFeedConfigCreate,
+  HealthWeights,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -817,6 +822,41 @@ class ApiClient {
 
   async adminSupportStats(): Promise<SupportTicketStats> {
     return this.request("/support/admin/tickets/stats");
+  }
+
+  // Listing Health Score
+  async getListingHealth(listingId: string): Promise<ListingHealthResponse> {
+    return this.request(`/listings/${listingId}/health`);
+  }
+
+  async getHealthSummary(): Promise<HealthSummaryResponse> {
+    return this.request("/listings/health/summary");
+  }
+
+  // IDX Feed Config
+  async listIdxFeeds(): Promise<IdxFeedConfig[]> {
+    return this.request("/settings/idx-feed");
+  }
+
+  async createIdxFeed(data: IdxFeedConfigCreate): Promise<IdxFeedConfig> {
+    return this.request("/settings/idx-feed", { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async updateIdxFeed(id: string, data: Partial<IdxFeedConfigCreate & { status: string }>): Promise<IdxFeedConfig> {
+    return this.request(`/settings/idx-feed/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+
+  async deleteIdxFeed(id: string): Promise<void> {
+    return this.request(`/settings/idx-feed/${id}`, { method: "DELETE" });
+  }
+
+  // Health Weights
+  async getHealthWeights(): Promise<HealthWeights> {
+    return this.request("/settings/health-weights");
+  }
+
+  async updateHealthWeights(weights: HealthWeights): Promise<HealthWeights> {
+    return this.request("/settings/health-weights", { method: "PATCH", body: JSON.stringify(weights) });
   }
 }
 

@@ -13,6 +13,7 @@ with workflow.unsafe.imports_passed_through():
         run_coverage,
         run_distribution,
         run_floorplan,
+        run_health_score,
         run_ingestion,
         run_learning,
         run_microsite_generator,
@@ -226,6 +227,16 @@ class ListingPipeline:
             start_to_close_timeout=_DEFAULT_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
+
+        # Step 7: Calculate health score (non-blocking)
+        try:
+            await workflow.execute_activity(
+                run_health_score, ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except Exception as exc:
+            workflow.logger.warning("health_score_failed listing=%s error=%s", input.listing_id, exc)
 
         return f"pipeline_complete:{input.listing_id}"
 
