@@ -43,7 +43,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <script dangerouslySetInnerHTML={{ __html: `
-          (function(){try{var t=localStorage.getItem('listingjet_theme');if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})();
+          (function(){try{if(!localStorage.getItem('listingjet_theme_v2')){localStorage.removeItem('listingjet_theme');localStorage.setItem('listingjet_theme_v2','1')}var t=localStorage.getItem('listingjet_theme');if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})();
         `}} />
       </head>
       <body className="min-h-full flex flex-col">
