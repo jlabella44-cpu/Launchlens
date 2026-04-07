@@ -86,7 +86,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] Integration test cases (run after sessions 11–15 are merged)
 
 ### Stub Fixes (Session 18)
-- [ ] **Implement real video cutting** — replace stub in `VideoCutter.create_cut()` with FFmpeg
+- [x] **Implement real video cutting** — already implemented with FFmpeg (H.264, aspect-ratio scaling, padding)
 - [x] **Wire Canva provider into factory** — factory already selects `CanvaTemplateProvider` when `canva_api_key` is set
 - [x] **Improve mock vision provider** — returns deterministic varied data based on image URL hash
 
@@ -97,12 +97,12 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] Fix PackagingAgent weight loading — replaced magic `1.0` with `DEFAULT_ROOM_WEIGHT` constant; LearningWeight query already wired
 - [x] SSE endpoint tests — already exist in `tests/test_api/test_sse.py`
 - [x] Middleware tests (security headers) — added `tests/test_monitoring/test_security_headers.py`
-- [ ] Provider tests (canva.py, kling.py, claude.py)
+- [x] Provider tests — already exist for canva (12 tests), kling (6), claude (3), plus factory/fallback/routing
 
 ### API Polish (Session 20)
 - [x] OpenAPI documentation / FastAPI metadata — already configured (title, version, description, 14 tag groups)
-- [ ] Response models for all endpoints (ActionResponse, CancelResponse, PipelineStatusResponse)
-- [ ] Standardize pagination — `PaginatedResponse` generic for `/listings`, `/credits/transactions`, `/admin/tenants`
+- [x] Response models — `ActionResponse` on approve/reject/retry, `CancelResponse` on cancel, `PipelineStatusResponse` on pipeline-status
+- [x] Standardize pagination — `PaginatedResponse` generic added; paginated `/admin/tenants` and `/credits/transactions`
 - [x] Rate limit headers (`X-RateLimit-*`) — `X-RateLimit-Limit` and `X-RateLimit-Remaining` on all responses
 - [ ] API versioning — `/api/v1/` prefix (optional)
 

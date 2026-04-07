@@ -289,6 +289,14 @@ class CreditService:
         )
         return list(result.scalars().all())
 
+    async def count_transactions(self, session: AsyncSession, tenant_id: uuid.UUID) -> int:
+        from sqlalchemy import func
+        result = await session.execute(
+            select(func.count(CreditTransaction.id))
+            .where(CreditTransaction.tenant_id == tenant_id)
+        )
+        return result.scalar() or 0
+
     async def ensure_account(self, session: AsyncSession, tenant_id: uuid.UUID, rollover_cap: int = 0) -> CreditAccount:
         """Get or create a credit account for a tenant."""
         account = (await session.execute(

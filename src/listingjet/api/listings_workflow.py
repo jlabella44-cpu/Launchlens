@@ -208,7 +208,11 @@ async def reject_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/retry")
+@router.post(
+    "/{listing_id}/retry",
+    response_model=ActionResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def retry_pipeline(
     listing_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
