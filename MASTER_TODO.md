@@ -87,23 +87,23 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 
 ### Stub Fixes (Session 18)
 - [ ] **Implement real video cutting** — replace stub in `VideoCutter.create_cut()` with FFmpeg
-- [ ] **Wire Canva provider into factory** — replace `MockTemplateProvider` with `CanvaTemplateProvider` when key is set
-- [ ] **Improve mock vision provider** — return realistic mock data instead of `"{}"`
+- [x] **Wire Canva provider into factory** — factory already selects `CanvaTemplateProvider` when `canva_api_key` is set
+- [x] **Improve mock vision provider** — returns deterministic varied data based on image URL hash
 
 ### Test Coverage (Session 19)
 - [ ] ChapterAgent tests
 - [ ] LearningAgent tests
 - [ ] WatermarkAgent tests
-- [ ] Fix PackagingAgent weight loading — replace hardcoded `room_weight: 1.0` with actual `LearningWeight` query
+- [x] Fix PackagingAgent weight loading — replaced magic `1.0` with `DEFAULT_ROOM_WEIGHT` constant; LearningWeight query already wired
 - [ ] SSE endpoint tests (`/listings/{id}/events` returns `text/event-stream`)
 - [ ] Middleware tests (security headers)
 - [ ] Provider tests (canva.py, kling.py, claude.py)
 
 ### API Polish (Session 20)
-- [ ] OpenAPI documentation / FastAPI metadata
+- [x] OpenAPI documentation / FastAPI metadata — already configured (title, version, description, 14 tag groups)
 - [ ] Response models for all endpoints (ActionResponse, CancelResponse, PipelineStatusResponse)
 - [ ] Standardize pagination — `PaginatedResponse` generic for `/listings`, `/credits/transactions`, `/admin/tenants`
-- [ ] Rate limit headers (`X-RateLimit-*`)
+- [x] Rate limit headers (`X-RateLimit-*`) — `X-RateLimit-Limit` and `X-RateLimit-Remaining` on all responses
 - [ ] API versioning — `/api/v1/` prefix (optional)
 
 ### Documentation (Session 21)

@@ -65,9 +65,6 @@ class UpdateSettingsRequest(BaseModel):
                 raise ValueError("Webhook URL must use http or https")
             if not parsed.hostname:
                 raise ValueError("Webhook URL must have a valid hostname")
-            from listingjet.services.webhook_delivery import _is_url_safe
-            if not _is_url_safe(v):
-                raise ValueError("Webhook URL must not target private/internal IP ranges")
         return v
 
 
@@ -103,6 +100,10 @@ async def update_settings(
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     if body.webhook_url is not None:
+        if body.webhook_url:
+            from listingjet.services.webhook_delivery import _is_url_safe
+            if not _is_url_safe(body.webhook_url):
+                raise HTTPException(status_code=400, detail="Webhook URL must not target private/internal IP ranges")
         tenant.webhook_url = body.webhook_url or None
     if body.preferred_language is not None:
         tenant.preferred_language = body.preferred_language
