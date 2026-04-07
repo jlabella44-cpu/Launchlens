@@ -1,4 +1,5 @@
 import hashlib
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -28,16 +29,19 @@ _DEMO_RATE_LIMIT_PER_WEEK = 1
 _DEMO_TENANT_ID = uuid.UUID(int=0)  # placeholder tenant for demo listings
 
 _demo_limiter: RateLimiter | None = None
+_demo_limiter_lock = threading.Lock()
 
 
 def _get_demo_limiter() -> RateLimiter:
     global _demo_limiter
     if _demo_limiter is None:
-        _demo_limiter = RateLimiter(
-            key_prefix="demo",
-            capacity=_DEMO_RATE_LIMIT_PER_WEEK,
-            refill_rate=_DEMO_RATE_LIMIT_PER_WEEK / (7 * 86400),
-        )
+        with _demo_limiter_lock:
+            if _demo_limiter is None:
+                _demo_limiter = RateLimiter(
+                    key_prefix="demo",
+                    capacity=_DEMO_RATE_LIMIT_PER_WEEK,
+                    refill_rate=_DEMO_RATE_LIMIT_PER_WEEK / (7 * 86400),
+                )
     return _demo_limiter
 
 

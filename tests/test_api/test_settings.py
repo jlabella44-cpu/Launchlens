@@ -12,7 +12,8 @@ from listingjet.config import settings
 async def _register(client: AsyncClient) -> tuple[str, str]:
     email = f"settings-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "Tester", "company_name": "SettingsCo"
+        "email": email, "password": "TestPass1!", "name": "Tester", "company_name": "SettingsCo",
+        "plan_tier": "free",
     })
     token = resp.json()["access_token"]
     payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
@@ -43,11 +44,12 @@ async def test_get_settings(_mock_rate_limiter, async_client):
 async def test_update_webhook_url(_mock_rate_limiter, async_client):
     token, _ = await _register(async_client)
 
-    resp = await async_client.patch(
-        "/settings",
-        json={"webhook_url": "https://example.com/hook"},
-        headers=_auth(token),
-    )
+    with patch("listingjet.services.webhook_delivery._is_url_safe", return_value=True):
+        resp = await async_client.patch(
+            "/settings",
+            json={"webhook_url": "https://example.com/hook"},
+            headers=_auth(token),
+        )
     assert resp.status_code == 200
     assert resp.json()["webhook_url"] == "https://example.com/hook"
 
@@ -61,11 +63,12 @@ async def test_clear_webhook_url(_mock_rate_limiter, async_client):
     token, _ = await _register(async_client)
 
     # Set it
-    await async_client.patch(
-        "/settings",
-        json={"webhook_url": "https://example.com/hook"},
-        headers=_auth(token),
-    )
+    with patch("listingjet.services.webhook_delivery._is_url_safe", return_value=True):
+        await async_client.patch(
+            "/settings",
+            json={"webhook_url": "https://example.com/hook"},
+            headers=_auth(token),
+        )
 
     # Clear it with empty string
     resp = await async_client.patch(
@@ -90,11 +93,12 @@ async def test_test_webhook_success(_mock_rate_limiter, async_client):
     token, _ = await _register(async_client)
 
     # Set webhook URL
-    await async_client.patch(
-        "/settings",
-        json={"webhook_url": "https://example.com/hook"},
-        headers=_auth(token),
-    )
+    with patch("listingjet.services.webhook_delivery._is_url_safe", return_value=True):
+        await async_client.patch(
+            "/settings",
+            json={"webhook_url": "https://example.com/hook"},
+            headers=_auth(token),
+        )
 
     # Mock the delivery
     with patch("listingjet.services.webhook_delivery.deliver_webhook", new_callable=AsyncMock, return_value=True):

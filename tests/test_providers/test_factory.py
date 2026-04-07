@@ -40,21 +40,25 @@ def test_get_tier2_vision_provider_returns_mock_when_flag_set():
         assert isinstance(provider, MockVisionProvider)
 
 
-def test_get_tier2_vision_provider_returns_qwen_when_dashscope_key_set():
+def test_get_tier2_vision_provider_returns_qwen_when_configured():
     with patch("listingjet.providers.factory.settings") as mock_settings:
         mock_settings.use_mock_providers = False
-        mock_settings.dashscope_api_key = "sk-test-dashscope"
-        mock_settings.dashscope_base_url = "https://test.example.com/v1"
+        mock_settings.vision_provider_tier2 = "qwen"
+        mock_settings.qwen_api_key = "sk-test"
+        mock_settings.agent_model_routing = ""
+        mock_settings.tenant_model_routing = ""
         provider = get_tier2_vision_provider()
-        from listingjet.providers.qwen_vision import QwenVisionProvider
+        from listingjet.providers.qwen import QwenVisionProvider
         assert isinstance(provider, QwenVisionProvider)
 
 
-def test_get_tier2_vision_provider_falls_back_to_openai():
+def test_get_tier2_vision_provider_returns_openai_when_configured():
     with patch("listingjet.providers.factory.settings") as mock_settings:
         mock_settings.use_mock_providers = False
-        mock_settings.dashscope_api_key = ""
+        mock_settings.vision_provider_tier2 = "openai"
         mock_settings.openai_api_key = "sk-test-openai"
+        mock_settings.agent_model_routing = ""
+        mock_settings.tenant_model_routing = ""
         provider = get_tier2_vision_provider()
         from listingjet.providers.openai_vision import OpenAIVisionProvider
         assert isinstance(provider, OpenAIVisionProvider)

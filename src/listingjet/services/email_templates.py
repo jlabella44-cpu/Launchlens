@@ -112,6 +112,121 @@ def weekly_summary(*, name: str, listings_processed: str, credits_used: str, cre
     return subject, body
 
 
+# ── Launch drip sequence templates ──
+
+
+def welcome_drip_1(*, name: str, upload_url: str) -> tuple[str, str]:
+    """WELCOME_DRIP_1 — Welcome + first upload CTA (sent immediately)."""
+    subject = "Welcome to ListingJet — upload your first listing in 60 seconds"
+    body = _render(
+        f"<h2 style=\"color:#0F1B2D;margin:0 0 16px;\">Hi {name},</h2>"
+        f"<p style=\"font-size:16px;color:#334155;\">Welcome to ListingJet! You're now part of the Founding 200.</p>"
+        f"<p style=\"font-size:16px;color:#334155;\">Here's how to get started: upload your property photos and let our AI create your complete listing package — MLS descriptions, branded flyers, social content, and more.</p>"
+        f"<p style=\"font-size:16px;color:#334155;\"><strong>It takes about 60 seconds.</strong></p>"
+        f"<p style=\"margin:24px 0;\">{_CTA_BUTTON.format(url=upload_url, label='Upload Your First Listing')}</p>"
+        f"<p style=\"font-size:14px;color:#64748b;\">Questions? Just reply to this email — we read every message.</p>"
+    )
+    return subject, body
+
+
+def welcome_drip_2(*, name: str, listing_url: str) -> tuple[str, str]:
+    """WELCOME_DRIP_2 — Results showcase (Day 1)."""
+    subject = "Here's what ListingJet just did with your photos"
+    body = _render(
+        f"<h2 style=\"color:#0F1B2D;margin:0 0 16px;\">Hi {name},</h2>"
+        f"<p style=\"font-size:16px;color:#334155;\">If you've uploaded your first listing, here's what our AI generated for you:</p>"
+        f"<ul style=\"font-size:15px;color:#334155;line-height:1.8;\">"
+        f"<li><strong>MLS-ready description</strong> — formal, compliant, ready to paste</li>"
+        f"<li><strong>Marketing description</strong> — engaging copy that sells</li>"
+        f"<li><strong>Photo curation</strong> — ranked, scored, hero shots selected</li>"
+        f"<li><strong>Social captions</strong> — ready for Instagram, Facebook, TikTok</li>"
+        f"</ul>"
+        f"<p style=\"margin:24px 0;\">{_CTA_BUTTON.format(url=listing_url, label='View Your Results')}</p>"
+        f"<p style=\"font-size:14px;color:#64748b;\">Haven't uploaded yet? No worries — you can start anytime.</p>"
+    )
+    return subject, body
+
+
+def welcome_drip_3(*, name: str) -> tuple[str, str]:
+    """WELCOME_DRIP_3 — Use cases (Day 3)."""
+    subject = "5 ways agents are using ListingJet to win more listings"
+    body = _render(
+        f"<h2 style=\"color:#0F1B2D;margin:0 0 16px;\">Hi {name},</h2>"
+        f"<p style=\"font-size:16px;color:#334155;\">Here's how top agents use ListingJet:</p>"
+        f"<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;\">"
+        f"<tr><td style=\"padding:8px 0;font-size:15px;color:#334155;\"><strong>1.</strong> Upload photos from their phone right after a showing</td></tr>"
+        f"<tr><td style=\"padding:8px 0;font-size:15px;color:#334155;\"><strong>2.</strong> Send AI-generated descriptions to clients for approval in minutes</td></tr>"
+        f"<tr><td style=\"padding:8px 0;font-size:15px;color:#334155;\"><strong>3.</strong> Use the social content pack for Instagram/TikTok launch posts</td></tr>"
+        f"<tr><td style=\"padding:8px 0;font-size:15px;color:#334155;\"><strong>4.</strong> Create branded flyers for open houses without a designer</td></tr>"
+        f"<tr><td style=\"padding:8px 0;font-size:15px;color:#334155;\"><strong>5.</strong> Export MLS-compliant packages and list faster than the competition</td></tr>"
+        f"</table>"
+        f"<p style=\"font-size:14px;color:#64748b;\">What takes most agents 3 hours takes ListingJet 3 minutes.</p>"
+    )
+    return subject, body
+
+
+def welcome_drip_4(*, name: str, upgrade_url: str) -> tuple[str, str]:
+    """WELCOME_DRIP_4 — FOMO + upgrade CTA (Day 5)."""
+    subject = "Your free trial is halfway done — here's what you'd lose"
+    body = _render(
+        f"<h2 style=\"color:#0F1B2D;margin:0 0 16px;\">Hi {name},</h2>"
+        f"<p style=\"font-size:16px;color:#334155;\">Your trial is halfway through. Here's what paid members keep:</p>"
+        f"<ul style=\"font-size:15px;color:#334155;line-height:1.8;\">"
+        f"<li>Unlimited AI listing descriptions (dual-tone)</li>"
+        f"<li>Full white-label branding (no ListingJet watermarks)</li>"
+        f"<li>Priority cloud rendering</li>"
+        f"<li>Advanced market analytics HUD</li>"
+        f"<li>30% off for life as a Founding 200 member</li>"
+        f"</ul>"
+        f"<p style=\"margin:24px 0;\">{_CTA_BUTTON.format(url=upgrade_url, label='Lock In Founding Pricing')}</p>"
+        f"<p style=\"font-size:14px;color:#64748b;\">Only a limited number of founding spots remain.</p>"
+    )
+    return subject, body
+
+
+def welcome_drip_5(*, name: str, upgrade_url: str) -> tuple[str, str]:
+    """WELCOME_DRIP_5 — Hard upgrade CTA (Day 10)."""
+    subject = "Last chance: Lock in 30% off ListingJet for life"
+    body = _render(
+        f"<h2 style=\"color:#0F1B2D;margin:0 0 16px;\">Hi {name},</h2>"
+        f"<p style=\"font-size:16px;color:#334155;\">Your trial is ending soon. As a Founding 200 member, you can lock in <strong>30% off for life</strong> — but only while spots last.</p>"
+        f"<p style=\"font-size:16px;color:#334155;\">After the Founding 200 fills up, pricing goes to full rate.</p>"
+        f"<p style=\"margin:24px 0;\">{_CTA_BUTTON.format(url=upgrade_url, label='Upgrade Now — 30% Off For Life')}</p>"
+        f"<p style=\"font-size:14px;color:#64748b;\">Questions? Reply to this email — we're here to help.</p>"
+    )
+    return subject, body
+
+
+# ── Social reminder templates ──
+
+
+def _social_reminder(**kwargs) -> tuple[str, str]:
+    address = kwargs.get("address", "your listing")
+    social_url = kwargs.get("social_url", "#")
+    subject = f"Time to share: {address} on social media"
+    html_body = f"""
+    <h2>Your listing is ready to share!</h2>
+    <p>Your listing at <strong>{address}</strong> has content ready for Instagram, Facebook, and TikTok.</p>
+    <p>Now is a great time to post — your captions, hashtags, and video cuts are all prepared.</p>
+    <p><a href="{social_url}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:8px;">View & Post Now</a></p>
+    <p style="color:#6B7280;font-size:14px;">Tip: Post during peak engagement hours for maximum visibility.</p>
+    """
+    return subject, html_body
+
+
+def _social_reminder_followup(**kwargs) -> tuple[str, str]:
+    address = kwargs.get("address", "your listing")
+    social_url = kwargs.get("social_url", "#")
+    subject = f"Reminder: Share {address} — engagement window closing"
+    html_body = f"""
+    <h2>Don't miss the engagement window</h2>
+    <p>Your listing at <strong>{address}</strong> still hasn't been shared on social media.</p>
+    <p>Listings shared within 48 hours of going live get significantly more engagement.</p>
+    <p><a href="{social_url}" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:8px;">Share Now</a></p>
+    """
+    return subject, html_body
+
+
 # Registry mapping template names to functions
 TEMPLATES: dict[str, callable] = {
     "listing_delivered": listing_delivered,
@@ -119,4 +234,11 @@ TEMPLATES: dict[str, callable] = {
     "review_rejected": review_rejected,
     "credits_low": credits_low,
     "weekly_summary": weekly_summary,
+    "welcome_drip_1": welcome_drip_1,
+    "welcome_drip_2": welcome_drip_2,
+    "welcome_drip_3": welcome_drip_3,
+    "welcome_drip_4": welcome_drip_4,
+    "welcome_drip_5": welcome_drip_5,
+    "social_reminder": _social_reminder,
+    "social_reminder_followup": _social_reminder_followup,
 }

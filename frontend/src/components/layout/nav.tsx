@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 export function Nav() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
 
   const linkClass = "text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors";
 
@@ -41,6 +43,7 @@ export function Nav() {
           {user && <Link href="/dashboard" className={linkClass}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass}>Listings</Link>}
           {user && <Link href="/analytics" className={linkClass}>Analytics</Link>}
+          {user && <Link href="/health" className={linkClass}>Health</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass}>Review</Link>
           )}
@@ -54,6 +57,13 @@ export function Nav() {
             <Link href="/admin" className="text-sm font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary)]/80 transition-colors">
               Admin
             </Link>
+          )}
+          {user && (
+            <NotificationBell
+              open={bellOpen}
+              onToggle={() => setBellOpen((v) => !v)}
+              onClose={() => setBellOpen(false)}
+            />
           )}
           <ThemeToggle />
           {user && (
@@ -70,6 +80,7 @@ export function Nav() {
           {user && <Link href="/dashboard" className={linkClass} onClick={() => setMenuOpen(false)}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass} onClick={() => setMenuOpen(false)}>Listings</Link>}
           {user && <Link href="/analytics" className={linkClass} onClick={() => setMenuOpen(false)}>Analytics</Link>}
+          {user && <Link href="/health" className={linkClass} onClick={() => setMenuOpen(false)}>Health</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass} onClick={() => setMenuOpen(false)}>Review</Link>
           )}

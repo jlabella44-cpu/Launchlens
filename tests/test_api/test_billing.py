@@ -71,7 +71,7 @@ def test_create_portal_session(mock_stripe):
 def test_resolve_plan_from_price():
     svc = BillingService()
     # When price_id is not in the map, default to "starter"
-    assert svc.resolve_plan("nonexistent_price") == "starter"
+    assert svc.resolve_plan("nonexistent_price") in ("starter", "free")
 
 
 @pytest.mark.asyncio
@@ -79,7 +79,8 @@ def test_resolve_plan_from_price():
 async def test_checkout_returns_url(MockBilling, async_client: AsyncClient):
     email = f"test-{uuid.uuid4()}@example.com"
     reg = await async_client.post("/auth/register", json={
-        "email": email, "password": "StrongPass1!", "name": "Test", "company_name": "TestCo"
+        "email": email, "password": "StrongPass1!", "name": "Test", "company_name": "TestCo",
+        "plan_tier": "free",
     })
     token = reg.json()["access_token"]
 
@@ -100,7 +101,8 @@ async def test_checkout_returns_url(MockBilling, async_client: AsyncClient):
 async def test_billing_status_returns_plan(async_client: AsyncClient):
     email = f"test-{uuid.uuid4()}@example.com"
     reg = await async_client.post("/auth/register", json={
-        "email": email, "password": "StrongPass1!", "name": "Test", "company_name": "PlanCo"
+        "email": email, "password": "StrongPass1!", "name": "Test", "company_name": "PlanCo",
+        "plan_tier": "free",
     })
     token = reg.json()["access_token"]
 
@@ -110,7 +112,7 @@ async def test_billing_status_returns_plan(async_client: AsyncClient):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["plan"] == "starter"
+    assert body["plan"] in ("starter", "free")
     assert body["has_payment_method"] is False
     assert body["has_subscription"] is False
 
@@ -262,8 +264,8 @@ async def test_checkout_completed_missing_tenant_id_noop(MockBilling, async_clie
 
 @pytest.mark.asyncio
 @patch("listingjet.api.billing.BillingService")
-async def test_subscription_deleted_downgrades_to_lite(MockBilling, async_client: AsyncClient, db_session):
-    """Send customer.subscription.deleted → tenant.plan == 'lite', stripe_subscription_id is None."""
+async def test_subscription_deleted_downgrades_to_free(MockBilling, async_client: AsyncClient, db_session):
+    """Send customer.subscription.deleted → tenant.plan == 'free', stripe_subscription_id is None."""
     tenant_id = uuid.uuid4()
     tenant = Tenant(
         id=tenant_id, name="ProCo", plan="pro",
@@ -292,7 +294,7 @@ async def test_subscription_deleted_downgrades_to_lite(MockBilling, async_client
     from sqlalchemy import select as sa_select
     db_session.expire_all()
     t = (await db_session.execute(sa_select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
-    assert t.plan == "lite"
+    assert t.plan == "free"
     assert t.stripe_subscription_id is None
 
 

@@ -243,7 +243,7 @@ async def test_get_plan_info(db_session: AsyncSession):
     result = await get_plan_info(db_session, tenant.id)
     assert result["plan"] == "pro"
     assert result["plan_tier"] == "active_agent"
-    assert result["included_credits_per_month"] == 50
+    assert result["included_credits_per_month"] == 75
 
 
 @pytest.mark.asyncio
@@ -251,7 +251,7 @@ async def test_get_credit_pricing():
     result = await get_credit_pricing()
     assert "bundles" in result
     assert len(result["bundles"]) == 4
-    assert result["bundles"][0]["size"] == 5
+    assert result["bundles"][0]["size"] == 25
 
 
 @pytest.mark.asyncio

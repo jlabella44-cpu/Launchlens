@@ -16,6 +16,7 @@ import TypographySection from "./_components/typography-section";
 import BrandVoiceSection from "./_components/brand-voice-section";
 import LogosSection from "./_components/logos-section";
 import CanvaIntegrationSection from "./_components/canva-integration-section";
+import ConnectedAccountsSection from "./_components/connected-accounts-section";
 import HudPreview from "./_components/hud-preview";
 
 /* ─── Extended form state (includes raw_config fields) ─── */
@@ -335,6 +336,7 @@ function BrandKitSettings() {
                 uploadingTeamLogo={uploadingTeamLogo}
               />
               <CanvaIntegrationSection />
+              <ConnectedAccountsSection />
             </div>
 
             {/* Right: Live HUD Preview */}

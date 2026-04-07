@@ -54,8 +54,65 @@ async def activate_addon(
         raise HTTPException(404, "Listing not found")
 
     # Can only add add-ons before pipeline starts generating
-    if listing.state not in {ListingState.NEW, ListingState.UPLOADING, ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}:
+    allowed_states = {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}
+    if listing.state not in allowed_states:
         raise HTTPException(409, f"Cannot add add-ons in state: {listing.state.value}")
+
+    # Handle bundle slug — activates all included add-ons in a single transaction
+    from listingjet.config.tiers import BUNDLE_PRICING
+
+    if body.addon_slug == "all_addons_bundle":
+        bundle = BUNDLE_PRICING.get("all_addons_bundle")
+        if not bundle:
+            raise HTTPException(status_code=400, detail="Bundle not found")
+
+        existing_bundle = (await db.execute(
+            select(AddonPurchase).where(
+                AddonPurchase.listing_id == listing_id,
+                AddonPurchase.bundle_id == "all_addons_bundle",
+            ).limit(1)
+        )).scalar_one_or_none()
+        if existing_bundle:
+            raise HTTPException(status_code=409, detail="Bundle already activated for this listing")
+
+        credit_svc = CreditService()
+        try:
+            txn = await credit_svc.deduct_credits(
+                db, current_user.tenant_id, bundle["credit_cost"],
+                transaction_type="addon_debit",
+                reference_type="bundle",
+                reference_id=f"{listing_id}:all_addons_bundle",
+                description="Premium Bundle for listing",
+            )
+        except InsufficientCreditsError:
+            raise HTTPException(status_code=402, detail="Insufficient credits for bundle")
+
+        purchases = []
+        for slug in bundle["includes"]:
+            catalog_entry = (await db.execute(
+                select(AddonCatalog).where(AddonCatalog.slug == slug)
+            )).scalar_one_or_none()
+            if catalog_entry:
+                purchase = AddonPurchase(
+                    tenant_id=current_user.tenant_id,
+                    listing_id=listing_id,
+                    addon_id=catalog_entry.id,
+                    credit_transaction_id=txn.id,
+                    bundle_id="all_addons_bundle",
+                    status="active",
+                )
+                db.add(purchase)
+                purchases.append(purchase)
+
+        await db.commit()
+        return {
+            "id": str(purchases[0].id) if purchases else "",
+            "addon_id": str(purchases[0].addon_id) if purchases else "",
+            "addon_slug": "all_addons_bundle",
+            "addon_name": "Premium Bundle",
+            "status": "active",
+            "created_at": purchases[0].created_at if purchases else None,
+        }
 
     # Find the add-on
     addon = (await db.execute(
@@ -158,7 +215,7 @@ async def remove_addon(
     addon_purchase, addon = purchase
 
     listing = await db.get(Listing, listing_id)
-    if listing and listing.state in {ListingState.NEW, ListingState.UPLOADING, ListingState.AWAITING_REVIEW}:
+    if listing and listing.state in {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.AWAITING_REVIEW}:
         # Refund credits
         credit_svc = CreditService()
         await credit_svc.add_credits(

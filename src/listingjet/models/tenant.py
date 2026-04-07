@@ -11,10 +11,10 @@ class Tenant(Base):
     __tablename__ = "tenants"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    plan: Mapped[str] = mapped_column(String(50), default="starter")
-    plan_tier: Mapped[str] = mapped_column(String(50), default="lite")
+    plan: Mapped[str] = mapped_column(String(50), default="free")
+    plan_tier: Mapped[str] = mapped_column(String(50), default="free")
     billing_model: Mapped[str] = mapped_column(String(50), default="credit")
-    per_listing_credit_cost: Mapped[int] = mapped_column(Integer, default=1)
+    per_listing_credit_cost: Mapped[int] = mapped_column(Integer, default=12)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

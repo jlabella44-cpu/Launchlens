@@ -97,7 +97,7 @@ class APIRateLimitMiddleware:
             key = f"ip:{ip}"
 
         try:
-            allowed = self._limiter.acquire(key=key, cost=1)
+            allowed, remaining = self._limiter.acquire_with_remaining(key=key, cost=1)
         except Exception:
             logger.warning("rate_limit.redis_error — denying request path=%s", request.url.path)
             return JSONResponse(
@@ -122,4 +122,5 @@ class APIRateLimitMiddleware:
 
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(capacity)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
         return response

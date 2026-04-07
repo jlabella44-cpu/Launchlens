@@ -145,6 +145,7 @@ async def register_assets(
 
     if listing.state == ListingState.NEW:
         listing.state = ListingState.UPLOADING
+        # DRAFT listings stay in DRAFT — pipeline starts via /start-pipeline endpoint
 
     await db.commit()
 

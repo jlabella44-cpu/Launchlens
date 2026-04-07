@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -37,8 +37,29 @@ export function CreateListingDialog({
   const [sqft, setSqft] = useState("");
   const [price, setPrice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
   const [error, setError] = useState("");
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
+
+  const lookupProperty = useCallback(
+    async (addr: { street: string; city: string; state: string; zip: string }) => {
+      const fullAddress = `${addr.street}, ${addr.city}, ${addr.state} ${addr.zip}`;
+      setLookingUp(true);
+      try {
+        const data = await apiClient.propertyLookup(fullAddress);
+        if (data.found && data.core) {
+          if (data.core.beds) setBeds(String(data.core.beds));
+          if (data.core.baths) setBaths(String(data.core.baths));
+          if (data.core.sqft) setSqft(String(data.core.sqft));
+        }
+      } catch {
+        // ATTOM lookup failed — user can fill manually
+      } finally {
+        setLookingUp(false);
+      }
+    },
+    []
+  );
 
   const addonCost = selectedAddons.size; // 1 credit each
   const totalCost = listingCreditCost + addonCost;
@@ -139,8 +160,14 @@ export function CreateListingDialog({
                       setCity(addr.city);
                       setState(addr.state);
                       setZip(addr.zip);
+                      lookupProperty(addr);
                     }}
                   />
+                  {lookingUp && (
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-1 animate-pulse">
+                      Looking up property details...
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">

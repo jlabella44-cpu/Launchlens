@@ -3,12 +3,15 @@ Ported from Juke Marketing Engine (app/services/video_generator.py).
 """
 
 import asyncio
+import logging
 import time
 
 import httpx
 import jwt as pyjwt
 
 from listingjet.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class KlingProvider:
@@ -45,10 +48,11 @@ class KlingProvider:
         camera_control: dict | None = None,
         duration: int = 5,
         mode: str = "pro",
+        model_name: str = "kling-v2-5-turbo",
     ) -> str:
         """Submit an image-to-video task to Kling. Returns task_id."""
         body: dict = {
-            "model_name": "kling-v1",
+            "model_name": model_name,
             "image": image_url,
             "prompt": prompt,
             "negative_prompt": negative_prompt,
@@ -56,7 +60,8 @@ class KlingProvider:
             "mode": mode,
             "duration": str(duration),
         }
-        if camera_control:
+        # Camera control is only supported on kling-v1 / kling-v1-6
+        if camera_control and not model_name.startswith("kling-v2"):
             body["camera_control"] = {
                 "type": "simple",
                 "config": {
@@ -85,8 +90,11 @@ class KlingProvider:
         task_id: str,
         timeout: int = 300,
         interval: int = 5,
-    ) -> str | None:
-        """Poll a Kling task until completion. Returns video URL or None on timeout."""
+    ) -> dict | None:
+        """Poll a Kling task until completion.
+
+        Returns dict with url, duration, credits on success; None on timeout/failure.
+        """
         start = time.time()
         async with httpx.AsyncClient(timeout=30) as client:
             while time.time() - start < timeout:
@@ -95,12 +103,27 @@ class KlingProvider:
                     headers=self._headers(),
                 )
                 data = resp.json()
-                status = data.get("data", {}).get("task_status")
+                task_data = data.get("data", {})
+                status = task_data.get("task_status")
 
                 if status == "succeed":
-                    videos = data["data"].get("task_result", {}).get("videos", [])
-                    return videos[0]["url"] if videos else None
+                    videos = task_data.get("task_result", {}).get("videos", [])
+                    if not videos:
+                        return None
+                    video = videos[0]
+                    credits = task_data.get("final_unit_deduction")
+                    logger.info(
+                        "kling_clip_complete task=%s duration=%ss credits=%s",
+                        task_id, video.get("duration"), credits,
+                    )
+                    return {
+                        "url": video["url"],
+                        "duration": video.get("duration"),
+                        "credits": credits,
+                    }
                 elif status == "failed":
+                    msg = task_data.get("task_status_msg", "unknown")
+                    logger.warning("kling_task_failed task=%s reason=%s", task_id, msg)
                     return None
 
                 await asyncio.sleep(interval)

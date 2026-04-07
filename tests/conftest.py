@@ -104,6 +104,18 @@ async def test_engine():
     async with engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
             await conn.execute(table.delete())
+        # Re-insert seed data that migrations provide (034, 038, 039)
+        await conn.execute(
+            Base.metadata.tables["addon_catalog"].insert(),
+            [
+                {"slug": "virtual_staging", "name": "Virtual Staging", "credit_cost": 15, "is_active": True, "metadata": {"styles": ["modern", "contemporary", "minimalist"]}},
+                {"slug": "image_editing", "name": "AI Image Editing", "credit_cost": 5, "is_active": True, "metadata": {"capabilities": ["remove_object", "enhance"]}},
+                {"slug": "cma_report", "name": "CMA Report", "credit_cost": 10, "is_active": True, "metadata": {"format": "html"}},
+                {"slug": "ai_video_tour", "name": "AI Video Tour", "credit_cost": 20, "is_active": True, "metadata": {}},
+                {"slug": "3d_floorplan", "name": "3D Floorplan", "credit_cost": 8, "is_active": True, "metadata": {}},
+                {"slug": "all_addons_bundle", "name": "All Add-ons Bundle", "credit_cost": 30, "is_active": True, "metadata": {"includes": ["ai_video_tour", "virtual_staging", "3d_floorplan"]}},
+            ],
+        )
     await engine.dispose()
 
 

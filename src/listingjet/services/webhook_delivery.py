@@ -70,6 +70,7 @@ async def deliver_webhook(
     payload: dict,
     tenant_id: str,
     listing_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> bool:
     """
     POST event to webhook URL. Returns True if delivered (2xx), False otherwise.
@@ -78,6 +79,7 @@ async def deliver_webhook(
       X-ListingJet-Event: event_type
       X-ListingJet-Timestamp: ISO timestamp
       X-ListingJet-Signature: HMAC-SHA256
+      X-ListingJet-Idempotency-Key: unique outbox row ID (for deduplication)
       Content-Type: application/json
     """
     if not _is_url_safe(url):
@@ -105,6 +107,8 @@ async def deliver_webhook(
         "X-ListingJet-Signature": f"sha256={signature}",
         "User-Agent": "ListingJet-Webhook/1.0",
     }
+    if idempotency_key:
+        headers["X-ListingJet-Idempotency-Key"] = idempotency_key
 
     @async_retry(
         max_retries=3,

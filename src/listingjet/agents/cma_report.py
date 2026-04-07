@@ -87,7 +87,7 @@ class CMAReportAgent(BaseAgent):
     agent_name = "cma_report"
 
     def __init__(self, llm_provider=None, storage_service=None, session_factory=None):
-        self._llm = llm_provider or get_llm_provider()
+        self._llm = llm_provider or get_llm_provider(agent=self.agent_name)
         self._storage = storage_service or StorageService()
         self._session_factory = session_factory or AsyncSessionLocal
 

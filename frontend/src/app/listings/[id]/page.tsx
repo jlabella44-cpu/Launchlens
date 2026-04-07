@@ -18,6 +18,7 @@ import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
 import { SharePanel } from "@/components/listings/share-panel";
 import { ActivityLog } from "@/components/listings/activity-log";
+import { HealthPanel } from "@/components/listings/health-panel";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 function ListingDetail() {
@@ -475,6 +476,26 @@ function ListingDetail() {
         {/* New Feature Panels */}
         {showActions && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            {/* Social Post Hub link */}
+            {showVideo && (
+              <a
+                href={`/listings/${id}/social`}
+                className="bg-white rounded-2xl border border-slate-100 p-5 hover:border-[#F97316]/30 hover:shadow-md transition-all group block"
+              >
+                <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2 group-hover:text-[#F97316] transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
+                  Social Media
+                </h3>
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  View and share ready-to-post content for Instagram, Facebook, and TikTok
+                </p>
+                <span className="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-[#F97316]">
+                  Open Social Hub
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </a>
+            )}
             {/* Auto-Fix Compliance */}
             <div className="bg-white rounded-2xl border border-slate-100 p-5">
               <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2" style={{ fontFamily: "var(--font-heading)" }}>
@@ -607,6 +628,11 @@ function ListingDetail() {
             </div>
           </div>
         )}
+
+        {/* Listing Health Score */}
+        <div className="mt-10">
+          <HealthPanel listingId={id} />
+        </div>
 
         {/* Activity Log */}
         <div className="mt-10">

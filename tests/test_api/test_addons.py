@@ -11,7 +11,8 @@ from listingjet.config import settings
 async def _register(client: AsyncClient) -> tuple[str, str]:
     email = f"addon-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "AddonTester", "company_name": "AddonCo"
+        "email": email, "password": "TestPass1!", "name": "AddonTester", "company_name": "AddonCo",
+        "plan_tier": "free",
     })
     token = resp.json()["access_token"]
     payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
@@ -54,9 +55,9 @@ async def test_list_addons_catalog(async_client: AsyncClient):
     # Migration seeds 3 add-ons
     assert len(addons) >= 3
     slugs = {a["slug"] for a in addons}
+    # virtual_staging is seeded in migration 034; ai_video_tour in 038
+    assert "virtual_staging" in slugs
     assert "ai_video_tour" in slugs
-    assert "3d_floorplan" in slugs
-    assert "social_content_pack" in slugs
     for addon in addons:
         assert addon["credit_cost"] > 0
         assert addon["is_active"] is True
@@ -73,12 +74,12 @@ async def test_activate_addon_success(async_client: AsyncClient, db_session):
 
     resp = await async_client.post(
         f"/addons/listings/{listing_id}/addons",
-        json={"addon_slug": "ai_video_tour"},
+        json={"addon_slug": "virtual_staging"},
         headers=_auth(token),
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["addon_slug"] == "ai_video_tour"
+    assert body["addon_slug"] == "virtual_staging"
     assert body["status"] == "active"
 
     # Note: deduct_credits is globally mocked in conftest, so balance won't change.
@@ -94,7 +95,7 @@ async def test_activate_addon_duplicate_409(async_client: AsyncClient, db_sessio
     # First activation
     resp = await async_client.post(
         f"/addons/listings/{listing_id}/addons",
-        json={"addon_slug": "ai_video_tour"},
+        json={"addon_slug": "virtual_staging"},
         headers=_auth(token),
     )
     assert resp.status_code == 200
@@ -102,7 +103,7 @@ async def test_activate_addon_duplicate_409(async_client: AsyncClient, db_sessio
     # Duplicate activation
     resp2 = await async_client.post(
         f"/addons/listings/{listing_id}/addons",
-        json={"addon_slug": "ai_video_tour"},
+        json={"addon_slug": "virtual_staging"},
         headers=_auth(token),
     )
     assert resp2.status_code == 409
@@ -130,7 +131,7 @@ async def test_activate_addon_insufficient_credits_402(async_client: AsyncClient
         try:
             resp = await async_client.post(
                 f"/addons/listings/{listing_id}/addons",
-                json={"addon_slug": "ai_video_tour"},
+                json={"addon_slug": "virtual_staging"},
                 headers=_auth(token),
             )
             assert resp.status_code in (402, 500)
@@ -164,12 +165,12 @@ async def test_list_listing_addons(async_client: AsyncClient, db_session):
     # Activate two add-ons
     await async_client.post(
         f"/addons/listings/{listing_id}/addons",
-        json={"addon_slug": "ai_video_tour"},
+        json={"addon_slug": "virtual_staging"},
         headers=_auth(token),
     )
     await async_client.post(
         f"/addons/listings/{listing_id}/addons",
-        json={"addon_slug": "3d_floorplan"},
+        json={"addon_slug": "ai_video_tour"},
         headers=_auth(token),
     )
 
@@ -178,8 +179,8 @@ async def test_list_listing_addons(async_client: AsyncClient, db_session):
     addons = resp.json()
     assert len(addons) == 2
     slugs = {a["addon_slug"] for a in addons}
+    assert "virtual_staging" in slugs
     assert "ai_video_tour" in slugs
-    assert "3d_floorplan" in slugs
 
 
 # --- DELETE /listings/{id}/addons/{slug} ---
@@ -194,7 +195,7 @@ async def test_remove_addon_refunds_credits(async_client: AsyncClient, db_sessio
     # Activate
     await async_client.post(
         f"/addons/listings/{listing_id}/addons",
-        json={"addon_slug": "ai_video_tour"},
+        json={"addon_slug": "virtual_staging"},
         headers=_auth(token),
     )
 
@@ -203,7 +204,7 @@ async def test_remove_addon_refunds_credits(async_client: AsyncClient, db_sessio
 
     # Remove — listing is in NEW state so refund should happen
     resp = await async_client.delete(
-        f"/addons/listings/{listing_id}/addons/ai_video_tour",
+        f"/addons/listings/{listing_id}/addons/virtual_staging",
         headers=_auth(token),
     )
     assert resp.status_code == 200

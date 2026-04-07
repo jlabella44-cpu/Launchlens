@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import apiClient from "@/lib/api-client";
+import { trackEvent, AnalyticsEvents } from "@/lib/analytics";
 
 const PLAN_DISPLAY: Record<string, { name: string; price: string; features: string[] }> = {
   lite: { name: "Lite", price: "$9/mo", features: ["Basic AI Listing Descriptions", "Standard Photo Curation", "MLS-Ready Exports"] },
@@ -36,16 +37,29 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
   const claimId = searchParams.get("claim");
+  const referralParam = searchParams.get("ref");
   const [name, setName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState(referralParam || "");
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { document.title = "Create Account | ListingJet"; }, []);
+
+  // Persist referral code from URL param to sessionStorage
+  useEffect(() => {
+    if (referralParam) {
+      sessionStorage.setItem("lj_ref", referralParam);
+      setReferralCode(referralParam);
+    } else {
+      const stored = sessionStorage.getItem("lj_ref");
+      if (stored) setReferralCode(stored);
+    }
+  }, [referralParam]);
 
   const planInfo = plan ? PLAN_DISPLAY[plan] : PLAN_DISPLAY["active_agent"];
 
@@ -65,6 +79,12 @@ function RegisterForm() {
     try {
       await register(email, password, name, companyName, plan || undefined, consent);
 
+      trackEvent(AnalyticsEvents.SIGNUP, {
+        plan: plan || "active_agent",
+        referral_code: referralCode || null,
+        has_addons: selectedAddons.size > 0,
+      });
+
       if (claimId) {
         try {
           const result = await apiClient.demoClaim(claimId);
@@ -76,8 +96,8 @@ function RegisterForm() {
       }
 
       router.push("/onboarding");
-    } catch (err: any) {
-      setError(err.message || "Registration failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -274,6 +294,29 @@ function RegisterForm() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Referral Code */}
+              <div>
+                <label htmlFor="referral" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Referral Code <span className="font-normal">(optional)</span>
+                </label>
+                <input
+                  id="referral"
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.trim())}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                  placeholder="e.g. SARAH30"
+                />
+                {referralCode && (
+                  <p className="text-[11px] text-[#F97316] mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                    30 bonus credits will be applied after signup
+                  </p>
+                )}
               </div>
 
               {/* Consent */}

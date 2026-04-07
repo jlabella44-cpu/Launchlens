@@ -82,6 +82,7 @@ class OutboxPoller:
                     payload=row.payload,
                     tenant_id=str(row.tenant_id),
                     listing_id=str(row.listing_id) if row.listing_id else None,
+                    idempotency_key=str(row.id),
                 )
 
             logger.info(

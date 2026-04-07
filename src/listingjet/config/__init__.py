@@ -82,7 +82,25 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
+    qwen_api_key: str = ""
+    gemini_api_key: str = ""
     use_mock_providers: bool = False
+
+    # LLM / Vision provider routing (values: "claude", "qwen", "gemma")
+    llm_provider: str = "claude"
+    vision_provider_tier1: str = "google"  # "google" | "gemma" | "qwen"
+    vision_provider_tier2: str = "openai"  # "openai" | "qwen" | "gemma"
+    # Per-agent overrides, JSON: {"llm": {"floorplan": "qwen"}, "vision": {"photo_compliance": "gemma"}}
+    agent_model_routing: str = ""
+    # Per-tenant overrides, JSON: {"<tenant_uuid>": {"llm": "claude"}}
+    tenant_model_routing: str = ""
+    # Enable fallback chain: try primary provider, fall back to Claude on failure
+    llm_fallback_enabled: bool = False
+    # Self-host / alt endpoint for Gemma (e.g. http://localhost:11434/v1 for Ollama)
+    gemma_base_url: str = ""
+    gemma_model: str = "gemma-4-31b-it"
+    # Qwen DashScope context caching (discounts repeated system prompts)
+    qwen_enable_cache: bool = False
 
     # Google OAuth
     google_oauth_client_id: str = ""
@@ -102,17 +120,35 @@ class Settings(BaseSettings):
     canva_api_key: str = ""
     canva_default_template_id: str = ""  # Canva Brand Template ID used when tenant has no override
 
-    # Credit bundles (Stripe price IDs for one-time purchases)
+    # Legacy credit bundles (kept for backward compat)
     stripe_price_credit_bundle_5: str = ""
     stripe_price_credit_bundle_10: str = ""
     stripe_price_credit_bundle_25: str = ""
     stripe_price_credit_bundle_50: str = ""
 
-    # New tier pricing (Stripe price IDs)
+    # v3 tier pricing (Stripe subscription price IDs)
     stripe_price_lite: str = ""
     stripe_price_active_agent: str = ""
     stripe_price_team: str = ""
-    stripe_price_annual: str = ""
+
+    # v3 tier-locked credit bundles (Stripe one-time price IDs)
+    # Format: stripe_price_credit_bundle_{tier}_{size}
+    stripe_price_credit_bundle_free_25: str = ""
+    stripe_price_credit_bundle_free_50: str = ""
+    stripe_price_credit_bundle_free_100: str = ""
+    stripe_price_credit_bundle_free_250: str = ""
+    stripe_price_credit_bundle_lite_25: str = ""
+    stripe_price_credit_bundle_lite_50: str = ""
+    stripe_price_credit_bundle_lite_100: str = ""
+    stripe_price_credit_bundle_lite_250: str = ""
+    stripe_price_credit_bundle_active_agent_25: str = ""
+    stripe_price_credit_bundle_active_agent_50: str = ""
+    stripe_price_credit_bundle_active_agent_100: str = ""
+    stripe_price_credit_bundle_active_agent_250: str = ""
+    stripe_price_credit_bundle_team_25: str = ""
+    stripe_price_credit_bundle_team_50: str = ""
+    stripe_price_credit_bundle_team_100: str = ""
+    stripe_price_credit_bundle_team_250: str = ""
 
     # Canva OAuth2 (Phase 2 — per-tenant access)
     canva_client_id: str = ""
@@ -133,17 +169,11 @@ class Settings(BaseSettings):
     email_enabled: bool = False
     ses_enabled: bool = False
 
-    # DashScope (Qwen)
-    dashscope_api_key: str = ""
-    dashscope_base_url: str = "https://dashscope-us.aliyuncs.com/compatible-mode/v1"
-
     # Video (Kling AI)
     kling_access_key: str = ""
     kling_secret_key: str = ""
     kling_api_base_url: str = "https://api.klingai.com"
-    video_max_photos: int = 8
     video_score_floor: float = 0.65
-    video_clip_duration: int = 5
 
     # Property Lookup
     attom_api_key: str = ""

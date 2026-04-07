@@ -12,27 +12,27 @@ PLAN_TO_PRICE: dict[str, str] = {}
 def _init_price_map():
     """Build price-to-plan map from config. Called lazily so settings are loaded."""
     if not PRICE_TO_PLAN:
-        # Primary plan names (stripe_price_starter, stripe_price_pro, stripe_price_enterprise)
-        if settings.stripe_price_starter:
-            PRICE_TO_PLAN[settings.stripe_price_starter] = "starter"
-            PLAN_TO_PRICE["starter"] = settings.stripe_price_starter
-        if settings.stripe_price_pro:
-            PRICE_TO_PLAN[settings.stripe_price_pro] = "pro"
-            PLAN_TO_PRICE["pro"] = settings.stripe_price_pro
-        if settings.stripe_price_enterprise:
-            PRICE_TO_PLAN[settings.stripe_price_enterprise] = "enterprise"
-            PLAN_TO_PRICE["enterprise"] = settings.stripe_price_enterprise
-
-        # Tier-based names (stripe_price_lite, stripe_price_active_agent, stripe_price_team)
+        # v3 tier names (stripe_price_lite, stripe_price_active_agent, stripe_price_team)
         if settings.stripe_price_lite:
-            PRICE_TO_PLAN[settings.stripe_price_lite] = "starter"
-            PLAN_TO_PRICE.setdefault("starter", settings.stripe_price_lite)
+            PRICE_TO_PLAN[settings.stripe_price_lite] = "lite"
+            PLAN_TO_PRICE["lite"] = settings.stripe_price_lite
         if settings.stripe_price_active_agent:
-            PRICE_TO_PLAN[settings.stripe_price_active_agent] = "pro"
-            PLAN_TO_PRICE.setdefault("pro", settings.stripe_price_active_agent)
+            PRICE_TO_PLAN[settings.stripe_price_active_agent] = "active_agent"
+            PLAN_TO_PRICE["active_agent"] = settings.stripe_price_active_agent
         if settings.stripe_price_team:
-            PRICE_TO_PLAN[settings.stripe_price_team] = "enterprise"
-            PLAN_TO_PRICE.setdefault("enterprise", settings.stripe_price_team)
+            PRICE_TO_PLAN[settings.stripe_price_team] = "team"
+            PLAN_TO_PRICE["team"] = settings.stripe_price_team
+
+        # Legacy plan names (for existing subscriptions during transition)
+        if settings.stripe_price_starter:
+            PRICE_TO_PLAN[settings.stripe_price_starter] = "free"
+            PLAN_TO_PRICE.setdefault("free", settings.stripe_price_starter)
+        if settings.stripe_price_pro:
+            PRICE_TO_PLAN[settings.stripe_price_pro] = "active_agent"
+            PLAN_TO_PRICE.setdefault("active_agent", settings.stripe_price_pro)
+        if settings.stripe_price_enterprise:
+            PRICE_TO_PLAN[settings.stripe_price_enterprise] = "team"
+            PLAN_TO_PRICE.setdefault("team", settings.stripe_price_enterprise)
 
 
 class BillingService:
@@ -106,7 +106,7 @@ class BillingService:
                 "Add the price to settings if this is a new product tier.",
                 price_id,
             )
-            return "starter"
+            return "free"
         return plan
 
     def get_price_for_plan(self, plan: str) -> str | None:
@@ -115,7 +115,12 @@ class BillingService:
 
     def list_invoices(self, customer_id: str, limit: int = 10) -> list[dict]:
         """List recent invoices for a customer."""
-        invoices = stripe.Invoice.list(api_key=self._api_key, customer=customer_id, limit=limit)
+        try:
+            invoices = stripe.Invoice.list(api_key=self._api_key, customer=customer_id, limit=limit)
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_list_invoices_failed customer=%s", customer_id)
+            raise
         return [
             {
                 "id": inv.id,
@@ -139,18 +144,28 @@ class BillingService:
         if not new_price_id:
             raise ValueError(f"No price configured for plan: {new_plan}")
 
-        subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_retrieve_subscription_failed sub=%s", subscription_id)
+            raise
         if not subscription.get("items", {}).get("data"):
             raise ValueError("Subscription has no items")
 
         item_id = subscription["items"]["data"][0].id
 
-        updated = stripe.Subscription.modify(
-            subscription_id,
-            api_key=self._api_key,
-            items=[{"id": item_id, "price": new_price_id}],
-            proration_behavior="create_prorations",
-        )
+        try:
+            updated = stripe.Subscription.modify(
+                subscription_id,
+                api_key=self._api_key,
+                items=[{"id": item_id, "price": new_price_id}],
+                proration_behavior="create_prorations",
+            )
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_modify_subscription_failed sub=%s", subscription_id)
+            raise
         return {
             "subscription_id": updated.id,
             "new_price_id": new_price_id,
@@ -160,7 +175,12 @@ class BillingService:
 
     def create_usage_record(self, subscription_id: str, quantity: int) -> dict:
         """Report metered usage (per-listing overage). Requires metered price."""
-        subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_retrieve_subscription_failed sub=%s", subscription_id)
+            raise
         items = subscription.get("items", {}).get("data", [])
         # Find the metered item (if configured)
         metered_item = None
@@ -172,9 +192,14 @@ class BillingService:
         if not metered_item:
             return {"reported": False, "reason": "No metered price item on subscription"}
 
-        record = stripe.SubscriptionItem.create_usage_record(
-            metered_item.id,
-            quantity=quantity,
-            action="increment",
-        )
+        try:
+            record = stripe.SubscriptionItem.create_usage_record(
+                metered_item.id,
+                quantity=quantity,
+                action="increment",
+            )
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_usage_record_failed sub=%s", subscription_id)
+            raise
         return {"reported": True, "quantity": quantity, "record_id": record.id}

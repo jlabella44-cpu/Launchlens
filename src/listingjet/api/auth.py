@@ -44,7 +44,7 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         raise HTTPException(status_code=400, detail=f"Invalid plan tier: {tier}. Must be one of: {', '.join(TIER_DEFAULTS)}")
 
     tier_config = TIER_DEFAULTS[tier]
-    plan = _TIER_TO_PLAN.get(tier, "starter")
+    plan = _TIER_TO_PLAN.get(tier, "free")
 
     tenant = Tenant(id=uuid.uuid4(), name=body.company_name, plan=plan, billing_model="credit")
     db.add(tenant)
@@ -55,6 +55,8 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         balance=tier_config["included_credits"],
+        granted_balance=tier_config["included_credits"],
+        purchased_balance=0,
         rollover_cap=tier_config["rollover_cap"],
     )
     db.add(credit_account)
@@ -80,17 +82,20 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     await db.commit()
     await db.refresh(user)
 
-    # Send welcome email (fire-and-forget)
+    # Send welcome drip email #1 (fire-and-forget)
+    # Full drip sequence: welcome_drip_1 (now), _2 (day 1), _3 (day 3), _4 (day 5), _5 (day 10)
+    # Subsequent drips are triggered by a scheduled task (see services/drip_scheduler.py)
     try:
         from listingjet.services.email import get_email_service
         email_svc = get_email_service()
-        await email_svc.send_template(user.email, "welcome", {
-            "name": user.name or "there",
-            "plan": tier,
-            "app_url": "https://app.listingjet.com",
-        })
+        email_svc.send_notification(
+            user.email,
+            "welcome_drip_1",
+            name=user.name or "there",
+            upload_url="https://app.listingjet.com/listings",
+        )
     except Exception:
-        logger.exception("welcome email failed for %s", email)
+        logger.exception("welcome email failed for user=%s", user.id)
 
     logger.info("auth.register tenant=%s tier=%s", tenant.id, tier)
     access = create_access_token(user)
@@ -311,13 +316,23 @@ async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/logout")
-async def logout():
-    """Logout endpoint. Clears httpOnly auth cookies.
+async def logout(request: Request):
+    """Logout endpoint. Revokes tokens server-side and clears httpOnly cookies."""
+    from listingjet.services.auth import revoke_token
 
-    Note: Full server-side token revocation requires a Redis-backed
-    blocklist. For now, short-lived access tokens (1hr) + cookie removal
-    limit exposure.
-    """
+    # Revoke access token (from header or cookie)
+    access_token = request.cookies.get("access_token")
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        access_token = auth_header[7:]
+    if access_token:
+        revoke_token(access_token)
+
+    # Revoke refresh token
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token:
+        revoke_token(refresh_token)
+
     return clear_auth_cookies(JSONResponse(content={"status": "ok"}))
 
 
@@ -331,55 +346,58 @@ class DeleteAccountRequest(BaseModel):
 
 
 @router.post("/delete-account")
-async def request_account_deletion(
+async def delete_account(
     body: DeleteAccountRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Request account deletion. Logs an audit event and emails support for
-    processing. This satisfies the GDPR/CCPA right-to-erasure without
-    requiring a fully automated cascade — support handles the actual purge.
+    """Delete account and all associated tenant data (GDPR/CCPA right-to-erasure).
+
+    Performs a cascading delete of all tenant-scoped data, then removes the
+    tenant and user records. Irreversible.
     """
     if body.confirmation != "DELETE":
         raise HTTPException(status_code=400, detail='Confirmation must be the string "DELETE"')
 
-    tenant = await db.get(Tenant, current_user.tenant_id)
+    tenant_id = current_user.tenant_id
+    tenant = await db.get(Tenant, tenant_id)
     tenant_name = tenant.name if tenant else "unknown"
 
+    # Emit audit event before deletion
     await emit_event(
         session=db,
-        event_type="account.deletion_requested",
+        event_type="account.deleted",
         payload={
             "user_id": str(current_user.id),
-            "tenant_id": str(current_user.tenant_id),
+            "tenant_id": str(tenant_id),
             "tenant_name": tenant_name,
         },
-        tenant_id=str(current_user.tenant_id),
+        tenant_id=str(tenant_id),
     )
+
+    # Cascade delete all tenant-scoped data
+    from listingjet.services.account_lifecycle import delete_tenant_data
+    await delete_tenant_data(db, tenant_id)
+
     await db.commit()
 
-    # Send notification email to support (fire-and-forget)
-    try:
-        from listingjet.services.email import get_email_service
-        email_svc = get_email_service()
-        email_svc.send(
-            to="support@listingjet.ai",
-            subject=f"Account Deletion Request — {tenant_name}",
-            html_body=(
-                f"<p>User <strong>{current_user.email}</strong> "
-                f"(tenant: {tenant_name}, id: {current_user.tenant_id}) "
-                f"has requested account deletion.</p>"
-                f"<p>Please process within 30 days per GDPR/CCPA requirements.</p>"
-            ),
-        )
-    except Exception:
-        logger.exception("delete_account_email_failed user=%s", current_user.id)
+    logger.info("account.deleted user=%s tenant=%s", current_user.id, tenant_id)
+    resp = JSONResponse(content={
+        "status": "deleted",
+        "message": "Your account and all associated data have been permanently deleted.",
+    })
+    return clear_auth_cookies(resp)
 
-    logger.info("account.deletion_requested user=%s tenant=%s", current_user.id, current_user.tenant_id)
-    return {
-        "status": "deletion_requested",
-        "message": "Your account deletion request has been received and will be processed within 30 days.",
-    }
+
+@router.get("/export-data")
+async def export_data(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export all personal data for the current user's tenant (GDPR data portability)."""
+    from listingjet.services.account_lifecycle import export_tenant_data
+    data = await export_tenant_data(db, current_user.tenant_id, current_user.id)
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -464,7 +482,7 @@ async def google_login(
         return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
 
     # New user — auto-register with default plan
-    tenant = Tenant(id=uuid.uuid4(), name=name or email.split("@")[0], plan="starter", billing_model="credit")
+    tenant = Tenant(id=uuid.uuid4(), name=name or email.split("@")[0], plan="free", billing_model="credit")
     db.add(tenant)
     await db.flush()
 
@@ -474,7 +492,9 @@ async def google_login(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         balance=0,
-        rollover_cap=5,
+        granted_balance=0,
+        purchased_balance=0,
+        rollover_cap=0,
     )
     db.add(credit_account)
 
@@ -490,7 +510,7 @@ async def google_login(
     await emit_event(
         session=db,
         event_type="user.registered",
-        payload={"email": email, "user_id": str(user.id), "provider": "google", "plan": "starter"},
+        payload={"email": email, "user_id": str(user.id), "provider": "google", "plan": "free"},
         tenant_id=str(tenant.id),
     )
     await db.commit()
