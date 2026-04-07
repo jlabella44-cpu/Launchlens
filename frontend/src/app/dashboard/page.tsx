@@ -57,19 +57,20 @@ function DashboardContent() {
         ]);
 
       if (creditsRes.status === "fulfilled") setCredits(creditsRes.value);
-      if (listingsRes.status === "fulfilled") setListings(listingsRes.value);
+      const fetchedListings = listingsRes.status === "fulfilled" && Array.isArray(listingsRes.value) ? listingsRes.value : [];
+      setListings(fetchedListings);
       if (usageRes.status === "fulfilled") setUsage(usageRes.value);
       if (brandRes.status === "fulfilled") setBrandKit(brandRes.value);
 
       // Fetch pipeline status for active listings
-      if (listingsRes.status === "fulfilled") {
+      if (fetchedListings.length > 0) {
         const activeStates = [
           "uploading",
           "analyzing",
           "exporting",
           "in_review",
         ];
-        const active = listingsRes.value
+        const active = fetchedListings
           .filter((l: ListingResponse) => activeStates.includes(l.state))
           .slice(0, 5);
 
