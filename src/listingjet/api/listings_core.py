@@ -2,7 +2,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
@@ -12,12 +12,26 @@ from listingjet.api.schemas.listings import (
     UpdateListingRequest,
 )
 from listingjet.database import get_db
+from listingjet.models.addon_purchase import AddonPurchase
 from listingjet.models.asset import Asset
+from listingjet.models.cma_report import CMAReport
 from listingjet.models.dollhouse_scene import DollhouseScene
+from listingjet.models.event import Event
+from listingjet.models.health_score_history import HealthScoreHistory
 from listingjet.models.listing import Listing, ListingState
+from listingjet.models.listing_event import ListingEvent
+from listingjet.models.listing_health_score import ListingHealthScore
+from listingjet.models.listing_microsite import ListingMicrosite
+from listingjet.models.import_job import ImportJob
+from listingjet.models.outbox import Outbox
 from listingjet.models.package_selection import PackageSelection
+from listingjet.models.performance_event import PerformanceEvent
+from listingjet.models.property_data import PropertyData
+from listingjet.models.scoring_event import ScoringEvent
+from listingjet.models.social_content import SocialContent
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
+from listingjet.models.video_asset import VideoAsset
 from listingjet.services.endpoint_rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)
@@ -231,7 +245,6 @@ async def update_listing(
         new_meta = body.metadata.model_dump(exclude_none=True)
         new_price = new_meta.get("price")
         if new_price is not None and old_price is not None and new_price != old_price:
-            from listingjet.models.listing_event import ListingEvent
             price_event = ListingEvent(
                 tenant_id=current_user.tenant_id,
                 listing_id=listing_id,
@@ -277,10 +290,27 @@ async def delete_listing(
         if txn:
             credits_refunded = txn.amount
 
-    # Delete related records
-    from sqlalchemy import delete as sa_delete
-    await db.execute(sa_delete(PackageSelection).where(PackageSelection.listing_id == listing_id))
-    await db.execute(sa_delete(Asset).where(Asset.listing_id == listing_id))
+    # Delete all related records
+    for model in (
+        VideoAsset,
+        SocialContent,
+        ListingEvent,
+        Event,
+        HealthScoreHistory,
+        ListingHealthScore,
+        ScoringEvent,
+        PerformanceEvent,
+        ListingMicrosite,
+        PropertyData,
+        CMAReport,
+        DollhouseScene,
+        ImportJob,
+        AddonPurchase,
+        Outbox,
+        PackageSelection,
+        Asset,
+    ):
+        await db.execute(sa_delete(model).where(model.listing_id == listing_id))
     await db.delete(listing)
     await db.commit()
 
