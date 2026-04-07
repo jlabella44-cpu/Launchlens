@@ -868,7 +868,10 @@ class ApiClient {
 
   // Notifications
   async getNotifications(unread: boolean = false): Promise<any[]> {
-    return this.request<any[]>(`/notifications?unread=${unread}`);
+    const res = await this.request<any>(`/notifications?unread=${unread}`);
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.items)) return res.items;
+    return [];
   }
 
   async markNotificationRead(notificationId: string): Promise<any> {
