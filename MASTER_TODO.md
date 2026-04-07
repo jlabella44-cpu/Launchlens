@@ -7,18 +7,18 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ## P0 — Production Blockers
 
 ### Critical Bugs (from Session 17)
-- [ ] **Temporal Worker registers zero activities** — import `ALL_ACTIVITIES` list
-- [ ] **Alembic migration chain broken** — four migrations share the same revision number; merge into single migration
-- [ ] **No CORS middleware** — add `CORSMiddleware` to FastAPI app
+- [x] **Temporal Worker registers zero activities** — `ALL_ACTIVITIES` import already in place
+- [x] **Alembic migration chain broken** — chain is linear and correct (001→041), no duplicate revisions
+- [x] **No CORS middleware** — `CORSMiddleware` already configured in `main.py`
 
 ### Pre-Launch Audit — Critical
 - [ ] **CRITICAL-1: No GDPR/CCPA account deletion or data export** — implement `DELETE /account` and `GET /export-data` with cascade deletion
-- [ ] **CRITICAL-2: Missing database indexes** — add indexes on `listing.state`, `listing.created_at`, `asset.listing_id`, `event.listing_id`, `property_data` composite
-- [ ] **CRITICAL-3: Stripe API calls unguarded** — add `try/catch` for `stripe.error.*` exceptions
-- [ ] **CRITICAL-4: Global singleton race conditions** — add `threading.Lock` for `_limiter` singleton, TTL eviction for `_low_credit_sent`
-- [ ] **CRITICAL-5: Debug tracebacks exposed to clients** — ensure `APP_ENV` doesn't leak tracebacks
+- [x] **CRITICAL-2: Missing database indexes** — already added via migrations 020 and 027
+- [x] **CRITICAL-3: Stripe API calls unguarded** — wrapped all calls in `try/except stripe.StripeError`
+- [x] **CRITICAL-4: Global singleton race conditions** — added `threading.Lock` for `_demo_limiter`; `_low_credit_sent` uses atomic Redis `SET NX`
+- [x] **CRITICAL-5: Debug tracebacks exposed to clients** — global exception handler returns generic message
 - [ ] **CRITICAL-6: WCAG 2.1 accessibility violations** — add `htmlFor` to labels, `role="alert"` to toasts, proper ARIA attributes
-- [ ] **CRITICAL-7: Worker health check misconfigured** — add health endpoint to worker or use process-based health check
+- [x] **CRITICAL-7: Worker health check misconfigured** — heartbeat file + `_heartbeat_loop` already configured
 
 ### Infrastructure
 - [ ] **SES production access** — wait for AWS approval, then verify

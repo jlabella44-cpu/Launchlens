@@ -115,7 +115,12 @@ class BillingService:
 
     def list_invoices(self, customer_id: str, limit: int = 10) -> list[dict]:
         """List recent invoices for a customer."""
-        invoices = stripe.Invoice.list(api_key=self._api_key, customer=customer_id, limit=limit)
+        try:
+            invoices = stripe.Invoice.list(api_key=self._api_key, customer=customer_id, limit=limit)
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_list_invoices_failed customer=%s", customer_id)
+            raise
         return [
             {
                 "id": inv.id,
@@ -139,18 +144,28 @@ class BillingService:
         if not new_price_id:
             raise ValueError(f"No price configured for plan: {new_plan}")
 
-        subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_retrieve_subscription_failed sub=%s", subscription_id)
+            raise
         if not subscription.get("items", {}).get("data"):
             raise ValueError("Subscription has no items")
 
         item_id = subscription["items"]["data"][0].id
 
-        updated = stripe.Subscription.modify(
-            subscription_id,
-            api_key=self._api_key,
-            items=[{"id": item_id, "price": new_price_id}],
-            proration_behavior="create_prorations",
-        )
+        try:
+            updated = stripe.Subscription.modify(
+                subscription_id,
+                api_key=self._api_key,
+                items=[{"id": item_id, "price": new_price_id}],
+                proration_behavior="create_prorations",
+            )
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_modify_subscription_failed sub=%s", subscription_id)
+            raise
         return {
             "subscription_id": updated.id,
             "new_price_id": new_price_id,
@@ -160,7 +175,12 @@ class BillingService:
 
     def create_usage_record(self, subscription_id: str, quantity: int) -> dict:
         """Report metered usage (per-listing overage). Requires metered price."""
-        subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id, api_key=self._api_key)
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_retrieve_subscription_failed sub=%s", subscription_id)
+            raise
         items = subscription.get("items", {}).get("data", [])
         # Find the metered item (if configured)
         metered_item = None
@@ -172,9 +192,14 @@ class BillingService:
         if not metered_item:
             return {"reported": False, "reason": "No metered price item on subscription"}
 
-        record = stripe.SubscriptionItem.create_usage_record(
-            metered_item.id,
-            quantity=quantity,
-            action="increment",
-        )
+        try:
+            record = stripe.SubscriptionItem.create_usage_record(
+                metered_item.id,
+                quantity=quantity,
+                action="increment",
+            )
+        except stripe.StripeError:
+            import logging
+            logging.getLogger(__name__).exception("stripe_usage_record_failed sub=%s", subscription_id)
+            raise
         return {"reported": True, "quantity": quantity, "record_id": record.id}
