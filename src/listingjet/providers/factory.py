@@ -66,6 +66,18 @@ def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
     return primary
 
 
+def get_tier2_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
+    """Return the Tier 2 vision provider, routed by config (default: VISION_PROVIDER_TIER2)."""
+    if settings.use_mock_providers:
+        from .mock import MockVisionProvider
+        return MockVisionProvider()
+    from ._routing import resolve_vision_provider
+    name = resolve_vision_provider(
+        agent, default=settings.vision_provider_tier2, tenant_id=tenant_id,
+    )
+    return _build_vision(name)
+
+
 def get_image_edit_provider() -> ImageEditProvider:
     if settings.use_mock_providers:
         from .mock import MockImageEditProvider

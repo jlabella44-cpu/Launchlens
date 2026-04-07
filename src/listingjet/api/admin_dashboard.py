@@ -24,8 +24,8 @@ router = APIRouter()
 
 
 @router.get("/health-detail")
-async def health_detail():
-    """Unauthenticated health check for the admin router."""
+async def health_detail(admin_user: User = Depends(require_admin)):
+    """Authenticated health check for the admin router."""
     return {"status": "ok", "detail": "admin"}
 
 

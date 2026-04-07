@@ -14,6 +14,7 @@ from listingjet.models.addon_purchase import AddonPurchase
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.user import User
 from listingjet.services.credits import CreditService, InsufficientCreditsError
+from listingjet.services.endpoint_rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ async def list_addons(db: AsyncSession = Depends(get_db)):
 async def activate_addon(
     listing_id: uuid.UUID,
     body: ActivateAddonRequest,
+    _rl=Depends(rate_limit(5, 60)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

@@ -66,8 +66,8 @@ async def test_rate_limit_raises_429_when_exceeded():
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_fails_open_on_redis_error():
-    """If RateLimiter constructor raises, the dep should fail open (no exception)."""
+async def test_rate_limit_fails_closed_on_redis_error():
+    """If RateLimiter constructor raises, the dep should fail closed (503)."""
     from listingjet.services.endpoint_rate_limit import rate_limit
 
     dep = rate_limit(limit=10, period=60)
@@ -77,8 +77,11 @@ async def test_rate_limit_fails_open_on_redis_error():
     request.state.tenant_id = "tenant-abc"
 
     with patch(_RL_PATCH, side_effect=Exception("Redis down")):
-        # Should NOT raise — fail open
-        await dep(request)
+        with pytest.raises(HTTPException) as exc_info:
+            await dep(request)
+
+    assert exc_info.value.status_code == 503
+    assert "temporarily unavailable" in exc_info.value.detail
 
 
 @pytest.mark.asyncio

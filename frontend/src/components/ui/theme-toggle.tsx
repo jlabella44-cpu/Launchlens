@@ -8,10 +8,17 @@ export function ThemeToggle() {
 
   useEffect(() => {
     setMounted(true);
+    // One-time migration: reset users who were auto-set to dark by system preference
+    if (!localStorage.getItem("listingjet_theme_v2")) {
+      localStorage.removeItem("listingjet_theme");
+      localStorage.setItem("listingjet_theme_v2", "1");
+    }
     const stored = localStorage.getItem("listingjet_theme");
-    if (stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+    if (stored === "dark") {
       setDark(true);
       document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
     }
   }, []);
 

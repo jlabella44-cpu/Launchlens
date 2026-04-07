@@ -219,8 +219,10 @@ class ApiClient {
   async getListings(): Promise<ListingResponse[]> {
     const { data, error, response } = await fetchClient.GET("/listings");
     if (error) throw this._toError(error, response);
-    const res = data as { items: ListingResponse[] } | ListingResponse[];
-    return Array.isArray(res) ? res : res.items;
+    if (!data) return [];
+    const res = data as { items?: ListingResponse[] } | ListingResponse[];
+    if (Array.isArray(res)) return res;
+    return Array.isArray(res.items) ? res.items : [];
   }
 
   async getListing(id: string): Promise<ListingResponse> {
@@ -870,7 +872,10 @@ class ApiClient {
 
   // Notifications
   async getNotifications(unread: boolean = false): Promise<any[]> {
-    return this.request<any[]>(`/notifications?unread=${unread}`);
+    const res = await this.request<any>(`/notifications?unread=${unread}`);
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.items)) return res.items;
+    return [];
   }
 
   async markNotificationRead(notificationId: string): Promise<any> {

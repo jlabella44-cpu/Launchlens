@@ -215,6 +215,7 @@ async def reject_listing(
 )
 async def retry_pipeline(
     listing_id: uuid.UUID,
+    _rl=Depends(rate_limit(3, 3600)),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

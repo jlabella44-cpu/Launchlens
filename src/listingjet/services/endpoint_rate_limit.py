@@ -45,7 +45,12 @@ def rate_limit(limit: int, period: int = 60, key_func: Callable | None = None):
                 refill_rate=refill_rate,
             )
         except Exception:
-            return  # fail open if Redis unavailable
+            logger.warning("endpoint_rate_limit.redis_unavailable path=%s", request.url.path)
+            raise HTTPException(
+                status_code=503,
+                detail="Service temporarily unavailable. Please try again shortly.",
+                headers={"Retry-After": "30"},
+            )
 
         if key_func:
             key = key_func(request)
@@ -62,7 +67,12 @@ def rate_limit(limit: int, period: int = 60, key_func: Callable | None = None):
         try:
             allowed = limiter.acquire(key=endpoint_key, cost=1)
         except Exception:
-            return  # fail open
+            logger.warning("endpoint_rate_limit.redis_error path=%s key=%s", request.url.path, endpoint_key)
+            raise HTTPException(
+                status_code=503,
+                detail="Service temporarily unavailable. Please try again shortly.",
+                headers={"Retry-After": "30"},
+            )
 
         if not allowed:
             logger.warning("endpoint_rate_limit.exceeded path=%s key=%s", request.url.path, key)

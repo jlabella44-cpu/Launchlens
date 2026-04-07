@@ -8,7 +8,7 @@ from listingjet.agents.base import strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.video_asset import VideoAsset
-from listingjet.providers import get_vision_provider
+from listingjet.providers import get_tier2_vision_provider
 from listingjet.services.metrics import record_cost
 
 from .base import AgentContext, BaseAgent
@@ -35,7 +35,7 @@ class ChapterAgent(BaseAgent):
     agent_name = "chapter"
 
     def __init__(self, vision_provider=None, session_factory=None):
-        self._vision_provider = vision_provider or get_vision_provider(agent=self.agent_name)
+        self._vision_provider = vision_provider or get_tier2_vision_provider()
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def execute(self, context: AgentContext) -> dict:
@@ -84,5 +84,5 @@ class ChapterAgent(BaseAgent):
                     "chapter_count": len(chapters),
                 })
 
-        record_cost(self.agent_name, "openai_gpt4v", 1)
+        record_cost(self.agent_name, "qwen_vision", 1)
         return {"chapter_count": len(chapters), "video_asset_id": str(video.id)}
