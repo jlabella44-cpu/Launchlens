@@ -1,7 +1,7 @@
 """Add listing health scores, health score history, and IDX feed configs tables.
 
-Revision ID: 037_health_score
-Revises: 036_support_tickets
+Revision ID: 041_health_score
+Revises: 040
 """
 
 import sqlalchemy as sa
@@ -9,8 +9,8 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision = "037_health_score"
-down_revision = "036_support_tickets"
+revision = "041_health_score"
+down_revision = "040"
 branch_labels = None
 depends_on = None
 

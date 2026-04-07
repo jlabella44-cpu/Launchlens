@@ -1,8 +1,11 @@
 import uuid
 from datetime import datetime
+
 from sqlalchemy import UUID, DateTime, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from listingjet.database import Base
+
 
 class SocialAccount(Base):
     __tablename__ = "social_accounts"

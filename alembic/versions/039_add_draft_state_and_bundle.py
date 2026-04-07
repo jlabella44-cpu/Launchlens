@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "039_add_draft_state_and_bundle"
-down_revision = "038_pricing_v3_weighted_credits"
+down_revision = "038_pricing_v3"
 branch_labels = None
 depends_on = None
 

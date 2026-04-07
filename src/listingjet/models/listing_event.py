@@ -1,9 +1,12 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import UUID, DateTime, String, func
+
+from sqlalchemy import UUID, DateTime, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from .base import TenantScopedModel
+
 
 class ListingEvent(TenantScopedModel):
     __tablename__ = "listing_events"

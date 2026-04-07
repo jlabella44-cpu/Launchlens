@@ -1,6 +1,8 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from listingjet.services.post_time_config import BEST_POST_TIMES, get_listing_timezone, find_next_post_window
+
+from listingjet.services.post_time_config import BEST_POST_TIMES, find_next_post_window, get_listing_timezone
+
 
 def test_best_post_times_has_all_platforms():
     assert "instagram" in BEST_POST_TIMES
