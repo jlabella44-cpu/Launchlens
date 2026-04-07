@@ -9,7 +9,7 @@ from listingjet.models.asset import Asset
 from listingjet.models.dollhouse_scene import DollhouseScene
 from listingjet.models.listing import Listing
 from listingjet.models.vision_result import VisionResult
-from listingjet.providers import get_vision_provider
+from listingjet.providers import get_tier2_vision_provider
 from listingjet.services.metrics import record_cost
 
 from .base import AgentContext, BaseAgent
@@ -55,7 +55,7 @@ class FloorplanAgent(BaseAgent):
     agent_name = "floorplan"
 
     def __init__(self, vision_provider=None, session_factory=None):
-        self._vision_provider = vision_provider or get_vision_provider()
+        self._vision_provider = vision_provider or get_tier2_vision_provider()
         self._session_factory = session_factory or AsyncSessionLocal
 
     def _find_floorplan_asset(self, assets: list[Asset]) -> Asset | None:
@@ -143,7 +143,7 @@ class FloorplanAgent(BaseAgent):
                     "room_count": len(scene_rooms),
                 })
 
-        record_cost(self.agent_name, "openai_gpt4v", 1)
+        record_cost(self.agent_name, "qwen_vision", 1)
         return {
             "room_count": len(scene_rooms),
             "scene_id": str(scene.id),

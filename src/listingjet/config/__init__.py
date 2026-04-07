@@ -133,6 +133,10 @@ class Settings(BaseSettings):
     email_enabled: bool = False
     ses_enabled: bool = False
 
+    # DashScope (Qwen)
+    dashscope_api_key: str = ""
+    dashscope_base_url: str = "https://dashscope-us.aliyuncs.com/compatible-mode/v1"
+
     # Video (Kling AI)
     kling_access_key: str = ""
     kling_secret_key: str = ""

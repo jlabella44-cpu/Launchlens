@@ -26,6 +26,18 @@ def get_llm_provider() -> LLMProvider:
     return ClaudeProvider()
 
 
+def get_tier2_vision_provider() -> VisionProvider:
+    """Return the Tier 2 vision provider (Qwen 3.6 Plus via DashScope, or OpenAI fallback)."""
+    if settings.use_mock_providers:
+        from .mock import MockVisionProvider
+        return MockVisionProvider()
+    if settings.dashscope_api_key:
+        from .qwen_vision import QwenVisionProvider
+        return QwenVisionProvider()
+    from .openai_vision import OpenAIVisionProvider
+    return OpenAIVisionProvider()
+
+
 def get_image_edit_provider() -> ImageEditProvider:
     if settings.use_mock_providers:
         from .mock import MockImageEditProvider
