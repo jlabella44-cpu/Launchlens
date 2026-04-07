@@ -33,7 +33,7 @@ async def test_create_listing(async_client: AsyncClient):
     }, headers=_auth(token))
     assert resp.status_code == 201
     body = resp.json()
-    assert body["state"] == "new"
+    assert body["state"] == "draft"
     assert body["address"]["city"] == "Austin"
     assert "id" in body
 
@@ -54,7 +54,7 @@ async def test_list_listings_returns_own(async_client: AsyncClient):
     await async_client.post("/listings", json={
         "address": {"street": "1 A St"}, "metadata": {"beds": 1},
     }, headers=_auth(token))
-    resp = await async_client.get("/listings", headers=_auth(token))
+    resp = await async_client.get("/listings?state=draft", headers=_auth(token))
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["items"]) == 1

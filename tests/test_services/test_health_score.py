@@ -116,6 +116,7 @@ async def test_calculate_content_score_full():
     brand_result = MagicMock()
     brand_result.scalar_one_or_none.return_value = brand_kit
 
+    # Execute call order: social count → brand kit → fha count
     call_count = 0
     async def mock_execute(stmt):
         nonlocal call_count
@@ -123,8 +124,8 @@ async def test_calculate_content_score_full():
         if call_count == 1:
             return social_result  # social count
         elif call_count == 2:
-            return fha_result     # fha count
-        return brand_result       # brand kit
+            return brand_result   # brand kit
+        return fha_result         # fha count
 
     session.execute = mock_execute
 
@@ -159,7 +160,8 @@ async def test_calculate_content_score_minimal():
     brand_result = MagicMock()
     brand_result.scalar_one_or_none.return_value = None
 
-    results = iter([social_result, fha_result, brand_result])
+    # Execute call order: social count → brand kit → fha count
+    results = iter([social_result, brand_result, fha_result])
     session.execute = AsyncMock(side_effect=lambda stmt: next(results))
 
     score, details = await calculate_content_score(session, listing_id, tenant_id)
