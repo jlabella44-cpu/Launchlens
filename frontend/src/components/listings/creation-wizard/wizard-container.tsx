@@ -61,8 +61,10 @@ export function WizardContainer() {
   const [formData, setFormData] = useState<WizardFormData>(INITIAL_FORM_DATA);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
-  const { refresh } = usePlan();
+  const { billingModel, canAffordListing, creditBalance, listingCreditCost, refresh } = usePlan();
   const { toast } = useToast();
+
+  const showCreditWarning = billingModel === "credit" && !canAffordListing;
 
   const updateFormData = useCallback((updates: Partial<WizardFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -100,6 +102,24 @@ export function WizardContainer() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* Insufficient credits warning */}
+      {showCreditWarning && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-800">
+            Insufficient credits ({creditBalance} remaining, {listingCreditCost} needed)
+          </p>
+          <p className="text-xs text-amber-600 mt-1">
+            You can still fill out the details, but you&apos;ll need to purchase credits before submitting.
+          </p>
+          <a
+            href="/billing"
+            className="inline-block mt-2 px-4 py-1.5 rounded-full bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 transition-colors"
+          >
+            Buy Credits
+          </a>
+        </div>
+      )}
+
       {/* Step indicator */}
       <nav className="flex items-center justify-between mb-8">
         {STEPS.map((s) => (

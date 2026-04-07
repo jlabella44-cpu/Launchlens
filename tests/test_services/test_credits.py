@@ -541,3 +541,51 @@ async def test_concurrent_deductions_no_double_spend(test_engine):
         svc = CreditService()
         balance = await svc.get_balance(check_session, tid)
         assert balance.balance == 0, f"Double-spend detected! Balance is {balance.balance}"
+
+
+# --- has_sufficient_credits ---
+
+
+@pytest.mark.asyncio
+async def test_has_sufficient_credits_true(db_session):
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=10)
+    svc = CreditService()
+    assert await svc.has_sufficient_credits(db_session, tid, amount=5) is True
+
+
+@pytest.mark.asyncio
+async def test_has_sufficient_credits_false(db_session):
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=2)
+    svc = CreditService()
+    assert await svc.has_sufficient_credits(db_session, tid, amount=5) is False
+
+
+@pytest.mark.asyncio
+async def test_has_sufficient_credits_no_account_raises(db_session):
+    svc = CreditService()
+    with pytest.raises(ValueError, match="No credit account"):
+        await svc.has_sufficient_credits(db_session, uuid.uuid4(), amount=1)
+
+
+# --- count_transactions ---
+
+
+@pytest.mark.asyncio
+async def test_count_transactions_empty(db_session):
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=10)
+    svc = CreditService()
+    assert await svc.count_transactions(db_session, tid) == 0
+
+
+@pytest.mark.asyncio
+async def test_count_transactions_after_add(db_session):
+    tid = uuid.uuid4()
+    await _create_account(db_session, tid, balance=0)
+    svc = CreditService()
+    await svc.add_credits(db_session, tid, 10, transaction_type="purchase", reference_id=str(uuid.uuid4()))
+    await svc.add_credits(db_session, tid, 5, transaction_type="grant", reference_id=str(uuid.uuid4()))
+    await db_session.flush()
+    assert await svc.count_transactions(db_session, tid) == 2

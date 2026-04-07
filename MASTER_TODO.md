@@ -54,8 +54,8 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] **4 unpushed commits on local master** — decide: PR these or reset to origin
 
 ### Vision Pipeline
-- [ ] **Add per-image logging** to vision agent (log before/after S3 download and Google Vision API call)
-- [ ] **Add timeouts** — per-image download (30s) and per-API-call (30s)
+- [x] **Add per-image logging** — already logging before/after each T1 and T2 analysis with asset ID and proxy status
+- [x] **Add timeouts** — 30s `asyncio.wait_for` per image on both T1 and T2; individual failures logged and skipped
 - [ ] **Build proxy image pipeline** — generate 1024px proxies during ingestion (4x speedup, 90MB → 3MB); plan at `docs/PROXY-IMAGE-PIPELINE.md`
 
 ---
@@ -63,10 +63,10 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ## P2 — Feature Work (Sessions 11–22)
 
 ### Credit System Frontend (Session 11)
-- [ ] Credit system frontend integration
+- [x] Credit system frontend integration — billing page, dashboard balance, plan context, purchase flow all exist; added insufficient-credit warning to listing creation wizard
 
 ### Credit System Tests (Session 12)
-- [ ] Credit service test coverage gaps
+- [x] Credit service test coverage — 27 tests covering deduction, FIFO, dual-pool, rollover, idempotency, concurrency, has_sufficient_credits, count_transactions
 
 ### Registration (Session 13)
 - [ ] Complete registration flow tasks
