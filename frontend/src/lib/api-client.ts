@@ -454,7 +454,10 @@ class ApiClient {
   }
 
   async getCreditTransactions(limit = 50, offset = 0): Promise<CreditTransaction[]> {
-    return this.request<CreditTransaction[]>(`/credits/transactions?limit=${limit}&offset=${offset}`);
+    const data = await this.request<{ items: CreditTransaction[] } | CreditTransaction[]>(
+      `/credits/transactions?limit=${limit}&offset=${offset}`,
+    );
+    return Array.isArray(data) ? data : data.items;
   }
 
   async getCreditPricing(): Promise<{ bundles: CreditBundle[] }> {
@@ -592,7 +595,8 @@ class ApiClient {
   }
 
   async adminTenants(): Promise<AdminTenantResponse[]> {
-    return this.request<AdminTenantResponse[]>("/admin/tenants");
+    const data = await this.request<{ items: AdminTenantResponse[] } | AdminTenantResponse[]>("/admin/tenants");
+    return Array.isArray(data) ? data : data.items;
   }
 
   async adminCreditsSummary(): Promise<CreditSummaryResponse> {

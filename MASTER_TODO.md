@@ -75,12 +75,12 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] Webhook expansion for credit bundle fulfillment
 
 ### Admin Dashboard (Session 15 + Progress Doc)
-- [ ] **Overview tab** — listings by state table, "Attention Required" alert, revenue summary, recent events feed
-- [ ] **Tenants tab** — click tenant → detail panel with edit form, webhook test, user management
-- [ ] **Listings tab** — filters (state, tenant, address search), actions (retry, edit)
-- [ ] **Credits tab** — global credit ledger, tenant credit table
-- [ ] **Audit Log tab** — filters and expandable JSON details
-- [ ] Lint & verify (ruff + TypeScript checks)
+- [x] **Overview tab** — stats, attention alert, revenue summary, recent events feed
+- [x] **Tenants tab** — search, sort, detail panel with edit form, webhook test, user management, credit adjustment
+- [x] **Listings tab** — state filter, address search, pagination, retry/edit actions
+- [x] **Credits tab** — global credit summary, tenant credit table with adjustment
+- [x] **Audit Log tab** — action/resource filters, expandable JSON details
+- [x] Lint & verify (ruff + TypeScript checks) — both pass clean
 
 ### E2E Tests (Session 16)
 - [ ] Integration test cases (run after sessions 11–15 are merged)
@@ -126,12 +126,12 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] Blanket per-agent grant (Phase B) — `deps_permissions.py:50`
 
 ### Frontend Remaining Pages
-- [ ] Demo dropzone page
-- [ ] Pricing page
-- [ ] Export download page
-- [ ] Video player
-- [ ] Video upload
-- [ ] Social preview cards
+- [x] Demo dropzone page — `src/app/demo/page.tsx` (drag-drop, file validation, upload progress)
+- [x] Pricing page — `src/app/pricing/page.tsx` (4 tiers, credit calculator, Stripe checkout)
+- [x] Export download page — `src/app/listings/[id]/export/page.tsx` (MLS/Marketing toggle, bundle download)
+- [x] Video player — `src/components/listings/video-player.tsx` (HLS/MP4, chapter navigation)
+- [x] Video upload — `src/components/listings/video-upload.tsx` (S3 key registration form)
+- [x] Social preview cards — `src/components/listings/social-preview.tsx` (Instagram/TikTok/FB/YT cuts)
 
 ---
 
