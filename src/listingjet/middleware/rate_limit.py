@@ -81,7 +81,12 @@ class APIRateLimitMiddleware:
             return await call_next(request)
 
         if self._limiter is None:
-            return await call_next(request)
+            logger.warning("rate_limit.redis_unavailable — denying request path=%s", request.url.path)
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Service temporarily unavailable. Please try again shortly."},
+                headers={"Retry-After": "30"},
+            )
 
         # Determine rate limit key
         tenant_id = getattr(request.state, "tenant_id", None)
@@ -94,8 +99,12 @@ class APIRateLimitMiddleware:
         try:
             allowed, remaining = self._limiter.acquire_with_remaining(key=key, cost=1)
         except Exception:
-            # Redis error — fail open
-            return await call_next(request)
+            logger.warning("rate_limit.redis_error — denying request path=%s", request.url.path)
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Service temporarily unavailable. Please try again shortly."},
+                headers={"Retry-After": "30"},
+            )
 
         capacity = _TENANT_CAPACITY if tenant_id else _PUBLIC_CAPACITY
 
