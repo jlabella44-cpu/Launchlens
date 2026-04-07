@@ -839,6 +839,63 @@ class ApiClient {
     if (error) throw this._toError(error);
     return data as any;
   }
+
+  // Listing Events
+  async createListingEvent(listingId: string, eventType: string, eventData: Record<string, any> = {}): Promise<any> {
+    return this.request<any>(`/listings/${listingId}/events`, {
+      method: "POST",
+      body: JSON.stringify({ event_type: eventType, event_data: eventData }),
+    });
+  }
+
+  async getListingEvents(listingId: string): Promise<any[]> {
+    return this.request<any[]>(`/listings/${listingId}/events`);
+  }
+
+  async markEventPosted(listingId: string, eventId: string, platform: string): Promise<any> {
+    return this.request<any>(`/listings/${listingId}/events/${eventId}/posted`, {
+      method: "PATCH",
+      body: JSON.stringify({ platform }),
+    });
+  }
+
+  // Notifications
+  async getNotifications(unread: boolean = false): Promise<any[]> {
+    return this.request<any[]>(`/notifications?unread=${unread}`);
+  }
+
+  async markNotificationRead(notificationId: string): Promise<any> {
+    return this.request<any>(`/notifications/${notificationId}/read`, { method: "PATCH" });
+  }
+
+  async markAllNotificationsRead(): Promise<any> {
+    return this.request<any>("/notifications/read-all", { method: "PATCH" });
+  }
+
+  // Social Accounts
+  async getSocialAccounts(): Promise<any[]> {
+    return this.request<any[]>("/social-accounts");
+  }
+
+  async saveSocialAccount(platform: string, platformUsername: string): Promise<any> {
+    return this.request<any>("/social-accounts", {
+      method: "POST",
+      body: JSON.stringify({ platform, platform_username: platformUsername }),
+    });
+  }
+
+  async deleteSocialAccount(accountId: string): Promise<void> {
+    return this.request<void>(`/social-accounts/${accountId}`, { method: "DELETE" });
+  }
+
+  // Social Content
+  async getSocialContent(listingId: string): Promise<any> {
+    return this.request<any>(`/listings/${listingId}/social-content`);
+  }
+
+  async getVideoSocialCuts(listingId: string): Promise<any[]> {
+    return this.getSocialCuts(listingId);
+  }
 }
 
 export const apiClient = new ApiClient();
