@@ -14,7 +14,8 @@ async def _register_admin(client: AsyncClient) -> tuple[str, str]:
     from tests.conftest import promote_to_superadmin
     email = f"admin-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "AdminPass1!", "name": "Admin", "company_name": "AdminCo"
+        "email": email, "password": "AdminPass1!", "name": "Admin", "company_name": "AdminCo",
+        "plan_tier": "free",
     })
     token = resp.json()["access_token"]
     await promote_to_superadmin(client, token)

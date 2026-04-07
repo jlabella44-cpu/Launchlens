@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-qwen-vis-001",
+  "object": "chat.completion",
+  "created": 1712361600,
+  "model": "qwen3.6-plus",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"labels\": [{\"name\": \"kitchen\", \"confidence\": 0.98, \"category\": \"room\"}, {\"name\": \"granite countertops\", \"confidence\": 0.92, \"category\": \"feature\"}, {\"name\": \"wide angle\", \"confidence\": 0.88, \"category\": \"shot_type\"}, {\"name\": \"natural light\", \"confidence\": 0.85, \"category\": \"quality\"}]}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 620, "completion_tokens": 72, "total_tokens": 692}
+}

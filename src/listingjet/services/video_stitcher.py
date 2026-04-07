@@ -30,6 +30,11 @@ class VideoStitcher:
             with open(clip_paths[0], "rb") as f:
                 return f.read()
 
+        # Hard-cut path: when all transitions are "cut" (or none provided),
+        # re-encode via concat filter for uniform output (clips may differ in codec/res).
+        if not transitions or all(t == "cut" for t in transitions):
+            return self._stitch_hard_cuts(clip_paths, output_width, output_height)
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "output.mp4")
 
@@ -79,6 +84,47 @@ class VideoStitcher:
             cmd.extend([output_path])
 
             subprocess.run(cmd, capture_output=True, check=True)
+
+            with open(output_path, "rb") as f:
+                return f.read()
+
+    def _stitch_hard_cuts(
+        self,
+        clip_paths: list[str],
+        output_width: int,
+        output_height: int,
+    ) -> bytes:
+        """Stitch clips with hard cuts via two-pass approach.
+
+        Pass 1: Normalize each clip to uniform resolution/fps/codec (one at a time).
+        Pass 2: Concat demuxer joins normalized files (stream-copy, near-zero memory).
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Pass 1: normalize each clip individually
+            normalized = []
+            for i, clip in enumerate(clip_paths):
+                norm_path = os.path.join(tmpdir, f"norm_{i}.mp4")
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", clip,
+                    "-vf", f"scale={output_width}:{output_height}:force_original_aspect_ratio=decrease,"
+                           f"pad={output_width}:{output_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                    "-pix_fmt", "yuv420p", "-an",
+                    norm_path,
+                ], capture_output=True, check=True)
+                normalized.append(norm_path)
+
+            # Pass 2: concat demuxer (stream-copy, minimal memory)
+            concat_list = os.path.join(tmpdir, "concat.txt")
+            with open(concat_list, "w") as f:
+                for path in normalized:
+                    f.write(f"file '{path}'\n")
+
+            output_path = os.path.join(tmpdir, "output.mp4")
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                "-i", concat_list, "-c", "copy", output_path,
+            ], capture_output=True, check=True)
 
             with open(output_path, "rb") as f:
                 return f.read()

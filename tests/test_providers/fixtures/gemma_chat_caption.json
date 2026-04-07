@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-gemma-001",
+  "object": "chat.completion",
+  "created": 1712361600,
+  "model": "gemma-4-31b-it",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Welcome home. Sunlit living, chef's kitchen, and a backyard built for weekends. #JustListed #DreamHome"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 88, "completion_tokens": 24, "total_tokens": 112}
+}

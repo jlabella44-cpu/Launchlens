@@ -27,6 +27,7 @@ with workflow.unsafe.imports_passed_through():
         run_vision_tier1,
         run_vision_tier2,
     )
+    from listingjet.activities.social_event import run_social_event
     from listingjet.agents.base import AgentContext
 
 
@@ -54,7 +55,7 @@ class ListingPipeline:
     |                                                               |
     |              [wait for human_review_completed]                 |
     |                                                               |
-    |  Content -> [Brand + Social (plan-gated)] -> MLS Export       |
+    |  Content -> [Brand + Social (always)] -> MLS Export           |
     |          -> Distribution                                      |
     +---------------------------------------------------------------+
     """
@@ -125,12 +126,16 @@ class ListingPipeline:
         if input.billing_model == "credit" and "ai_video_tour" not in addons:
             run_video_step = False
 
-        video_task = None
+        # Build parallel tasks: video generation + human review wait
+        parallel = []
+
         if run_video_step:
-            video_task = workflow.execute_activity(
-                run_video, ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=_DEFAULT_RETRY,
+            parallel.append(
+                workflow.execute_activity(
+                    run_video, ctx,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    retry_policy=_DEFAULT_RETRY,
+                )
             )
 
         # Skip review wait if auto-approved by packaging agent
@@ -139,15 +144,14 @@ class ListingPipeline:
             and packaging_result.get("auto_approved") is True
         )
         if not auto_approved:
-            # Wait for human review (listing is now AWAITING_REVIEW)
-            await workflow.wait_condition(lambda: self._review_completed)
+            parallel.append(workflow.wait_condition(lambda: self._review_completed))
 
-        # Collect video result (may already be done) — don't block pipeline on failure
-        if video_task:
-            try:
-                await video_task
-            except Exception as exc:
-                workflow.logger.warning("video_task_failed listing=%s error=%s", input.listing_id, exc)
+        # Run video + review wait concurrently; don't fail pipeline on video errors
+        if parallel:
+            results = await asyncio.gather(*parallel, return_exceptions=True)
+            for r in results:
+                if isinstance(r, Exception):
+                    workflow.logger.warning("parallel_task_failed listing=%s error=%s", input.listing_id, r)
 
         # Phase 2: Post-approval pipeline
         # Step 1: Content (dual-tone)
@@ -157,27 +161,19 @@ class ListingPipeline:
             retry_policy=_DEFAULT_RETRY,
         )
 
-        # Step 2: Brand + Social in parallel (social is plan-gated)
+        # Step 2: Brand + Social in parallel (social ALWAYS runs — included in base)
         parallel_tasks = [
             workflow.execute_activity(
                 run_brand, ctx,
                 start_to_close_timeout=_DEFAULT_TIMEOUT,
                 retry_policy=_DEFAULT_RETRY,
-            )
+            ),
+            workflow.execute_activity(
+                run_social_content, ctx,
+                start_to_close_timeout=_DEFAULT_TIMEOUT,
+                retry_policy=_DEFAULT_RETRY,
+            ),
         ]
-        # Social content: plan-gated for legacy, addon-gated for credit users
-        run_social = (
-            (input.billing_model == "credit" and "social_content_pack" in addons)
-            or (input.billing_model != "credit" and input.plan in ("pro", "enterprise"))
-        )
-        if run_social:
-            parallel_tasks.append(
-                workflow.execute_activity(
-                    run_social_content, ctx,
-                    start_to_close_timeout=_DEFAULT_TIMEOUT,
-                    retry_policy=_DEFAULT_RETRY,
-                )
-            )
         results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
         brand_result = results[0]
         if isinstance(brand_result, BaseException):
@@ -198,8 +194,9 @@ class ListingPipeline:
         )
 
         # Step 3: MLS Export (builds both bundles)
+        from listingjet.activities.pipeline import MLSExportParams
         await workflow.execute_activity(
-            run_mls_export, ctx, content_result, flyer_key,
+            run_mls_export, MLSExportParams(ctx, content_result, flyer_key),
             start_to_close_timeout=timedelta(minutes=15),
             retry_policy=_DEFAULT_RETRY,
         )
@@ -228,7 +225,17 @@ class ListingPipeline:
             retry_policy=_DEFAULT_RETRY,
         )
 
-        # Step 7: Calculate health score (non-blocking)
+        # Step 7: Create social event for reminders (non-blocking)
+        try:
+            await workflow.execute_activity(
+                run_social_event, ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except Exception as exc:
+            workflow.logger.warning("social_event_failed listing=%s error=%s", input.listing_id, exc)
+
+        # Step 8: Calculate health score (non-blocking)
         try:
             await workflow.execute_activity(
                 run_health_score, ctx,

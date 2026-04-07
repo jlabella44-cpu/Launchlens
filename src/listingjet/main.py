@@ -9,6 +9,7 @@ from listingjet.api import (
     addons,
     admin_dashboard,
     admin_listings,
+    admin_providers,
     admin_tenants,
     admin_users,
     analytics,
@@ -23,13 +24,18 @@ from listingjet.api import (
     health,
     help_agent,
     image_edit,
+    launch,
+    listing_events,
     listing_health,
     listing_permissions,
     listings_core,
+    listings_draft,
     listings_media,
     listings_workflow,
     microsite,
+    notifications,
     properties,
+    social_accounts,
     sse,
     support,
     team,
@@ -155,12 +161,14 @@ def create_app() -> FastAPI:
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
     app.include_router(listings_core.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_draft.router, prefix="/listings", tags=["listings-draft"])
     app.include_router(listings_workflow.router, prefix="/listings", tags=["listings"])
     app.include_router(listings_media.router, prefix="/listings", tags=["listings"])
     app.include_router(admin_dashboard.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_tenants.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_users.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_listings.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_providers.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
@@ -176,6 +184,10 @@ def create_app() -> FastAPI:
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
     app.include_router(support.router, prefix="/support", tags=["support"])
+    app.include_router(listing_events.router, prefix="/listings", tags=["listing-events"])
+    app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+    app.include_router(social_accounts.router, prefix="/social-accounts", tags=["social-accounts"])
+    app.include_router(launch.router, tags=["launch"])
     app.include_router(listing_health.router, tags=["listing-health"])
     app.include_router(health.router)
 

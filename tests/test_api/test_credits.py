@@ -12,7 +12,8 @@ from listingjet.config import settings
 async def _register(client: AsyncClient) -> tuple[str, str]:
     email = f"credit-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "CreditTester", "company_name": "CreditCo"
+        "email": email, "password": "TestPass1!", "name": "CreditTester", "company_name": "CreditCo",
+        "plan_tier": "free",
     })
     token = resp.json()["access_token"]
     payload = pyjwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
@@ -104,7 +105,7 @@ async def test_get_pricing(async_client: AsyncClient):
     assert "bundles" in body
     assert len(body["bundles"]) == 4
     sizes = [b["size"] for b in body["bundles"]]
-    assert sizes == [5, 10, 25, 50]
+    assert sizes == [25, 50, 100, 250]
 
 
 # --- POST /credits/purchase ---
@@ -114,7 +115,7 @@ async def test_get_pricing(async_client: AsyncClient):
 async def test_purchase_invalid_bundle_size(async_client: AsyncClient):
     token, _ = await _register(async_client)
     resp = await async_client.post("/credits/purchase", json={
-        "bundle_size": 99, "success_url": "https://example.com/ok", "cancel_url": "https://example.com/cancel"
+        "bundle_size": 999, "success_url": "https://example.com/ok", "cancel_url": "https://example.com/cancel"
     }, headers=_auth(token))
     assert resp.status_code == 400
     assert "Invalid bundle size" in resp.json()["detail"]
@@ -125,9 +126,9 @@ async def test_purchase_not_configured(async_client: AsyncClient):
     """When Stripe price IDs aren't configured, returns 501."""
     token, _ = await _register(async_client)
     resp = await async_client.post("/credits/purchase", json={
-        "bundle_size": 5, "success_url": "https://example.com/ok", "cancel_url": "https://example.com/cancel"
+        "bundle_size": 25, "success_url": "https://example.com/ok", "cancel_url": "https://example.com/cancel"
     }, headers=_auth(token))
-    # Config has empty stripe_price_credit_bundle_5, so should be 501
+    # Config has empty stripe price for bundles, so should be 501
     assert resp.status_code == 501
 
 
@@ -140,7 +141,7 @@ async def test_purchase_creates_checkout(async_client: AsyncClient, monkeypatch)
     mock_session.url = "https://checkout.stripe.com/test"
 
     # Monkeypatch the settings attribute so getattr(settings, ...) returns a real price ID
-    monkeypatch.setattr(settings, "stripe_price_credit_bundle_5", "price_test_5")
+    monkeypatch.setattr(settings, "stripe_price_credit_bundle_free_25", "price_test_25")
 
     with (
         patch("stripe.checkout.Session.create", return_value=mock_session),
@@ -148,7 +149,7 @@ async def test_purchase_creates_checkout(async_client: AsyncClient, monkeypatch)
     ):
         mock_billing_cls.return_value.create_customer.return_value = "cus_test_123"
         resp = await async_client.post("/credits/purchase", json={
-            "bundle_size": 5,
+            "bundle_size": 25,
             "success_url": "https://example.com/ok",
             "cancel_url": "https://example.com/cancel",
         }, headers=_auth(token))

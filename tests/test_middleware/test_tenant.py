@@ -9,7 +9,8 @@ async def _register(client: AsyncClient) -> str:
     """Register a user, return token."""
     email = f"test-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={
-        "email": email, "password": "TestPass1!", "name": "Tester", "company_name": "TestCo"
+        "email": email, "password": "TestPass1!", "name": "Tester", "company_name": "TestCo",
+        "plan_tier": "free",
     })
     return resp.json()["access_token"]
 

@@ -1,4 +1,29 @@
 PLAN_LIMITS: dict[str, dict] = {
+    "free": {
+        "max_listings_per_month": 5,
+        "max_assets_per_listing": 25,
+        "tier2_vision": False,
+        "social_content": False,
+    },
+    "lite": {
+        "max_listings_per_month": 25,
+        "max_assets_per_listing": 50,
+        "tier2_vision": True,
+        "social_content": False,
+    },
+    "active_agent": {
+        "max_listings_per_month": 75,
+        "max_assets_per_listing": 50,
+        "tier2_vision": True,
+        "social_content": True,
+    },
+    "team": {
+        "max_listings_per_month": 999999,
+        "max_assets_per_listing": 100,
+        "tier2_vision": True,
+        "social_content": True,
+    },
+    # Legacy aliases
     "starter": {
         "max_listings_per_month": 5,
         "max_assets_per_listing": 25,
@@ -13,7 +38,7 @@ PLAN_LIMITS: dict[str, dict] = {
         "health_market_signal": False,
     },
     "pro": {
-        "max_listings_per_month": 50,
+        "max_listings_per_month": 75,
         "max_assets_per_listing": 50,
         "tier2_vision": True,
         "social_content": True,
@@ -26,7 +51,7 @@ PLAN_LIMITS: dict[str, dict] = {
         "health_market_signal": False,
     },
     "enterprise": {
-        "max_listings_per_month": 500,
+        "max_listings_per_month": 999999,
         "max_assets_per_listing": 100,
         "tier2_vision": True,
         "social_content": True,
@@ -42,7 +67,7 @@ PLAN_LIMITS: dict[str, dict] = {
 
 
 def get_limits(plan: str) -> dict:
-    return PLAN_LIMITS.get(plan, PLAN_LIMITS["starter"])
+    return PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
 
 
 def check_listing_quota(plan: str, current_count: int) -> bool:

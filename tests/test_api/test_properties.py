@@ -16,7 +16,8 @@ from listingjet.api.schemas.properties import (
 async def _register(client: AsyncClient) -> str:
     resp = await client.post("/auth/register", json={
         "email": f"prop-{uuid.uuid4()}@example.com",
-        "password": "TestPass1!", "name": "PropTester", "company_name": "PropCo"
+        "password": "TestPass1!", "name": "PropTester", "company_name": "PropCo",
+        "plan_tier": "free",
     })
     return resp.json()["access_token"]
 

@@ -73,10 +73,17 @@ async def run_social_content(context: AgentContext) -> dict:
     return await SocialContentAgent().instrumented_execute(context)
 
 
+@dataclasses.dataclass
+class MLSExportParams:
+    context: AgentContext
+    content_result: dict
+    flyer_s3_key: str | None = None
+
+
 @activity.defn
-async def run_mls_export(context: AgentContext, content_result: dict, flyer_s3_key: str | None) -> dict:
+async def run_mls_export(params: MLSExportParams) -> dict:
     from listingjet.agents.mls_export import MLSExportAgent
-    return await MLSExportAgent(content_result=content_result, flyer_s3_key=flyer_s3_key).instrumented_execute(context)
+    return await MLSExportAgent(content_result=params.content_result, flyer_s3_key=params.flyer_s3_key).instrumented_execute(params.context)
 
 
 @activity.defn
@@ -231,6 +238,9 @@ async def run_microsite_generator(context: AgentContext) -> dict:
     return await MicrositeGeneratorAgent().instrumented_execute(context)
 
 
+from listingjet.activities.social_event import run_social_event  # noqa: E402, I001
+
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
@@ -239,4 +249,5 @@ ALL_ACTIVITIES = [
     run_video, run_chapters, run_social_cuts, run_learning,
     run_link_import, run_property_verification,
     run_health_score, run_virtual_staging, run_cma_report, run_microsite_generator,
+    run_social_event,
 ]

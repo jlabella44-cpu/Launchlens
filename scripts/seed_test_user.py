@@ -60,13 +60,13 @@ async def main():
             tenant = Tenant(
                 id=tenant_id,
                 name=COMPANY,
-                plan="pro",
+                plan="active_agent",
                 plan_tier="active_agent",
                 billing_model="credit",
-                per_listing_credit_cost=1,
-                credit_balance=50,
-                included_credits=50,
-                rollover_cap=25,
+                per_listing_credit_cost=12,
+                credit_balance=75,
+                included_credits=75,
+                rollover_cap=50,
             )
             session.add(tenant)
             await session.flush()
@@ -74,8 +74,10 @@ async def main():
             credit_account = CreditAccount(
                 id=uuid.uuid4(),
                 tenant_id=tenant_id,
-                balance=50,
-                rollover_cap=25,
+                balance=75,
+                granted_balance=75,
+                purchased_balance=0,
+                rollover_cap=50,
             )
             session.add(credit_account)
             print(f"Created tenant: {COMPANY} ({tenant_id})")

@@ -74,7 +74,7 @@ class VisionAgent(BaseAgent):
     agent_name = "vision"
 
     def __init__(self, vision_provider=None, session_factory=None):
-        self._vision_provider = vision_provider or get_vision_provider()
+        self._vision_provider = vision_provider or get_vision_provider(agent=self.agent_name)
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def run_tier1(self, context: AgentContext) -> int:

@@ -11,13 +11,23 @@ def test_kling_provider_exists():
 
 
 def test_video_prompts_exist():
-    from listingjet.agents.video_prompts import NEGATIVE_PROMPT, ROOM_CAMERA_CONTROLS, ROOM_PROMPTS
+    from listingjet.agents.video_template import NEGATIVE_PROMPT, ROOM_CAMERA_CONTROLS, ROOM_PROMPTS
     assert "kitchen" in ROOM_PROMPTS
     assert "living_room" in ROOM_PROMPTS
     assert "exterior" in ROOM_PROMPTS
     assert "kitchen" in ROOM_CAMERA_CONTROLS
     assert "zoom" in ROOM_CAMERA_CONTROLS["kitchen"]
     assert len(NEGATIVE_PROMPT) > 0
+
+
+def test_standard_60s_template():
+    from listingjet.agents.video_template import STANDARD_60S
+    assert STANDARD_60S.name == "standard_60s"
+    assert STANDARD_60S.clip_duration_s == 5
+    assert STANDARD_60S.clip_count == 12
+    assert STANDARD_60S.kling_model == "kling-v2-5-turbo"
+    assert STANDARD_60S.kling_mode == "pro"
+    assert STANDARD_60S.transition == "cut"
 
 
 def test_kling_jwt_generation():

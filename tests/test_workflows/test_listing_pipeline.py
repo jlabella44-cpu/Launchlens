@@ -53,3 +53,12 @@ def test_pipeline_has_retry_policy():
     source = open(listing_pipeline.__file__).read()
     assert "RetryPolicy" in source
     assert "start_to_close_timeout" in source
+
+
+def test_social_content_always_included():
+    """Social content should always run regardless of billing model or addons."""
+    import inspect
+
+    from listingjet.workflows.listing_pipeline import ListingPipeline
+    source = inspect.getsource(ListingPipeline.run)
+    assert "social_content_pack" not in source, "social_content should no longer be addon-gated"

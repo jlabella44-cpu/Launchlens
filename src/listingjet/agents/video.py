@@ -1,6 +1,4 @@
-"""VideoAgent — generates AI property tour videos from listing photos via Kling.
-Ported from Juke Marketing Engine with adaptations for ListingJet pipeline.
-"""
+"""VideoAgent — generates AI property tour videos from listing photos via Kling 2.5 Turbo."""
 
 import asyncio
 import logging
@@ -10,12 +8,14 @@ import tempfile
 import httpx
 from sqlalchemy import select
 
-from listingjet.agents.video_prompts import (
+from listingjet.agents.video_template import (
+    DRONE_ROOMS,
+    EXTERIOR_ROOMS,
     NEGATIVE_PROMPT,
-    SLOT_ORDER,
+    STANDARD_60S,
+    VideoTemplate,
     get_camera_control,
     get_prompt_for_room,
-    get_transition,
 )
 from listingjet.config import settings
 from listingjet.database import AsyncSessionLocal
@@ -24,7 +24,6 @@ from listingjet.models.listing import Listing
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
-from listingjet.providers.elevenlabs import get_voiceover_provider
 from listingjet.providers.kling import KlingProvider
 from listingjet.services.endcard import ENDCARD_DURATION, generate_endcard
 from listingjet.services.metrics import record_cost
@@ -45,12 +44,13 @@ class VideoAgent(BaseAgent):
         storage_service=None,
         video_stitcher=None,
         session_factory=None,
+        template: VideoTemplate = STANDARD_60S,
     ):
         self._kling = kling_provider or KlingProvider()
         self._storage = storage_service or StorageService()
         self._stitcher = video_stitcher or VideoStitcher()
         self._session_factory = session_factory or AsyncSessionLocal
-        self._max_photos = settings.video_max_photos
+        self._template = template
         self._score_floor = settings.video_score_floor
         self._semaphore = asyncio.Semaphore(3)  # max 3 concurrent Kling calls
 
@@ -72,21 +72,35 @@ class VideoAgent(BaseAgent):
                 if not selections:
                     return {"skipped": True, "reason": "No package selections"}
 
-                # Select photos for video using slot priority
+                # Select 12 photos using template slot algorithm
                 selected = self._select_photos(selections)
                 if not selected:
                     return {"skipped": True, "reason": "No photos above score floor"}
 
                 # Generate clips via Kling
-                clip_urls = await self._generate_clips(selected, listing.metadata_)
+                clip_results = await self._generate_clips(selected, listing.metadata_)
 
-                # Filter out failed clips
-                successful = [(s, url) for s, url in zip(selected, clip_urls) if url]
+                # Filter out failed clips (poll_task returns dict or None)
+                successful = [(s, r) for s, r in zip(selected, clip_results) if r]
                 if not successful:
                     return {"status": "failed", "reason": "All clips failed to generate"}
 
+                total_credits = sum(
+                    float(r.get("credits") or 0) for _, r in successful
+                )
+                logger.info(
+                    "video_clips_generated listing=%s clips=%d/%d credits=%.1f",
+                    listing_id, len(successful), self._template.clip_count, total_credits,
+                )
+
+                if len(successful) < self._template.clip_count:
+                    logger.warning(
+                        "video_clip_count_short listing=%s expected=%d actual=%d",
+                        listing_id, self._template.clip_count, len(successful),
+                    )
+
                 # Download clips to temp files
-                clip_paths = await self._download_clips([url for _, url in successful])
+                clip_paths = await self._download_clips([r["url"] for _, r in successful])
 
                 # Generate branded end-card from tenant's BrandKit
                 from listingjet.models.brand_kit import BrandKit
@@ -108,14 +122,9 @@ class VideoAgent(BaseAgent):
                         if endcard_path:
                             clip_paths.append(endcard_path)
 
-                # Stitch into final video (includes end-card if generated)
-                transitions = [get_transition(i, len(successful)) for i in range(len(successful))]
-                if endcard_path:
-                    transitions.append("fade")  # Fade into end-card
+                # Stitch into final video with hard cuts (silent MP4)
+                transitions = [self._template.transition] * len(clip_paths)
                 video_bytes = self._stitcher.stitch(clip_paths, transitions)
-
-                # Generate voiceover narration from listing description
-                video_bytes = await self._add_voiceover(video_bytes, listing)
 
                 # Upload to S3
                 s3_key = self._storage.upload_bytes(
@@ -130,7 +139,7 @@ class VideoAgent(BaseAgent):
                     listing_id=listing_id,
                     s3_key=s3_key,
                     video_type="ai_generated",
-                    duration_seconds=len(successful) * settings.video_clip_duration,
+                    duration_seconds=len(successful) * self._template.clip_duration_s,
                     status="ready",
                     clip_count=len(successful),
                 )
@@ -140,6 +149,7 @@ class VideoAgent(BaseAgent):
                     "listing_id": str(listing_id),
                     "video_type": "ai_generated",
                     "clip_count": len(successful),
+                    "total_credits": total_credits,
                     "s3_key": s3_key,
                 })
 
@@ -159,46 +169,132 @@ class VideoAgent(BaseAgent):
         }
 
     def _select_photos(self, selections) -> list[tuple]:
-        """Select up to max_photos using slot priority order."""
-        # Build lookup: room_label → best (selection, asset, vision_result)
-        by_room: dict[str, tuple] = {}
+        """Fill exactly template.clip_count positions.
+
+        Position layout:
+          1      = front exterior (best)
+          2      = drone OR second-best exterior
+          3..N-1 = interiors, score-descending (best up front, lowest in back half)
+          N      = drone OR exterior_rear OR repeat exterior
+
+        If the package has fewer unique photos than clip_count, pad by repeating
+        the highest-scored photos.
+        """
+        total = self._template.clip_count
+
+        # Bucket photos by room category, each sorted by score desc
+        drones: list[tuple] = []
+        exteriors: list[tuple] = []
+        interiors: list[tuple] = []
         for ps, asset, vr in selections:
             room = vr.room_label if vr else "unknown"
-            score = vr.quality_score / 100.0 if vr else 0
-            # Keep highest-scored per room
-            if room not in by_room or score > (by_room[room][2].quality_score / 100.0 if by_room[room][2] else 0):
-                by_room[room] = (ps, asset, vr)
+            score = vr.quality_score / 100.0 if vr else 0.0
+            entry = (ps, asset, vr, score)
+            if room in DRONE_ROOMS:
+                drones.append(entry)
+            elif room in EXTERIOR_ROOMS:
+                exteriors.append(entry)
+            else:
+                interiors.append(entry)
 
-        # Select in slot order
-        selected = []
-        for room in SLOT_ORDER:
-            if room in by_room and len(selected) < self._max_photos:
-                _, asset, vr = by_room[room]
-                score = vr.quality_score / 100.0 if vr else 0
-                # Drone and exterior bypass score floor
-                if room in ("drone", "exterior") or score >= self._score_floor:
-                    selected.append(by_room[room])
-        return selected
+        drones.sort(key=lambda e: e[3], reverse=True)
+        exteriors.sort(key=lambda e: e[3], reverse=True)
+        interiors.sort(key=lambda e: e[3], reverse=True)
 
-    async def _generate_clips(self, selected, metadata) -> list[str | None]:
-        """Generate Kling clips concurrently with rate limiting."""
+        # All photos pooled and score-sorted — used as the padding reservoir
+        all_photos = sorted(
+            drones + exteriors + interiors,
+            key=lambda e: e[3],
+            reverse=True,
+        )
+        if not all_photos:
+            return []
+
+        def pop_or_pad(bucket: list, fallback: list) -> tuple:
+            if bucket:
+                return bucket.pop(0)
+            if fallback:
+                return fallback[0]  # peek — don't consume the reservoir
+            return all_photos[0]
+
+        positions: list[tuple] = [None] * total  # type: ignore
+
+        # Position 1: best exterior (fallback: best photo overall)
+        positions[0] = pop_or_pad(exteriors, all_photos)
+
+        # Position N (last): best drone, else next exterior, else repeat exterior
+        if drones:
+            positions[total - 1] = drones.pop(0)
+        elif exteriors:
+            positions[total - 1] = exteriors.pop(0)
+        else:
+            positions[total - 1] = positions[0]
+
+        # Position 2: next drone, else next exterior, else best interior
+        if drones:
+            positions[1] = drones.pop(0)
+        elif exteriors:
+            positions[1] = exteriors.pop(0)
+        elif interiors:
+            positions[1] = interiors[0]
+        else:
+            positions[1] = positions[0]
+
+        # Positions 3..N-1 (interior slots, score-descending)
+        interior_slots = total - 3  # positions[2] .. positions[total-2]
+        interior_pool = list(interiors)  # already score-sorted desc
+        for i in range(interior_slots):
+            slot_idx = 2 + i
+            if interior_pool:
+                positions[slot_idx] = interior_pool.pop(0)
+            else:
+                # Pad with highest-scored interior if we have any; else best photo
+                if interiors:
+                    positions[slot_idx] = interiors[0]
+                else:
+                    # No interiors at all — pad from all_photos, avoiding adjacent duplicates
+                    positions[slot_idx] = self._pad_pick(all_photos, positions, slot_idx)
+
+        # Strip the (ps, asset, vr, score) score element for downstream compatibility
+        return [(ps, asset, vr) for (ps, asset, vr, _score) in positions]
+
+    def _pad_pick(self, pool: list, positions: list, slot_idx: int) -> tuple:
+        """Pick a padding photo from pool, avoiding exact duplicate of neighbor if possible."""
+        prev = positions[slot_idx - 1] if slot_idx > 0 else None
+        prev_asset_id = prev[1].id if prev else None
+        for entry in pool:
+            if entry[1].id != prev_asset_id:
+                return entry
+        return pool[0]
+
+    async def _generate_clips(self, selected, metadata) -> list[dict | None]:
+        """Generate Kling clips concurrently with rate limiting.
+
+        Returns list of dicts {url, duration, credits} or None for failed clips.
+        """
         async def generate_one(index, ps, asset, vr):
             room = vr.room_label if vr else "living_room"
             prompt = get_prompt_for_room(room, metadata)
             camera = get_camera_control(room)
+
+            # Convert S3 key to presigned URL for Kling API
+            image_url = self._storage.presigned_url(asset.file_path)
 
             async with self._semaphore:
                 if index > 0:
                     await asyncio.sleep(3)  # Stagger to avoid rate limits
                 try:
                     task_id = await self._kling.generate_clip(
-                        image_url=asset.file_path,
+                        image_url=image_url,
                         prompt=prompt,
                         negative_prompt=NEGATIVE_PROMPT,
                         camera_control=camera,
+                        duration=self._template.clip_duration_s,
+                        mode=self._template.kling_mode,
+                        model_name=self._template.kling_model,
                     )
-                    url = await self._kling.poll_task(task_id)
-                    return url
+                    result = await self._kling.poll_task(task_id)
+                    return result
                 except Exception as exc:
                     logger.warning(
                         "video_clip_failed room=%s asset=%s error=%s",
@@ -220,72 +316,6 @@ class VideoAgent(BaseAgent):
                     f.write(resp.content)
                 paths.append(path)
         return paths
-
-    async def _add_voiceover(self, video_bytes: bytes, listing) -> bytes:
-        """Generate voiceover from listing description and overlay on video.
-
-        Returns original video bytes if voiceover generation fails or is unavailable.
-        """
-        import subprocess
-
-        voiceover = get_voiceover_provider()
-        description = (listing.metadata_ or {}).get("description", "")
-        if not description:
-            # Try to build a basic description from metadata
-            meta = listing.metadata_ or {}
-            addr = listing.address or {}
-            parts = []
-            if addr.get("street"):
-                parts.append(f"Welcome to {addr['street']}.")
-            if meta.get("beds") and meta.get("baths"):
-                parts.append(f"This {meta['beds']} bedroom, {meta['baths']} bathroom home")
-            if meta.get("sqft"):
-                parts.append(f"offers {meta['sqft']:,} square feet of living space.")
-            description = " ".join(parts) if parts else ""
-
-        if not description:
-            return video_bytes
-
-        try:
-            audio_bytes = await voiceover.synthesize(description)
-            if not audio_bytes:
-                return video_bytes
-
-            # Write video + audio to temp files, merge with ffmpeg
-            video_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_vo_in_", delete=False)
-            audio_fd = tempfile.NamedTemporaryFile(suffix=".mp3", prefix="listingjet_vo_audio_", delete=False)
-            output_fd = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="listingjet_vo_out_", delete=False)
-            video_path = video_fd.name
-            video_fd.close()
-            audio_path = audio_fd.name
-            audio_fd.close()
-            output_path = output_fd.name
-            output_fd.close()
-
-            with open(video_path, "wb") as f:
-                f.write(video_bytes)
-            with open(audio_path, "wb") as f:
-                f.write(audio_bytes)
-
-            subprocess.run([
-                "ffmpeg", "-i", video_path, "-i", audio_path,
-                "-c:v", "copy", "-c:a", "aac",
-                "-map", "0:v:0", "-map", "1:a:0",
-                "-shortest",
-                "-y", output_path,
-            ], check=True, capture_output=True)
-
-            with open(output_path, "rb") as f:
-                result = f.read()
-
-            for p in (video_path, audio_path, output_path):
-                if os.path.exists(p):
-                    os.unlink(p)
-
-            return result
-        except Exception:
-            logger.warning("voiceover_failed listing=%s", listing.id, exc_info=True)
-            return video_bytes
 
     def _try_download_logo(self, logo_url: str | None) -> bytes | None:
         """Download logo from S3. Returns None on failure or invalid key."""

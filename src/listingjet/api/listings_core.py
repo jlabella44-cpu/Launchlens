@@ -97,6 +97,10 @@ async def list_listings(
     if state != "cancelled":
         base_query = base_query.where(Listing.state != ListingState.CANCELLED)
 
+    # Hide draft listings unless explicitly requested
+    if state != "draft":
+        base_query = base_query.where(Listing.state != ListingState.DRAFT)
+
     if state:
         try:
             validated_state = ListingState(state)
@@ -215,8 +219,26 @@ async def update_listing(
 
     if body.address is not None:
         listing.address = body.address.model_dump(exclude_none=True)
+
+    # Capture old price before overwriting metadata
+    old_price = (listing.metadata_ or {}).get("price") if body.metadata is not None else None
+
     if body.metadata is not None:
         listing.metadata_ = body.metadata.model_dump(exclude_none=True)
+
+    # Auto-detect price change for social reminders
+    if body.metadata is not None:
+        new_meta = body.metadata.model_dump(exclude_none=True)
+        new_price = new_meta.get("price")
+        if new_price is not None and old_price is not None and new_price != old_price:
+            from listingjet.models.listing_event import ListingEvent
+            price_event = ListingEvent(
+                tenant_id=current_user.tenant_id,
+                listing_id=listing_id,
+                event_type="price_change",
+                event_data={"old_price": old_price, "new_price": new_price},
+            )
+            db.add(price_event)
 
     await db.commit()
     await db.refresh(listing)
@@ -246,7 +268,7 @@ async def delete_listing(
 
     # Refund credits only if no significant pipeline work was done
     credits_refunded = 0
-    refundable_states = {ListingState.NEW, ListingState.UPLOADING, ListingState.ANALYZING, ListingState.FAILED}
+    refundable_states = {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.ANALYZING, ListingState.FAILED}
     tenant = await db.get(Tenant, current_user.tenant_id)
     if tenant and tenant.billing_model == "credit" and listing.credit_cost and listing.state in refundable_states:
         from listingjet.services.credits import CreditService

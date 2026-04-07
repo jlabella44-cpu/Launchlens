@@ -90,19 +90,19 @@ async def get_listing_health(
             weight=weights.get("content", 0.2),
             details=signals["content"]["details"],
         )
-    if "velocity" in signals and plan in ("pro", "enterprise"):
+    if "velocity" in signals and plan in ("active_agent", "pro", "team", "enterprise"):
         breakdown.pipeline_velocity = HealthSubScoreDetail(
             score=signals["velocity"]["score"],
             weight=weights.get("velocity", 0.15),
             details=signals["velocity"]["details"],
         )
-    if "syndication" in signals and plan in ("pro", "enterprise"):
+    if "syndication" in signals and plan in ("active_agent", "pro", "team", "enterprise"):
         breakdown.syndication = HealthSubScoreDetail(
             score=signals["syndication"]["score"],
             weight=weights.get("syndication", 0.2),
             details=signals["syndication"]["details"],
         )
-    if "market" in signals and plan == "enterprise":
+    if "market" in signals and plan in ("team", "enterprise"):
         breakdown.market_signal = HealthSubScoreDetail(
             score=signals["market"]["score"],
             weight=weights.get("market", 0.15),
@@ -212,20 +212,22 @@ async def create_idx_feed(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> IdxFeedConfigResponse:
-    """Create an IDX feed configuration (Pro+ only)."""
+    """Create an IDX feed configuration (requires active_agent/pro+ plan)."""
     tenant = await db.get(Tenant, current_user.tenant_id)
-    if not tenant or tenant.plan == "starter":
-        raise HTTPException(403, "IDX feed integration requires Pro or Enterprise plan")
+    no_idx_plans = {"free", "lite", "starter"}
+    if not tenant or tenant.plan in no_idx_plans:
+        raise HTTPException(403, "IDX feed integration requires Active Agent plan or higher")
 
-    # Enterprise: unlimited. Pro: max 1.
-    if tenant.plan == "pro":
+    # team/enterprise: unlimited. active_agent/pro: max 1.
+    limited_plans = {"active_agent", "pro"}
+    if tenant.plan in limited_plans:
         existing = await db.execute(
             select(func.count()).select_from(IdxFeedConfig).where(
                 IdxFeedConfig.tenant_id == current_user.tenant_id
             )
         )
         if (existing.scalar() or 0) >= 1:
-            raise HTTPException(409, "Pro plan allows 1 IDX feed. Upgrade to Enterprise for more.")
+            raise HTTPException(409, "Your plan allows 1 IDX feed. Upgrade to Team for more.")
 
     config = IdxFeedConfig(
         tenant_id=current_user.tenant_id,
@@ -319,7 +321,7 @@ async def update_health_weights(
 ) -> HealthWeightsResponse:
     """Customize health score weights (Enterprise only)."""
     tenant = await db.get(Tenant, current_user.tenant_id)
-    if not tenant or tenant.plan != "enterprise":
+    if not tenant or tenant.plan not in ("team", "enterprise"):
         raise HTTPException(403, "Custom health weights require Enterprise plan")
 
     total = body.media + body.content + body.velocity + body.syndication + body.market

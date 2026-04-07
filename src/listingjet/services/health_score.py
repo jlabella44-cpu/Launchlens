@@ -44,6 +44,12 @@ DEFAULT_WEIGHTS = {
 
 # Which sub-scores are available per plan
 PLAN_SUBSCORES = {
+    # New pricing tiers
+    "free": {"media", "content"},
+    "lite": {"media", "content"},
+    "active_agent": {"media", "content", "velocity", "syndication"},
+    "team": {"media", "content", "velocity", "syndication", "market"},
+    # Legacy aliases
     "starter": {"media", "content"},
     "pro": {"media", "content", "velocity", "syndication"},
     "enterprise": {"media", "content", "velocity", "syndication", "market"},

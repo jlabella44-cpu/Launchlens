@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-gemma-vis-001",
+  "object": "chat.completion",
+  "created": 1712361600,
+  "model": "gemma-4-31b-it",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"labels\": [{\"name\": \"living room\", \"confidence\": 0.96, \"category\": \"room\"}, {\"name\": \"hardwood floor\", \"confidence\": 0.89, \"category\": \"feature\"}]}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 540, "completion_tokens": 42, "total_tokens": 582}
+}

@@ -164,10 +164,12 @@ export interface BillingStatusResponse {
 
 export interface CreditBalance {
   balance: number;
+  granted_balance: number;
+  purchased_balance: number;
   rollover_balance: number;
   rollover_cap: number;
-  per_listing_credit_cost: number;
-  tier: string;
+  per_listing_credit_cost?: number;
+  tier?: string;
   period_start: string;
   period_end: string;
 }

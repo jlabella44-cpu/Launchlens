@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-qwen-001",
+  "object": "chat.completion",
+  "created": 1712361600,
+  "model": "qwen3.6-plus",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Stunning 3-bed 2-bath Craftsman with original hardwood floors, updated kitchen, and a sun-drenched primary suite. Fenced backyard and two-car garage complete this move-in-ready gem."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 142,
+    "completion_tokens": 38,
+    "total_tokens": 180
+  }
+}

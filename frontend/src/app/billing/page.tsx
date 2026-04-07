@@ -7,10 +7,16 @@ import { ProtectedRoute } from "@/components/layout/protected-route";
 import { usePlan } from "@/contexts/plan-context";
 import apiClient from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
+import { trackEvent, AnalyticsEvents } from "@/lib/analytics";
 import type { CreditTransaction, CreditBundle } from "@/lib/types";
 
 const TIER_LABELS: Record<string, string> = {
-  starter: "Lite",
+  free: "Free",
+  lite: "Lite",
+  active_agent: "Active Agent",
+  team: "Team",
+  // Legacy
+  starter: "Free",
   pro: "Active Agent",
   enterprise: "Team",
 };
@@ -25,8 +31,90 @@ const TX_TYPE_STYLES: Record<string, { bg: string; text: string; label: string }
   refund: { bg: "bg-green-50", text: "text-green-700", label: "Confirmed" },
 };
 
+/** Live counter showing remaining Founding 200 spots. */
+function FoundingCounter() {
+  const [remaining, setRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Try to fetch from API; fallback to a placeholder
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "/api"}/founding/remaining`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.remaining != null) setRemaining(data.remaining); })
+      .catch(() => { /* endpoint may not exist yet — show nothing */ });
+  }, []);
+
+  if (remaining == null) return null;
+
+  return (
+    <div className="flex flex-col items-center">
+      <motion.p
+        initial={{ scale: 0.8 }}
+        animate={{ scale: 1 }}
+        className="text-3xl font-bold text-[#F97316]"
+      >
+        {remaining}
+      </motion.p>
+      <p className="text-[10px] text-white/40 uppercase tracking-wider">Spots remaining</p>
+    </div>
+  );
+}
+
+/** Referral link share widget with copy-to-clipboard. */
+function ReferralShareWidget() {
+  const [copied, setCopied] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Try to fetch user's referral code
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "/api"}/referral/code`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("listingjet_token") || ""}`,
+      },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.code) setCode(data.code); })
+      .catch(() => { /* endpoint may not exist yet */ });
+  }, []);
+
+  const referralUrl = code
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/register?ref=${code}`
+    : null;
+
+  function handleCopy() {
+    if (!referralUrl) return;
+    navigator.clipboard.writeText(referralUrl);
+    setCopied(true);
+    trackEvent(AnalyticsEvents.REFERRAL_SENT, { code: code || "" });
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (!referralUrl) {
+    return (
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        Your referral link will appear here once your account is fully activated.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        readOnly
+        value={referralUrl}
+        className="flex-1 px-4 py-2.5 rounded-lg border border-[var(--color-card-border)] bg-[var(--color-bg)] text-sm text-[var(--color-text)] truncate"
+      />
+      <button
+        onClick={handleCopy}
+        className="px-4 py-2.5 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors whitespace-nowrap"
+      >
+        {copied ? "Copied!" : "Copy Link"}
+      </button>
+    </div>
+  );
+}
+
 function BillingContent() {
-  const { billingModel, creditBalance, tier, rolloverCap } = usePlan();
+  const { billingModel, creditBalance, grantedBalance, purchasedBalance, tier, rolloverCap } = usePlan();
   const { toast } = useToast();
 
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
@@ -107,12 +195,26 @@ function BillingContent() {
                   {creditBalance ?? 0}
                   <span className="text-lg font-normal text-[var(--color-text-secondary)] ml-2 uppercase tracking-wider">Credits</span>
                 </motion.p>
-                {rolloverCap != null && (
-                  <p className="text-xs text-[var(--color-text-secondary)] mt-1 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-border)]" />
-                    {rolloverCap} credits rollover cap
-                  </p>
-                )}
+                <div className="flex items-center gap-4 mt-2">
+                  {grantedBalance != null && (
+                    <p className="text-xs text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                      {grantedBalance} granted
+                    </p>
+                  )}
+                  {purchasedBalance != null && (
+                    <p className="text-xs text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                      {purchasedBalance} purchased
+                    </p>
+                  )}
+                  {rolloverCap != null && rolloverCap > 0 && (
+                    <p className="text-xs text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-border)]" />
+                      {rolloverCap} rollover cap
+                    </p>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -266,8 +368,8 @@ function BillingContent() {
                 try {
                   const { portal_url } = await apiClient.billingPortal(window.location.href);
                   window.location.href = portal_url;
-                } catch (err: any) {
-                  alert(err.message || "Failed to open billing portal");
+                } catch (err: unknown) {
+                  alert(err instanceof Error ? err.message : "Failed to open billing portal");
                 }
               }}
               className="px-6 py-3 rounded-full border border-[var(--color-border)] text-sm font-semibold text-[var(--color-text-secondary)] hover:border-amber-400 hover:text-amber-600 hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
@@ -276,6 +378,43 @@ function BillingContent() {
             </button>
           </div>
         )}
+
+        {/* Founding 200 Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-[#0B1120] to-[#1a2744] rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#F97316]">Founding 200</span>
+            </div>
+            <p className="text-white font-bold text-lg" style={{ fontFamily: "var(--font-heading)" }}>
+              Lock in 30% off for life
+            </p>
+            <p className="text-sm text-white/50 mt-1">
+              Be one of the first 200 subscribers and keep founding pricing forever.
+            </p>
+          </div>
+          <div className="text-center">
+            <FoundingCounter />
+          </div>
+        </motion.div>
+
+        {/* Share & Earn */}
+        <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-card-border)] p-6">
+          <h2
+            className="text-lg font-bold text-[var(--color-text)] mb-1"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Share &amp; Earn
+          </h2>
+          <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+            Give a friend 30 credits, get 30 credits when they sign up.
+          </p>
+          <ReferralShareWidget />
+        </div>
 
         {/* Footer */}
         <footer className="mt-16 pt-6 border-t border-[var(--color-card-border)] flex items-center justify-between text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -14,6 +15,7 @@ import type { ListingResponse, SharedListingResponse } from "@/lib/types";
 type Tab = "my" | "shared";
 
 function ListingsDashboard() {
+  const router = useRouter();
   const [listings, setListings] = useState<ListingResponse[]>([]);
   const [sharedListings, setSharedListings] = useState<SharedListingResponse[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("my");
@@ -96,7 +98,7 @@ function ListingsDashboard() {
             </p>
             {activeTab === "my" && (
               <button
-                onClick={() => setDialogOpen(true)}
+                onClick={() => router.push("/listings/new")}
                 className="flex-shrink-0 px-5 py-2.5 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors inline-flex items-center gap-2 shadow-md shadow-orange-200"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -247,7 +249,7 @@ function ListingsDashboard() {
               description="Upload your first property photos and let our AI generate MLS-ready marketing materials in minutes."
               action={
                 <button
-                  onClick={() => setDialogOpen(true)}
+                  onClick={() => router.push("/listings/new")}
                   className="px-6 py-3 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors shadow-md shadow-orange-200"
                 >
                   Create First Listing
