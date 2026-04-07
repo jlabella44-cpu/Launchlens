@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 export function Nav() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
 
   const linkClass = "text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors";
 
@@ -54,6 +56,13 @@ export function Nav() {
             <Link href="/admin" className="text-sm font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary)]/80 transition-colors">
               Admin
             </Link>
+          )}
+          {user && (
+            <NotificationBell
+              open={bellOpen}
+              onToggle={() => setBellOpen((v) => !v)}
+              onClose={() => setBellOpen(false)}
+            />
           )}
           <ThemeToggle />
           {user && (
