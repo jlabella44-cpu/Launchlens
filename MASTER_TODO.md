@@ -139,14 +139,14 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 
 ### Code Cleanup (from TODO.md)
 - [ ] **Listings.py monolith** — split 800+ line file into sub-routers (CRUD, review, export, video, package)
-- [ ] **CSP blocks frontend** — `SecurityHeadersMiddleware` sets overly restrictive CSP; needs frontend audit
+- [x] **CSP blocks frontend** — already relaxed to `frame-ancestors 'none'` (API backend only)
 - [ ] **Pipeline status endpoint expensive** — `get_pipeline_status` recomputes on every request; needs caching
-- [ ] Dead comment in listings.py (Audit #18)
-- [ ] Unused listing states: `SHADOW_REVIEW`, `GENERATING`, `DELIVERING`, `TRACKING` (Audit #19)
+- [x] Dead comment in listings.py (Audit #18) — no longer present
+- [x] Unused listing states: `SHADOW_REVIEW`, `GENERATING`, `DELIVERING`, `TRACKING` (Audit #19) — never existed in enum
 - [ ] Test JWT fixture doesn't create User rows (Audit #20)
-- [ ] `upload-urls` endpoint uses `body: dict` — no Pydantic schema (Audit #12)
-- [ ] Cancel listing reuses `FAILED` state — add `CANCELLED` enum value (Audit #16)
-- [ ] Brand Kit migration gap — verify migration numbering/chain (Audit #22)
+- [x] `upload-urls` endpoint uses `body: dict` (Audit #12) — now uses `UploadUrlsRequest` Pydantic schema
+- [x] Cancel listing reuses `FAILED` state (Audit #16) — `CANCELLED` enum added in migration 024
+- [x] Brand Kit migration gap (Audit #22) — chain is correct (011→013), gap is harmless
 - [ ] **10 service modules have zero test coverage** (HIGH-8)
 
 ### Deferred to Post-Launch
