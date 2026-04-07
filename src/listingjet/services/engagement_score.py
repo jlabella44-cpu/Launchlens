@@ -1,50 +1,39 @@
-"""Engagement prediction score — heuristic estimate of listing photo performance.
+"""Engagement prediction score — thin wrapper around HealthScoreService.calculate_media_score.
 
-Uses existing VisionResult quality/commercial scores, hero candidate status,
-coverage completeness, and global baseline weights to predict a 0-100
-engagement score displayed on the listing dashboard.
+The original heuristic has been moved to health_score.calculate_media_score().
+This function is kept for backward compatibility with callers that pass
+in-memory VisionResult lists (no async DB session available).
 """
+
+# Required shots — kept in sync with health_score.py
+REQUIRED_SHOTS = {"exterior", "living_room", "kitchen", "bedroom", "bathroom"}
 
 
 def predict_engagement(vision_results: list, package_selections: list | None = None) -> int:
     """Return 0-100 engagement prediction score from vision data.
 
-    Scoring breakdown:
-    - 40%: average quality score across all photos
-    - 30%: average commercial score (features that attract buyers)
-    - 10%: hero candidate bonus (strong lead photo)
-    - 10%: exterior/curb appeal bonus
-    - 10%: coverage bonus (5+ distinct room types)
+    This is the synchronous in-memory version. For the full async DB-backed
+    media score, use ``health_score.calculate_media_score()``.
     """
     if not vision_results:
-        return 50  # Default when no vision data
+        return 50
 
     avg_quality = sum(vr.quality_score or 50 for vr in vision_results) / len(vision_results)
     avg_commercial = sum(vr.commercial_score or 50 for vr in vision_results) / len(vision_results)
 
-    score = avg_quality * 0.4 + avg_commercial * 0.3
+    # Hero strength
+    hero_results = [vr for vr in vision_results if getattr(vr, "hero_candidate", False)]
+    hero_strength = max((vr.commercial_score or 0 for vr in hero_results), default=0) if hero_results else 0
 
-    # Hero candidate bonus
-    has_hero = any(getattr(vr, "hero_candidate", False) for vr in vision_results)
-    if has_hero:
-        score += 10
-
-    # Exterior/curb appeal bonus
-    exterior_labels = {"exterior", "drone", "facade", "building exterior"}
-    has_exterior = any(
-        getattr(vr, "room_label", "") in exterior_labels for vr in vision_results
-    )
-    if has_exterior:
-        score += 10
-
-    # Coverage bonus (diverse room types)
-    room_types = {
-        getattr(vr, "room_label", None) for vr in vision_results
+    # Coverage
+    covered = {
+        getattr(vr, "room_label", None)
+        for vr in vision_results
         if getattr(vr, "room_label", None)
     }
-    if len(room_types) >= 5:
-        score += 10
-    elif len(room_types) >= 3:
-        score += 5
+    coverage_pct = len(covered & REQUIRED_SHOTS) / len(REQUIRED_SHOTS) * 100
+
+    # Same weights as health_score.calculate_media_score
+    score = avg_quality * 0.40 + avg_commercial * 0.30 + hero_strength * 0.15 + coverage_pct * 0.15
 
     return min(100, max(0, int(score)))

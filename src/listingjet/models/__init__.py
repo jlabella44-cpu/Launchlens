@@ -25,3 +25,6 @@ from .scoring_event import ScoringEvent                      # noqa
 from .listing_event import ListingEvent                      # noqa
 from .social_account import SocialAccount                    # noqa
 from .notification import Notification                       # noqa
+from .listing_health_score import ListingHealthScore         # noqa
+from .health_score_history import HealthScoreHistory          # noqa
+from .idx_feed_config import IdxFeedConfig                   # noqa

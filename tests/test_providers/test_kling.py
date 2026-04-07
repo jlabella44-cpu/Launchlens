@@ -85,5 +85,5 @@ async def test_kling_poll_task_returns_url(MockClient):
     MockClient.return_value = mock_client_instance
 
     provider = KlingProvider(access_key="test_ak", secret_key="test_sk")
-    url = await provider.poll_task("task_123", timeout=10, interval=1)
-    assert url == "https://cdn.kling.ai/video.mp4"
+    result = await provider.poll_task("task_123", timeout=10, interval=1)
+    assert result == {"url": "https://cdn.kling.ai/video.mp4", "duration": "5", "credits": None}

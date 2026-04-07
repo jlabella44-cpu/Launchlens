@@ -1,6 +1,8 @@
-from listingjet.api.schemas.social import CreateListingEventRequest, MarkPostedRequest
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
+
+from listingjet.api.schemas.social import CreateListingEventRequest, MarkPostedRequest
+
 
 def test_create_event_valid_types():
     for t in ["open_house", "sold_pending"]:

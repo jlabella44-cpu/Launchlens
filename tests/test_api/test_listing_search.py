@@ -43,8 +43,8 @@ async def test_filter_by_state(_mock_rate_limiter, async_client):
     await _create_listing(async_client, token, "100 Oak Ln", "Austin", "TX")
     await _create_listing(async_client, token, "200 Pine St", "Denver", "CO")
 
-    # Both are "new" state
-    resp = await async_client.get("/listings?state=new", headers=_auth(token))
+    # Both are "draft" state
+    resp = await async_client.get("/listings?state=draft", headers=_auth(token))
     assert resp.status_code == 200
     assert len(resp.json()["items"]) == 2
 
@@ -61,7 +61,7 @@ async def test_search_by_city(_mock_rate_limiter, async_client):
     await _create_listing(async_client, token, "200 Pine St", "Denver", "CO")
     await _create_listing(async_client, token, "300 Elm Ave", "Austin", "TX")
 
-    resp = await async_client.get("/listings?search=Austin", headers=_auth(token))
+    resp = await async_client.get("/listings?state=draft&search=Austin", headers=_auth(token))
     assert resp.status_code == 200
     assert len(resp.json()["items"]) == 2
 
@@ -72,7 +72,7 @@ async def test_search_by_street(_mock_rate_limiter, async_client):
     await _create_listing(async_client, token, "100 Oak Ln", "Austin", "TX")
     await _create_listing(async_client, token, "200 Pine St", "Denver", "CO")
 
-    resp = await async_client.get("/listings?search=Oak", headers=_auth(token))
+    resp = await async_client.get("/listings?state=draft&search=Oak", headers=_auth(token))
     assert resp.status_code == 200
     data = resp.json()["items"]
     assert len(data) == 1
@@ -85,11 +85,11 @@ async def test_pagination(_mock_rate_limiter, async_client):
     for i in range(5):
         await _create_listing(async_client, token, f"{i}00 Test St", "City", "TX")
 
-    resp = await async_client.get("/listings?page_size=2&page=1", headers=_auth(token))
+    resp = await async_client.get("/listings?state=draft&page_size=2&page=1", headers=_auth(token))
     assert resp.status_code == 200
     assert len(resp.json()["items"]) == 2
 
-    resp2 = await async_client.get("/listings?page_size=2&page=2", headers=_auth(token))
+    resp2 = await async_client.get("/listings?state=draft&page_size=2&page=2", headers=_auth(token))
     assert resp2.status_code == 200
     assert len(resp2.json()["items"]) == 2
 
@@ -100,12 +100,12 @@ async def test_combined_filters(_mock_rate_limiter, async_client):
     await _create_listing(async_client, token, "100 Oak Ln", "Austin", "TX")
     await _create_listing(async_client, token, "200 Pine St", "Austin", "TX")
 
-    # Both are "new" and in Austin
-    resp = await async_client.get("/listings?state=new&search=Austin", headers=_auth(token))
+    # Both are "draft" and in Austin
+    resp = await async_client.get("/listings?state=draft&search=Austin", headers=_auth(token))
     assert resp.status_code == 200
     assert len(resp.json()["items"]) == 2
 
     # Search for Oak + new state
-    resp = await async_client.get("/listings?state=new&search=Oak", headers=_auth(token))
+    resp = await async_client.get("/listings?state=draft&search=Oak", headers=_auth(token))
     assert resp.status_code == 200
     assert len(resp.json()["items"]) == 1

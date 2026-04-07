@@ -3,9 +3,10 @@
 Revision ID: 040
 Revises: 039_add_draft_state_and_bundle
 """
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+from alembic import op
 
 revision = "040"
 down_revision = "039_add_draft_state_and_bundle"
