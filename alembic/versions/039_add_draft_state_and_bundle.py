@@ -4,8 +4,9 @@ Revision ID: 039_add_draft_state_and_bundle
 Revises: 038_pricing_v3_weighted_credits
 Create Date: 2026-04-06
 """
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "039_add_draft_state_and_bundle"
 down_revision = "038_pricing_v3_weighted_credits"
