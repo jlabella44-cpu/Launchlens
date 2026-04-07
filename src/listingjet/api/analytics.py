@@ -150,25 +150,38 @@ async def analytics_usage(
 @router.get("/credits")
 async def analytics_credits(
     days: int = Query(default=30, ge=1, le=365),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Credit transaction history for charting."""
+    """Credit transaction history for charting, with pagination."""
     tid = current_user.tenant_id
     start = datetime.now(timezone.utc) - timedelta(days=days)
 
-    rows = (await db.execute(
+    base_query = (
         select(CreditTransaction)
         .where(
             CreditTransaction.tenant_id == tid,
             CreditTransaction.created_at >= start,
         )
         .order_by(CreditTransaction.created_at.asc())
-        .limit(1000)
+    )
+
+    from sqlalchemy import func
+    total = (await db.execute(
+        select(func.count()).select_from(base_query.subquery())
+    )).scalar() or 0
+
+    rows = (await db.execute(
+        base_query.offset(offset).limit(limit)
     )).scalars().all()
 
     return {
         "days": days,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
         "data": [
             {
                 "date": row.created_at.isoformat(),

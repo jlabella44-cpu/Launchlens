@@ -16,6 +16,16 @@ logger = logging.getLogger(__name__)
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "email"
 
 
+def _mask_email(email: str) -> str:
+    """Mask an email for logging: 'user@example.com' → 'u***@e***.com'."""
+    try:
+        local, domain = email.rsplit("@", 1)
+        parts = domain.rsplit(".", 1)
+        return f"{local[0]}***@{parts[0][0]}***.{parts[-1]}"
+    except (IndexError, ValueError):
+        return "***"
+
+
 def _load_template(name: str, **kwargs: str) -> str:
     """Load an HTML template and substitute {placeholders}."""
     path = TEMPLATE_DIR / name
@@ -57,7 +67,7 @@ class EmailService:
                     if self.user and self.password:
                         server.login(self.user, self.password)
                     server.sendmail(self.sender, [to], msg.as_string())
-                logger.info("email_sent", extra={"to": to, "subject": subject})
+                logger.info("email_sent", extra={"to": _mask_email(to), "subject": subject})
                 return
             except (smtplib.SMTPException, OSError, TimeoutError) as exc:
                 last_error = exc
@@ -66,7 +76,7 @@ class EmailService:
                     delay = 2 ** attempt  # 2s, 4s
                     logger.warning("email_retry attempt=%d/%d error=%s delay=%ds", attempt, 3, exc, delay)
                     time.sleep(delay)
-        logger.error("email_failed after 3 attempts", extra={"to": to, "error": str(last_error)})
+        logger.error("email_failed after 3 attempts", extra={"to": _mask_email(to), "error": str(last_error)})
         raise last_error  # type: ignore[misc]
 
     def send_pipeline_complete(self, to: str, listing_address: str, listing_id: str) -> None:
@@ -123,9 +133,9 @@ class SESEmailService(EmailService):
                     "Body": {"Html": {"Data": html_body, "Charset": "UTF-8"}},
                 },
             )
-            logger.info("ses_email_sent", extra={"to": to, "subject": subject})
+            logger.info("ses_email_sent", extra={"to": _mask_email(to), "subject": subject})
         except ClientError as e:
-            logger.error("ses_email_failed", extra={"to": to, "error": str(e)})
+            logger.error("ses_email_failed", extra={"to": _mask_email(to), "error": str(e)})
             raise
 
     # Share-specific notification helpers
@@ -162,13 +172,13 @@ class NoOpEmailService(EmailService):
     """Does nothing — used in dev/test."""
 
     def send(self, to: str, subject: str, html_body: str) -> None:
-        logger.debug("noop_email", extra={"to": to, "subject": subject})
+        logger.debug("noop_email", extra={"to": _mask_email(to), "subject": subject})
 
     async def send_template(self, to: str, template_name: str, context: dict) -> None:
-        logger.debug("noop_email_template", extra={"to": to, "template": template_name})
+        logger.debug("noop_email_template", extra={"to": _mask_email(to), "template": template_name})
 
     def send_notification(self, to: str, template_name: str, **kwargs: str) -> None:
-        logger.debug("noop_email_notification", extra={"to": to, "template": template_name})
+        logger.debug("noop_email_notification", extra={"to": _mask_email(to), "template": template_name})
 
 
 def get_email_service() -> EmailService:
