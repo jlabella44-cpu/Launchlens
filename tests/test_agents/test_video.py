@@ -70,7 +70,7 @@ async def test_video_agent_creates_video_asset(db_session, listing_for_video):
 
     mock_kling = MagicMock()
     mock_kling.generate_clip = AsyncMock(return_value="task_001")
-    mock_kling.poll_task = AsyncMock(return_value="https://cdn.kling.ai/clip.mp4")
+    mock_kling.poll_task = AsyncMock(return_value={"url": "https://cdn.kling.ai/clip.mp4", "credits": 0.5})
 
     mock_storage = MagicMock()
     mock_storage.upload_bytes = MagicMock(return_value=f"videos/{listing.id}/tour.mp4")
@@ -114,7 +114,7 @@ async def test_video_agent_emits_event(db_session, listing_for_video):
 
     mock_kling = MagicMock()
     mock_kling.generate_clip = AsyncMock(return_value="task_001")
-    mock_kling.poll_task = AsyncMock(return_value="https://cdn.kling.ai/clip.mp4")
+    mock_kling.poll_task = AsyncMock(return_value={"url": "https://cdn.kling.ai/clip.mp4", "credits": 0.5})
     mock_storage = MagicMock()
     mock_storage.upload_bytes = MagicMock(return_value="videos/test.mp4")
     mock_stitcher = MagicMock()

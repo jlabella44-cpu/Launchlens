@@ -213,7 +213,7 @@ async def remove_addon(
     addon_purchase, addon = purchase
 
     listing = await db.get(Listing, listing_id)
-    if listing and listing.state in {ListingState.NEW, ListingState.UPLOADING, ListingState.AWAITING_REVIEW}:
+    if listing and listing.state in {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.AWAITING_REVIEW}:
         # Refund credits
         credit_svc = CreditService()
         await credit_svc.add_credits(

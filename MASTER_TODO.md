@@ -91,9 +91,9 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] **Improve mock vision provider** — returns deterministic varied data based on image URL hash
 
 ### Test Coverage (Session 19)
-- [ ] ChapterAgent tests
-- [ ] LearningAgent tests
-- [ ] WatermarkAgent tests
+- [x] ChapterAgent tests — already exist in `tests/test_agents/test_chapter.py`
+- [x] LearningAgent tests — already exist in `tests/test_agents/test_learning.py`
+- [x] WatermarkAgent tests — already exist in `tests/test_agents/test_watermark.py`
 - [x] Fix PackagingAgent weight loading — replaced magic `1.0` with `DEFAULT_ROOM_WEIGHT` constant; LearningWeight query already wired
 - [ ] SSE endpoint tests (`/listings/{id}/events` returns `text/event-stream`)
 - [ ] Middleware tests (security headers)
@@ -114,10 +114,10 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] Add CI badge to README
 
 ### Learning Loop (Session 22)
-- [ ] Wire `LearningAgent` into pipeline (add `run_learning` activity after distribution step)
-- [ ] Photo reorder endpoint — `POST /listings/{id}/package/reorder`
+- [x] Wire `LearningAgent` into pipeline — already in Step 6 of `listing_pipeline.py` after distribution
+- [x] Photo reorder endpoint — `POST /{listing_id}/package/reorder` already in `listings_media.py`
 - [ ] Performance event ingestion — write to `PerformanceEvent` table on listing delivery and export download
-- [ ] Weight decay — add `apply_decay` method to `weight_manager.py`
+- [x] Weight decay — `apply_decay` method already exists in `weight_manager.py` (90-day decay toward 1.0)
 - [ ] XGBoost model upgrade (Phase 2 of weight manager)
 
 ### Listing Permissions — Remaining Phases

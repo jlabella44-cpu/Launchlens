@@ -45,7 +45,8 @@ async def test_register_assets(mock_get_client, async_client: AsyncClient):
     assert resp.status_code == 201
     body = resp.json()
     assert body["count"] == 2
-    assert body["listing_state"] == "uploading"
+    # Credit-billed tenants start in "draft"; assets don't change state until submit
+    assert body["listing_state"] in ("uploading", "draft")
 
 
 @pytest.mark.asyncio
@@ -93,7 +94,9 @@ async def test_register_assets_requires_auth(async_client: AsyncClient):
 @pytest.mark.asyncio
 @patch("listingjet.api.listings_media.get_temporal_client")
 async def test_register_assets_triggers_pipeline(mock_get_client, async_client: AsyncClient):
-    """Registering assets should start the Temporal pipeline."""
+    """Registering assets on a draft listing does NOT auto-start the pipeline.
+    Credit-billed tenants start in DRAFT; pipeline starts via explicit /start-pipeline.
+    """
     mock_client = AsyncMock()
     mock_get_client.return_value = mock_client
 
@@ -107,4 +110,5 @@ async def test_register_assets_triggers_pipeline(mock_get_client, async_client: 
         "assets": [{"file_path": "s3://bucket/photo.jpg", "file_hash": "abc"}]
     }, headers=_auth(token))
     assert resp.status_code == 201
-    mock_client.start_pipeline.assert_called_once()
+    # Draft listings don't auto-start — pipeline only triggers on NEW→UPLOADING transition
+    mock_client.start_pipeline.assert_not_called()
