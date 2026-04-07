@@ -105,6 +105,7 @@ _TAG_METADATA = [
 
 
 def create_app() -> FastAPI:
+    is_production = settings.app_env == "production"
     app = FastAPI(
         title="ListingJet API",
         version="1.0.0",
@@ -115,8 +116,9 @@ def create_app() -> FastAPI:
         ),
         lifespan=lifespan,
         openapi_tags=_TAG_METADATA,
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=None if is_production else "/docs",
+        redoc_url=None if is_production else "/redoc",
+        openapi_url=None if is_production else "/openapi.json",
     )
     # CORS — must be added before other middleware so OPTIONS preflight works
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
