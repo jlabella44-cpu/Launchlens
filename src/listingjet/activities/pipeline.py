@@ -225,6 +225,12 @@ async def run_microsite_generator(context: AgentContext) -> dict:
     return await MicrositeGeneratorAgent().instrumented_execute(context)
 
 
+@activity.defn
+async def run_mls_publish(context: AgentContext, content_result: dict | None = None) -> dict:
+    from listingjet.agents.mls_publish import MLSPublishAgent
+    return await MLSPublishAgent(content_result=content_result or {}).instrumented_execute(context)
+
+
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
@@ -233,4 +239,5 @@ ALL_ACTIVITIES = [
     run_video, run_chapters, run_social_cuts, run_learning,
     run_link_import, run_property_verification,
     run_virtual_staging, run_cma_report, run_microsite_generator,
+    run_mls_publish,
 ]

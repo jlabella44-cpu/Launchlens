@@ -527,3 +527,76 @@ export interface AnalyticsCredits {
   days: number;
   data: CreditDataPoint[];
 }
+
+// MLS Connections & Publish
+
+export interface MLSConnection {
+  id: string;
+  name: string;
+  mls_board: string;
+  reso_api_url: string;
+  oauth_token_url: string;
+  client_id: string;
+  is_active: boolean;
+  last_tested_at: string | null;
+  last_test_status: string | null;
+  config: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateMLSConnectionRequest {
+  name: string;
+  mls_board: string;
+  reso_api_url: string;
+  oauth_token_url: string;
+  client_id: string;
+  client_secret: string;
+  bearer_token?: string | null;
+  config?: Record<string, unknown>;
+}
+
+export interface UpdateMLSConnectionRequest {
+  name?: string;
+  mls_board?: string;
+  reso_api_url?: string;
+  oauth_token_url?: string;
+  client_id?: string;
+  client_secret?: string;
+  bearer_token?: string | null;
+  is_active?: boolean;
+  config?: Record<string, unknown>;
+}
+
+export interface MLSConnectionTestResult {
+  connection_id: string;
+  status: string;
+  error: string | null;
+  tested_at: string;
+}
+
+export interface PublishResponse {
+  publish_record_id: string;
+  listing_id: string;
+  status: string;
+  message: string;
+}
+
+export interface PublishStatusResponse {
+  id: string;
+  listing_id: string;
+  connection_id: string;
+  connection_name: string | null;
+  status: string;
+  reso_listing_key: string | null;
+  reso_property_id: string | null;
+  photos_submitted: number;
+  photos_accepted: number;
+  error_message: string | null;
+  error_code: string | null;
+  retry_count: number;
+  submitted_at: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}

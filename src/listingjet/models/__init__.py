@@ -21,3 +21,5 @@ from .addon_catalog import AddonCatalog                      # noqa
 from .addon_purchase import AddonPurchase                    # noqa
 from .listing_permission import ListingPermission            # noqa
 from .listing_permission import ListingAuditLog              # noqa
+from .mls_connection import MLSConnection                    # noqa
+from .mls_publish_record import MLSPublishRecord             # noqa

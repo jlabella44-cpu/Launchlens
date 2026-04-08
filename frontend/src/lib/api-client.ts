@@ -818,6 +818,39 @@ class ApiClient {
   async adminSupportStats(): Promise<SupportTicketStats> {
     return this.request("/support/admin/tickets/stats");
   }
+
+  // --- MLS Connections ---
+
+  async getMLSConnections(): Promise<import("./types").MLSConnection[]> {
+    return this.request("/mls/connections");
+  }
+
+  async createMLSConnection(data: import("./types").CreateMLSConnectionRequest): Promise<import("./types").MLSConnection> {
+    return this.request("/mls/connections", { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async updateMLSConnection(id: string, data: import("./types").UpdateMLSConnectionRequest): Promise<import("./types").MLSConnection> {
+    return this.request(`/mls/connections/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+
+  async deleteMLSConnection(id: string): Promise<void> {
+    return this.request(`/mls/connections/${id}`, { method: "DELETE" });
+  }
+
+  async testMLSConnection(id: string): Promise<import("./types").MLSConnectionTestResult> {
+    return this.request(`/mls/connections/${id}/test`, { method: "POST" });
+  }
+
+  // --- MLS Publish ---
+
+  async publishToMLS(listingId: string, connectionId?: string): Promise<import("./types").PublishResponse> {
+    const body = connectionId ? { connection_id: connectionId } : {};
+    return this.request(`/listings/${listingId}/publish`, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  async getPublishStatus(listingId: string): Promise<import("./types").PublishStatusResponse[]> {
+    return this.request(`/listings/${listingId}/publish-status`);
+  }
 }
 
 export const apiClient = new ApiClient();

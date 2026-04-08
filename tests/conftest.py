@@ -61,6 +61,7 @@ def _mock_external_services():
         patch("listingjet.api.listings_media.get_temporal_client", return_value=mock_temporal),
         patch("listingjet.api.listings_workflow.get_temporal_client", return_value=mock_temporal),
         patch("listingjet.api.bulk.get_temporal_client", return_value=mock_temporal),
+        patch("listingjet.api.mls_publish.get_temporal_client", return_value=mock_temporal),
     ):
         yield
 

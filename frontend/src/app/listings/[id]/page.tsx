@@ -40,6 +40,8 @@ function ListingDetail() {
   const [cmaLoading, setCmaLoading] = useState(false);
   const [micrositeLoading, setMicrositeLoading] = useState(false);
   const [complianceFixing, setComplianceFixing] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState<import("@/lib/types").PublishStatusResponse[] | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -57,10 +59,11 @@ function ListingDetail() {
         const pkg = await apiClient.getPackage(id);
         setSelections(pkg);
       }
-      // Load CMA and microsite if listing is far enough along
-      if (["approved", "exporting", "delivered"].includes(l.state)) {
+      // Load CMA, microsite, and publish status if listing is far enough along
+      if (["approved", "exporting", "delivered", "publishing"].includes(l.state)) {
         apiClient.getCMAReport(id).then(setCmaReport).catch(() => {});
         apiClient.getMicrosite(id).then(setMicrosite).catch(() => {});
+        apiClient.getPublishStatus(id).then(setPublishStatus).catch(() => {});
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load listing";
@@ -77,7 +80,7 @@ function ListingDetail() {
   }, [fetchData]);
 
   useEffect(() => {
-    const PROCESSING_STATES = ["uploading", "analyzing", "exporting"];
+    const PROCESSING_STATES = ["uploading", "analyzing", "exporting", "publishing"];
     if (!listing || !PROCESSING_STATES.includes(listing.state)) return;
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
@@ -115,6 +118,22 @@ function ListingDetail() {
       window.open(res.download_url, "_blank");
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : "Export not available yet", "error");
+    }
+  }
+
+  async function handlePublishToMLS() {
+    setPublishing(true);
+    try {
+      const res = await apiClient.publishToMLS(id);
+      toast(res.message, "success");
+      // Refresh publish status
+      const status = await apiClient.getPublishStatus(id);
+      setPublishStatus(status);
+      fetchData();
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Publish failed", "error");
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -356,7 +375,61 @@ function ListingDetail() {
                       </svg>
                       Quick Download
                     </button>
+                    <button
+                      onClick={handlePublishToMLS}
+                      disabled={publishing || listing.state === "publishing"}
+                      className="px-5 py-2.5 rounded-full bg-[#F97316] hover:bg-[#ea6c12] text-white text-sm font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {publishing ? (
+                        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                      )}
+                      {listing.state === "publishing" ? "Publishing..." : "Publish to MLS"}
+                    </button>
                   </>
+                )}
+                {/* MLS Publish Status */}
+                {publishStatus && publishStatus.length > 0 && (
+                  <div className="w-full mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-2">MLS Publish Status</p>
+                    {publishStatus.map((ps) => (
+                      <div key={ps.id} className="flex items-center gap-2 text-sm">
+                        <span className={`inline-block w-2 h-2 rounded-full ${
+                          ps.status === "submitted" || ps.status === "confirmed" ? "bg-green-500" :
+                          ps.status === "failed" ? "bg-red-500" :
+                          "bg-amber-500 animate-pulse"
+                        }`} />
+                        <span className="text-slate-600 font-medium">{ps.connection_name || "MLS"}</span>
+                        <span className="text-slate-400">—</span>
+                        <span className={`font-medium ${
+                          ps.status === "submitted" || ps.status === "confirmed" ? "text-green-600" :
+                          ps.status === "failed" ? "text-red-600" :
+                          "text-amber-600"
+                        }`}>
+                          {ps.status === "submitting_property" ? "Submitting listing..." :
+                           ps.status === "submitting_media" ? "Uploading photos..." :
+                           ps.status.charAt(0).toUpperCase() + ps.status.slice(1)}
+                        </span>
+                        {ps.photos_accepted > 0 && (
+                          <span className="text-slate-400 text-xs">({ps.photos_accepted}/{ps.photos_submitted} photos)</span>
+                        )}
+                        {ps.reso_listing_key && (
+                          <span className="text-slate-400 text-xs ml-auto">MLS# {ps.reso_listing_key}</span>
+                        )}
+                      </div>
+                    ))}
+                    {publishStatus.some(ps => ps.status === "failed") && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {publishStatus.find(ps => ps.status === "failed")?.error_message}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}

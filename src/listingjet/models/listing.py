@@ -22,6 +22,7 @@ class ListingState(str, enum.Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     EXPORTING = "exporting"
+    PUBLISHING = "publishing"
     DEMO = "demo"
 
 

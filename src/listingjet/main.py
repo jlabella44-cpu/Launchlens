@@ -28,6 +28,7 @@ from listingjet.api import (
     listings_media,
     listings_workflow,
     microsite,
+    mls_publish,
     properties,
     sse,
     support,
@@ -97,6 +98,7 @@ _TAG_METADATA = [
     {"name": "settings", "description": "Tenant settings and preferences"},
     {"name": "analytics", "description": "Usage metrics and reporting"},
     {"name": "demo", "description": "Public demo listing upload"},
+    {"name": "mls", "description": "RESO Web API MLS connections and one-click publish"},
     {"name": "sse", "description": "Server-Sent Events for real-time pipeline updates"},
     {"name": "team", "description": "Team member management within a tenant"},
     {"name": "help-agent", "description": "AI help agent for product support and data lookups"},
@@ -157,6 +159,8 @@ def create_app() -> FastAPI:
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
     app.include_router(cma.router, prefix="/listings", tags=["listings"])
     app.include_router(microsite.router, prefix="/listings", tags=["listings"])
+    app.include_router(mls_publish.router, prefix="/listings", tags=["mls"])
+    app.include_router(mls_publish.connections_router, prefix="/mls/connections", tags=["mls"])
     app.include_router(image_edit.router, prefix="/listings", tags=["image-editing"])
     app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
