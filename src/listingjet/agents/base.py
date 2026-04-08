@@ -8,6 +8,15 @@ from listingjet.services.metrics import StepTimer
 from listingjet.telemetry import agent_span
 
 
+def _safe_heartbeat(detail: object) -> None:
+    """Send a Temporal activity heartbeat, silently no-op outside an activity context."""
+    try:
+        from temporalio import activity
+        activity.heartbeat(detail)
+    except RuntimeError:
+        pass  # Not running inside a Temporal activity (e.g. unit tests)
+
+
 def strip_markdown_fences(text: str) -> str:
     """Remove ```json ... ``` wrappers that LLMs often add around JSON."""
     text = text.strip()

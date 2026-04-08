@@ -11,9 +11,8 @@ import json
 from dataclasses import dataclass
 
 from sqlalchemy import select
-from temporalio import activity
 
-from listingjet.agents.base import strip_markdown_fences
+from listingjet.agents.base import _safe_heartbeat, strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
@@ -110,7 +109,7 @@ class PhotoComplianceAgent(BaseAgent):
                 # detect worker death within the heartbeat_timeout window.
                 results: list[PhotoComplianceResult] = []
                 for idx, (pkg, asset) in enumerate(rows):
-                    activity.heartbeat(f"photo {idx + 1}/{len(rows)}")
+                    _safe_heartbeat(f"photo {idx + 1}/{len(rows)}")
                     presigned = self._storage.presigned_url(asset.file_path, expires_in=300)
                     check = await self._check_photo(
                         image_url=presigned,
