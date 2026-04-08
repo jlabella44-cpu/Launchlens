@@ -1,4 +1,4 @@
-"""Listing import endpoints — import from third-party links (Google Drive, Show & Tour)."""
+"""Listing import endpoints — import from third-party links (Google Drive, Dropbox, Show & Tour)."""
 import asyncio
 import uuid
 
@@ -79,7 +79,7 @@ async def import_from_link_endpoint(
     if not platform:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported link. Supported platforms: Google Drive, Show & Tour.",
+            detail="Unsupported link. Supported platforms: Google Drive, Dropbox, Show & Tour.",
         )
 
     # Create ImportJob record

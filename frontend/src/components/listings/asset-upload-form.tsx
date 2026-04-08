@@ -394,7 +394,7 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Paste Google Drive or Show & Tour link..."
+            placeholder="Paste Google Drive, Dropbox, or Show & Tour link..."
             value={importUrl}
             onChange={(e) => setImportUrl(e.target.value)}
             disabled={importing}
@@ -426,7 +426,7 @@ export function AssetUploadForm({ listingId, onUploaded }: AssetUploadFormProps)
           <p className="mt-2 text-sm text-red-500">{importError}</p>
         )}
         <p className="mt-2 text-xs text-slate-400">
-          Supports Google Drive shared folders and Show &amp; Tour delivery links
+          Supports Google Drive, Dropbox shared folders, and Show &amp; Tour delivery links
         </p>
       </div>
     </GlassCard>
