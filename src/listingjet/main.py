@@ -44,6 +44,7 @@ from listingjet.api import (
     support,
     team,
     tenant_settings,
+    white_label,
 )
 from listingjet.config import settings
 from listingjet.database import AsyncSessionLocal
@@ -199,6 +200,7 @@ def create_app() -> FastAPI:
     app.include_router(launch.router, tags=["launch"])
     app.include_router(listing_health.router, tags=["listing-health"])
     app.include_router(performance.router, tags=["performance"])
+    app.include_router(white_label.router, tags=["white-label"])
     app.include_router(health.router)
 
     from fastapi.responses import JSONResponse

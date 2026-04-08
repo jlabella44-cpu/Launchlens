@@ -6,9 +6,11 @@ import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { useBranding } from "@/contexts/branding-context";
 
 export function Nav() {
   const { user, logout } = useAuth();
+  const branding = useBranding();
   const [menuOpen, setMenuOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
 
@@ -22,7 +24,11 @@ export function Nav() {
           className="font-[var(--font-heading)] text-xl font-bold text-[var(--color-primary)] tracking-wide shrink-0"
           style={{ fontFamily: "var(--font-heading)" }}
         >
-          ListingJet
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.appName} className="h-7" />
+          ) : (
+            branding.appName
+          )}
         </Link>
 
         <button
