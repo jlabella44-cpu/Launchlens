@@ -59,6 +59,8 @@ import type {
   IdxFeedConfig,
   IdxFeedConfigCreate,
   HealthWeights,
+  PerformanceOverview,
+  ListingPerformance,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -944,6 +946,15 @@ class ApiClient {
 
   async updateHealthWeights(weights: HealthWeights): Promise<HealthWeights> {
     return this.request("/settings/health-weights", { method: "PATCH", body: JSON.stringify(weights) });
+  }
+
+  // Performance Intelligence
+  async getPerformanceOverview(): Promise<PerformanceOverview> {
+    return this.request("/analytics/performance");
+  }
+
+  async getListingPerformance(listingId: string): Promise<ListingPerformance> {
+    return this.request(`/analytics/performance/listing/${listingId}`);
   }
 }
 
