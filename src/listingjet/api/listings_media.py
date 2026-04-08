@@ -298,8 +298,8 @@ async def reorder_package(
 
     swapped = 0
     for swap in swaps:
-        from_pos = swap.get("from_position")
-        to_pos = swap.get("to_position")
+        from_pos = swap.get("from_position") if isinstance(swap, dict) else getattr(swap, "from_position", None)
+        to_pos = swap.get("to_position") if isinstance(swap, dict) else getattr(swap, "to_position", None)
         if from_pos is None or to_pos is None:
             continue
 
@@ -314,33 +314,36 @@ async def reorder_package(
         sel_to.selected_by = "human"
 
         # Emit override events with room_label for learning agent
-        from_vr = vr_map.get(sel_from.asset_id)
-        to_vr = vr_map.get(sel_to.asset_id)
+        try:
+            from_vr = vr_map.get(sel_from.asset_id)
+            to_vr = vr_map.get(sel_to.asset_id)
 
-        await emit_event(
-            session=db,
-            event_type="package.override.swap_to",
-            payload={
-                "asset_id": str(sel_from.asset_id),
-                "room_label": from_vr.room_label if from_vr else None,
-                "from_position": to_pos,
-                "to_position": from_pos,
-            },
-            tenant_id=str(current_user.tenant_id),
-            listing_id=str(listing.id),
-        )
-        await emit_event(
-            session=db,
-            event_type="package.override.swap_from",
-            payload={
-                "asset_id": str(sel_to.asset_id),
-                "room_label": to_vr.room_label if to_vr else None,
-                "from_position": from_pos,
-                "to_position": to_pos,
-            },
-            tenant_id=str(current_user.tenant_id),
-            listing_id=str(listing.id),
-        )
+            await emit_event(
+                session=db,
+                event_type="package.override.swap_to",
+                payload={
+                    "asset_id": str(sel_from.asset_id),
+                    "room_label": from_vr.room_label if from_vr else None,
+                    "from_position": to_pos,
+                    "to_position": from_pos,
+                },
+                tenant_id=str(current_user.tenant_id),
+                listing_id=str(listing.id),
+            )
+            await emit_event(
+                session=db,
+                event_type="package.override.swap_from",
+                payload={
+                    "asset_id": str(sel_to.asset_id),
+                    "room_label": to_vr.room_label if to_vr else None,
+                    "from_position": from_pos,
+                    "to_position": to_pos,
+                },
+                tenant_id=str(current_user.tenant_id),
+                listing_id=str(listing.id),
+            )
+        except Exception:
+            logger.exception("Failed to emit reorder events for swap %s->%s", from_pos, to_pos)
         swapped += 1
 
     await db.commit()
