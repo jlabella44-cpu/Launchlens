@@ -130,6 +130,7 @@ async def register_assets(
             detail=f"Asset limit reached ({existing_count}/{max_allowed}). Upgrade your plan for more.",
         )
 
+    created_assets = []
     for a in body.assets:
         asset = Asset(
             tenant_id=current_user.tenant_id,
@@ -139,11 +140,13 @@ async def register_assets(
             state="uploaded",
         )
         db.add(asset)
+        created_assets.append(asset)
 
     if listing.state == ListingState.NEW:
         listing.state = ListingState.UPLOADING
         # DRAFT listings stay in DRAFT — pipeline starts via /start-pipeline endpoint
 
+    await db.flush()  # assign IDs to created_assets
     await db.commit()
 
     # Trigger the pipeline if listing just entered UPLOADING
@@ -163,6 +166,7 @@ async def register_assets(
     return CreateAssetsResponse(
         count=len(body.assets),
         listing_state=listing.state.value,
+        assets=created_assets,
     )
 
 

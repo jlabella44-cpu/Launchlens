@@ -13,9 +13,17 @@ class CreateAssetsRequest(BaseModel):
     assets: list[AssetInput]
 
 
+class AssetSummary(BaseModel):
+    id: uuid.UUID
+    file_path: str
+
+    model_config = {"from_attributes": True}
+
+
 class CreateAssetsResponse(BaseModel):
     count: int
     listing_state: str
+    assets: list[AssetSummary]
 
 
 class AssetResponse(BaseModel):
