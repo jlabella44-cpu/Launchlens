@@ -103,3 +103,30 @@ class BaseAgent(ABC):
             tenant_id=context.tenant_id,
             listing_id=context.listing_id,
         )
+
+    # Sentinel UUID for system/agent-initiated audit entries.
+    _AGENT_SENTINEL_USER = uuid.UUID("00000000-0000-0000-0000-000000000000")
+
+    async def log_decision(
+        self,
+        session,
+        context: "AgentContext",
+        action: str,
+        reasoning: str,
+        details: dict | None = None,
+    ) -> None:
+        """Record an agent decision in the audit log with its reasoning.
+
+        This provides a structured trail for the Shadow Reviewer and human
+        operators to understand *why* an agent took a particular action.
+        """
+        from listingjet.services.audit import audit_log
+        await audit_log(
+            session=session,
+            user_id=self._AGENT_SENTINEL_USER,
+            action=f"agent.{self.agent_name}.{action}",
+            resource_type="listing",
+            resource_id=context.listing_id,
+            tenant_id=uuid.UUID(context.tenant_id),
+            details={"reasoning": reasoning, **(details or {})},
+        )

@@ -1,7 +1,13 @@
+import logging
+
 from temporalio.client import Client
+from temporalio.common import WorkflowIDReusePolicy
+from temporalio.service import RPCError
 
 from listingjet.config import settings
 from listingjet.workflows.listing_pipeline import ListingPipeline, ListingPipelineInput
+
+logger = logging.getLogger(__name__)
 
 
 class TemporalClient:
@@ -23,19 +29,29 @@ class TemporalClient:
     ) -> str:
         client = await self._connect()
         workflow_id = f"listing-pipeline-{listing_id}"
-        handle = await client.start_workflow(
-            ListingPipeline.run,
-            ListingPipelineInput(
-                listing_id=listing_id,
-                tenant_id=tenant_id,
-                plan=plan,
-                billing_model=billing_model,
-                enabled_addons=enabled_addons,
-            ),
-            id=workflow_id,
-            task_queue=settings.temporal_task_queue,
-        )
-        return handle.id
+        try:
+            handle = await client.start_workflow(
+                ListingPipeline.run,
+                ListingPipelineInput(
+                    listing_id=listing_id,
+                    tenant_id=tenant_id,
+                    plan=plan,
+                    billing_model=billing_model,
+                    enabled_addons=enabled_addons,
+                ),
+                id=workflow_id,
+                task_queue=settings.temporal_task_queue,
+                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+            )
+            return handle.id
+        except RPCError as exc:
+            if "already started" in str(exc).lower():
+                logger.warning(
+                    "Workflow already running for listing %s, returning existing handle",
+                    listing_id,
+                )
+                return workflow_id
+            raise
 
     async def signal_review_completed(self, listing_id: str) -> None:
         client = await self._connect()
