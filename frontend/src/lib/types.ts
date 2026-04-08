@@ -597,6 +597,28 @@ export interface IdxFeedConfigCreate {
   poll_interval_minutes?: number;
 }
 
+// -- Performance Intelligence --
+
+export interface PerformanceInsight {
+  type: string;
+  data: Record<string, unknown>;
+  sample_size: number;
+}
+
+export interface PerformanceOverview {
+  tenant_id: string;
+  total_outcomes: number;
+  insights: PerformanceInsight[];
+  sufficient_data: boolean;
+}
+
+export interface ListingPerformance {
+  listing_id: string;
+  outcome: Record<string, unknown>;
+  comparisons: Record<string, unknown>;
+  sample_size: number;
+}
+
 export interface HealthWeights {
   media: number;
   content: number;

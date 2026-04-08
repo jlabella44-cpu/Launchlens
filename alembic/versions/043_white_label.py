@@ -1,15 +1,15 @@
 """Add white-label columns to brand_kits.
 
-Revision ID: 042_white_label
-Revises: 041_health_score
+Revision ID: 043_white_label
+Revises: 042_performance_intelligence
 """
 
 import sqlalchemy as sa
 
 from alembic import op
 
-revision = "042_white_label"
-down_revision = "041_health_score"
+revision = "043_white_label"
+down_revision = "042_performance_intelligence"
 branch_labels = None
 depends_on = None
 
