@@ -210,14 +210,14 @@ export function StepUploadPhotos({ formData, onUpdate, onNext, onBack }: Props) 
       const registered = await apiClient.registerAssets(listingId, { assets });
 
       // Store uploaded assets in wizard state
-      const uploadedAssets = (registered as any).assets ?? [];
+      const returnedAssets = (registered as any).assets ?? [];
       onUpdate({
         uploadedAssets: [
           ...formData.uploadedAssets,
-          ...uploadedAssets.map((a: any) => ({
+          ...returnedAssets.map((a: any, i: number) => ({
             id: a.id,
-            filename: a.filename ?? a.file_path ?? "",
-            url: a.url ?? a.cdn_url ?? "",
+            filename: successful[i]?.file?.name ?? a.file_path ?? "",
+            url: "",
           })),
         ],
       });
