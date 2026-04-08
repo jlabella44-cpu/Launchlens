@@ -1,5 +1,7 @@
 # src/listingjet/agents/packaging.py
+import logging
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from sqlalchemy import delete, select
@@ -16,8 +18,45 @@ from listingjet.services.weight_manager import WeightManager
 
 from .base import AgentContext, BaseAgent
 
+logger = logging.getLogger(__name__)
+
 MLS_MAX_PHOTOS = 25  # 1 hero + 24 supporting
 DEFAULT_ROOM_WEIGHT = 1.0  # Neutral weight when no LearningWeight data exists
+MIN_QUALITY_SCORE = 25  # Skip photos below this quality threshold
+
+# Required rooms: must include at least 1 of each if available
+REQUIRED_ROOMS = ["exterior", "kitchen", "living_room", "bathroom"]
+
+# Max slots per room type (prevents overrepresentation)
+ROOM_MAX_SLOTS: dict[str, int] = {
+    "exterior": 4,
+    "living_room": 2,
+    "kitchen": 2,
+    "dining_room": 2,
+    "bedroom": 3,
+    "bathroom": 3,
+    "office": 1,
+    "backyard": 2,
+    "pool": 2,
+    "garage": 1,
+    "basement": 1,
+    "laundry": 0,  # exclude
+}
+
+# MLS position ordering — exterior first, then interior flow
+MLS_POSITION_ORDER = [
+    "exterior",
+    "living_room",
+    "kitchen",
+    "dining_room",
+    "bedroom",
+    "bathroom",
+    "office",
+    "backyard",
+    "pool",
+    "garage",
+    "basement",
+]
 
 
 class PackagingAgent(BaseAgent):
@@ -26,6 +65,87 @@ class PackagingAgent(BaseAgent):
     def __init__(self, session_factory=None, weight_manager=None):
         self._session_factory = session_factory or AsyncSessionLocal
         self._wm = weight_manager or WeightManager()
+
+    @staticmethod
+    def _select_diverse(
+        scored: list[tuple[float, uuid.UUID, VisionResult]],
+    ) -> list[tuple[float, uuid.UUID, VisionResult]]:
+        """Select up to MLS_MAX_PHOTOS with room diversity constraints."""
+        # Filter quality floor
+        candidates = [
+            (s, aid, vr) for s, aid, vr in scored
+            if (vr.quality_score or 50) >= MIN_QUALITY_SCORE
+        ]
+
+        # Filter excluded rooms (max_slots == 0)
+        candidates = [
+            (s, aid, vr) for s, aid, vr in candidates
+            if ROOM_MAX_SLOTS.get(vr.room_label, 2) > 0
+        ]
+
+        selected: list[tuple[float, uuid.UUID, VisionResult]] = []
+        selected_ids: set[uuid.UUID] = set()
+        room_counts: dict[str, int] = defaultdict(int)
+
+        # Phase 1: Guarantee required rooms (best photo per required room)
+        for required in REQUIRED_ROOMS:
+            for s, aid, vr in candidates:
+                if aid in selected_ids:
+                    continue
+                if vr.room_label == required:
+                    selected.append((s, aid, vr))
+                    selected_ids.add(aid)
+                    room_counts[required] += 1
+                    break
+
+        # Phase 2: Fill remaining slots by score, respecting room caps
+        for s, aid, vr in candidates:
+            if len(selected) >= MLS_MAX_PHOTOS:
+                break
+            if aid in selected_ids:
+                continue
+            room = vr.room_label or "_unknown"
+            max_slots = ROOM_MAX_SLOTS.get(room, 2)
+            if room_counts[room] >= max_slots:
+                continue
+            selected.append((s, aid, vr))
+            selected_ids.add(aid)
+            room_counts[room] += 1
+
+        return selected
+
+    @staticmethod
+    def _reorder_mls(
+        selected: list[tuple[float, uuid.UUID, VisionResult]],
+    ) -> list[tuple[float, uuid.UUID, VisionResult]]:
+        """Reorder selected photos to follow MLS best practice positioning."""
+        priority = {room: i for i, room in enumerate(MLS_POSITION_ORDER)}
+        max_priority = len(MLS_POSITION_ORDER)
+
+        # Hero: best exterior, or best overall if no exterior
+        hero = None
+        rest = []
+        for item in selected:
+            if hero is None and item[2].room_label == "exterior":
+                hero = item
+            else:
+                rest.append(item)
+
+        if hero is None and selected:
+            hero = selected[0]
+            rest = selected[1:]
+
+        # Sort rest by room priority, then by score within room
+        rest.sort(key=lambda x: (
+            priority.get(x[2].room_label or "_unknown", max_priority),
+            -x[0],  # higher score first within same room
+        ))
+
+        result = []
+        if hero:
+            result.append(hero)
+        result.extend(rest)
+        return result
 
     async def execute(self, context: AgentContext) -> dict:
         async with self.session_scope(context) as (session, listing_id, tenant_id):
@@ -76,7 +196,10 @@ class PackagingAgent(BaseAgent):
                     scored.append((score, asset_id, vr))
 
                 scored.sort(key=lambda x: x[0], reverse=True)
-                top = scored[:MLS_MAX_PHOTOS]
+
+                # Diversity-aware selection + MLS ordering
+                top = self._select_diverse(scored)
+                top = self._reorder_mls(top)
 
                 hero_asset_id = str(top[0][1]) if top else None
 
