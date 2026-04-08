@@ -38,31 +38,31 @@ async def _create_listing(client: AsyncClient, token: str) -> str:
 
 @pytest.mark.asyncio
 @patch("listingjet.api.listings_media.get_storage")
-async def test_upload_urls_max_50_files_succeeds(MockStorage, async_client: AsyncClient):
-    """Request presigned URLs for exactly 50 files → 200 with 50 URLs."""
+async def test_upload_urls_max_100_files_succeeds(MockStorage, async_client: AsyncClient):
+    """Request presigned URLs for exactly 100 files → 200 with 100 URLs."""
     mock_svc = MockStorage.return_value
     mock_svc.presigned_upload_url.return_value = "https://s3.example.com/presigned"
 
     token, _ = await _register(async_client)
     listing_id = await _create_listing(async_client, token)
 
-    filenames = [f"photo_{i}.jpg" for i in range(50)]
+    filenames = [f"photo_{i}.jpg" for i in range(100)]
     resp = await async_client.post(
         f"/listings/{listing_id}/upload-urls",
         json={"filenames": filenames},
         headers=_auth(token),
     )
     assert resp.status_code == 200
-    assert len(resp.json()["upload_urls"]) == 50
+    assert len(resp.json()["upload_urls"]) == 100
 
 
 @pytest.mark.asyncio
-async def test_upload_urls_51_files_returns_400(async_client: AsyncClient):
-    """Request presigned URLs for 51 files → 400."""
+async def test_upload_urls_101_files_returns_400(async_client: AsyncClient):
+    """Request presigned URLs for 101 files → 400."""
     token, _ = await _register(async_client)
     listing_id = await _create_listing(async_client, token)
 
-    filenames = [f"photo_{i}.jpg" for i in range(51)]
+    filenames = [f"photo_{i}.jpg" for i in range(101)]
     resp = await async_client.post(
         f"/listings/{listing_id}/upload-urls",
         json={"filenames": filenames},

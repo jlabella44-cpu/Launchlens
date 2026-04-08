@@ -66,8 +66,8 @@ async def get_upload_urls(
             files.append({"filename": f, "content_type": body.content_type})
         else:
             files.append({"filename": f.filename, "content_type": f.content_type or body.content_type})
-    if not files or len(files) > 50:
-        raise HTTPException(status_code=400, detail="Provide 1-50 files")
+    if not files or len(files) > 100:
+        raise HTTPException(status_code=400, detail="Provide 1-100 files")
 
     ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
     storage = get_storage()
