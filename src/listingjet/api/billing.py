@@ -24,6 +24,7 @@ from listingjet.models.user import User
 from listingjet.services.billing import BillingService
 from listingjet.services.credits import CreditService
 from listingjet.services.endpoint_rate_limit import rate_limit
+from listingjet.services.events import emit_event
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +241,19 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                 "payment_failed customer=%s invoice=%s",
                 customer_id, data_object.get("id"),
             )
+            # Find tenant by Stripe customer ID and emit event
+            from listingjet.models.tenant import Tenant
+            tenant = (await db.execute(
+                select(Tenant).where(Tenant.stripe_customer_id == customer_id)
+            )).scalar_one_or_none()
+            if tenant:
+                await emit_event(
+                    session=db,
+                    event_type="billing.payment_failed",
+                    payload={"customer_id": customer_id, "invoice_id": data_object.get("id")},
+                    tenant_id=str(tenant.id),
+                )
+                await db.commit()
 
     return {"status": "ok"}
 
@@ -281,6 +295,12 @@ async def _handle_checkout_completed(
                 reference_type="stripe_event",
                 reference_id=event_id,
                 description=f"Credit bundle: {bundle_size} credits",
+            )
+            await emit_event(
+                session=db,
+                event_type="credit.bundle_fulfilled",
+                payload={"bundle_size": bundle_size, "stripe_event_id": event_id},
+                tenant_id=str(tenant.id),
             )
             await db.commit()
         return

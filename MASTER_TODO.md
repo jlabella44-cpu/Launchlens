@@ -69,10 +69,10 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] Credit service test coverage — 27 tests covering deduction, FIFO, dual-pool, rollover, idempotency, concurrency, has_sufficient_credits, count_transactions
 
 ### Registration (Session 13)
-- [ ] Complete registration flow tasks
+- [x] Complete registration flow — backend registration, plan tier selection, credit account creation, welcome email, frontend register + onboarding pages all implemented
 
 ### Webhooks (Session 14)
-- [ ] Webhook expansion for credit bundle fulfillment
+- [x] Webhook expansion — emit `credit.bundle_fulfilled`, `billing.payment_failed`, `credit.low_balance` events via outbox
 
 ### Admin Dashboard (Session 15 + Progress Doc)
 - [x] **Overview tab** — stats, attention alert, revenue summary, recent events feed
@@ -140,7 +140,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ### Code Cleanup (from TODO.md)
 - [x] **Listings.py monolith** — split 806-line `listings_media.py` into `listings_video.py` (115), `listings_import.py` (147), `listings_review.py` (130), keeping media at 440
 - [x] **CSP blocks frontend** — already relaxed to `frame-ancestors 'none'` (API backend only)
-- [ ] **Pipeline status endpoint expensive** — `get_pipeline_status` recomputes on every request; needs caching
+- [x] **Pipeline status endpoint expensive** — engagement score cached in-process after first computation per listing
 - [x] Dead comment in listings.py (Audit #18) — no longer present
 - [x] Unused listing states: `SHADOW_REVIEW`, `GENERATING`, `DELIVERING`, `TRACKING` (Audit #19) — never existed in enum
 - [ ] Test JWT fixture doesn't create User rows (Audit #20)

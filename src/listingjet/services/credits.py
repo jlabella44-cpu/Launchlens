@@ -112,9 +112,16 @@ class CreditService:
         )
         session.add(txn)
 
-        # Low-credit alert
+        # Low-credit alert + webhook event
         if account.balance < 3:
             self._send_low_credit_alert(session, tenant_id, account.balance)
+            from listingjet.services.events import emit_event
+            await emit_event(
+                session=session,
+                event_type="credit.low_balance",
+                payload={"balance": account.balance, "threshold": 3},
+                tenant_id=str(tenant_id),
+            )
 
         return txn
 
