@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
 import type { PackageSelection } from "@/lib/types";
@@ -38,10 +39,12 @@ export function PackageViewer({ selections }: PackageViewerProps) {
                 #{sel.position + 1}
               </span>
               {sel.thumbnail_url ? (
-                <img
+                <Image
                   src={sel.thumbnail_url}
                   alt={`Photo ${sel.position + 1}`}
-                  className="w-12 h-9 object-cover rounded"
+                  width={48}
+                  height={36}
+                  className="object-cover rounded"
                 />
               ) : (
                 <div className="w-12 h-9 rounded bg-slate-100 flex items-center justify-center">

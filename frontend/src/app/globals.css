@@ -21,8 +21,8 @@
   --color-input-border: #E2E8F0;
 
   /* Typography — Exo 2 for aviation feel, Josefin Sans for body */
-  --font-heading: "Exo 2", sans-serif;
-  --font-body: "Josefin Sans", sans-serif;
+  --font-heading: var(--font-exo2), "Exo 2", sans-serif;
+  --font-body: var(--font-josefin), "Josefin Sans", sans-serif;
 
   /* Spacing */
   --space-xs: 4px;
