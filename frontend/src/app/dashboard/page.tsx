@@ -270,9 +270,11 @@ function DashboardContent() {
                   title="No listings yet"
                   description="Upload your first property photos and let our AI generate MLS-ready marketing materials in minutes."
                   action={
-                    <Button variant="primary" onClick={() => setShowCreateDialog(true)}>
-                      Create First Listing
-                    </Button>
+                    <Link href="/listings/new">
+                      <Button variant="primary">
+                        Create First Listing
+                      </Button>
+                    </Link>
                   }
                 />
               </GlassCard>
@@ -303,13 +305,11 @@ function DashboardContent() {
                 Quick Actions
               </h3>
               <div className="space-y-2">
-                <Button
-                  variant="primary"
-                  className="w-full"
-                  onClick={() => setShowCreateDialog(true)}
-                >
-                  + New Listing
-                </Button>
+                <Link href="/listings/new" className="block">
+                  <Button variant="primary" className="w-full">
+                    + New Listing
+                  </Button>
+                </Link>
                 <Link href="/review" className="block">
                   <Button variant="secondary" className="w-full">
                     Review Queue
