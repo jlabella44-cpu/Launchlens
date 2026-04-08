@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 
-from listingjet.agents.base import strip_markdown_fences
+from listingjet.agents.base import _safe_heartbeat, strip_markdown_fences
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
@@ -105,9 +105,11 @@ class PhotoComplianceAgent(BaseAgent):
                 )
                 rows = result.all()
 
-                # Scan each photo
+                # Scan each photo, heartbeating progress so Temporal can
+                # detect worker death within the heartbeat_timeout window.
                 results: list[PhotoComplianceResult] = []
-                for pkg, asset in rows:
+                for idx, (pkg, asset) in enumerate(rows):
+                    _safe_heartbeat(f"photo {idx + 1}/{len(rows)}")
                     presigned = self._storage.presigned_url(asset.file_path, expires_in=300)
                     check = await self._check_photo(
                         image_url=presigned,
@@ -116,6 +118,23 @@ class PhotoComplianceAgent(BaseAgent):
                     )
                     results.append(check)
 
+                    # Audit-log each flagged photo with reasoning so the
+                    # Shadow Reviewer can understand why it was flagged.
+                    if not check.compliant:
+                        await self.log_decision(
+                            session,
+                            context,
+                            action="flagged",
+                            reasoning=check.issues_summary,
+                            details={
+                                "asset_id": check.asset_id,
+                                "branding": check.branding,
+                                "signage": check.signage,
+                                "people": check.people,
+                                "text_overlay": check.text_overlay,
+                            },
+                        )
+
                 # Build report
                 flagged = [r for r in results if not r.compliant]
                 report = {
@@ -123,6 +142,18 @@ class PhotoComplianceAgent(BaseAgent):
                     "compliant_count": len(results) - len(flagged),
                     "flagged_count": len(flagged),
                     "all_compliant": len(flagged) == 0,
+                    "decisions": [
+                        {
+                            "asset_id": r.asset_id,
+                            "compliant": r.compliant,
+                            "branding": r.branding,
+                            "signage": r.signage,
+                            "people": r.people,
+                            "text_overlay": r.text_overlay,
+                            "reasoning": r.issues_summary,
+                        }
+                        for r in results
+                    ],
                     "flagged_photos": [
                         {
                             "asset_id": r.asset_id,

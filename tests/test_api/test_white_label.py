@@ -4,8 +4,11 @@ import uuid
 import jwt as pyjwt
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from listingjet.config import settings
+
+_TEST_DB_URL = "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
 
 
 async def _register(client: AsyncClient, plan: str = "team") -> tuple[str, str]:
@@ -18,13 +21,17 @@ async def _register(client: AsyncClient, plan: str = "team") -> tuple[str, str]:
     tenant_id = payload["tenant_id"]
 
     if plan != "free":
-        from listingjet.database import AsyncSessionLocal
         from listingjet.models.tenant import Tenant
-        async with AsyncSessionLocal() as db:
-            tenant = await db.get(Tenant, uuid.UUID(tenant_id))
-            if tenant:
-                tenant.plan = plan
-                await db.commit()
+        # Use the test DB directly — AsyncSessionLocal points to the main DB
+        # engine which is a different database (and possibly event loop) in CI.
+        engine = create_async_engine(_TEST_DB_URL, echo=False)
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as db:
+            async with db.begin():
+                tenant = await db.get(Tenant, uuid.UUID(tenant_id))
+                if tenant:
+                    tenant.plan = plan
+        await engine.dispose()
 
     return token, tenant_id
 

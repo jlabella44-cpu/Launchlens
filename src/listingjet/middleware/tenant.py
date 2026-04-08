@@ -5,7 +5,7 @@ from starlette.responses import JSONResponse
 
 from listingjet.config import settings
 
-_PUBLIC_PATHS = {"/health", "/health/deep", "/auth/register", "/auth/login", "/billing/webhook", "/demo/upload", "/addons"}
+_PUBLIC_PATHS = {"/health", "/health/deep", "/auth/register", "/auth/login", "/auth/refresh", "/auth/forgot-password", "/auth/reset-password", "/billing/webhook", "/demo/upload", "/addons", "/branding"}
 
 
 class TenantMiddleware:
