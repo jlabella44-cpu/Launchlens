@@ -39,6 +39,7 @@ from listingjet.api import (
     notifications,
     properties,
     social_accounts,
+    social_publish,
     sse,
     support,
     team,
@@ -54,6 +55,7 @@ from listingjet.middleware.tenant import TenantMiddleware
 from listingjet.monitoring import init_monitoring
 from listingjet.services.idx_feed_poller import IdxFeedPoller
 from listingjet.services.outbox_poller import OutboxPoller
+from listingjet.services.scheduled_post_executor import ScheduledPostExecutor
 
 setup_logging(app_env=settings.app_env, log_level=settings.log_level)
 
@@ -78,8 +80,10 @@ async def lifespan(app: FastAPI):
 
     outbox_task = None
     idx_task = None
+    post_task = None
     outbox_poller = None
     idx_poller = None
+    post_executor = None
     try:
         outbox_poller = OutboxPoller(session_factory=AsyncSessionLocal)
         outbox_task = asyncio.create_task(outbox_poller.run())
@@ -92,9 +96,15 @@ async def lifespan(app: FastAPI):
     except Exception:
         logging.getLogger(__name__).warning("IDX feed poller failed to start — running without it")
 
+    try:
+        post_executor = ScheduledPostExecutor(session_factory=AsyncSessionLocal)
+        post_task = asyncio.create_task(post_executor.run())
+    except Exception:
+        logging.getLogger(__name__).warning("Scheduled post executor failed to start — running without it")
+
     yield
 
-    for poller_obj, task_obj in [(outbox_poller, outbox_task), (idx_poller, idx_task)]:
+    for poller_obj, task_obj in [(outbox_poller, outbox_task), (idx_poller, idx_task), (post_executor, post_task)]:
         if task_obj:
             try:
                 if poller_obj:
@@ -195,6 +205,7 @@ def create_app() -> FastAPI:
     app.include_router(listing_events.router, prefix="/listings", tags=["listing-events"])
     app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
     app.include_router(social_accounts.router, prefix="/social-accounts", tags=["social-accounts"])
+    app.include_router(social_publish.router, tags=["social-publish"])
     app.include_router(launch.router, tags=["launch"])
     app.include_router(listing_health.router, tags=["listing-health"])
     app.include_router(health.router)

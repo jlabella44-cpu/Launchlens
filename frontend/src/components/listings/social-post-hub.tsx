@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import apiClient from "@/lib/api-client";
+import type { ScheduledPost } from "@/lib/types";
 import { PlatformPostCard } from "./platform-post-card";
 import type { CaptionStyle } from "./caption-hook-selector";
 
@@ -16,6 +17,7 @@ interface SocialAccount {
   id: string;
   platform: string;
   platform_username: string;
+  status: string;
 }
 
 interface SocialCutInfo {
@@ -29,6 +31,22 @@ interface SocialContent {
   instagram_captions?: Partial<Record<CaptionStyle, string>>;
   facebook_captions?: Partial<Record<CaptionStyle, string>>;
   hashtags?: string[];
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    published: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+    scheduled: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+    publishing: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
+    failed: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+    cancelled: "bg-slate-100 text-slate-500",
+    draft: "bg-slate-100 text-slate-500",
+  };
+  return (
+    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${styles[status] || styles.draft}`}>
+      {status}
+    </span>
+  );
 }
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -48,6 +66,7 @@ export function SocialPostHub({ listingId }: SocialPostHubProps) {
   const [socialContent, setSocialContent] = useState<SocialContent | null>(null);
   const [socialCuts, setSocialCuts] = useState<SocialCutInfo[]>([]);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeEvent, setActiveEvent] = useState<ListingEvent | null>(null);
 
@@ -76,6 +95,14 @@ export function SocialPostHub({ listingId }: SocialPostHubProps) {
           setSocialCuts(cuts as any);
         } catch {
           setSocialCuts([]);
+        }
+
+        // Scheduled/published posts
+        try {
+          const posts = await apiClient.listSocialPosts(listingId);
+          setScheduledPosts(posts);
+        } catch {
+          setScheduledPosts([]);
         }
       } catch {
         // non-fatal
@@ -118,6 +145,44 @@ export function SocialPostHub({ listingId }: SocialPostHubProps) {
     if (!activeEvent) return;
     try {
       await apiClient.markEventPosted(listingId, activeEvent.id, platform);
+    } catch {
+      // silent
+    }
+  }
+
+  function isAccountConnected(platform: string): boolean {
+    return socialAccounts.some(
+      (a) => a.platform?.toLowerCase() === platform.toLowerCase() && a.status === "connected"
+    );
+  }
+
+  async function handlePublishNow(platform: string, caption: string, hashtags: string[]) {
+    try {
+      const cut = getCutForPlatform(platform);
+      const mediaKeys = cut ? [cut.download_url] : [];
+      const post = await apiClient.publishNow(listingId, { platform, caption, hashtags, media_s3_keys: mediaKeys });
+      setScheduledPosts((prev) => [post, ...prev]);
+      if (activeEvent) {
+        await apiClient.markEventPosted(listingId, activeEvent.id, platform);
+      }
+    } catch {
+      // error handled by caller via toast
+    }
+  }
+
+  async function handleCancelPost(postId: string) {
+    try {
+      const updated = await apiClient.cancelSocialPost(postId);
+      setScheduledPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+    } catch {
+      // silent
+    }
+  }
+
+  async function handleRetryPost(postId: string) {
+    try {
+      const updated = await apiClient.retrySocialPost(postId);
+      setScheduledPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
     } catch {
       // silent
     }
@@ -184,10 +249,44 @@ export function SocialPostHub({ listingId }: SocialPostHubProps) {
             captions={getCaptions(platform)}
             hashtags={socialContent?.hashtags}
             connectedUsername={getAccountUsername(platform)}
+            isOAuthConnected={isAccountConnected(platform)}
             onMarkPosted={handleMarkPosted}
+            onPublishNow={handlePublishNow}
           />
         ))}
       </div>
+
+      {/* Post Status Section */}
+      {scheduledPosts.length > 0 && (
+        <div className="bg-white dark:bg-[rgba(15,27,45,0.8)] rounded-2xl border border-slate-100 dark:border-white/10 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">
+            Publishing Activity
+          </p>
+          <div className="space-y-2">
+            {scheduledPosts.map((post) => (
+              <div key={post.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 dark:bg-white/5">
+                <span className="text-xs font-semibold capitalize w-20">{post.platform}</span>
+                <StatusBadge status={post.status} />
+                <span className="flex-1 text-xs text-slate-500 truncate">{post.caption.slice(0, 60)}...</span>
+                {post.platform_post_url && (
+                  <a href={post.platform_post_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--color-primary)] hover:underline">
+                    View
+                  </a>
+                )}
+                {post.status === "scheduled" && (
+                  <button onClick={() => handleCancelPost(post.id)} className="text-xs text-red-500 hover:underline">Cancel</button>
+                )}
+                {post.status === "failed" && (
+                  <button onClick={() => handleRetryPost(post.id)} className="text-xs text-[#F97316] hover:underline">Retry</button>
+                )}
+                {post.error_message && post.status === "failed" && (
+                  <span className="text-[10px] text-red-400" title={post.error_message}>Error</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

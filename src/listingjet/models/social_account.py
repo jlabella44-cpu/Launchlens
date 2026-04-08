@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import UUID, DateTime, String, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from listingjet.database import Base
@@ -17,6 +18,10 @@ class SocialAccount(Base):
     platform_username: Mapped[str] = mapped_column(String(100), nullable=False)
     platform_user_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     access_token_encrypted: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    refresh_token_encrypted: Mapped[str | None] = mapped_column(String(500), nullable=True)
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scopes: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    page_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    page_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -10,6 +10,8 @@ interface SocialAccount {
   id: string;
   platform: string;
   platform_username: string;
+  page_name: string | null;
+  status: string;
 }
 
 const PLATFORM_CONFIG: Record<Platform, { label: string; color: string; icon: React.ReactNode }> = {
@@ -62,6 +64,11 @@ export default function ConnectedAccountsSection() {
     facebook: false,
     tiktok: false,
   });
+  const [connecting, setConnecting] = useState<Record<Platform, boolean>>({
+    instagram: false,
+    facebook: false,
+    tiktok: false,
+  });
 
   const load = useCallback(async () => {
     try {
@@ -108,6 +115,22 @@ export default function ConnectedAccountsSection() {
     }
   }
 
+  async function handleOAuthConnect(platform: Platform) {
+    setConnecting((c) => ({ ...c, [platform]: true }));
+    try {
+      const { auth_url } = await apiClient.socialOAuthConnect(platform);
+      window.location.href = auth_url;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Connect failed";
+      if (msg.includes("403")) {
+        toast("Upgrade to Active Agent plan to connect accounts", "error");
+      } else {
+        toast(msg, "error");
+      }
+      setConnecting((c) => ({ ...c, [platform]: false }));
+    }
+  }
+
   async function handleRemove(platform: Platform) {
     const existing = getAccount(platform);
     if (!existing) return;
@@ -137,7 +160,7 @@ export default function ConnectedAccountsSection() {
           Link your social handles so they appear on post previews.
         </p>
         <p className="text-xs text-slate-400 mt-1 italic">
-          Auto-posting coming soon — for now, copy captions and download clips from the Social Post Hub.
+          Connect via OAuth to publish directly, or enter a username for copy-paste mode.
         </p>
       </div>
 
@@ -172,9 +195,13 @@ export default function ConnectedAccountsSection() {
               </div>
 
               {/* Status badge */}
-              {connected ? (
+              {connected?.status === "connected" ? (
                 <span className="shrink-0 text-[10px] font-semibold text-green-600 bg-green-50 dark:bg-green-950/40 dark:text-green-400 px-2 py-0.5 rounded-full">
-                  Connected
+                  {connected.page_name ? `${connected.page_name}` : "Connected"}
+                </span>
+              ) : connected ? (
+                <span className="shrink-0 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                  Manual
                 </span>
               ) : (
                 <span className="shrink-0 text-[10px] font-semibold text-slate-400 bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded-full">
@@ -182,13 +209,24 @@ export default function ConnectedAccountsSection() {
                 </span>
               )}
 
-              {/* Save button */}
+              {/* OAuth connect button */}
+              {(!connected || connected.status !== "connected") && (
+                <button
+                  onClick={() => handleOAuthConnect(platform)}
+                  disabled={connecting[platform]}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {connecting[platform] ? "..." : "Connect"}
+                </button>
+              )}
+
+              {/* Save username button */}
               <button
                 onClick={() => handleSave(platform)}
                 disabled={saving[platform]}
                 className="shrink-0 px-3 py-1.5 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold transition-colors disabled:opacity-50"
               >
-                {saving[platform] ? "Saving..." : "Save"}
+                {saving[platform] ? "..." : "Save"}
               </button>
 
               {/* Remove button */}

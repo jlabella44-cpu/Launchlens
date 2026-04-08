@@ -175,6 +175,15 @@ class Settings(BaseSettings):
     kling_api_base_url: str = "https://api.klingai.com"
     video_score_floor: float = 0.65
 
+    # Social Publishing (Meta / TikTok OAuth)
+    meta_app_id: str = ""
+    meta_app_secret: str = ""
+    meta_redirect_uri: str = "https://api.listingjet.ai/social-accounts/meta/callback"
+    tiktok_client_key: str = ""
+    tiktok_client_secret: str = ""
+    tiktok_redirect_uri: str = "https://api.listingjet.ai/social-accounts/tiktok/callback"
+    social_publish_frontend_redirect: str = "https://listingjet.ai/settings"
+
     # Property Lookup
     attom_api_key: str = ""
     walk_score_api_key: str = ""

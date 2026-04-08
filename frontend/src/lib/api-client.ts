@@ -59,6 +59,10 @@ import type {
   IdxFeedConfig,
   IdxFeedConfigCreate,
   HealthWeights,
+  ScheduledPost,
+  PublishRequest,
+  ScheduleRequest,
+  OAuthRedirectResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -944,6 +948,31 @@ class ApiClient {
 
   async updateHealthWeights(weights: HealthWeights): Promise<HealthWeights> {
     return this.request("/settings/health-weights", { method: "PATCH", body: JSON.stringify(weights) });
+  }
+
+  // Social Publishing
+  async socialOAuthConnect(platform: string): Promise<OAuthRedirectResponse> {
+    return this.request(`/social-accounts/${platform}/connect`);
+  }
+
+  async publishNow(listingId: string, data: PublishRequest): Promise<ScheduledPost> {
+    return this.request(`/listings/${listingId}/social/publish`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async schedulePost(listingId: string, data: ScheduleRequest): Promise<ScheduledPost> {
+    return this.request(`/listings/${listingId}/social/schedule`, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  async listSocialPosts(listingId: string): Promise<ScheduledPost[]> {
+    return this.request(`/listings/${listingId}/social/posts`);
+  }
+
+  async cancelSocialPost(postId: string): Promise<ScheduledPost> {
+    return this.request(`/social/posts/${postId}/cancel`, { method: "PATCH" });
+  }
+
+  async retrySocialPost(postId: string): Promise<ScheduledPost> {
+    return this.request(`/social/posts/${postId}/retry`, { method: "POST" });
   }
 }
 

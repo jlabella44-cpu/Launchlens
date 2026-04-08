@@ -28,3 +28,4 @@ from .notification import Notification                       # noqa
 from .listing_health_score import ListingHealthScore         # noqa
 from .health_score_history import HealthScoreHistory          # noqa
 from .idx_feed_config import IdxFeedConfig                   # noqa
+from .scheduled_post import ScheduledPost                    # noqa

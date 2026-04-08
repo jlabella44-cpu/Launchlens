@@ -604,3 +604,36 @@ export interface HealthWeights {
   syndication: number;
   market: number;
 }
+
+// -- Social Publishing --
+
+export interface ScheduledPost {
+  id: string;
+  listing_id: string;
+  platform: string;
+  caption: string;
+  hashtags: string[];
+  status: string;
+  scheduled_at: string | null;
+  platform_post_id: string | null;
+  platform_post_url: string | null;
+  published_at: string | null;
+  error_message: string | null;
+  retry_count: number;
+  created_at: string;
+}
+
+export interface PublishRequest {
+  platform: string;
+  caption: string;
+  hashtags: string[];
+  media_s3_keys: string[];
+}
+
+export interface ScheduleRequest extends PublishRequest {
+  scheduled_at: string;
+}
+
+export interface OAuthRedirectResponse {
+  auth_url: string;
+}
