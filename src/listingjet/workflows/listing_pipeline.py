@@ -19,6 +19,7 @@ with workflow.unsafe.imports_passed_through():
         run_microsite_generator,
         run_mls_export,
         run_packaging,
+        run_performance_intelligence,
         run_photo_compliance,
         run_property_verification,
         run_social_content,
@@ -259,6 +260,16 @@ class ListingPipeline:
             )
         except Exception as exc:
             workflow.logger.warning("health_score_failed listing=%s error=%s", input.listing_id, exc)
+
+        # Step 9: Performance intelligence — link photos to outcomes (non-blocking)
+        try:
+            await workflow.execute_activity(
+                run_performance_intelligence, ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except Exception as exc:
+            workflow.logger.warning("performance_intelligence_failed listing=%s error=%s", input.listing_id, exc)
 
         return f"pipeline_complete:{input.listing_id}"
 

@@ -38,6 +38,7 @@ from listingjet.api import (
     microsite,
     notifications,
     performance,
+    performance_intelligence,
     properties,
     social_accounts,
     sse,
@@ -200,6 +201,7 @@ def create_app() -> FastAPI:
     app.include_router(launch.router, tags=["launch"])
     app.include_router(listing_health.router, tags=["listing-health"])
     app.include_router(performance.router, tags=["performance"])
+    app.include_router(performance_intelligence.router, tags=["performance-intelligence"])
     app.include_router(white_label.router, tags=["white-label"])
     app.include_router(health.router)
 

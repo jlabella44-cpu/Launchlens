@@ -61,6 +61,9 @@ import type {
   HealthWeights,
   PerformanceOverview,
   ListingPerformance,
+  PerformanceInsightsResponse,
+  OutcomeSummaryResponse,
+  ListingOutcomeResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -955,6 +958,23 @@ class ApiClient {
 
   async getListingPerformance(listingId: string): Promise<ListingPerformance> {
     return this.request(`/analytics/performance/listing/${listingId}`);
+  }
+
+  // Performance Intelligence — Phase 5 enrichments
+  async getPerformanceInsights(): Promise<PerformanceInsightsResponse> {
+    return this.request("/analytics/performance");
+  }
+
+  async getOutcomeSummary(status?: string, limit = 50, offset = 0): Promise<OutcomeSummaryResponse> {
+    const qs = new URLSearchParams();
+    if (status) qs.set("status", status);
+    qs.set("limit", String(limit));
+    qs.set("offset", String(offset));
+    return this.request(`/analytics/performance/outcomes?${qs}`);
+  }
+
+  async getListingOutcome(listingId: string): Promise<ListingOutcomeResponse> {
+    return this.request(`/listings/${listingId}/outcome`);
   }
 }
 

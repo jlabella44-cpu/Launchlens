@@ -238,6 +238,12 @@ async def run_microsite_generator(context: AgentContext) -> dict:
     return await MicrositeGeneratorAgent().instrumented_execute(context)
 
 
+@activity.defn
+async def run_performance_intelligence(context: AgentContext) -> dict:
+    from listingjet.agents.performance_intelligence import PerformanceIntelligenceAgent
+    return await PerformanceIntelligenceAgent().instrumented_execute(context)
+
+
 from listingjet.activities.social_event import run_social_event  # noqa: E402, I001
 
 
@@ -249,5 +255,5 @@ ALL_ACTIVITIES = [
     run_video, run_chapters, run_social_cuts, run_learning,
     run_link_import, run_property_verification,
     run_health_score, run_virtual_staging, run_cma_report, run_microsite_generator,
-    run_social_event,
+    run_social_event, run_performance_intelligence,
 ]
