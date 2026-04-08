@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import apiClient from "@/lib/api-client";
@@ -40,10 +41,12 @@ export function ListingCard({ listing, onDeleted }: ListingCardProps) {
       {/* Photo Thumbnail */}
       <div className="relative aspect-[4/3] bg-gradient-to-br from-slate-200 to-slate-100 overflow-hidden">
         {listing.thumbnail_url ? (
-          <img
+          <Image
             src={listing.thumbnail_url}
             alt={address.street || "Property photo"}
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
