@@ -203,7 +203,7 @@ async def list_assets(
             return None
 
     with ThreadPoolExecutor(max_workers=10) as pool:
-        urls = list(pool.map(_gen_url, [a.file_path for a in assets]))
+        urls = list(pool.map(_gen_url, [a.proxy_path or a.file_path for a in assets]))
 
     for data, asset_obj, url in zip(response, assets, urls):
         # Use presigned URL if available, fall back to proxy_path
@@ -229,7 +229,7 @@ async def get_package(
         raise HTTPException(status_code=404, detail="Listing not found")
 
     result = await db.execute(
-        select(PackageSelection, Asset.file_path)
+        select(PackageSelection, Asset.proxy_path, Asset.file_path)
         .join(Asset, PackageSelection.asset_id == Asset.id)
         .where(PackageSelection.listing_id == listing.id)
         .order_by(PackageSelection.position)
@@ -238,10 +238,10 @@ async def get_package(
 
     storage = get_storage()
     items = []
-    for s, file_path in rows:
+    for s, proxy_path, file_path in rows:
         thumb = None
         try:
-            thumb = storage.presigned_url(file_path, expires_in=3600)
+            thumb = storage.presigned_url(proxy_path or file_path, expires_in=3600)
         except Exception:
             pass
         items.append({
