@@ -209,17 +209,15 @@ export function StepUploadPhotos({ formData, onUpdate, onNext, onBack }: Props) 
 
       const registered = await apiClient.registerAssets(listingId, { assets });
 
-      // Store uploaded assets in wizard state
+      // Store uploaded assets in wizard state using local blob previews for thumbnails
       const returnedAssets = (registered as any).assets ?? [];
+      const newUploaded = returnedAssets.map((a: any, i: number) => ({
+        id: a.id,
+        filename: successful[i]?.file?.name ?? a.file_path ?? "",
+        url: files[i]?.preview ?? URL.createObjectURL(successful[i].file),
+      }));
       onUpdate({
-        uploadedAssets: [
-          ...formData.uploadedAssets,
-          ...returnedAssets.map((a: any, i: number) => ({
-            id: a.id,
-            filename: successful[i]?.file?.name ?? a.file_path ?? "",
-            url: "",
-          })),
-        ],
+        uploadedAssets: [...formData.uploadedAssets, ...newUploaded],
       });
 
       toast(
@@ -227,8 +225,7 @@ export function StepUploadPhotos({ formData, onUpdate, onNext, onBack }: Props) 
         "success"
       );
 
-      // Cleanup pending previews
-      files.forEach((f) => URL.revokeObjectURL(f.preview));
+      // Don't revoke blob URLs — they're used for thumbnails in the wizard
       setFiles([]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Upload failed";
