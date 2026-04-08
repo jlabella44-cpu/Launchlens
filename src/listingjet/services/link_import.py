@@ -1,14 +1,16 @@
 """
 Link-import service — download photos from third-party delivery links
-(Google Drive, Show & Tour) and persist them to S3.
+(Google Drive, Dropbox, Show & Tour) and persist them to S3.
 """
 
 from __future__ import annotations
 
 import hashlib
+import io
 import logging
 import re
 import uuid
+import zipfile
 from collections.abc import Callable
 
 import httpx
@@ -27,12 +29,17 @@ _GOOGLE_DRIVE_RE = re.compile(
 _SHOW_TOUR_RE = re.compile(
     r"(?:show\.tours|showandtour\.com)/(?P<id>[A-Za-z0-9_-]+)"
 )
+_DROPBOX_RE = re.compile(
+    r"(?:www\.)?dropbox\.com/(?:sh|scl/fo)/(?P<id>[A-Za-z0-9_-]+)"
+)
 
 
 def detect_platform(url: str) -> str | None:
     """Return a platform key for *url*, or ``None`` if unrecognised."""
     if _GOOGLE_DRIVE_RE.search(url):
         return "google_drive"
+    if _DROPBOX_RE.search(url):
+        return "dropbox"
     if _SHOW_TOUR_RE.search(url):
         return "show_tour"
     return None
@@ -141,6 +148,60 @@ class ShowTourImporter:
 
 
 # ---------------------------------------------------------------------------
+# Dropbox importer
+# ---------------------------------------------------------------------------
+
+_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic", "gif", "tiff", "tif", "bmp"}
+
+
+class DropboxImporter:
+    """Download images from a publicly-shared Dropbox folder.
+
+    Dropbox shared folder links (``/sh/`` or ``/scl/fo/``) support
+    ``?dl=1`` which returns a ZIP archive of the entire folder.  This
+    avoids needing a Dropbox API token for public links.
+    """
+
+    @staticmethod
+    def _to_direct_url(url: str) -> str:
+        """Convert a Dropbox shared link to a direct-download URL."""
+        # Strip any existing query params and force dl=1
+        base = url.split("?")[0]
+        return f"{base}?dl=1"
+
+    @staticmethod
+    def _is_image(filename: str) -> bool:
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        return ext in _IMAGE_EXTENSIONS
+
+    async def download_folder_zip(self, url: str) -> list[tuple[str, bytes]]:
+        """Download the shared folder as a ZIP and extract image files.
+
+        Returns a list of ``(filename, data)`` tuples.
+        """
+        dl_url = self._to_direct_url(url)
+        async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+            resp = await client.get(dl_url)
+            resp.raise_for_status()
+
+        images: list[tuple[str, bytes]] = []
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+                # Use just the filename, strip any directory prefix
+                filename = info.filename.rsplit("/", 1)[-1]
+                if not self._is_image(filename):
+                    continue
+                data = zf.read(info)
+                if len(data) == 0:
+                    continue
+                images.append((filename, data))
+
+        return images
+
+
+# ---------------------------------------------------------------------------
 # Main entry-point
 # ---------------------------------------------------------------------------
 
@@ -178,6 +239,24 @@ async def import_from_link(
                 logger.exception(
                     "Failed to import Google Drive file %s — skipping",
                     img.get("id"),
+                )
+            if on_progress is not None:
+                on_progress(idx, total)
+
+    elif platform == "dropbox":
+        importer_db = DropboxImporter()
+        images = await importer_db.download_folder_zip(url)
+        total = len(images)
+
+        for idx, (filename, data) in enumerate(images, 1):
+            try:
+                s3_key = _upload(storage, listing_id, batch_id, filename, data)
+                file_hash = hashlib.sha256(data).hexdigest()
+                results.append({"file_path": s3_key, "file_hash": file_hash})
+            except Exception:
+                logger.exception(
+                    "Failed to import Dropbox image %s — skipping",
+                    filename,
                 )
             if on_progress is not None:
                 on_progress(idx, total)
