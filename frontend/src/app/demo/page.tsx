@@ -343,7 +343,7 @@ export default function DemoPage() {
           {/* How it works */}
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { step: "1", title: "Drop Photos", desc: "Drag and drop your listing photos — JPG or PNG, up to 50 files." },
+              { step: "1", title: "Drop Photos", desc: "Drag and drop your listing photos — JPG or PNG, up to 100 files." },
               { step: "2", title: "AI Processes", desc: "Our AI curates, scores, and packages the best shots in minutes." },
               { step: "3", title: "Review Results", desc: "See your AI-curated package. Create an account to unlock all features." },
             ].map((item) => (

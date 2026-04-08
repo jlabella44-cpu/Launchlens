@@ -26,7 +26,7 @@ def test_plan_limits_has_all_tiers():
 def test_free_limits():
     limits = get_limits("free")
     assert limits["max_listings_per_month"] == 5
-    assert limits["max_assets_per_listing"] == 25
+    assert limits["max_assets_per_listing"] == 100
     assert limits["tier2_vision"] is False
 
 
@@ -34,7 +34,7 @@ def test_starter_limits():
     """Legacy alias — same as free."""
     limits = get_limits("starter")
     assert limits["max_listings_per_month"] == 5
-    assert limits["max_assets_per_listing"] == 25
+    assert limits["max_assets_per_listing"] == 100
     assert limits["tier2_vision"] is False
 
 
@@ -42,7 +42,7 @@ def test_pro_limits():
     """Legacy alias — same as active_agent."""
     limits = get_limits("pro")
     assert limits["max_listings_per_month"] == 75
-    assert limits["max_assets_per_listing"] == 50
+    assert limits["max_assets_per_listing"] == 100
     assert limits["tier2_vision"] is True
 
 
@@ -75,7 +75,7 @@ def test_check_asset_quota_under_limit():
 
 def test_check_asset_quota_over_limit():
     from listingjet.services.plan_limits import check_asset_quota
-    assert check_asset_quota("starter", existing_count=10, adding_count=20) is False
+    assert check_asset_quota("starter", existing_count=90, adding_count=20) is False
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -121,14 +121,14 @@ async def test_create_listing_enforces_monthly_quota(async_client: AsyncClient, 
 
 @pytest.mark.asyncio
 async def test_register_assets_enforces_per_listing_quota(async_client: AsyncClient):
-    """Starter plan: 25 assets/listing. Adding beyond limit returns 403."""
+    """Starter plan: 100 assets/listing. Adding beyond limit returns 403."""
     token, _ = await _register(async_client)
     create_resp = await async_client.post("/listings", json={
         "address": {"street": "Asset Quota St"}, "metadata": {},
     }, headers=_auth(token))
     listing_id = create_resp.json()["id"]
 
-    assets_batch = [{"file_path": f"s3://b/{i}.jpg", "file_hash": f"h{i:03d}"} for i in range(25)]
+    assets_batch = [{"file_path": f"s3://b/{i}.jpg", "file_hash": f"h{i:03d}"} for i in range(100)]
     resp = await async_client.post(f"/listings/{listing_id}/assets", json={
         "assets": assets_batch
     }, headers=_auth(token))
