@@ -53,6 +53,70 @@ def test_show_tour_extract_project_id():
     assert project_id == "proj-456"
 
 
+# -- Show & Tour HTML scraping tests ----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_show_tour_list_images_from_html(httpx_mock):
+    """ShowTourImporter extracts image URLs from an HTML delivery page."""
+    html = """
+    <html>
+    <head>
+        <meta property="og:image" content="https://cdn.showandtour.com/photos/hero.jpg" />
+    </head>
+    <body>
+        <img src="https://cdn.showandtour.com/photos/living_room.jpg" />
+        <img src="https://cdn.showandtour.com/photos/kitchen.png?w=1200" />
+        <img src="https://cdn.showandtour.com/photos/bedroom.jpeg" />
+        <img src="/static/favicon.png" />
+        <img src="https://cdn.showandtour.com/icons/logo.png" />
+    </body>
+    </html>
+    """
+    httpx_mock.add_response(url="https://show.tours/LLuh6mqts0vonNo3urLm", text=html)
+
+    importer = ShowTourImporter()
+    urls = await importer.list_images("https://show.tours/LLuh6mqts0vonNo3urLm")
+
+    # Should find 4 real photos, skip favicon and logo
+    assert len(urls) == 4
+    assert any("hero.jpg" in u for u in urls)
+    assert any("living_room.jpg" in u for u in urls)
+    assert any("kitchen.png" in u for u in urls)
+    assert any("bedroom.jpeg" in u for u in urls)
+    assert not any("favicon" in u for u in urls)
+    assert not any("logo" in u for u in urls)
+
+
+@pytest.mark.asyncio
+async def test_show_tour_list_images_deduplicates(httpx_mock):
+    """Duplicate image URLs (differing only by query params) are collapsed."""
+    html = """
+    <html><body>
+        <img src="https://cdn.example.com/photo.jpg?w=800" />
+        <img src="https://cdn.example.com/photo.jpg?w=1200" />
+        <img src="https://cdn.example.com/other.jpg" />
+    </body></html>
+    """
+    httpx_mock.add_response(url="https://show.tours/abc", text=html)
+
+    importer = ShowTourImporter()
+    urls = await importer.list_images("https://show.tours/abc")
+
+    assert len(urls) == 2
+
+
+@pytest.mark.asyncio
+async def test_show_tour_list_images_empty_page(httpx_mock):
+    """A page with no images returns an empty list."""
+    httpx_mock.add_response(url="https://show.tours/empty", text="<html><body>No photos</body></html>")
+
+    importer = ShowTourImporter()
+    urls = await importer.list_images("https://show.tours/empty")
+
+    assert urls == []
+
+
 # -- Dropbox importer unit tests -------------------------------------------
 
 
