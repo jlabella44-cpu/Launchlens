@@ -262,10 +262,10 @@ export function StepUploadPhotos({ formData, onUpdate, onNext, onBack }: Props) 
               // Refresh uploaded assets list
               try {
                 const assets = await apiClient.getAssets(listingId);
-                const mapped = (assets as any[]).map((a: any) => ({
+                const mapped = assets.map((a) => ({
                   id: a.id,
                   filename: a.file_path?.split("/").pop() ?? "",
-                  url: a.url ?? "",
+                  url: a.thumbnail_url ?? "",
                 }));
                 onUpdate({ uploadedAssets: mapped });
               } catch {
