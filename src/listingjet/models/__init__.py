@@ -30,3 +30,4 @@ from .health_score_history import HealthScoreHistory          # noqa
 from .idx_feed_config import IdxFeedConfig                   # noqa
 from .listing_outcome import ListingOutcome                  # noqa
 from .photo_outcome_correlation import PhotoOutcomeCorrelation  # noqa
+from .performance_insight import PerformanceInsight          # noqa

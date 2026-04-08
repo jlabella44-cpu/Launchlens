@@ -150,14 +150,13 @@ async def test_ingest_outcome_creates_record(db_session, listing_with_package, t
     outcome = await ingest_outcome(db_session, listing.id, tenant_id, idx_data, source="test_feed")
 
     assert outcome.status == "closed"
-    assert outcome.list_price == 450000.0
-    assert outcome.sale_price == 460000.0
+    assert outcome.original_price == 450000.0
+    assert outcome.final_price == 460000.0
     assert outcome.price_ratio == pytest.approx(460000 / 450000, abs=0.001)
     assert outcome.days_on_market == 12
     assert outcome.outcome_grade == "A"
-    assert outcome.total_photos_mls == 3
+    assert outcome.photo_count == 3
     assert outcome.hero_room_label == "exterior"
-    assert outcome.avg_photo_score is not None
 
 
 @pytest.mark.asyncio
@@ -201,7 +200,7 @@ async def test_ingest_outcome_counts_price_changes(db_session, listing_with_pack
         db_session, listing.id, tenant_id,
         {"StandardStatus": "Closed", "DaysOnMarket": 60},
     )
-    assert outcome.price_changes == 3
+    assert outcome.price_change_count == 3
 
 
 # ---- Integration tests for compute_correlations ----
@@ -252,7 +251,7 @@ async def test_compute_correlations_generates_data(db_session, tenant_id):
 
         outcome = ListingOutcome(
             tenant_id=tenant_id, listing_id=listing.id, status="closed",
-            list_price=400000, sale_price=410000, price_ratio=1.025,
+            original_price=400000, final_price=410000, price_ratio=1.025,
             days_on_market=15 + i * 5, outcome_grade="A" if i < 2 else "B",
         )
         db_session.add(outcome)

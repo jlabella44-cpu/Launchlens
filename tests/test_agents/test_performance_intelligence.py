@@ -80,9 +80,8 @@ async def test_agent_creates_outcome_stub(db_session, listing_with_photos):
 
     assert outcome is not None
     assert outcome.status == "active"
-    assert outcome.total_photos_mls == 3
+    assert outcome.photo_count == 3
     assert outcome.hero_room_label == "exterior"
-    assert outcome.avg_photo_score is not None
 
 
 @pytest.mark.asyncio

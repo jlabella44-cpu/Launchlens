@@ -1,9 +1,13 @@
+import logging
 from typing import Literal
 
 GLOBAL_BASELINE_WEIGHT = 1.0  # updated after Juke eval set reaches 200 examples
 WEIGHT_MIN = 0.1
 WEIGHT_MAX = 2.0
 BLEND_LISTING_THRESHOLD = 10  # listings (not events) before full tenant weights
+COLD_START_THRESHOLD = 3  # listings below which a weight can be safely reset
+
+logger = logging.getLogger(__name__)
 
 # Outcome boost blending: how much weight outcome data gets vs base score
 # Ramps from 0→OUTCOME_MAX_INFLUENCE as closed listings grow past MIN_OUTCOMES
@@ -41,7 +45,13 @@ class WeightManager:
         # Regression-to-mean: 0.01 pull toward 1.0 on every update
         pull = 0.01 if current_weight > 1.0 else -0.01
         new_weight = current_weight + delta - pull
-        return max(WEIGHT_MIN, min(WEIGHT_MAX, new_weight))
+        clamped = max(WEIGHT_MIN, min(WEIGHT_MAX, new_weight))
+        if clamped == WEIGHT_MIN or clamped == WEIGHT_MAX:
+            logger.warning(
+                "weight_clamped action=%s current=%.3f new=%.3f boundary=%.1f",
+                action, current_weight, new_weight, clamped,
+            )
+        return clamped
 
     def apply_decay(self, weight: float, days_since_update: int) -> float:
         """Regress stale weights toward 1.0 after 90 days of inactivity."""
@@ -96,3 +106,48 @@ class WeightManager:
             base = self.apply_outcome_boost(base, outcome_boost, outcome_samples)
 
         return base
+
+    # ------------------------------------------------------------------
+    # Monitoring & cold-start protection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def check_health(weights: list[dict]) -> dict:
+        """Return health statistics for a set of tenant learning weights.
+
+        *weights* is a list of dicts with keys ``room_label``, ``weight``,
+        and ``labeled_listing_count``.
+
+        Returns a summary dict useful for admin dashboards and alerts.
+        """
+        if not weights:
+            return {
+                "total_rooms": 0,
+                "min_weight": None,
+                "max_weight": None,
+                "at_floor": 0,
+                "at_ceiling": 0,
+                "cold_start_rooms": 0,
+                "cold_start_labels": [],
+            }
+
+        ws = [w["weight"] for w in weights]
+        cold = [
+            w["room_label"]
+            for w in weights
+            if w["labeled_listing_count"] < COLD_START_THRESHOLD
+        ]
+        return {
+            "total_rooms": len(weights),
+            "min_weight": min(ws),
+            "max_weight": max(ws),
+            "at_floor": sum(1 for v in ws if v <= WEIGHT_MIN),
+            "at_ceiling": sum(1 for v in ws if v >= WEIGHT_MAX),
+            "cold_start_rooms": len(cold),
+            "cold_start_labels": cold,
+        }
+
+    @staticmethod
+    def should_reset_cold_start(labeled_listing_count: int) -> bool:
+        """Return True if a weight has too few observations to be reliable."""
+        return labeled_listing_count < COLD_START_THRESHOLD

@@ -255,7 +255,7 @@ export function PerformanceIntelligence() {
                       <td className="py-2 px-2 text-right">
                         {o.price_ratio != null ? `${(o.price_ratio * 100).toFixed(1)}%` : "-"}
                       </td>
-                      <td className="py-2 px-2 text-right">{o.total_photos_mls ?? "-"}</td>
+                      <td className="py-2 px-2 text-right">{o.photo_count ?? "-"}</td>
                       <td className="py-2 px-2 capitalize">{o.hero_room_label?.replace(/_/g, " ") ?? "-"}</td>
                     </tr>
                   ))}

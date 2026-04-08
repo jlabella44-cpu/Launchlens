@@ -14,11 +14,13 @@ from listingjet.api.schemas.admin import (
     UpdateTenantRequest,
 )
 from listingjet.models.credit_transaction import CreditTransaction
+from listingjet.models.learning_weight import LearningWeight
 from listingjet.models.listing import Listing
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.audit import audit_log
 from listingjet.services.events import emit_event
+from listingjet.services.weight_manager import WeightManager
 
 router = APIRouter()
 
@@ -248,3 +250,84 @@ async def adjust_credits(
     await db.commit()
     await db.refresh(txn)
     return txn
+
+
+# ── Weight Health Monitoring ──────────────────────────────────────
+
+
+@router.get("/tenants/{tenant_id}/weight-health")
+async def get_weight_health(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Return learning-weight health stats for a tenant (cold-start detection, boundary alerts)."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    result = await db.execute(
+        select(LearningWeight).where(LearningWeight.tenant_id == tenant_id)
+    )
+    rows = result.scalars().all()
+
+    weights = [
+        {
+            "room_label": w.room_label,
+            "weight": w.weight,
+            "labeled_listing_count": w.labeled_listing_count,
+        }
+        for w in rows
+    ]
+
+    wm = WeightManager()
+    health = wm.check_health(weights)
+    health["weights"] = weights
+    return health
+
+
+@router.post("/tenants/{tenant_id}/weights/reset")
+async def reset_weight(
+    tenant_id: uuid.UUID,
+    room_label: str = Query(..., description="Room label to reset"),
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Reset a cold-start weight to baseline 1.0.
+
+    Only allows reset if the weight has fewer than COLD_START_THRESHOLD
+    labeled listings, preventing accidental erasure of mature weights.
+    """
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    result = await db.execute(
+        select(LearningWeight).where(
+            LearningWeight.tenant_id == tenant_id,
+            LearningWeight.room_label == room_label,
+        )
+    )
+    weight = result.scalar_one_or_none()
+    if not weight:
+        raise HTTPException(status_code=404, detail=f"No weight found for room '{room_label}'")
+
+    wm = WeightManager()
+    if not wm.should_reset_cold_start(weight.labeled_listing_count):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Weight has {weight.labeled_listing_count} labeled listings — "
+            f"exceeds cold-start threshold. Manual reset not recommended.",
+        )
+
+    old_weight = weight.weight
+    weight.weight = 1.0
+    weight.labeled_listing_count = 0
+
+    await audit_log(
+        db, admin_user.id, "reset_weight", "learning_weight",
+        str(weight.id), tenant_id=tenant_id,
+        details={"room_label": room_label, "old_weight": old_weight, "new_weight": 1.0},
+    )
+    await db.commit()
+    return {"room_label": room_label, "old_weight": old_weight, "new_weight": 1.0, "reset": True}

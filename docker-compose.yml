@@ -34,6 +34,28 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── PgBouncer (connection pooler) ─────────────────────────────
+  # Required for serverless deployments where connection counts spike.
+  # Sits between the app and Postgres in transaction-pool mode.
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.0
+    environment:
+      DATABASE_URL: postgresql://listingjet:password@postgres:5432/listingjet
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+      MIN_POOL_SIZE: 5
+    ports:
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # ── Redis ────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine

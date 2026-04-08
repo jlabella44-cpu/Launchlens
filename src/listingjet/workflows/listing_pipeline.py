@@ -20,6 +20,7 @@ with workflow.unsafe.imports_passed_through():
         run_mls_export,
         run_packaging,
         run_performance_intelligence,
+        run_photo_compliance,
         run_property_verification,
         run_social_content,
         run_social_cuts,
@@ -91,6 +92,7 @@ class ListingPipeline:
         await workflow.execute_activity(
             run_vision_tier2, ctx,
             start_to_close_timeout=_VISION_TIER2_TIMEOUT,
+            heartbeat_timeout=timedelta(minutes=3),
             retry_policy=_DEFAULT_RETRY,
         )
         await workflow.execute_activity(
@@ -121,6 +123,18 @@ class ListingPipeline:
             retry_policy=_DEFAULT_RETRY,
         )
 
+        # Photo compliance scan (non-blocking): check packaged photos for
+        # MLS violations before human review.  Failures are warnings only.
+        try:
+            await workflow.execute_activity(
+                run_photo_compliance, ctx,
+                start_to_close_timeout=_DEFAULT_TIMEOUT,
+                heartbeat_timeout=timedelta(minutes=2),
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except Exception as exc:
+            workflow.logger.warning("photo_compliance_failed listing=%s error=%s", input.listing_id, exc)
+
         # Start video generation in parallel with human review
         # For credit users, only run if video add-on is enabled
         run_video_step = True
@@ -135,6 +149,7 @@ class ListingPipeline:
                 workflow.execute_activity(
                     run_video, ctx,
                     start_to_close_timeout=timedelta(minutes=30),
+                    heartbeat_timeout=timedelta(minutes=5),
                     retry_policy=_DEFAULT_RETRY,
                 )
             )

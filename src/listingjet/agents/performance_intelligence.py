@@ -55,7 +55,6 @@ class PerformanceIntelligenceAgent(BaseAgent):
                 selections = pkg_result.scalars().all()
 
                 hero_room_label = None
-                avg_score = None
                 if selections:
                     hero_sel = selections[0]
                     vr_result = await session.execute(
@@ -67,17 +66,12 @@ class PerformanceIntelligenceAgent(BaseAgent):
                     if hero_vr:
                         hero_room_label = hero_vr.room_label
 
-                    scores = [s.composite_score for s in selections if s.composite_score is not None]
-                    if scores:
-                        avg_score = sum(scores) / len(scores)
-
                 outcome = ListingOutcome(
                     tenant_id=tenant_id,
                     listing_id=listing_id,
                     status="active",
-                    total_photos_mls=len(selections),
+                    photo_count=len(selections),
                     hero_room_label=hero_room_label,
-                    avg_photo_score=round(avg_score, 4) if avg_score else None,
                 )
                 session.add(outcome)
                 logger.info(

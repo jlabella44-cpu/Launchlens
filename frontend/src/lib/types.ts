@@ -597,6 +597,28 @@ export interface IdxFeedConfigCreate {
   poll_interval_minutes?: number;
 }
 
+// -- Performance Intelligence --
+
+export interface PerformanceInsight {
+  type: string;
+  data: Record<string, unknown>;
+  sample_size: number;
+}
+
+export interface PerformanceOverview {
+  tenant_id: string;
+  total_outcomes: number;
+  insights: PerformanceInsight[];
+  sufficient_data: boolean;
+}
+
+export interface ListingPerformance {
+  listing_id: string;
+  outcome: Record<string, unknown>;
+  comparisons: Record<string, unknown>;
+  sample_size: number;
+}
+
 export interface HealthWeights {
   media: number;
   content: number;
@@ -642,19 +664,18 @@ export interface PerformanceInsightsResponse {
 export interface ListingOutcomeResponse {
   listing_id: string;
   status: string;
-  list_price: number | null;
+  original_price: number | null;
+  final_price: number | null;
   sale_price: number | null;
   price_ratio: number | null;
   days_on_market: number | null;
   days_to_contract: number | null;
-  price_changes: number;
-  total_photos_mls: number | null;
+  price_change_count: number;
+  photo_count: number | null;
   hero_room_label: string | null;
-  avg_photo_score: number | null;
   outcome_grade: string | null;
   idx_source: string | null;
-  first_seen_at: string | null;
-  closed_at: string | null;
+  sold_date: string | null;
 }
 
 export interface OutcomeSummaryResponse {

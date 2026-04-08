@@ -146,7 +146,6 @@ async def ingest_outcome(
     total_photos = len(selections)
 
     hero_room_label = None
-    avg_score = None
     if selections:
         # Get hero room from vision results
         hero_sel = selections[0]
@@ -157,10 +156,6 @@ async def ingest_outcome(
         if hero_vr:
             hero_room_label = hero_vr.room_label
 
-        scores = [s.composite_score for s in selections if s.composite_score is not None]
-        if scores:
-            avg_score = sum(scores) / len(scores)
-
     grade = _compute_grade(dom, price_ratio)
     now = datetime.now(timezone.utc)
 
@@ -168,23 +163,23 @@ async def ingest_outcome(
         "tenant_id": tenant_id,
         "listing_id": listing_id,
         "status": status,
-        "list_price": float(list_price) if list_price else None,
+        "original_price": float(list_price) if list_price else None,
+        "final_price": float(sale_price) if sale_price else None,
         "sale_price": float(sale_price) if sale_price else None,
         "price_ratio": price_ratio,
         "days_on_market": int(dom) if dom is not None else None,
         "days_to_contract": int(days_to_contract) if days_to_contract is not None else None,
-        "price_changes": price_change_count,
-        "total_photos_mls": total_photos,
+        "price_change_count": price_change_count,
+        "photo_count": total_photos,
         "hero_room_label": hero_room_label,
-        "avg_photo_score": round(avg_score, 4) if avg_score else None,
         "outcome_grade": grade,
         "idx_source": source,
         "raw_idx_data": idx_data,
         "updated_at": now,
     }
 
-    if status == "closed":
-        values["closed_at"] = now
+    if status in ("closed", "sold"):
+        values["sold_date"] = now
 
     stmt = pg_insert(ListingOutcome).values(id=uuid.uuid4(), **values)
     stmt = stmt.on_conflict_do_update(

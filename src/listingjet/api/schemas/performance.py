@@ -43,19 +43,18 @@ class PerformanceInsightsResponse(BaseModel):
 class ListingOutcomeResponse(BaseModel):
     listing_id: uuid.UUID
     status: str
-    list_price: float | None = None
+    original_price: float | None = None
+    final_price: float | None = None
     sale_price: float | None = None
     price_ratio: float | None = None
     days_on_market: int | None = None
     days_to_contract: int | None = None
-    price_changes: int = 0
-    total_photos_mls: int | None = None
+    price_change_count: int = 0
+    photo_count: int | None = None
     hero_room_label: str | None = None
-    avg_photo_score: float | None = None
     outcome_grade: str | None = None
     idx_source: str | None = None
-    first_seen_at: datetime | None = None
-    closed_at: datetime | None = None
+    sold_date: datetime | None = None
 
     model_config = {"from_attributes": True}
 

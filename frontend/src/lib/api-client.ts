@@ -59,6 +59,8 @@ import type {
   IdxFeedConfig,
   IdxFeedConfigCreate,
   HealthWeights,
+  PerformanceOverview,
+  ListingPerformance,
   PerformanceInsightsResponse,
   OutcomeSummaryResponse,
   ListingOutcomeResponse,
@@ -949,7 +951,16 @@ class ApiClient {
     return this.request("/settings/health-weights", { method: "PATCH", body: JSON.stringify(weights) });
   }
 
-  // Performance Intelligence (Phase 5)
+  // Performance Intelligence
+  async getPerformanceOverview(): Promise<PerformanceOverview> {
+    return this.request("/analytics/performance");
+  }
+
+  async getListingPerformance(listingId: string): Promise<ListingPerformance> {
+    return this.request(`/analytics/performance/listing/${listingId}`);
+  }
+
+  // Performance Intelligence — Phase 5 enrichments
   async getPerformanceInsights(): Promise<PerformanceInsightsResponse> {
     return this.request("/analytics/performance");
   }

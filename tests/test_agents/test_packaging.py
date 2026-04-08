@@ -3,20 +3,16 @@ import pytest
 from sqlalchemy import select
 
 from listingjet.agents.base import AgentContext
-from listingjet.agents.packaging import PackagingAgent
+from listingjet.agents.packaging import (
+    REQUIRED_ROOMS,
+    ROOM_MAX_SLOTS,
+    PackagingAgent,
+)
 from listingjet.models.listing import ListingState
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.vision_result import VisionResult
 from listingjet.services.weight_manager import WeightManager
 from tests.test_agents.conftest import make_session_factory
-
-
-from listingjet.agents.packaging import (
-    MIN_QUALITY_SCORE,
-    MLS_MAX_PHOTOS,
-    REQUIRED_ROOMS,
-    ROOM_MAX_SLOTS,
-)
 
 
 async def _add_vr(db_session, asset_id, quality=80, commercial=60, hero=True, tier=1, room_label="living_room"):

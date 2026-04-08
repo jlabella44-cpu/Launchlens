@@ -41,7 +41,7 @@ def create_access_token(user: User) -> str:
         "tenant_id": str(user.tenant_id),
         "role": user.role.value,
         "type": "access",
-        "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expiry_minutes),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
@@ -102,18 +102,31 @@ def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: s
         httponly=True,
         secure=is_prod,
         samesite="lax",
-        max_age=settings.jwt_expiry_hours * 3600,
+        max_age=settings.jwt_expiry_minutes * 60,
         path="/",
     )
+    # Refresh token uses SameSite=strict — it is only ever sent to our own
+    # /auth/refresh endpoint, so cross-site POST is not needed.
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
         secure=is_prod,
-        samesite="lax",
+        samesite="strict",
         max_age=settings.jwt_refresh_expiry_days * 86400,
         path="/auth/refresh",
     )
+    # Add Partitioned attribute (CHIPS) in production for third-party cookie
+    # isolation.  Starlette doesn't support the Partitioned flag natively, so
+    # we patch the Set-Cookie header directly.
+    if is_prod:
+        raw_headers = response.raw_headers
+        patched: list[tuple[bytes, bytes]] = []
+        for name, value in raw_headers:
+            if name == b"set-cookie" and b"refresh_token" in value:
+                value = value + b"; Partitioned"
+            patched.append((name, value))
+        response.raw_headers = patched
     return response
 
 
