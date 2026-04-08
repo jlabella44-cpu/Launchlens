@@ -15,11 +15,11 @@ const FAQ_DATA = [
       },
       {
         q: "How do I upload my first listing?",
-        a: "Go to Dashboard > click 'New Listing' > enter the property address > drag and drop your photos (JPG or PNG, up to 50 files). The AI pipeline starts automatically after upload.",
+        a: "Go to Dashboard > click 'New Listing' > enter the property address > drag and drop your photos (JPG or PNG, up to 100 files). The AI pipeline starts automatically after upload.",
       },
       {
         q: "What file formats are supported?",
-        a: "We accept JPG and PNG images, up to 20MB each. You can upload up to 50 photos per listing.",
+        a: "We accept JPG and PNG images, up to 20MB each. You can upload up to 100 photos per listing.",
       },
       {
         q: "How long does processing take?",

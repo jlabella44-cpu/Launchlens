@@ -144,7 +144,7 @@ const steps = [
 const faqs = [
   {
     q: "What file formats do you support?",
-    a: "JPEG, PNG, WebP, and HEIC. Photos up to 20MB each, up to 50 per listing.",
+    a: "JPEG, PNG, WebP, and HEIC. Photos up to 20MB each, up to 100 per listing.",
   },
   {
     q: "How long does processing take?",

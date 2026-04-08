@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import apiClient from "@/lib/api-client";
 import { sha256 } from "@/lib/hash";
 
-const MAX_FILES = 50;
+const MAX_FILES = 100;
 const MAX_SIZE_MB = 20;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png"];

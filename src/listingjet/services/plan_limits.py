@@ -1,19 +1,19 @@
 PLAN_LIMITS: dict[str, dict] = {
     "free": {
         "max_listings_per_month": 5,
-        "max_assets_per_listing": 25,
+        "max_assets_per_listing": 100,
         "tier2_vision": False,
         "social_content": False,
     },
     "lite": {
         "max_listings_per_month": 25,
-        "max_assets_per_listing": 50,
+        "max_assets_per_listing": 100,
         "tier2_vision": True,
         "social_content": False,
     },
     "active_agent": {
         "max_listings_per_month": 75,
-        "max_assets_per_listing": 50,
+        "max_assets_per_listing": 100,
         "tier2_vision": True,
         "social_content": True,
     },
@@ -26,7 +26,7 @@ PLAN_LIMITS: dict[str, dict] = {
     # Legacy aliases
     "starter": {
         "max_listings_per_month": 5,
-        "max_assets_per_listing": 25,
+        "max_assets_per_listing": 100,
         "tier2_vision": False,
         "social_content": False,
         "health_breakdown": False,
@@ -39,7 +39,7 @@ PLAN_LIMITS: dict[str, dict] = {
     },
     "pro": {
         "max_listings_per_month": 75,
-        "max_assets_per_listing": 50,
+        "max_assets_per_listing": 100,
         "tier2_vision": True,
         "social_content": True,
         "health_breakdown": True,
