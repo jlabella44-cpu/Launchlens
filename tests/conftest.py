@@ -127,9 +127,10 @@ async def db_session(test_engine):
         await session.rollback()  # isolate each test
 
 
-def make_jwt(tenant_id: str) -> str:
+def make_jwt(tenant_id: str, user_id: str | None = None) -> str:
+    uid = user_id or str(uuid.uuid4())
     return jwt.encode(
-        {"tenant_id": tenant_id, "sub": f"user-{tenant_id}"},
+        {"tenant_id": tenant_id, "sub": uid, "role": "admin", "type": "access"},
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )

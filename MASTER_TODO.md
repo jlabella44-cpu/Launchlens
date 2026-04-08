@@ -107,11 +107,11 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] API versioning — `/api/v1/` prefix (optional)
 
 ### Documentation (Session 21)
-- [ ] Create `README.md`
-- [ ] Update `.env.example` with all config settings
-- [ ] Create `CHANGELOG.md`
+- [x] Create `README.md` — 244 lines with architecture diagram, quick start, tech stack, CI badges
+- [x] Update `.env.example` — added JWT refresh, v3 Stripe tiers, LLM provider, Canva OAuth, SES, property data keys
+- [x] Create `CHANGELOG.md` — 226 lines documenting features by milestone
 - [ ] Update `PROJECT_OVERVIEW_FOR_LLM.md`
-- [ ] Add CI badge to README
+- [x] Add CI badge to README — test + lint badges present
 
 ### Learning Loop (Session 22)
 - [x] Wire `LearningAgent` into pipeline — already in Step 6 of `listing_pipeline.py` after distribution
@@ -123,7 +123,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ### Listing Permissions — Remaining Phases
 - [ ] Phase C: Cross-tenant email invitations (needs SES production access)
 - [ ] Phase E: Email notifications (share/revoke/edit digest — templates built, needs SES)
-- [ ] Blanket per-agent grant (Phase B) — `deps_permissions.py:50`
+- [x] Blanket per-agent grant (Phase B) — already implemented in `deps_permissions.py` (listing_id NULL + grantor_tenant_id)
 
 ### Frontend Remaining Pages
 - [x] Demo dropzone page — `src/app/demo/page.tsx` (drag-drop, file validation, upload progress)
@@ -143,7 +143,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] **Pipeline status endpoint expensive** — engagement score cached in-process after first computation per listing
 - [x] Dead comment in listings.py (Audit #18) — no longer present
 - [x] Unused listing states: `SHADOW_REVIEW`, `GENERATING`, `DELIVERING`, `TRACKING` (Audit #19) — never existed in enum
-- [ ] Test JWT fixture doesn't create User rows (Audit #20)
+- [x] Test JWT fixture doesn't create User rows (Audit #20) — `make_jwt` updated with proper UUID sub, role, and type fields
 - [x] `upload-urls` endpoint uses `body: dict` (Audit #12) — now uses `UploadUrlsRequest` Pydantic schema
 - [x] Cancel listing reuses `FAILED` state (Audit #16) — `CANCELLED` enum added in migration 024
 - [x] Brand Kit migration gap (Audit #22) — chain is correct (011→013), gap is harmless
