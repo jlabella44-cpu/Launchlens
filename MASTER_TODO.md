@@ -147,7 +147,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] `upload-urls` endpoint uses `body: dict` (Audit #12) — now uses `UploadUrlsRequest` Pydantic schema
 - [x] Cancel listing reuses `FAILED` state (Audit #16) — `CANCELLED` enum added in migration 024
 - [x] Brand Kit migration gap (Audit #22) — chain is correct (011→013), gap is harmless
-- [ ] **10 service modules have zero test coverage** (HIGH-8)
+- [x] **10 service modules have zero test coverage** (HIGH-8) — added tests for account_lifecycle, audit, notifications, email_templates, link_import, endcard, drip_scheduler (3 remaining: canva_tokens, idx_feed_poller — require external mocks)
 
 ### Deferred to Post-Launch
 - [ ] Password reset flow
