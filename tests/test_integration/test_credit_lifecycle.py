@@ -115,7 +115,8 @@ async def test_full_credit_lifecycle(async_client: AsyncClient, db_session):
     # Verify transactions exist
     txn_resp = await async_client.get("/credits/transactions", headers=_auth(token))
     if txn_resp.status_code == 200:
-        txns = txn_resp.json()
+        data = txn_resp.json()
+        txns = data["items"] if isinstance(data, dict) else data
         assert isinstance(txns, list)
         # Should have at least the purchase transaction
         assert len(txns) >= 1
@@ -392,10 +393,12 @@ async def test_api_contracts_credits(async_client: AsyncClient, db_session):
         body = resp.json()
         assert "balance" in body
 
-    # Transactions
+    # Transactions (paginated)
     resp = await async_client.get("/credits/transactions", headers=_auth(token))
     if resp.status_code == 200:
-        assert isinstance(resp.json(), list)
+        data = resp.json()
+        assert "items" in data
+        assert isinstance(data["items"], list)
 
     # Pricing
     resp = await async_client.get("/credits/pricing", headers=_auth(token))

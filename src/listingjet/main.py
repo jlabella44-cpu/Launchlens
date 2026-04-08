@@ -30,7 +30,10 @@ from listingjet.api import (
     listing_permissions,
     listings_core,
     listings_draft,
+    listings_import,
     listings_media,
+    listings_review,
+    listings_video,
     listings_workflow,
     microsite,
     notifications,
@@ -166,6 +169,9 @@ def create_app() -> FastAPI:
     app.include_router(listings_draft.router, prefix="/listings", tags=["listings-draft"])
     app.include_router(listings_workflow.router, prefix="/listings", tags=["listings"])
     app.include_router(listings_media.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_video.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_import.router, prefix="/listings", tags=["listings"])
+    app.include_router(listings_review.router, prefix="/listings", tags=["listings"])
     app.include_router(admin_dashboard.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_tenants.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_users.router, prefix="/admin", tags=["admin"])

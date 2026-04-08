@@ -1,7 +1,7 @@
 """Credit system API — balance, transactions, purchases, service costs."""
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
@@ -10,7 +10,6 @@ from listingjet.api.schemas.credits import (
     CreditPricingResponse,
     CreditPurchaseRequest,
     CreditPurchaseResponse,
-    CreditTransactionResponse,
     ServiceCostsResponse,
     ServiceCreditCost,
 )
@@ -74,15 +73,24 @@ async def get_credit_balance(
     return balance
 
 
-@router.get("/transactions", response_model=list[CreditTransactionResponse])
+@router.get("/transactions")
 async def get_credit_transactions(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     svc = CreditService()
-    return await svc.get_transactions(db, current_user.tenant_id, limit=limit, offset=offset)
+    items = await svc.get_transactions(db, current_user.tenant_id, limit=limit, offset=offset)
+    total = await svc.count_transactions(db, current_user.tenant_id)
+    page = (offset // limit) + 1 if limit > 0 else 1
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": limit,
+        "has_next": (offset + limit) < total,
+    }
 
 
 @router.get("/pricing", response_model=CreditPricingResponse)

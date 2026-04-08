@@ -112,9 +112,16 @@ class CreditService:
         )
         session.add(txn)
 
-        # Low-credit alert
+        # Low-credit alert + webhook event
         if account.balance < 3:
             self._send_low_credit_alert(session, tenant_id, account.balance)
+            from listingjet.services.events import emit_event
+            await emit_event(
+                session=session,
+                event_type="credit.low_balance",
+                payload={"balance": account.balance, "threshold": 3},
+                tenant_id=str(tenant_id),
+            )
 
         return txn
 
@@ -288,6 +295,14 @@ class CreditService:
             .offset(offset)
         )
         return list(result.scalars().all())
+
+    async def count_transactions(self, session: AsyncSession, tenant_id: uuid.UUID) -> int:
+        from sqlalchemy import func
+        result = await session.execute(
+            select(func.count(CreditTransaction.id))
+            .where(CreditTransaction.tenant_id == tenant_id)
+        )
+        return result.scalar() or 0
 
     async def ensure_account(self, session: AsyncSession, tenant_id: uuid.UUID, rollover_cap: int = 0) -> CreditAccount:
         """Get or create a credit account for a tenant."""

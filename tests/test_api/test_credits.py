@@ -70,7 +70,9 @@ async def test_get_transactions_empty(async_client: AsyncClient):
     await async_client.get("/credits/balance", headers=_auth(token))
     resp = await async_client.get("/credits/transactions", headers=_auth(token))
     assert resp.status_code == 200
-    assert resp.json() == []
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 @pytest.mark.asyncio
@@ -86,7 +88,8 @@ async def test_get_transactions_after_deduct(async_client: AsyncClient, db_sessi
 
     resp = await async_client.get("/credits/transactions", headers=_auth(token))
     assert resp.status_code == 200
-    txns = resp.json()
+    data = resp.json()
+    txns = data["items"]
     # deduct_credits is globally mocked in the async_client fixture,
     # so only the add_credits transaction is recorded.
     assert len(txns) >= 1

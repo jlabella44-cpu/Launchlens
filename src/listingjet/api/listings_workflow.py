@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Simple in-process cache for engagement scores (computed once per listing, never changes)
+_engagement_cache: dict[str, tuple] = {}
+
 
 @router.post("/{listing_id}/review", response_model=ActionResponse)
 async def start_review(
@@ -208,7 +211,11 @@ async def reject_listing(
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
-@router.post("/{listing_id}/retry")
+@router.post(
+    "/{listing_id}/retry",
+    response_model=ActionResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def retry_pipeline(
     listing_id: uuid.UUID,
     _rl=Depends(rate_limit(3, 3600)),
@@ -354,23 +361,29 @@ async def get_pipeline_status(
                 s["status"] = "in_progress"
             break
 
-    # Engagement prediction + features — only compute for packaged listings (expensive)
+    # Engagement prediction + features — cached to avoid recomputation on every poll
     engagement_score = None
     detected_features = []
     packaged_states = {"awaiting_review", "in_review", "approved", "exporting", "delivered"}
     if state_val in packaged_states:
-        from listingjet.models.vision_result import VisionResult
-        from listingjet.services.engagement_score import predict_engagement
-        from listingjet.services.feature_tags import extract_features
+        cache_key = f"engagement:{listing_id}"
+        cached = _engagement_cache.get(cache_key)
+        if cached:
+            engagement_score, detected_features = cached
+        else:
+            from listingjet.models.vision_result import VisionResult
+            from listingjet.services.engagement_score import predict_engagement
+            from listingjet.services.feature_tags import extract_features
 
-        vision_results = (await db.execute(
-            select(VisionResult)
-            .join(Asset, VisionResult.asset_id == Asset.id)
-            .where(Asset.listing_id == listing_id, VisionResult.tier == 1)
-        )).scalars().all()
+            vision_results = (await db.execute(
+                select(VisionResult)
+                .join(Asset, VisionResult.asset_id == Asset.id)
+                .where(Asset.listing_id == listing_id, VisionResult.tier == 1)
+            )).scalars().all()
 
-        engagement_score = predict_engagement(vision_results)
-        detected_features = extract_features(vision_results)
+            engagement_score = predict_engagement(vision_results)
+            detected_features = extract_features(vision_results)
+            _engagement_cache[cache_key] = (engagement_score, detected_features)
 
     return {
         "listing_id": str(listing.id),

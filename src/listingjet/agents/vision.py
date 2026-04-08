@@ -1,4 +1,5 @@
 # src/listingjet/agents/vision.py
+import asyncio
 import logging
 import uuid
 
@@ -60,6 +61,7 @@ COMMERCIAL_LABELS = {
 }
 
 TIER2_CANDIDATE_LIMIT = 20
+PER_IMAGE_TIMEOUT = 30  # seconds — fail fast if a single image hangs
 
 
 def _labels_to_vision_result(asset_id: uuid.UUID, labels: list[VisionLabel]) -> VisionResult:
@@ -126,7 +128,17 @@ class VisionAgent(BaseAgent):
                         count + 1, len(assets), asset.id,
                         "yes" if asset.proxy_path else "no",
                     )
-                    labels = await self._vision_provider.analyze(image_url=image_url)
+                    try:
+                        labels = await asyncio.wait_for(
+                            self._vision_provider.analyze(image_url=image_url),
+                            timeout=PER_IMAGE_TIMEOUT,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning("Vision T1 timeout asset=%s after %ds", asset.id, PER_IMAGE_TIMEOUT)
+                        continue
+                    except Exception:
+                        logger.exception("Vision T1 failed asset=%s", asset.id)
+                        continue
                     vr = _labels_to_vision_result(asset.id, labels)
                     session.add(vr)
                     count += 1
@@ -185,7 +197,17 @@ class VisionAgent(BaseAgent):
                         count + 1, len(candidates), asset.id,
                         "yes" if asset.proxy_path else "no",
                     )
-                    labels = await self._tier2_vision_provider.analyze(image_url=image_url)
+                    try:
+                        labels = await asyncio.wait_for(
+                            self._tier2_vision_provider.analyze(image_url=image_url),
+                            timeout=PER_IMAGE_TIMEOUT,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning("Vision T2 timeout asset=%s after %ds", asset.id, PER_IMAGE_TIMEOUT)
+                        continue
+                    except Exception:
+                        logger.exception("Vision T2 failed asset=%s", asset.id)
+                        continue
 
                     quality_labels = [lbl for lbl in labels if lbl.category == "quality"]
                     shot_labels = [lbl for lbl in labels if lbl.category == "shot_type"]

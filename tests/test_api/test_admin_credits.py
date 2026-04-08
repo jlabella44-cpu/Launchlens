@@ -166,6 +166,7 @@ async def test_tenant_list_includes_credit_balance(async_client: AsyncClient):
 
     resp = await async_client.get("/admin/tenants", headers=_auth(token))
     assert resp.status_code == 200
-    tenants = resp.json()
+    data = resp.json()
+    tenants = data["items"]
     tenant = next(t for t in tenants if t["id"] == tenant_id)
     assert tenant["credit_balance"] == 25

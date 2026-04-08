@@ -31,7 +31,8 @@ async def test_list_tenants(async_client: AsyncClient):
     token, tenant_id = await _register_admin(async_client)
     resp = await async_client.get("/admin/tenants", headers=_auth(token))
     assert resp.status_code == 200
-    tenants = resp.json()
+    data = resp.json()
+    tenants = data["items"]
     assert isinstance(tenants, list)
     assert any(t["id"] == tenant_id for t in tenants)
 

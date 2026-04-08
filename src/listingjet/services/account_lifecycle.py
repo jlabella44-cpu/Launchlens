@@ -27,13 +27,8 @@ from listingjet.models.user import User
 from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
 
-# Tables deleted in dependency order (children first).
-# Models with FK cascades (ListingPermission, ListingAuditLog,
-# NotificationPreference) are handled automatically by the DB.
+# Tables with a direct tenant_id column, deleted in dependency order.
 _TENANT_SCOPED_TABLES = [
-    VisionResult,
-    VideoAsset,
-    SocialContent,
     Asset,
     Listing,
     BrandKit,
@@ -50,6 +45,15 @@ _TENANT_SCOPED_TABLES = [
 
 async def delete_tenant_data(db: AsyncSession, tenant_id: uuid.UUID) -> None:
     """Delete all data belonging to a tenant, then remove users and tenant."""
+    # First delete child tables that reference assets/listings (no tenant_id column)
+    tenant_asset_ids = select(Asset.id).where(Asset.tenant_id == tenant_id)
+    tenant_listing_ids = select(Listing.id).where(Listing.tenant_id == tenant_id)
+
+    await db.execute(delete(VisionResult).where(VisionResult.asset_id.in_(tenant_asset_ids)))
+    await db.execute(delete(VideoAsset).where(VideoAsset.listing_id.in_(tenant_listing_ids)))
+    await db.execute(delete(SocialContent).where(SocialContent.listing_id.in_(tenant_listing_ids)))
+
+    # Then delete tenant-scoped tables
     for model in _TENANT_SCOPED_TABLES:
         await db.execute(delete(model).where(model.tenant_id == tenant_id))
 

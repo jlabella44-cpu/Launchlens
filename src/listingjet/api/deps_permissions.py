@@ -47,8 +47,7 @@ async def get_listing_with_permission(
         1. Listing owner (same tenant) -> BILLING (full access)
         2. Admin in listing's tenant -> READ (write needs explicit grant)
         3. Per-listing permission grant (active, not expired, not revoked)
-        4. TODO: Blanket per-agent grant (Phase B - listings are tenant-scoped,
-           not user-owned, so blanket grants need a per-tenant model)
+        4. Blanket per-agent grant (Phase B — listing_id IS NULL, tenant-scoped)
         5. None -> raise 403/404
     """
     # Load listing without tenant filter (cross-tenant access possible)

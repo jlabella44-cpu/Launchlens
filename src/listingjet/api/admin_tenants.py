@@ -23,14 +23,27 @@ from listingjet.services.events import emit_event
 router = APIRouter()
 
 
-@router.get("/tenants", response_model=list[TenantResponse])
+@router.get("/tenants")
 async def list_tenants(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
-    """List all tenants ordered by creation date. Requires superadmin role."""
-    result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
-    return result.scalars().all()
+    """List all tenants with pagination. Requires superadmin role."""
+    total = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
+    offset = (page - 1) * page_size
+    result = await db.execute(
+        select(Tenant).order_by(Tenant.created_at.desc()).offset(offset).limit(page_size)
+    )
+    tenants = result.scalars().all()
+    return {
+        "items": [TenantResponse.model_validate(t) for t in tenants],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": (offset + page_size) < total,
+    }
 
 
 @router.get("/tenants/{tenant_id}", response_model=TenantDetailResponse)
