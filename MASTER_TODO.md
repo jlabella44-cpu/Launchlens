@@ -138,7 +138,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ## P3 — Low Priority / Deferred
 
 ### Code Cleanup (from TODO.md)
-- [ ] **Listings.py monolith** — split 800+ line file into sub-routers (CRUD, review, export, video, package)
+- [x] **Listings.py monolith** — split 806-line `listings_media.py` into `listings_video.py` (115), `listings_import.py` (147), `listings_review.py` (130), keeping media at 440
 - [x] **CSP blocks frontend** — already relaxed to `frame-ancestors 'none'` (API backend only)
 - [ ] **Pipeline status endpoint expensive** — `get_pipeline_status` recomputes on every request; needs caching
 - [x] Dead comment in listings.py (Audit #18) — no longer present

@@ -1,13 +1,11 @@
-import asyncio
+"""Listing media endpoints — uploads, assets, package, export."""
 import logging
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
-import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import case, extract, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
@@ -22,7 +20,6 @@ from listingjet.api.schemas.listings import (
     ExportResponse,
     ReorderRequest,
     UploadUrlsRequest,
-    VideoUploadRequest,
 )
 from listingjet.database import get_db
 from listingjet.models.asset import Asset
@@ -31,7 +28,7 @@ from listingjet.models.package_selection import PackageSelection
 from listingjet.models.performance_event import PerformanceEvent
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
-from listingjet.models.video_asset import VideoAsset
+from listingjet.models.vision_result import VisionResult
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 from listingjet.services.plan_limits import check_asset_quota, get_limits
@@ -288,7 +285,6 @@ async def reorder_package(
     selections = {s.position: s for s in result.scalars().all()}
 
     # Load vision results for room labels
-    from listingjet.models.vision_result import VisionResult
     vr_result = await db.execute(
         select(VisionResult).where(
             VisionResult.asset_id.in_([s.asset_id for s in selections.values()])
@@ -405,106 +401,6 @@ async def export_listing(
     )
 
 
-@router.get("/{listing_id}/video")
-async def get_video(
-    listing_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    listing = (await db.execute(
-        select(Listing).where(Listing.id == listing_id, Listing.tenant_id == current_user.tenant_id)
-    )).scalar_one_or_none()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    video = (await db.execute(
-        select(VideoAsset)
-        .where(VideoAsset.listing_id == listing.id, VideoAsset.status == "ready")
-        .order_by(VideoAsset.created_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
-    if not video:
-        raise HTTPException(status_code=404, detail="No video available")
-
-    return {
-        "s3_key": video.s3_key,
-        "video_type": video.video_type,
-        "duration_seconds": video.duration_seconds,
-        "status": video.status,
-        "chapters": video.chapters,
-        "social_cuts": video.social_cuts,
-        "thumbnail_s3_key": video.thumbnail_s3_key,
-        "clip_count": video.clip_count,
-        "created_at": video.created_at.isoformat(),
-    }
-
-
-@router.get("/{listing_id}/video/social-cuts")
-async def get_video_social_cuts(
-    listing_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    listing = (await db.execute(
-        select(Listing).where(Listing.id == listing_id, Listing.tenant_id == current_user.tenant_id)
-    )).scalar_one_or_none()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    video = (await db.execute(
-        select(VideoAsset)
-        .where(VideoAsset.listing_id == listing.id, VideoAsset.status == "ready")
-        .order_by(VideoAsset.created_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
-
-    if not video or not video.social_cuts:
-        return []
-    return video.social_cuts
-
-
-@router.post("/{listing_id}/video/upload", status_code=201)
-async def upload_video(
-    listing_id: uuid.UUID,
-    body: VideoUploadRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Register a user-submitted or professional video."""
-    listing = (await db.execute(
-        select(Listing).where(Listing.id == listing_id, Listing.tenant_id == current_user.tenant_id)
-    )).scalar_one_or_none()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    if body.video_type not in ("user_raw", "professional"):
-        raise HTTPException(status_code=400, detail="video_type must be 'user_raw' or 'professional'")
-
-    # Validate S3 key is scoped to this tenant's namespace
-    tenant_prefix = f"videos/{listing_id}/"
-    if not body.s3_key.startswith(tenant_prefix):
-        raise HTTPException(status_code=400, detail=f"s3_key must start with {tenant_prefix}")
-
-    video = VideoAsset(
-        tenant_id=current_user.tenant_id,
-        listing_id=listing.id,
-        s3_key=body.s3_key,
-        video_type=body.video_type,
-        duration_seconds=body.duration_seconds,
-        status="ready",
-    )
-    db.add(video)
-    await db.commit()
-    await db.refresh(video)
-
-    return {
-        "id": str(video.id),
-        "s3_key": video.s3_key,
-        "video_type": video.video_type,
-        "status": video.status,
-    }
-
-
 @router.get("/{listing_id}/activity")
 async def listing_activity(
     listing_id: uuid.UUID,
@@ -515,7 +411,6 @@ async def listing_activity(
     """Get the event audit trail for a listing, newest first."""
     from listingjet.models.event import Event
 
-    # Verify listing belongs to tenant
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -543,264 +438,3 @@ async def listing_activity(
         }
         for e in events
     ]
-
-
-# ---------------------------------------------------------------------------
-# Link import
-# ---------------------------------------------------------------------------
-
-
-class ImportLinkRequest(BaseModel):
-    url: str
-
-
-class ImportLinkResponse(BaseModel):
-    import_id: uuid.UUID
-    platform: str
-    status: str
-
-
-class ImportStatusResponse(BaseModel):
-    import_id: uuid.UUID
-    status: str
-    platform: str
-    total_files: int
-    completed_files: int
-    error_message: str | None
-
-
-async def _run_link_import_background(
-    listing_id: str,
-    tenant_id: str,
-    url: str,
-    platform: str,
-    import_job_id: str,
-) -> None:
-    """Background task that runs the link import activity."""
-    from listingjet.activities.pipeline import LinkImportParams, run_link_import
-
-    params = LinkImportParams(
-        listing_id=listing_id,
-        tenant_id=tenant_id,
-        url=url,
-        platform=platform,
-        import_job_id=import_job_id,
-    )
-    await run_link_import(params)
-
-
-@router.post("/{listing_id}/import-link", response_model=ImportLinkResponse)
-async def import_from_link_endpoint(
-    listing_id: uuid.UUID,
-    body: ImportLinkRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Start importing photos from a third-party delivery link (Google Drive, Show & Tour)."""
-    from listingjet.models.import_job import ImportJob
-    from listingjet.services.link_import import detect_platform
-
-    # Verify listing belongs to tenant
-    listing = (await db.execute(
-        select(Listing).where(
-            Listing.id == listing_id,
-            Listing.tenant_id == current_user.tenant_id,
-        )
-    )).scalar_one_or_none()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    platform = detect_platform(body.url)
-    if not platform:
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported link. Supported platforms: Google Drive, Show & Tour.",
-        )
-
-    # Create ImportJob record
-    job = ImportJob(
-        id=uuid.uuid4(),
-        listing_id=listing_id,
-        tenant_id=current_user.tenant_id,
-        url=body.url,
-        platform=platform,
-        status="pending",
-    )
-    db.add(job)
-    await db.commit()
-    await db.refresh(job)
-
-    # Fire-and-forget background task
-    asyncio.create_task(
-        _run_link_import_background(
-            listing_id=str(listing_id),
-            tenant_id=str(current_user.tenant_id),
-            url=body.url,
-            platform=platform,
-            import_job_id=str(job.id),
-        )
-    )
-
-    return ImportLinkResponse(
-        import_id=job.id,
-        platform=platform,
-        status="started",
-    )
-
-
-@router.get("/{listing_id}/import-status/{import_id}", response_model=ImportStatusResponse)
-async def get_import_status(
-    listing_id: uuid.UUID,
-    import_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Check the status of a link-import job."""
-    from listingjet.models.import_job import ImportJob
-
-    # Verify listing belongs to tenant
-    listing = (await db.execute(
-        select(Listing).where(
-            Listing.id == listing_id,
-            Listing.tenant_id == current_user.tenant_id,
-        )
-    )).scalar_one_or_none()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    job = await db.get(ImportJob, import_id)
-    if not job or job.listing_id != listing_id:
-        raise HTTPException(status_code=404, detail="Import job not found")
-
-    return ImportStatusResponse(
-        import_id=job.id,
-        status=job.status,
-        platform=job.platform,
-        total_files=job.total_files or 0,
-        completed_files=job.completed_files or 0,
-        error_message=job.error_message,
-    )
-
-
-# --- Review Analytics ---
-
-
-@router.get("/review/analytics")
-async def get_review_analytics(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get review override rate and trust score analytics for the tenant.
-
-    Returns:
-      - override_rate: % of photos changed by humans across all reviewed listings
-      - override_rate_by_month: monthly trend showing if the AI is improving
-      - avg_trust_score: average AI trust score across reviewed listings
-      - total_reviewed: number of listings that went through human review
-      - total_auto_approved: number of listings auto-approved
-    """
-    tenant_id = current_user.tenant_id
-
-    # Total selections and human overrides
-    total_selections = (await db.execute(
-        select(func.count(PackageSelection.id))
-        .join(Listing, PackageSelection.listing_id == Listing.id)
-        .where(
-            PackageSelection.tenant_id == tenant_id,
-            Listing.state.in_([
-                ListingState.APPROVED, ListingState.DELIVERED,
-                ListingState.EXPORTING,
-            ]),
-        )
-    )).scalar() or 0
-
-    human_overrides = (await db.execute(
-        select(func.count(PackageSelection.id))
-        .join(Listing, PackageSelection.listing_id == Listing.id)
-        .where(
-            PackageSelection.tenant_id == tenant_id,
-            PackageSelection.selected_by == "human",
-            Listing.state.in_([
-                ListingState.APPROVED, ListingState.DELIVERED,
-                ListingState.EXPORTING,
-            ]),
-        )
-    )).scalar() or 0
-
-    override_rate = (human_overrides / total_selections * 100) if total_selections > 0 else 0.0
-
-    # Average trust score
-    avg_trust = (await db.execute(
-        select(func.avg(PackageSelection.composite_score))
-        .join(Listing, PackageSelection.listing_id == Listing.id)
-        .where(
-            PackageSelection.tenant_id == tenant_id,
-            Listing.state.in_([
-                ListingState.APPROVED, ListingState.DELIVERED,
-                ListingState.EXPORTING,
-            ]),
-        )
-    )).scalar() or 0.0
-
-    # Total reviewed (went through human review) vs auto-approved
-    from listingjet.models.event import Event
-    total_reviewed = (await db.execute(
-        select(func.count(func.distinct(Event.listing_id))).where(
-            Event.tenant_id == tenant_id,
-            Event.event_type == "listing.review_started",
-        )
-    )).scalar() or 0
-
-    total_auto_approved = (await db.execute(
-        select(func.count(func.distinct(Event.listing_id))).where(
-            Event.tenant_id == tenant_id,
-            Event.event_type == "packaging.completed",
-            func.cast(Event.payload["auto_approved"], sa.Boolean).is_(True),
-        )
-    )).scalar() or 0
-
-    # Monthly override rate trend (last 6 months)
-    six_months_ago = datetime.now(timezone.utc) - timedelta(days=180)
-    monthly_result = await db.execute(
-        select(
-            extract("year", PackageSelection.created_at).label("year"),
-            extract("month", PackageSelection.created_at).label("month"),
-            func.count(PackageSelection.id).label("total"),
-            func.sum(
-                case((PackageSelection.selected_by == "human", 1), else_=0)
-            ).label("overrides"),
-        )
-        .join(Listing, PackageSelection.listing_id == Listing.id)
-        .where(
-            PackageSelection.tenant_id == tenant_id,
-            PackageSelection.created_at >= six_months_ago,
-            Listing.state.in_([
-                ListingState.APPROVED, ListingState.DELIVERED,
-                ListingState.EXPORTING,
-            ]),
-        )
-        .group_by("year", "month")
-        .order_by("year", "month")
-    )
-
-    override_trend = []
-    for row in monthly_result:
-        month_total = row.total or 0
-        month_overrides = row.overrides or 0
-        rate = (month_overrides / month_total * 100) if month_total > 0 else 0.0
-        override_trend.append({
-            "month": f"{int(row.year)}-{int(row.month):02d}",
-            "override_rate": round(rate, 1),
-            "total_selections": month_total,
-            "human_overrides": month_overrides,
-        })
-
-    return {
-        "override_rate": round(override_rate, 1),
-        "avg_trust_score": round(float(avg_trust), 1),
-        "total_selections": total_selections,
-        "human_overrides": human_overrides,
-        "total_reviewed": total_reviewed,
-        "total_auto_approved": total_auto_approved,
-        "override_trend": override_trend,
-    }
