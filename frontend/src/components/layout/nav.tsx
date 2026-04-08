@@ -43,6 +43,7 @@ export function Nav() {
           {user && <Link href="/dashboard" className={linkClass}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass}>Listings</Link>}
           {user && <Link href="/analytics" className={linkClass}>Analytics</Link>}
+          {user && <Link href="/analytics/performance" className={linkClass}>Performance</Link>}
           {user && <Link href="/health" className={linkClass}>Health</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass}>Review</Link>
