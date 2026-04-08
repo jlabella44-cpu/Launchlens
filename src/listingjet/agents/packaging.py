@@ -11,6 +11,7 @@ from listingjet.models.asset import Asset
 from listingjet.models.learning_weight import LearningWeight
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
+from listingjet.models.photo_outcome_correlation import PhotoOutcomeCorrelation
 from listingjet.models.scoring_event import ScoringEvent
 from listingjet.models.tenant import Tenant
 from listingjet.models.vision_result import VisionResult
@@ -170,6 +171,18 @@ class PackagingAgent(BaseAgent):
                 )
                 weight_map = {lw.room_label: lw for lw in lw_result.scalars().all()}
 
+                # Phase 5: Load outcome-based boosts per room
+                oc_result = await session.execute(
+                    select(PhotoOutcomeCorrelation).where(
+                        PhotoOutcomeCorrelation.tenant_id == tenant_id,
+                        PhotoOutcomeCorrelation.dimension == "room_label",
+                    )
+                )
+                outcome_boost_map = {
+                    oc.dimension_value: (oc.outcome_boost, oc.sample_count)
+                    for oc in oc_result.scalars().all()
+                }
+
                 # Score each asset
                 now = datetime.now(timezone.utc)
                 scored = []
@@ -186,11 +199,16 @@ class PackagingAgent(BaseAgent):
                             days_stale = (now - lw.updated_at).days
                             room_weight = self._wm.apply_decay(room_weight, days_stale)
 
+                    # Phase 5: outcome boost from real sale data
+                    ob = outcome_boost_map.get(vr.room_label, (1.0, 0)) if vr.room_label else (1.0, 0)
+
                     features = {
                         "quality_score": vr.quality_score or 50,
                         "commercial_score": vr.commercial_score or 50,
                         "hero_candidate": vr.hero_candidate or False,
                         "room_weight": room_weight,
+                        "outcome_boost": ob[0],
+                        "outcome_samples": ob[1],
                     }
                     score = self._wm.score(features)
                     scored.append((score, asset_id, vr))

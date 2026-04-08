@@ -5,6 +5,11 @@ WEIGHT_MIN = 0.1
 WEIGHT_MAX = 2.0
 BLEND_LISTING_THRESHOLD = 10  # listings (not events) before full tenant weights
 
+# Outcome boost blending: how much weight outcome data gets vs base score
+# Ramps from 0→OUTCOME_MAX_INFLUENCE as closed listings grow past MIN_OUTCOMES
+OUTCOME_MIN_SAMPLES = 3
+OUTCOME_MAX_INFLUENCE = 0.15  # max 15% adjustment from outcome data
+
 
 class WeightManager:
     """
@@ -45,10 +50,34 @@ class WeightManager:
         decay = min(0.1 * ((days_since_update - 90) / 30), 0.5)  # max 50% decay
         return weight * (1 - decay) + 1.0 * decay
 
+    def apply_outcome_boost(
+        self,
+        base_score: float,
+        outcome_boost: float,
+        sample_count: int,
+    ) -> float:
+        """Apply outcome-based boost from PhotoOutcomeCorrelation data.
+
+        The influence ramps up as sample_count grows, capped at
+        OUTCOME_MAX_INFLUENCE.  A boost of 1.1 with full influence
+        raises the score by ~1.5%.
+        """
+        if sample_count < OUTCOME_MIN_SAMPLES or outcome_boost == 1.0:
+            return base_score
+
+        # Ramp influence: 3 samples → 33%, 10+ → 100% of max influence
+        ramp = min((sample_count - OUTCOME_MIN_SAMPLES + 1) / 7.0, 1.0)
+        influence = ramp * OUTCOME_MAX_INFLUENCE
+
+        # Apply boost as a blend: score * (1 + influence * (boost - 1))
+        adjusted = base_score * (1.0 + influence * (outcome_boost - 1.0))
+        return min(1.0, max(0.0, adjusted))
+
     def score(self, features: dict) -> float:
         """
         Composite scoring for photo selection.
         Formula: (quality*0.5 + commercial*0.3 + hero_bonus*0.2) * room_weight
+        Then optionally adjusted by outcome_boost from Phase 5 correlations.
         Clamped to [0.0, 1.0].
         Phase 2: XGBoost model (see TODOS.md TODO-4).
         """
@@ -58,4 +87,12 @@ class WeightManager:
         room_weight = features.get("room_weight", 1.0)
 
         composite = (quality * 0.5) + (commercial * 0.3) + (hero_bonus * 0.2)
-        return min(1.0, max(0.0, composite * room_weight))
+        base = min(1.0, max(0.0, composite * room_weight))
+
+        # Phase 5: outcome boost from real sale performance data
+        outcome_boost = features.get("outcome_boost", 1.0)
+        outcome_samples = features.get("outcome_samples", 0)
+        if outcome_boost != 1.0 and outcome_samples >= OUTCOME_MIN_SAMPLES:
+            base = self.apply_outcome_boost(base, outcome_boost, outcome_samples)
+
+        return base

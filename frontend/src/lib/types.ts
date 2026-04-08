@@ -604,3 +604,66 @@ export interface HealthWeights {
   syndication: number;
   market: number;
 }
+
+// Performance Intelligence types (Phase 5)
+export interface RoomCorrelation {
+  room: string;
+  boost: number;
+  avg_dom: number | null;
+  sample_count: number;
+}
+
+export interface HeroInsight {
+  room: string;
+  boost: number;
+  avg_dom: number | null;
+  avg_price_ratio: number | null;
+  sample_count: number;
+}
+
+export interface QualityImpact {
+  bucket: string;
+  boost: number;
+  avg_dom: number | null;
+  sample_count: number;
+}
+
+export interface PerformanceInsightsResponse {
+  summary: string;
+  outcomes_count: number;
+  avg_dom: number | null;
+  avg_price_ratio: number | null;
+  grade_distribution: Record<string, number>;
+  top_rooms: RoomCorrelation[];
+  hero_insights: HeroInsight[];
+  quality_impact: QualityImpact[];
+}
+
+export interface ListingOutcomeResponse {
+  listing_id: string;
+  status: string;
+  list_price: number | null;
+  sale_price: number | null;
+  price_ratio: number | null;
+  days_on_market: number | null;
+  days_to_contract: number | null;
+  price_changes: number;
+  total_photos_mls: number | null;
+  hero_room_label: string | null;
+  avg_photo_score: number | null;
+  outcome_grade: string | null;
+  idx_source: string | null;
+  first_seen_at: string | null;
+  closed_at: string | null;
+}
+
+export interface OutcomeSummaryResponse {
+  total_tracked: number;
+  total_closed: number;
+  total_pending: number;
+  total_active: number;
+  avg_dom: number | null;
+  avg_price_ratio: number | null;
+  grade_distribution: Record<string, number>;
+  listings: ListingOutcomeResponse[];
+}
