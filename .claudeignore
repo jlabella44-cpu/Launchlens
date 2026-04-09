@@ -1,0 +1,34 @@
+# Large dependency / build directories
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+# IDE / OS
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# Lock file (large, not needed for code search)
+uv.lock
+
+# Docker / infra
+.cache/
+tmp/
+*.log
+
+# Design system assets (large markdown/image files)
+design-system/
