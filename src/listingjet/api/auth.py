@@ -71,6 +71,8 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         role=UserRole.ADMIN,
         consent_at=datetime.now(timezone.utc),
         consent_version="2026-04-03",
+        ai_consent_at=datetime.now(timezone.utc),
+        ai_consent_version="1.0",
     )
     db.add(user)
     await emit_event(
@@ -190,6 +192,29 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+class AiConsentRequest(BaseModel):
+    consent: bool
+
+
+@router.post("/ai-consent")
+async def update_ai_consent(
+    body: AiConsentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Record or revoke AI processing consent for the current user."""
+    from datetime import datetime, timezone
+    user = await db.get(User, current_user.id)
+    if body.consent:
+        user.ai_consent_at = datetime.now(timezone.utc)
+        user.ai_consent_version = "1.0"
+    else:
+        user.ai_consent_at = None
+        user.ai_consent_version = None
+    await db.commit()
+    return {"ai_consent": body.consent, "ai_consent_at": str(user.ai_consent_at) if user.ai_consent_at else None}
 
 
 # ---------------------------------------------------------------------------
