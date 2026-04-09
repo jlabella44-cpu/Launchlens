@@ -39,6 +39,7 @@ from listingjet.models.listing import Listing
 from listingjet.models.listing_health_score import ListingHealthScore
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
+from listingjet.services import field_encryption
 from listingjet.services import health_score as hs
 
 router = APIRouter()
@@ -233,7 +234,7 @@ async def create_idx_feed(
         tenant_id=current_user.tenant_id,
         name=body.name,
         base_url=body.base_url,
-        api_key_encrypted=body.api_key,  # TODO: encrypt with Fernet in production
+        api_key_encrypted=field_encryption.encrypt(body.api_key),
         board_id=body.board_id,
         poll_interval_minutes=body.poll_interval_minutes,
     )
@@ -269,7 +270,7 @@ async def update_idx_feed(
 
     for field, value in body.model_dump(exclude_unset=True).items():
         if field == "api_key" and value is not None:
-            config.api_key_encrypted = value  # TODO: encrypt
+            config.api_key_encrypted = field_encryption.encrypt(value)
         elif hasattr(config, field):
             setattr(config, field, value)
 
