@@ -184,9 +184,13 @@ def test_select_photos_fills_12_positions():
     assert selected[0][2].room_label == "exterior"
     # pos 12 = drone
     assert selected[-1][2].room_label == "drone"
-    # Interior slots 3-11 should be score-descending
-    interior_scores = [s[2].quality_score for s in selected[2:11]]
-    assert interior_scores == sorted(interior_scores, reverse=True)
+    # Interior slots 3-11 should follow walkthrough order (spatial flow)
+    interior_rooms = [s[2].room_label for s in selected[2:11]]
+    assert interior_rooms == [
+        "living_room", "kitchen", "dining_room", "office",
+        "primary_bedroom", "primary_bathroom", "bedroom", "bathroom",
+        "backyard",
+    ]
 
 
 def test_select_photos_pads_when_thin():
