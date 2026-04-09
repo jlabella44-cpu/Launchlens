@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet.models.health_score_history import HealthScoreHistory
 from listingjet.models.listing import Listing
 from listingjet.models.outbox import Outbox
 
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 OUTBOX_RETENTION_DAYS = 30
 EXPORT_RETENTION_DAYS = 90
+HEALTH_HISTORY_RETENTION_DAYS = 90
 
 
 async def cleanup_delivered_outbox(session: AsyncSession) -> int:
@@ -73,11 +75,25 @@ async def cleanup_expired_exports(session: AsyncSession, storage=None) -> dict:
     return {"listings_cleaned": len(listings), "s3_deleted": s3_deleted}
 
 
+async def cleanup_old_health_history(session: AsyncSession) -> int:
+    """Delete health score history rows older than HEALTH_HISTORY_RETENTION_DAYS."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=HEALTH_HISTORY_RETENTION_DAYS)
+    result = await session.execute(
+        delete(HealthScoreHistory).where(HealthScoreHistory.calculated_at < cutoff)
+    )
+    count = result.rowcount
+    if count:
+        logger.info("data_retention.health_history_cleanup deleted=%d cutoff=%s", count, cutoff.isoformat())
+    return count
+
+
 async def run_all_retention(session: AsyncSession, storage=None) -> dict:
     """Run all retention policies. Call from a scheduled task or management command."""
     outbox_deleted = await cleanup_delivered_outbox(session)
     export_result = await cleanup_expired_exports(session, storage=storage)
+    health_deleted = await cleanup_old_health_history(session)
     return {
         "outbox_deleted": outbox_deleted,
         **export_result,
+        "health_history_deleted": health_deleted,
     }
