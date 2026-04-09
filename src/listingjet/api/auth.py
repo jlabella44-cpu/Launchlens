@@ -71,8 +71,8 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
         role=UserRole.ADMIN,
         consent_at=datetime.now(timezone.utc),
         consent_version="2026-04-03",
-        ai_consent_at=datetime.now(timezone.utc),
-        ai_consent_version="1.0",
+        ai_consent_at=datetime.now(timezone.utc) if body.ai_consent else None,
+        ai_consent_version="1.0" if body.ai_consent else None,
     )
     db.add(user)
     await emit_event(

@@ -11,20 +11,13 @@ class RegisterRequest(BaseModel):
     company_name: str
     plan_tier: str | None = None
     consent: bool = False
-    ai_consent: bool = False
+    ai_consent: bool = True
 
     @field_validator("consent")
     @classmethod
     def consent_required(cls, v: bool) -> bool:
         if not v:
             raise ValueError("You must agree to the Privacy Policy to create an account")
-        return v
-
-    @field_validator("ai_consent")
-    @classmethod
-    def ai_consent_required(cls, v: bool) -> bool:
-        if not v:
-            raise ValueError("You must consent to AI processing of your listing photos")
         return v
 
     model_config = {
