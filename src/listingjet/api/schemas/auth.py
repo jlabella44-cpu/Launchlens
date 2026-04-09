@@ -11,6 +11,7 @@ class RegisterRequest(BaseModel):
     company_name: str
     plan_tier: str | None = None
     consent: bool = False
+    ai_consent: bool = True
 
     @field_validator("consent")
     @classmethod
