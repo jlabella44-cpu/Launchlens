@@ -43,7 +43,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ### Data Integrity
 - [x] **HIGH-5: Outbox poller can duplicate webhook deliveries** — `X-ListingJet-Idempotency-Key` header added
 - [x] **HIGH-6: Unbounded analytics queries** — pagination with offset/limit on `/analytics/credits`
-- [ ] **Dual credit systems (Audit #8)** — `CreditAccount` table vs `Tenant.credit_balance` are two sources of truth; needs product decision
+- [x] **Dual credit systems (Audit #8)** — Dropped `Tenant.credit_balance`; `CreditAccount` is sole source of truth (migration 046)
 
 ### Deployment
 - [ ] **Deploy backend with new analytics endpoints** (ECR push + ECS redeploy)
@@ -148,6 +148,16 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] Cancel listing reuses `FAILED` state (Audit #16) — `CANCELLED` enum added in migration 024
 - [x] Brand Kit migration gap (Audit #22) — chain is correct (011→013), gap is harmless
 - [x] **10 service modules have zero test coverage** (HIGH-8) — added tests for account_lifecycle, audit, notifications, email_templates, link_import, endcard, drip_scheduler (3 remaining: canva_tokens, idx_feed_poller — require external mocks)
+
+### Session Apr 9, 2026 — Resolved
+- [x] **Dependabot cryptography CVE-2026-39892** — merged #195, bumped to 46.0.7
+- [x] **Dual credit systems** — dropped `Tenant.credit_balance`, migration 046
+- [x] **CI workflows reference `master`** — removed dead branch from lint/docker/test workflows
+- [x] **Deploy not gated on tests** — added `needs: test` to deploy job
+- [x] **IDX API keys stored plaintext** — added Fernet encryption via `FIELD_ENCRYPTION_KEY` env var
+- [x] **Health score history no cleanup** — added 90-day cleanup to `data_retention.py`
+- [x] **Video prompts generic** — expanded to 31 room types, spatial walkthrough ordering
+- [x] **No automatic market tracking** — added `MarketTracker` using ATTOM API (zero agent setup)
 
 ### Deferred to Post-Launch
 - [ ] Password reset flow
