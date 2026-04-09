@@ -33,14 +33,34 @@ async def list_tenants(
     db: AsyncSession = Depends(get_db_admin),
 ):
     """List all tenants with pagination. Requires superadmin role."""
+    from listingjet.models.credit_account import CreditAccount
+
     total = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
     offset = (page - 1) * page_size
     result = await db.execute(
         select(Tenant).order_by(Tenant.created_at.desc()).offset(offset).limit(page_size)
     )
     tenants = result.scalars().all()
+
+    # Look up credit balances from CreditAccount (the single source of truth)
+    tenant_ids = [t.id for t in tenants]
+    if tenant_ids:
+        balances_result = await db.execute(
+            select(CreditAccount.tenant_id, CreditAccount.balance)
+            .where(CreditAccount.tenant_id.in_(tenant_ids))
+        )
+        balance_map = {row.tenant_id: row.balance for row in balances_result}
+    else:
+        balance_map = {}
+
+    items = []
+    for t in tenants:
+        resp = TenantResponse.model_validate(t)
+        resp.credit_balance = balance_map.get(t.id, 0)
+        items.append(resp)
+
     return {
-        "items": [TenantResponse.model_validate(t) for t in tenants],
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -215,7 +235,6 @@ async def adjust_credits(
         )
 
     credit_acct.balance = new_balance
-    tenant.credit_balance = new_balance  # keep in sync for backward compat
 
     account_id = credit_acct.id
     txn = CreditTransaction(

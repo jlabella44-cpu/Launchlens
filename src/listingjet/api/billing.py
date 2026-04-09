@@ -395,7 +395,7 @@ async def _handle_subscription_deleted(
     if not tenant:
         return
 
-    # Downgrade to free — preserve credit_balance (purchased credits are theirs)
+    # Downgrade to free — CreditAccount balance is preserved (purchased credits are theirs)
     apply_plan_credits(tenant, "free")
     tenant.stripe_subscription_id = None
     await db.commit()
