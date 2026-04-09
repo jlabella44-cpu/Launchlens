@@ -119,6 +119,10 @@ class Settings(BaseSettings):
     reso_api_url: str = ""
     reso_api_key: str = ""
 
+    # Field-level encryption (Fernet key for IDX API keys, etc.)
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    field_encryption_key: str = ""
+
     # Canva
     canva_api_key: str = ""
     canva_default_template_id: str = ""  # Canva Brand Template ID used when tenant has no override

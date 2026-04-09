@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from listingjet.models.idx_feed_config import IdxFeedConfig
 from listingjet.models.listing import Listing
 from listingjet.models.performance_event import PerformanceEvent
+from listingjet.services.field_encryption import decrypt
 from listingjet.services.outcome_tracker import ingest_outcome
 from listingjet.services.reso_adapter import RESOAdapter
 
@@ -36,7 +37,7 @@ class IdxFeedPoller:
         try:
             adapter = RESOAdapter(
                 base_url=config.base_url,
-                api_key=config.api_key_encrypted,  # TODO: decrypt in production
+                api_key=decrypt(config.api_key_encrypted),
             )
 
             # Get listings for this tenant that are in delivered state

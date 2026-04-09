@@ -14,6 +14,7 @@ from listingjet.agents.video_template import (
     NEGATIVE_PROMPT,
     STANDARD_60S,
     VIDEO_EXCLUDED_LABELS,
+    WALKTHROUGH_ORDER,
     VideoTemplate,
     get_prompt_for_room,
 )
@@ -231,12 +232,12 @@ class VideoAgent(BaseAgent):
                         room = "unknown"
                 seen[aid] = (ps, asset, vr, score, room)
 
-        # Bucket photos by room category, each sorted by score desc
+        # Bucket photos by room category
         drones: list[tuple] = []
         exteriors: list[tuple] = []
         interiors: list[tuple] = []
         for aid, (ps, asset, vr, score, room) in seen.items():
-            entry = (ps, asset, vr, score)
+            entry = (ps, asset, vr, score, room)
             if room in DRONE_ROOMS:
                 drones.append(entry)
             elif room in EXTERIOR_ROOMS:
@@ -246,7 +247,12 @@ class VideoAgent(BaseAgent):
 
         drones.sort(key=lambda e: e[3], reverse=True)
         exteriors.sort(key=lambda e: e[3], reverse=True)
-        interiors.sort(key=lambda e: e[3], reverse=True)
+
+        # Sort interiors by walkthrough order (spatial flow), score as tiebreaker.
+        # Rooms not in WALKTHROUGH_ORDER go to the end, sorted by score.
+        walk_index = {room: i for i, room in enumerate(WALKTHROUGH_ORDER)}
+        max_walk = len(WALKTHROUGH_ORDER)
+        interiors.sort(key=lambda e: (walk_index.get(e[4], max_walk), -e[3]))
 
         # All photos pooled and score-sorted — used as the padding reservoir
         all_photos = sorted(
@@ -287,23 +293,23 @@ class VideoAgent(BaseAgent):
         else:
             positions[1] = positions[0]
 
-        # Positions 3..N-1 (interior slots, score-descending)
+        # Positions 3..N-1 (interior slots in walkthrough order)
         interior_slots = total - 3  # positions[2] .. positions[total-2]
-        interior_pool = list(interiors)  # already score-sorted desc
+        interior_pool = list(interiors)  # already walkthrough-sorted
         for i in range(interior_slots):
             slot_idx = 2 + i
             if interior_pool:
                 positions[slot_idx] = interior_pool.pop(0)
             else:
-                # Pad with highest-scored interior if we have any; else best photo
+                # Pad with first interior if we have any; else best photo
                 if interiors:
                     positions[slot_idx] = interiors[0]
                 else:
                     # No interiors at all — pad from all_photos, avoiding adjacent duplicates
                     positions[slot_idx] = self._pad_pick(all_photos, positions, slot_idx)
 
-        # Strip the (ps, asset, vr, score) score element for downstream compatibility
-        return [(ps, asset, vr) for (ps, asset, vr, _score) in positions]
+        # Strip score/room extras for downstream compatibility → (ps, asset, vr)
+        return [(e[0], e[1], e[2]) for e in positions]
 
     def _pad_pick(self, pool: list, positions: list, slot_idx: int) -> tuple:
         """Pick a padding photo from pool, avoiding exact duplicate of neighbor if possible."""
