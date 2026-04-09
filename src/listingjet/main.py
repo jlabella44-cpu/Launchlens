@@ -56,6 +56,7 @@ from listingjet.middleware.security_headers import SecurityHeadersMiddleware
 from listingjet.middleware.tenant import TenantMiddleware
 from listingjet.monitoring import init_monitoring
 from listingjet.services.idx_feed_poller import IdxFeedPoller
+from listingjet.services.market_tracker import MarketTracker
 from listingjet.services.outbox_poller import OutboxPoller
 
 setup_logging(app_env=settings.app_env, log_level=settings.log_level)
@@ -81,8 +82,10 @@ async def lifespan(app: FastAPI):
 
     outbox_task = None
     idx_task = None
+    market_task = None
     outbox_poller = None
     idx_poller = None
+    market_tracker = None
     try:
         outbox_poller = OutboxPoller(session_factory=AsyncSessionLocal)
         outbox_task = asyncio.create_task(outbox_poller.run())
@@ -95,9 +98,19 @@ async def lifespan(app: FastAPI):
     except Exception:
         logging.getLogger(__name__).warning("IDX feed poller failed to start — running without it")
 
+    try:
+        market_tracker = MarketTracker(session_factory=AsyncSessionLocal)
+        market_task = asyncio.create_task(market_tracker.run())
+    except Exception:
+        logging.getLogger(__name__).warning("Market tracker failed to start — running without it")
+
     yield
 
-    for poller_obj, task_obj in [(outbox_poller, outbox_task), (idx_poller, idx_task)]:
+    for poller_obj, task_obj in [
+        (outbox_poller, outbox_task),
+        (idx_poller, idx_task),
+        (market_tracker, market_task),
+    ]:
         if task_obj:
             try:
                 if poller_obj:
