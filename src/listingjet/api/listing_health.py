@@ -302,8 +302,22 @@ async def get_health_weights(
     db: AsyncSession = Depends(get_db),
 ) -> HealthWeightsResponse:
     """Get current health score weights for the tenant."""
+    from listingjet.models.tenant_health_weights import TenantHealthWeights
+
     tenant = await db.get(Tenant, current_user.tenant_id)
     plan = tenant.plan if tenant else "starter"
+
+    # Check for custom weights first
+    custom = (await db.execute(
+        select(TenantHealthWeights).where(TenantHealthWeights.tenant_id == current_user.tenant_id)
+    )).scalar_one_or_none()
+
+    if custom and plan in ("team", "enterprise"):
+        return HealthWeightsResponse(
+            media=custom.media, content=custom.content, velocity=custom.velocity,
+            syndication=custom.syndication, market=custom.market,
+        )
+
     weights = hs._resolve_weights(plan)
     return HealthWeightsResponse(
         media=weights.get("media", 0),
@@ -321,6 +335,8 @@ async def update_health_weights(
     db: AsyncSession = Depends(get_db),
 ) -> HealthWeightsResponse:
     """Customize health score weights (Enterprise only)."""
+    from listingjet.models.tenant_health_weights import TenantHealthWeights
+
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant or tenant.plan not in ("team", "enterprise"):
         raise HTTPException(403, "Custom health weights require Enterprise plan")
@@ -329,8 +345,25 @@ async def update_health_weights(
     if not (0.99 <= total <= 1.01):
         raise HTTPException(422, f"Weights must sum to 1.0 (got {total:.2f})")
 
-    # TODO: persist custom weights in tenant metadata or dedicated table
-    # For now, return the requested weights
+    existing = (await db.execute(
+        select(TenantHealthWeights).where(TenantHealthWeights.tenant_id == current_user.tenant_id)
+    )).scalar_one_or_none()
+
+    if existing:
+        existing.media = body.media
+        existing.content = body.content
+        existing.velocity = body.velocity
+        existing.syndication = body.syndication
+        existing.market = body.market
+    else:
+        db.add(TenantHealthWeights(
+            tenant_id=current_user.tenant_id,
+            media=body.media, content=body.content, velocity=body.velocity,
+            syndication=body.syndication, market=body.market,
+        ))
+
+    await db.flush()
+
     return HealthWeightsResponse(
         media=body.media,
         content=body.content,

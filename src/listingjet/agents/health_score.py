@@ -6,6 +6,8 @@ Emits health.score.updated event and health.score.alert if below threshold.
 """
 import logging
 
+from sqlalchemy import select
+
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.tenant import Tenant
 from listingjet.services import health_score as hs
@@ -25,15 +27,30 @@ class HealthScoreAgent(BaseAgent):
 
     async def execute(self, context: AgentContext) -> dict:
         async with self.session_scope(context) as (session, listing_id, tenant_id):
+            from listingjet.models.tenant_health_weights import TenantHealthWeights
+
             # Resolve tenant plan + custom weights
             tenant = await session.get(Tenant, tenant_id)
             plan = tenant.plan if tenant else "starter"
+
+            custom_weights = None
+            if plan in ("team", "enterprise"):
+                thw = (await session.execute(
+                    select(TenantHealthWeights).where(TenantHealthWeights.tenant_id == tenant_id)
+                )).scalar_one_or_none()
+                if thw:
+                    custom_weights = {
+                        "media": thw.media, "content": thw.content,
+                        "velocity": thw.velocity, "syndication": thw.syndication,
+                        "market": thw.market,
+                    }
 
             score = await hs.calculate(
                 session=session,
                 listing_id=listing_id,
                 tenant_id=tenant_id,
                 plan=plan,
+                custom_weights=custom_weights,
             )
 
             await self.emit(session, context, "health.score.updated", {
