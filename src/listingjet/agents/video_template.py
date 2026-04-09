@@ -4,92 +4,165 @@ from dataclasses import dataclass
 
 ROOM_PROMPTS: dict[str, str] = {
     "drone": (
-        "Aerial drone footage slowly gliding forward over residential property, "
-        "camera tilts gently downward revealing rooftop and landscaping, "
-        "trees sway softly in the breeze, shadows shift across the lawn, "
+        "Aerial drone footage gliding forward over residential property, "
+        "camera tilts gently downward revealing rooftop and full lot, "
+        "trees sway softly, shadows move across manicured lawn, "
         "golden hour sunlight, smooth continuous forward motion, cinematic 4K real estate"
     ),
     "exterior": (
-        "Camera steadily pushes forward along walkway toward front door of house, "
-        "parallax movement past landscaping and columns, porch light glows warmly, "
-        "leaves rustle gently, late afternoon sun casts long shadows across facade, "
+        "Camera pushes steadily forward along front walkway toward entrance, "
+        "parallax past landscaping, columns, and architectural details, "
+        "late afternoon sun casts warm directional light across facade, "
         "smooth dolly motion, professional real estate cinematography"
     ),
     "exterior_rear": (
-        "Camera glides laterally across backyard revealing patio and outdoor living space, "
-        "plants sway gently in breeze, sunlight dapples through tree canopy, "
+        "Camera glides laterally across rear of home revealing patio and outdoor living, "
+        "plants sway gently, sunlight dapples through tree canopy onto siding, "
         "smooth tracking shot with natural depth parallax, cinematic real estate"
     ),
+    "entryway": (
+        "Camera pushes forward through front entry into home, light pours in from doorway, "
+        "shadows shift across floor as camera advances, "
+        "architectural details emerge with depth parallax, "
+        "smooth continuous dolly, welcoming first impression, professional cinematography"
+    ),
+    "foyer": (
+        "Camera enters foyer and slowly pans upward revealing ceiling height, "
+        "natural light from adjacent windows creates warm tones, "
+        "smooth tilt motion with foreground depth, elegant first impression, cinematic interior"
+    ),
     "living_room": (
-        "Camera pushes slowly forward through spacious living room, "
-        "natural light streams through windows casting moving shadows on floor, "
-        "curtains drift gently, parallax reveals furniture depth and room scale, "
+        "Camera pushes slowly forward through living room, "
+        "natural light streams through windows illuminating textures and surfaces, "
+        "parallax reveals furniture arrangement and room scale, "
         "warm ambient atmosphere, smooth continuous dolly, professional interior cinematography"
+    ),
+    "family_room": (
+        "Camera tracks laterally through family room revealing comfortable layout, "
+        "soft window light creates warm atmosphere, "
+        "depth parallax between seating and built-in features, "
+        "smooth tracking motion, inviting casual living space, cinematic interior"
     ),
     "kitchen": (
         "Camera glides forward into kitchen revealing countertops and cabinetry, "
-        "overhead pendant lights cast warm pools of light on surfaces, "
-        "subtle reflections shift on stainless steel and stone countertops, "
+        "pendant lights cast warm pools of light on work surfaces, "
+        "reflections shift subtly on appliances and stone countertops, "
         "smooth dolly push with natural parallax, bright modern interior, cinematic real estate"
     ),
-    "bedroom": (
-        "Camera slowly tracks right to left across bedroom, "
-        "soft natural light from windows illuminates bedding and furniture, "
-        "gentle depth parallax between foreground and background elements, "
-        "peaceful serene atmosphere, smooth lateral tracking shot, professional interior"
-    ),
-    "primary_bedroom": (
-        "Camera pushes gently forward into luxurious primary suite, "
-        "morning light cascades through large windows, soft shadows move across bed, "
-        "parallax reveals room depth and architectural details, "
-        "smooth continuous dolly motion, elegant luxury interior cinematography"
-    ),
-    "bathroom": (
-        "Camera glides forward into bathroom revealing tile work and fixtures, "
-        "light reflects and shimmers off glass shower door and mirror surfaces, "
-        "clean bright illumination with subtle caustic reflections on tile, "
-        "smooth push-in motion, spa-like atmosphere, professional real estate"
-    ),
-    "primary_bathroom": (
-        "Camera tracks laterally across primary bathroom revealing double vanity and soaking tub, "
-        "light plays across marble surfaces and chrome fixtures, water-like reflections shimmer, "
-        "smooth tracking shot with depth parallax, luxury spa interior cinematography"
-    ),
     "dining_room": (
-        "Camera pushes forward through dining area, chandelier light creates warm ambiance, "
-        "subtle light shifts across table surface and wall art, "
-        "parallax between chairs and background reveals room depth, "
+        "Camera pushes forward into dining area, fixture light creates warm ambiance, "
+        "light shifts across table surface and wall details, "
+        "parallax between furnishings and background reveals room proportion, "
         "smooth dolly motion, elegant interior, professional real estate cinematography"
     ),
+    "breakfast_nook": (
+        "Camera glides toward breakfast area adjacent to kitchen, "
+        "morning light streams through nearby windows across table, "
+        "smooth push-in with subtle parallax, bright casual dining space, cinematic interior"
+    ),
+    "primary_bedroom": (
+        "Camera pushes gently forward into primary suite, "
+        "soft light cascades through large windows across bed and furnishings, "
+        "parallax reveals room depth and architectural details, "
+        "smooth continuous dolly motion, elegant retreat, luxury interior cinematography"
+    ),
+    "bedroom": (
+        "Camera slowly tracks laterally across bedroom, "
+        "soft natural light from windows illuminates surfaces, "
+        "gentle depth parallax between foreground and background, "
+        "peaceful atmosphere, smooth lateral tracking shot, professional interior"
+    ),
+    "primary_bathroom": (
+        "Camera tracks laterally revealing double vanity and spa features, "
+        "light plays across tile, stone, and chrome surfaces, "
+        "subtle reflections shimmer on glass and mirror, "
+        "smooth tracking shot with depth parallax, luxury spa atmosphere, cinematic interior"
+    ),
+    "bathroom": (
+        "Camera glides forward into bathroom revealing tile and fixtures, "
+        "light reflects off glass and mirror surfaces, "
+        "clean bright illumination with subtle caustic reflections, "
+        "smooth push-in motion, spa-like atmosphere, professional real estate"
+    ),
     "office": (
-        "Camera slowly tracks across home office, natural window light shifts across desk surface, "
-        "bookshelves and decor create layered depth with parallax movement, "
-        "smooth lateral tracking shot, productive modern atmosphere, cinematic interior"
+        "Camera slowly tracks across home office, window light shifts across desk, "
+        "shelving and decor create layered depth with parallax, "
+        "smooth lateral tracking shot, focused productive atmosphere, cinematic interior"
+    ),
+    "laundry": (
+        "Camera pushes gently forward into laundry room revealing clean organized space, "
+        "bright even illumination across cabinetry and appliances, "
+        "smooth dolly motion, functional modern utility space, professional real estate"
+    ),
+    "mudroom": (
+        "Camera glides through mudroom entry revealing storage and organization, "
+        "natural light from adjacent door, clean practical space, "
+        "smooth forward motion, inviting transitional area, cinematic interior"
+    ),
+    "closet": (
+        "Camera pushes slowly into walk-in closet revealing organization system, "
+        "even recessed lighting illuminates shelving and hanging space, "
+        "smooth dolly forward, spacious organized storage, professional interior"
+    ),
+    "staircase": (
+        "Camera tilts upward following staircase line revealing second floor landing, "
+        "light shifts across railing and wall surfaces, "
+        "smooth vertical pan motion, architectural detail, professional real estate"
+    ),
+    "hallway": (
+        "Camera glides forward down hallway, wall art and doorways create depth parallax, "
+        "light from adjacent rooms spills across floor, "
+        "smooth forward dolly, connecting spaces, cinematic interior"
     ),
     "garage": (
         "Camera pushes forward into spacious garage, overhead lighting illuminates clean floor, "
-        "depth parallax reveals storage and organization, "
-        "smooth dolly motion, even bright lighting, professional real estate"
+        "depth parallax reveals storage capacity, "
+        "smooth dolly motion, bright even lighting, professional real estate"
     ),
     "pool": (
-        "Camera glides slowly forward over pool, water surface ripples and shimmers with light, "
-        "reflections dance across surrounding deck, palm fronds sway gently overhead, "
+        "Camera glides slowly forward over pool, water surface ripples and shimmers, "
+        "reflections dance across surrounding deck and coping, "
         "resort-style atmosphere, smooth aerial drift, cinematic outdoor luxury"
     ),
+    "patio": (
+        "Camera tracks laterally across covered patio revealing outdoor living setup, "
+        "dappled sunlight through overhead structure, furniture creates foreground depth, "
+        "smooth tracking shot, outdoor entertaining space, cinematic real estate"
+    ),
+    "deck": (
+        "Camera glides across deck revealing railing and views beyond, "
+        "natural light and shadows from overhead, "
+        "smooth lateral tracking with landscape depth, outdoor living, cinematic real estate"
+    ),
     "backyard": (
-        "Camera tracks laterally across backyard revealing landscaping and outdoor features, "
+        "Camera tracks laterally across backyard revealing full landscaping, "
         "leaves and grass sway gently in breeze, sunlight filters through trees, "
         "natural depth parallax, smooth tracking shot, inviting outdoor living, cinematic real estate"
     ),
-    "entryway": (
-        "Camera pushes forward through grand entryway, light pours in from above, "
-        "shadows shift across floor as camera advances, architectural details emerge with parallax, "
-        "smooth continuous dolly into home, welcoming atmosphere, professional cinematography"
-    ),
     "basement": (
         "Camera glides forward through finished basement, recessed lighting creates even illumination, "
-        "depth parallax reveals entertainment area and living space, "
+        "depth parallax reveals entertainment and living area, "
         "smooth dolly motion, modern finished interior, professional real estate"
+    ),
+    "theater": (
+        "Camera pushes slowly forward into home theater, ambient lighting along walls, "
+        "seating and screen create dramatic depth, "
+        "smooth cinematic dolly, entertainment luxury, professional interior"
+    ),
+    "gym": (
+        "Camera tracks laterally through home gym revealing equipment and mirrors, "
+        "bright even lighting, reflections add depth, "
+        "smooth tracking shot, active lifestyle space, professional real estate"
+    ),
+    "wine_cellar": (
+        "Camera pushes forward into wine cellar, warm accent lighting across racks, "
+        "subtle reflections on glass bottles, temperature-controlled atmosphere, "
+        "smooth dolly motion, luxury entertaining feature, cinematic interior"
+    ),
+    "bonus_room": (
+        "Camera glides forward into versatile bonus room, natural light from windows, "
+        "flexible open space with depth parallax, "
+        "smooth dolly motion, adaptable living area, professional real estate"
     ),
 }
 
@@ -97,19 +170,33 @@ ROOM_CAMERA_CONTROLS: dict[str, dict[str, int]] = {
     "drone": {"zoom": 2, "horizontal": 3},
     "exterior": {"zoom": 4, "horizontal": 0},
     "exterior_rear": {"zoom": 3, "horizontal": 2},
+    "entryway": {"zoom": 5, "horizontal": 0},
+    "foyer": {"zoom": 3, "horizontal": 0},
     "living_room": {"zoom": 4, "horizontal": -2},
+    "family_room": {"zoom": 3, "horizontal": -3},
     "kitchen": {"zoom": 5, "horizontal": 0},
-    "bedroom": {"zoom": 3, "horizontal": -3},
-    "primary_bedroom": {"zoom": 4, "horizontal": -2},
-    "bathroom": {"zoom": 3, "horizontal": 0},
-    "primary_bathroom": {"zoom": 3, "horizontal": 2},
     "dining_room": {"zoom": 4, "horizontal": -2},
+    "breakfast_nook": {"zoom": 4, "horizontal": 0},
+    "primary_bedroom": {"zoom": 4, "horizontal": -2},
+    "bedroom": {"zoom": 3, "horizontal": -3},
+    "primary_bathroom": {"zoom": 3, "horizontal": 2},
+    "bathroom": {"zoom": 3, "horizontal": 0},
     "office": {"zoom": 3, "horizontal": 3},
+    "laundry": {"zoom": 3, "horizontal": 0},
+    "mudroom": {"zoom": 3, "horizontal": 0},
+    "closet": {"zoom": 4, "horizontal": 0},
+    "staircase": {"zoom": 2, "horizontal": 0},
+    "hallway": {"zoom": 4, "horizontal": 0},
     "garage": {"zoom": 3, "horizontal": 0},
     "pool": {"zoom": 2, "horizontal": 3},
+    "patio": {"zoom": 3, "horizontal": -3},
+    "deck": {"zoom": 2, "horizontal": -3},
     "backyard": {"zoom": 2, "horizontal": -3},
-    "entryway": {"zoom": 5, "horizontal": 0},
     "basement": {"zoom": 4, "horizontal": 0},
+    "theater": {"zoom": 4, "horizontal": 0},
+    "gym": {"zoom": 3, "horizontal": 3},
+    "wine_cellar": {"zoom": 4, "horizontal": 0},
+    "bonus_room": {"zoom": 3, "horizontal": 0},
 }
 
 NEGATIVE_PROMPT = (
@@ -129,11 +216,30 @@ VIDEO_EXCLUDED_LABELS: frozenset[str] = frozenset({
 FEATURE_TAGS: dict[str, list[str]] = {
     "kitchen": ["island", "quartz_counters", "granite_counters", "stainless_appliances"],
     "bathroom": ["soaking_tub", "walk_in_shower", "double_vanity"],
+    "primary_bathroom": ["soaking_tub", "walk_in_shower", "double_vanity", "heated_floors"],
     "living_room": ["vaulted_ceilings", "fireplace", "hardwood_floors", "built_ins"],
+    "family_room": ["fireplace", "built_ins", "hardwood_floors"],
     "exterior": ["pool", "outdoor_kitchen", "fire_pit", "deck", "patio"],
     "bedroom": ["walk_in_closet", "tray_ceiling"],
+    "primary_bedroom": ["walk_in_closet", "tray_ceiling", "sitting_area"],
     "basement": ["theater", "gym", "wet_bar"],
 }
+
+# Walkthrough order for spatial flow (exterior → entry → main living → private → outdoor → aerial close)
+# Rooms not in this list are placed by score after the last matched room.
+WALKTHROUGH_ORDER: list[str] = [
+    "entryway", "foyer",
+    "living_room", "family_room",
+    "kitchen", "breakfast_nook", "dining_room",
+    "office",
+    "hallway", "staircase",
+    "primary_bedroom", "primary_bathroom", "closet",
+    "bedroom", "bathroom",
+    "laundry", "mudroom",
+    "basement", "theater", "gym", "wine_cellar", "bonus_room",
+    "patio", "deck", "pool", "backyard",
+    "garage",
+]
 
 # Room buckets for template-based photo selection
 DRONE_ROOMS: frozenset[str] = frozenset({"drone"})
