@@ -49,6 +49,7 @@ jobs:
       - run: python -m pytest --tb=short -q
 
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
