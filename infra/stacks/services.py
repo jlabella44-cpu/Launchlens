@@ -109,7 +109,7 @@ class ServicesStack(Stack):
                 stream_prefix="api",
                 log_group=logs.LogGroup(
                     self, "ApiLogs",
-                    log_group_name="/launchlens/api",
+                    log_group_name="/listingjet/api",
                     retention=logs.RetentionDays.ONE_MONTH,
                 ),
             ),
@@ -123,6 +123,7 @@ class ServicesStack(Stack):
                 "OPENAI_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "OPENAI_API_KEY"),
                 "ANTHROPIC_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "ANTHROPIC_API_KEY"),
                 "GOOGLE_VISION_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "GOOGLE_VISION_API_KEY"),
+                "RESEND_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "RESEND_API_KEY"),
             },
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
@@ -236,7 +237,7 @@ class ServicesStack(Stack):
                 stream_prefix="worker",
                 log_group=logs.LogGroup(
                     self, "WorkerLogs",
-                    log_group_name="/launchlens/worker",
+                    log_group_name="/listingjet/worker",
                     retention=logs.RetentionDays.ONE_MONTH,
                 ),
             ),
@@ -250,6 +251,7 @@ class ServicesStack(Stack):
                 "GOOGLE_VISION_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "GOOGLE_VISION_API_KEY"),
                 "KLING_ACCESS_KEY": ecs.Secret.from_secrets_manager(app_secrets, "KLING_ACCESS_KEY"),
                 "KLING_SECRET_KEY": ecs.Secret.from_secrets_manager(app_secrets, "KLING_SECRET_KEY"),
+                "RESEND_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "RESEND_API_KEY"),
             },
             command=["worker"],
             health_check=ecs.HealthCheck(
@@ -288,7 +290,7 @@ class ServicesStack(Stack):
                 stream_prefix="temporal",
                 log_group=logs.LogGroup(
                     self, "TemporalLogs",
-                    log_group_name="/launchlens/temporal",
+                    log_group_name="/listingjet/temporal",
                     retention=logs.RetentionDays.ONE_MONTH,
                 ),
             ),
