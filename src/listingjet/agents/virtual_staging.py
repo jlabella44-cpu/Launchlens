@@ -7,7 +7,6 @@ staged with the selected style, downloaded, and re-uploaded to S3.
 import logging
 import uuid
 
-import httpx
 from sqlalchemy import select
 
 from listingjet.database import AsyncSessionLocal
@@ -78,21 +77,15 @@ class VirtualStagingAgent(BaseAgent):
                     # Get presigned URL for the source image
                     source_url = self._storage.presigned_url(asset.file_path)
 
-                    # Call staging provider
-                    staged_url = await self._provider.stage_image(
+                    # Call staging provider — returns PNG bytes directly
+                    staged_bytes = await self._provider.stage_image(
                         image_url=source_url,
                         room_type=vr.room_label,
                         style=_DEFAULT_STYLE,
                     )
 
-                    # Download staged image and upload to S3
-                    async with httpx.AsyncClient(timeout=60) as client:
-                        resp = await client.get(staged_url)
-                        resp.raise_for_status()
-                        staged_bytes = resp.content
-
-                    s3_key = f"listings/{listing_id}/staged/{uuid.uuid4()}.jpg"
-                    self._storage.upload(s3_key, staged_bytes, content_type="image/jpeg")
+                    s3_key = f"listings/{listing_id}/staged/{uuid.uuid4()}.png"
+                    self._storage.upload(s3_key, staged_bytes, content_type="image/png")
 
                     # Create a new asset for the staged version
                     staged_asset = Asset(
