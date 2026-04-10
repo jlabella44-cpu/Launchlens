@@ -504,6 +504,101 @@ async def test_ai_consent_toggle(async_client: AsyncClient):
     assert resp.json()["ai_consent"] is True
 
 
+@pytest.mark.asyncio
+async def test_me_exposes_ai_consent_fields(async_client: AsyncClient):
+    """GET /auth/me returns ai_consent_at and ai_consent_version so the UI can render state."""
+    token, _ = await _register(async_client)
+    me = await async_client.get("/auth/me", headers=_auth(token))
+    assert me.status_code == 200
+    body = me.json()
+    assert body["ai_consent_at"] is not None
+    assert body["ai_consent_version"] == "1.0"
+
+    # After revoke, both fields should be null
+    await async_client.post("/auth/ai-consent", json={"consent": False}, headers=_auth(token))
+    me = await async_client.get("/auth/me", headers=_auth(token))
+    assert me.json()["ai_consent_at"] is None
+    assert me.json()["ai_consent_version"] is None
+
+
+@pytest.mark.asyncio
+async def test_ai_consent_writes_audit_log(async_client: AsyncClient, db_session):
+    """Grant and revoke actions produce audit log entries with previous/current state."""
+    from sqlalchemy import select
+
+    from listingjet.models.audit_log import AuditLog
+
+    token, tenant_id = await _register(async_client)
+
+    # Revoke — should produce user.ai_consent.revoked entry
+    resp = await async_client.post(
+        "/auth/ai-consent", json={"consent": False}, headers=_auth(token)
+    )
+    assert resp.status_code == 200
+
+    # Re-grant — should produce user.ai_consent.granted entry
+    resp = await async_client.post(
+        "/auth/ai-consent", json={"consent": True}, headers=_auth(token)
+    )
+    assert resp.status_code == 200
+
+    rows = (await db_session.execute(
+        select(AuditLog)
+        .where(
+            AuditLog.tenant_id == uuid.UUID(tenant_id),
+            AuditLog.action.in_(
+                ["user.ai_consent.revoked", "user.ai_consent.granted"]
+            ),
+        )
+        .order_by(AuditLog.created_at)
+    )).scalars().all()
+
+    assert len(rows) == 2
+    revoked, granted = rows
+    assert revoked.action == "user.ai_consent.revoked"
+    assert revoked.resource_type == "user"
+    assert revoked.details["previous"] is True
+    assert revoked.details["current"] is False
+
+    assert granted.action == "user.ai_consent.granted"
+    assert granted.details["previous"] is False
+    assert granted.details["current"] is True
+    assert granted.details["version"] == "1.0"
+
+
+@pytest.mark.asyncio
+async def test_revoke_then_regrant_unblocks_pipeline(async_client: AsyncClient, db_session):
+    """After revoking then re-granting consent, pipeline start should succeed."""
+    token, tenant_id = await _register(async_client, plan_tier="active_agent")
+    await _add_credits(async_client, db_session, tenant_id, 50)
+
+    listing_id = await _create_listing(async_client, token)
+    await async_client.post(
+        f"/listings/{listing_id}/assets",
+        json={"assets": [{"file_path": f"s3://b/{listing_id}/p.jpg", "file_hash": "abc"}]},
+        headers=_auth(token),
+    )
+
+    # Revoke — pipeline start must 403
+    await async_client.post("/auth/ai-consent", json={"consent": False}, headers=_auth(token))
+    blocked = await async_client.post(
+        f"/listings/{listing_id}/start-pipeline",
+        json={"selected_addons": []},
+        headers=_auth(token),
+    )
+    assert blocked.status_code == 403
+
+    # Re-grant — pipeline start must succeed
+    await async_client.post("/auth/ai-consent", json={"consent": True}, headers=_auth(token))
+    resp = await async_client.post(
+        f"/listings/{listing_id}/start-pipeline",
+        json={"selected_addons": []},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["state"] == "uploading"
+
+
 # ── Test: Pipeline Start + Asset Upload E2E ────────────────────────
 
 
