@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,33 @@ export function CreateListingDialog({
   onCreated,
 }: CreateListingDialogProps) {
   const { billingModel, creditBalance, listingCreditCost, canAffordListing, refresh } = usePlan();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+
+    function handleTab(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+    dialog.addEventListener("keydown", handleTab);
+    return () => dialog.removeEventListener("keydown", handleTab);
+  }, [open]);
 
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
@@ -139,8 +166,15 @@ export function CreateListingDialog({
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="glass w-full max-w-lg rounded-2xl p-8 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div
+              ref={dialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-listing-title"
+              className="glass w-full max-w-lg rounded-2xl p-8 shadow-xl max-h-[90vh] overflow-y-auto"
+            >
               <h2
+                id="create-listing-title"
                 className="text-xl font-bold mb-6"
                 style={{ fontFamily: "var(--font-heading)" }}
               >

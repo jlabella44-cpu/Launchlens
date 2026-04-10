@@ -84,10 +84,10 @@ export default function LoginPage() {
       className="h-screen flex overflow-hidden"
     >
       {/* Left: Hero Panel */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-[#0B1120] relative overflow-hidden p-10">
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-[var(--color-primary)] relative overflow-hidden p-10">
         {/* Logo */}
         <div className="flex items-center gap-2 z-10">
-          <svg className="w-8 h-8 text-[#F97316]" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-8 h-8 text-[var(--color-cta)]" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3.5 18.5L9.5 12.5L13 16L22 6L20.5 4.5L13 12L9.5 8.5L2 16L3.5 18.5Z" />
           </svg>
           <span className="text-white text-xl font-bold tracking-wide" style={{ fontFamily: "var(--font-heading)" }}>
@@ -117,7 +117,7 @@ export default function LoginPage() {
             High-performance marketing automation for elite real estate professionals.
           </p>
           <div className="flex items-center gap-2 mt-6">
-            <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-[var(--color-cta)] animate-pulse" />
             <span className="text-xs text-white/40 uppercase tracking-widest">
               System Status: Supersonic
             </span>
@@ -126,7 +126,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right: Login Form */}
-      <div className="flex-1 flex flex-col bg-[#F5F7FA]">
+      <div className="flex-1 flex flex-col bg-[var(--color-background)]">
         {/* Language selector */}
         <div className="hidden lg:flex justify-end p-6">
           <span className="text-xs text-slate-400 uppercase tracking-wider">
@@ -164,7 +164,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
                     placeholder="pilot@listingjet.ai"
                   />
                 </div>
@@ -176,7 +176,7 @@ export default function LoginPage() {
                   <label htmlFor="password" className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                     Security Cipher
                   </label>
-                  <Link href="/forgot-password" className="text-[10px] font-semibold uppercase tracking-wider text-[#F97316] hover:text-[#ea580c]">
+                  <Link href="/forgot-password" className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-cta)] hover:brightness-90">
                     Forgot?
                   </Link>
                 </div>
@@ -192,7 +192,7 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                    className="w-full pl-10 pr-12 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
                     placeholder="••••••••••"
                   />
                   <button
@@ -216,7 +216,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                <p role="alert" className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
                   {error}
                 </p>
               )}
@@ -225,7 +225,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-6 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-200"
+                className="w-full py-3 px-6 rounded-full bg-[var(--color-cta)] hover:brightness-90 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
               >
                 {loading ? (
                   <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -248,7 +248,7 @@ export default function LoginPage() {
               Don&apos;t have an account?{" "}
               <Link
                 href="/register"
-                className="text-[#F97316] font-medium hover:underline"
+                className="text-[var(--color-cta)] font-medium hover:underline"
               >
                 Register
               </Link>

@@ -26,15 +26,15 @@ function ScoreBar({ label, detail, description }: { label: string; detail: Healt
     <div className="space-y-1">
       <div className="flex justify-between items-center">
         <div>
-          <span className="text-sm font-medium text-slate-700">{label}</span>
-          <span className="text-xs text-slate-400 ml-2">({Math.round(detail.weight * 100)}%)</span>
+          <span className="text-sm font-medium text-[var(--color-text)]">{label}</span>
+          <span className="text-xs text-[var(--color-text-secondary)] ml-2">({Math.round(detail.weight * 100)}%)</span>
         </div>
-        <span className="text-sm font-semibold text-slate-900">{detail.score}</span>
+        <span className="text-sm font-semibold text-[var(--color-text)]">{detail.score}</span>
       </div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-[var(--color-background)] rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-xs text-slate-400">{description}</p>
+      <p className="text-xs text-[var(--color-text-secondary)]">{description}</p>
     </div>
   );
 }
@@ -54,11 +54,11 @@ export function HealthPanel({ listingId }: HealthPanelProps) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-100 p-6 animate-pulse">
-        <div className="h-6 bg-slate-100 rounded w-1/3 mb-4" />
+      <div className="bg-[var(--color-card)] rounded-xl border border-[var(--color-card-border)] p-6 animate-pulse">
+        <div className="h-6 bg-[var(--color-background)] rounded w-1/3 mb-4" />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-8 bg-slate-50 rounded" />
+            <div key={i} className="h-8 bg-[var(--color-background)] rounded" />
           ))}
         </div>
       </div>
@@ -75,9 +75,9 @@ export function HealthPanel({ listingId }: HealthPanelProps) {
   ) as [string, HealthSubScoreDetail][];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-100 p-6 space-y-4">
+    <div className="bg-[var(--color-card)] rounded-xl border border-[var(--color-card-border)] p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900">Listing Health</h3>
+        <h3 className="text-lg font-semibold text-[var(--color-text)]">Listing Health</h3>
         <HealthBadge score={health.overall_score} size="md" />
       </div>
 
@@ -89,15 +89,15 @@ export function HealthPanel({ listingId }: HealthPanelProps) {
       </div>
 
       {health.trend.length > 1 && (
-        <div className="pt-3 border-t border-slate-50">
-          <p className="text-xs text-slate-400">
+        <div className="pt-3 border-t border-[var(--color-card-border)]">
+          <p className="text-xs text-[var(--color-text-secondary)]">
             {health.trend.length}-day trend: {health.trend[0].overall} → {health.trend[health.trend.length - 1].overall}
           </p>
         </div>
       )}
 
       {health.calculated_at && (
-        <p className="text-xs text-slate-300">
+        <p className="text-xs text-[var(--color-text-secondary)]">
           Last updated: {new Date(health.calculated_at).toLocaleString()}
         </p>
       )}

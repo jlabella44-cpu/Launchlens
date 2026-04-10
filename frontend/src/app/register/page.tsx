@@ -18,7 +18,7 @@ export default function RegisterPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#F97316] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[var(--color-cta)] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <RegisterForm />
@@ -90,19 +90,19 @@ function RegisterForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left: Hero Panel */}
-      <div className="hidden lg:flex lg:w-[45%] flex-col justify-between bg-[#0B1120] relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[45%] flex-col justify-between bg-[var(--color-primary)] relative overflow-hidden">
         <img
           src="/images/register-bg.jpg"
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-40"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1a2744]/80 via-[#2d4a6f]/60 to-[#0d1b2a]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--color-primary)]/80 via-[var(--color-secondary)]/60 to-[var(--color-primary)]" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
         {/* Logo */}
         <div className="relative z-10 p-10">
           <div className="flex items-center gap-2">
-            <svg className="w-6 h-6 text-[#F97316]" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="w-6 h-6 text-[var(--color-cta)]" viewBox="0 0 24 24" fill="currentColor">
               <path d="M3.5 18.5L9.5 12.5L13 16L22 6L20.5 4.5L13 12L9.5 8.5L2 16L3.5 18.5Z" />
             </svg>
             <span className="text-white text-lg font-bold" style={{ fontFamily: "var(--font-heading)" }}>
@@ -144,14 +144,14 @@ function RegisterForm() {
               <ul className="space-y-1.5">
                 {planInfo.features.map((f) => (
                   <li key={f} className="flex items-center gap-2 text-xs text-slate-600">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-cta)]" />
                     {f}
                   </li>
                 ))}
               </ul>
             </div>
             <div className="flex items-center gap-2 mt-4">
-              <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[var(--color-cta)] animate-pulse" />
               <span className="text-[10px] text-white/40 uppercase tracking-widest">
                 System Status: Ready for Deployment
               </span>
@@ -161,7 +161,7 @@ function RegisterForm() {
       </div>
 
       {/* Right: Register Form */}
-      <div className="flex-1 flex flex-col bg-[#F5F7FA]">
+      <div className="flex-1 flex flex-col bg-[var(--color-background)]">
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="w-full max-w-md">
             <h1
@@ -189,7 +189,7 @@ function RegisterForm() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
                     placeholder="John Doe"
                   />
                 </div>
@@ -203,7 +203,7 @@ function RegisterForm() {
                     required
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
                     placeholder="Elite Realty"
                   />
                 </div>
@@ -220,7 +220,7 @@ function RegisterForm() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
                   placeholder="commander@listingjet.ai"
                 />
               </div>
@@ -237,7 +237,7 @@ function RegisterForm() {
                   minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
                   placeholder="••••••••"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
@@ -255,11 +255,11 @@ function RegisterForm() {
                   type="text"
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value.trim())}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
                   placeholder="e.g. SARAH30"
                 />
                 {referralCode && (
-                  <p className="text-[11px] text-[#F97316] mt-1 flex items-center gap-1">
+                  <p className="text-[11px] text-[var(--color-cta)] mt-1 flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
@@ -274,16 +274,16 @@ function RegisterForm() {
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#F97316] focus:ring-[#F97316]/30"
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[var(--color-cta)] focus:ring-[var(--color-cta)]/30"
                   required
                 />
                 <span className="text-xs text-slate-500">
                   I agree to the{" "}
-                  <Link href="/terms" className="text-[#F97316] hover:underline" target="_blank">
+                  <Link href="/terms" className="text-[var(--color-cta)] hover:underline" target="_blank">
                     Terms of Service
                   </Link>{" "}
                   and{" "}
-                  <Link href="/privacy" className="text-[#F97316] hover:underline" target="_blank">
+                  <Link href="/privacy" className="text-[var(--color-cta)] hover:underline" target="_blank">
                     Privacy Policy
                   </Link>, and consent to my listing data being processed by third-party AI
                   services as described therein.
@@ -291,7 +291,7 @@ function RegisterForm() {
               </label>
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                <p role="alert" className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
                   {error}
                 </p>
               )}
@@ -300,7 +300,7 @@ function RegisterForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 px-6 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-200"
+                className="w-full py-3.5 px-6 rounded-full bg-[var(--color-cta)] hover:brightness-90 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
               >
                 {loading ? (
                   <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -321,7 +321,7 @@ function RegisterForm() {
               Already have an account?{" "}
               <Link
                 href="/login"
-                className="text-[#F97316] font-medium hover:underline"
+                className="text-[var(--color-cta)] font-medium hover:underline"
               >
                 Sign in
               </Link>

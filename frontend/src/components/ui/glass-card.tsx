@@ -48,8 +48,7 @@ export function GlassCard({ children, className = "", onClick, tilt = true }: Gl
         transformStyle: "preserve-3d",
       }}
       className={`
-        bg-white/70 dark:bg-[rgba(30,41,59,0.7)] backdrop-blur-xl border border-white/20 dark:border-white/10
-        rounded-xl shadow-xl p-6
+        glass rounded-xl shadow-xl p-6
         transition-shadow duration-200
         hover:shadow-2xl
         ${onClick ? "cursor-pointer" : ""}

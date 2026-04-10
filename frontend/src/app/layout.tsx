@@ -58,10 +58,16 @@ export default function RootLayout({
         `}} />
       </head>
       <body className="min-h-full flex flex-col">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-[999] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-[var(--color-surface)] focus:text-[var(--color-text)] focus:rounded-lg focus:shadow-lg focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          Skip to main content
+        </a>
         <ErrorBoundary>
           <OfflineBanner />
           <AuthProviderWrapper>
-            <div className="flex-1">{children}</div>
+            <div id="main-content" className="flex-1">{children}</div>
             <Footer />
           </AuthProviderWrapper>
         </ErrorBoundary>

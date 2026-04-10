@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Select } from "@/components/ui/select";
 import apiClient from "@/lib/api-client";
 import type { ListingPermissionResponse } from "@/lib/types";
@@ -34,6 +34,33 @@ export function SharePanel({ listingId, isOpen, onClose }: SharePanelProps) {
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap
+  useEffect(() => {
+    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+
+    function handleTab(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+    dialog.addEventListener("keydown", handleTab);
+    return () => dialog.removeEventListener("keydown", handleTab);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -104,19 +131,25 @@ export function SharePanel({ listingId, isOpen, onClose }: SharePanelProps) {
     }
   }
 
-  if (!isOpen) return null;
-
   return (
+    <AnimatePresence>
+      {isOpen && (
     <motion.div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="share-panel-title"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
+      transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className="fixed right-0 top-0 h-full w-full max-w-md bg-[var(--color-surface)] border-l border-[var(--color-card-border)] shadow-2xl z-50 flex flex-col"
     >
       {/* Header */}
       <div className="px-6 py-4 border-b border-[var(--color-card-border)] flex items-center justify-between">
         <div>
           <h2
+            id="share-panel-title"
             className="text-lg font-bold text-[var(--color-text)]"
             style={{ fontFamily: "var(--font-heading)" }}
           >
@@ -128,6 +161,7 @@ export function SharePanel({ listingId, isOpen, onClose }: SharePanelProps) {
         </div>
         <button
           onClick={onClose}
+          aria-label="Close share panel"
           className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--color-background)] text-[var(--color-text-secondary)] transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -281,5 +315,7 @@ export function SharePanel({ listingId, isOpen, onClose }: SharePanelProps) {
         </p>
       </div>
     </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
