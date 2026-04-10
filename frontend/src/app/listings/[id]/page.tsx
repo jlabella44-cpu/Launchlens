@@ -72,7 +72,10 @@ function ListingDetail() {
     }
   }, [id]);
 
-  useEffect(() => { document.title = "Listing Detail | ListingJet"; }, []);
+  useEffect(() => {
+    const street = listing?.address?.street;
+    document.title = street ? `${street} | ListingJet` : "Listing Detail | ListingJet";
+  }, [listing]);
 
   useEffect(() => {
     fetchData();
