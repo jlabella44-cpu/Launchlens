@@ -40,15 +40,21 @@ export function StepVirtualStaging({ formData, onUpdate, onNext, onBack }: Props
 
   return (
     <GlassCard tilt={false}>
-      <h2
-        className="text-xl font-bold mb-2"
-        style={{ fontFamily: "var(--font-heading)" }}
-      >
-        Virtual Staging
-      </h2>
+      <div className="flex items-baseline gap-2 mb-2">
+        <h2
+          className="text-xl font-bold"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          Virtual Staging
+        </h2>
+        <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] font-semibold px-1.5 py-0.5 rounded-full border border-[var(--color-border)]">
+          Optional
+        </span>
+      </div>
       <p className="text-sm text-[var(--color-text-secondary)] mb-6">
-        Select photos you'd like virtually staged. Tap a photo to toggle it. Each
-        selected photo will have furniture and decor added by AI.
+        Select photos you&apos;d like virtually staged, or skip this step to
+        continue without staging. Each selected photo will have furniture and
+        decor added by AI.
       </p>
 
       {uploadedAssets.length === 0 ? (

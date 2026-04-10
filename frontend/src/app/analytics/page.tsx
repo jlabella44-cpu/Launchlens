@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { GlassCard } from "@/components/ui/glass-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { TimelineChart } from "@/components/analytics/timeline-chart";
 import { StateBreakdown } from "@/components/analytics/state-breakdown";
 import { CreditHistory } from "@/components/analytics/credit-history";
@@ -120,6 +122,21 @@ function AnalyticsContent() {
 
         {tab === "performance" ? (
           <PerformanceIntelligence />
+        ) : overview?.total_listings === 0 ? (
+          <GlassCard tilt={false}>
+            <EmptyState
+              title="No data yet"
+              description="Analytics come to life once you've created your first listing. Create one now and come back to see pipeline, delivery, and credit trends."
+              action={
+                <Link
+                  href="/listings/new"
+                  className="px-5 py-2.5 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors shadow-md shadow-orange-200"
+                >
+                  Create your first listing
+                </Link>
+              }
+            />
+          </GlassCard>
         ) : (
           <>
             {/* Stat Cards */}
