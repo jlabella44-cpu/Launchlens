@@ -18,6 +18,10 @@ async def test_handle_failure_emits_event_and_reraises():
     agent = ConcreteAgent()
     ctx = AgentContext(listing_id="abc", tenant_id="tenant-1")
     mock_session = AsyncMock()
+    # Return None from session.get so the notify_pipeline_failed branch is
+    # skipped — otherwise the mock leaks an unawaited coroutine when the
+    # notification path tries to use the session's sync methods.
+    mock_session.get = AsyncMock(return_value=None)
     with patch("listingjet.services.events.emit_event", new_callable=AsyncMock) as mock_emit:
         with pytest.raises(ValueError, match="simulated failure"):
             await agent.handle_failure(ValueError("simulated failure"), ctx, session=mock_session)

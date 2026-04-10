@@ -32,7 +32,7 @@ def test_standard_60s_template():
 
 def test_kling_jwt_generation():
     from listingjet.providers.kling import KlingProvider
-    provider = KlingProvider(access_key="test_ak", secret_key="test_sk")
+    provider = KlingProvider(access_key="test_ak", secret_key="test_sk_that_is_long_enough_for_sha256_minimum_32_bytes")
     token = provider._generate_jwt()
     assert isinstance(token, str)
     assert len(token) > 0
@@ -53,7 +53,7 @@ async def test_kling_generate_clip_submits_task(MockClient):
     mock_client_instance.__aexit__ = AsyncMock(return_value=None)
     MockClient.return_value = mock_client_instance
 
-    provider = KlingProvider(access_key="test_ak", secret_key="test_sk")
+    provider = KlingProvider(access_key="test_ak", secret_key="test_sk_that_is_long_enough_for_sha256_minimum_32_bytes")
     task_id = await provider.generate_clip(
         image_url="https://example.com/photo.jpg",
         prompt="Slow cinematic dolly into kitchen",
@@ -84,6 +84,6 @@ async def test_kling_poll_task_returns_url(MockClient):
     mock_client_instance.__aexit__ = AsyncMock(return_value=None)
     MockClient.return_value = mock_client_instance
 
-    provider = KlingProvider(access_key="test_ak", secret_key="test_sk")
+    provider = KlingProvider(access_key="test_ak", secret_key="test_sk_that_is_long_enough_for_sha256_minimum_32_bytes")
     result = await provider.poll_task("task_123", timeout=10, interval=1)
     assert result == {"url": "https://cdn.kling.ai/video.mp4", "duration": "5", "credits": None}

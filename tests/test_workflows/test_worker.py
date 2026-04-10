@@ -7,7 +7,9 @@ def test_worker_module_imports():
 
 
 def test_worker_registers_all_activities():
+    from pathlib import Path
+
     from listingjet.workflows import worker
-    source = open(worker.__file__).read()
+    source = Path(worker.__file__).read_text()
     assert "ALL_ACTIVITIES" in source
     assert "ListingPipeline" in source

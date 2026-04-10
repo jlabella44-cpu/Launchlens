@@ -10,7 +10,9 @@ from listingjet.services.listing_creation import ListingCreationService
 
 @pytest.fixture
 def mock_session():
-    session = AsyncMock()
+    # Use MagicMock as the base so sync methods like session.add() don't
+    # return unawaited coroutines. Mark only the real async methods as AsyncMock.
+    session = MagicMock()
     session.flush = AsyncMock()
     session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
     return session
