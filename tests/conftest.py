@@ -58,6 +58,7 @@ def _mock_external_services():
         patch("listingjet.api.auth._get_lockout_redis", return_value=mock_redis),
         patch("listingjet.services.credits._get_redis", return_value=mock_redis),
         patch("listingjet.temporal_client.get_temporal_client", return_value=mock_temporal),
+        patch("listingjet.api.listings_draft.get_temporal_client", return_value=mock_temporal),
         patch("listingjet.api.listings_media.get_temporal_client", return_value=mock_temporal),
         patch("listingjet.api.listings_workflow.get_temporal_client", return_value=mock_temporal),
         patch("listingjet.api.bulk.get_temporal_client", return_value=mock_temporal),

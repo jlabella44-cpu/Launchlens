@@ -1,7 +1,7 @@
 # tests/test_agents/test_floorplan.py
 import json
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -13,6 +13,15 @@ from listingjet.models.dollhouse_scene import DollhouseScene
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.vision_result import VisionResult
 from tests.test_agents.conftest import make_session_factory
+
+
+@pytest.fixture(autouse=True)
+def patch_storage():
+    """Mock S3 storage to avoid boto3 credential lookups in tests."""
+    mock = MagicMock()
+    mock.presigned_url.side_effect = lambda key, **kw: f"https://s3.example.com/{key}?signed=1"
+    with patch("listingjet.agents.floorplan.get_storage", return_value=mock):
+        yield mock
 
 
 def test_dollhouse_scene_model_exists():
