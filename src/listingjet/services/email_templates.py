@@ -7,14 +7,14 @@ _WRAPPER = """<!DOCTYPE html>
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F1F5F9;padding:32px 0;">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
-  <tr><td style="background-color:#0F1B2D;padding:24px 32px;">
-    <span style="color:#ffffff;font-size:22px;font-weight:bold;">ListingJet</span>
+  <tr><td style="background-color:{header_color};padding:24px 32px;">
+    <span style="color:#ffffff;font-size:22px;font-weight:bold;">{brand_name}</span>
   </td></tr>
   <tr><td style="padding:32px;">
     {content}
   </td></tr>
   <tr><td style="background-color:#F1F5F9;padding:16px 32px;text-align:center;font-size:12px;color:#64748b;">
-    &copy; ListingJet &mdash; Automated real-estate marketing
+    {footer_text}
   </td></tr>
 </table>
 </td></tr>
@@ -29,8 +29,18 @@ _CTA_BUTTON = (
 )
 
 
-def _render(content: str) -> str:
-    return _WRAPPER.format(content=content)
+def _render(
+    content: str,
+    brand_name: str = "ListingJet",
+    header_color: str = "#0F1B2D",
+    footer_text: str = "&copy; ListingJet &mdash; Automated real-estate marketing",
+) -> str:
+    return _WRAPPER.format(
+        content=content,
+        brand_name=brand_name,
+        header_color=header_color,
+        footer_text=footer_text,
+    )
 
 
 def listing_delivered(*, name: str, address: str, download_url: str, listing_url: str) -> tuple[str, str]:

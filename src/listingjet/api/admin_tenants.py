@@ -14,11 +14,13 @@ from listingjet.api.schemas.admin import (
     UpdateTenantRequest,
 )
 from listingjet.models.credit_transaction import CreditTransaction
+from listingjet.models.learning_weight import LearningWeight
 from listingjet.models.listing import Listing
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.audit import audit_log
 from listingjet.services.events import emit_event
+from listingjet.services.weight_manager import WeightManager
 
 router = APIRouter()
 
@@ -31,14 +33,34 @@ async def list_tenants(
     db: AsyncSession = Depends(get_db_admin),
 ):
     """List all tenants with pagination. Requires superadmin role."""
+    from listingjet.models.credit_account import CreditAccount
+
     total = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
     offset = (page - 1) * page_size
     result = await db.execute(
         select(Tenant).order_by(Tenant.created_at.desc()).offset(offset).limit(page_size)
     )
     tenants = result.scalars().all()
+
+    # Look up credit balances from CreditAccount (the single source of truth)
+    tenant_ids = [t.id for t in tenants]
+    if tenant_ids:
+        balances_result = await db.execute(
+            select(CreditAccount.tenant_id, CreditAccount.balance)
+            .where(CreditAccount.tenant_id.in_(tenant_ids))
+        )
+        balance_map = {row.tenant_id: row.balance for row in balances_result}
+    else:
+        balance_map = {}
+
+    items = []
+    for t in tenants:
+        resp = TenantResponse.model_validate(t)
+        resp.credit_balance = balance_map.get(t.id, 0)
+        items.append(resp)
+
     return {
-        "items": [TenantResponse.model_validate(t) for t in tenants],
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -213,7 +235,6 @@ async def adjust_credits(
         )
 
     credit_acct.balance = new_balance
-    tenant.credit_balance = new_balance  # keep in sync for backward compat
 
     account_id = credit_acct.id
     txn = CreditTransaction(
@@ -248,3 +269,84 @@ async def adjust_credits(
     await db.commit()
     await db.refresh(txn)
     return txn
+
+
+# ── Weight Health Monitoring ──────────────────────────────────────
+
+
+@router.get("/tenants/{tenant_id}/weight-health")
+async def get_weight_health(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Return learning-weight health stats for a tenant (cold-start detection, boundary alerts)."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    result = await db.execute(
+        select(LearningWeight).where(LearningWeight.tenant_id == tenant_id)
+    )
+    rows = result.scalars().all()
+
+    weights = [
+        {
+            "room_label": w.room_label,
+            "weight": w.weight,
+            "labeled_listing_count": w.labeled_listing_count,
+        }
+        for w in rows
+    ]
+
+    wm = WeightManager()
+    health = wm.check_health(weights)
+    health["weights"] = weights
+    return health
+
+
+@router.post("/tenants/{tenant_id}/weights/reset")
+async def reset_weight(
+    tenant_id: uuid.UUID,
+    room_label: str = Query(..., description="Room label to reset"),
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Reset a cold-start weight to baseline 1.0.
+
+    Only allows reset if the weight has fewer than COLD_START_THRESHOLD
+    labeled listings, preventing accidental erasure of mature weights.
+    """
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    result = await db.execute(
+        select(LearningWeight).where(
+            LearningWeight.tenant_id == tenant_id,
+            LearningWeight.room_label == room_label,
+        )
+    )
+    weight = result.scalar_one_or_none()
+    if not weight:
+        raise HTTPException(status_code=404, detail=f"No weight found for room '{room_label}'")
+
+    wm = WeightManager()
+    if not wm.should_reset_cold_start(weight.labeled_listing_count):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Weight has {weight.labeled_listing_count} labeled listings — "
+            f"exceeds cold-start threshold. Manual reset not recommended.",
+        )
+
+    old_weight = weight.weight
+    weight.weight = 1.0
+    weight.labeled_listing_count = 0
+
+    await audit_log(
+        db, admin_user.id, "reset_weight", "learning_weight",
+        str(weight.id), tenant_id=tenant_id,
+        details={"room_label": room_label, "old_weight": old_weight, "new_weight": 1.0},
+    )
+    await db.commit()
+    return {"room_label": room_label, "old_weight": old_weight, "new_weight": 1.0, "reset": True}

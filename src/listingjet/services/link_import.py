@@ -1,14 +1,16 @@
 """
 Link-import service — download photos from third-party delivery links
-(Google Drive, Show & Tour) and persist them to S3.
+(Google Drive, Dropbox, Show & Tour) and persist them to S3.
 """
 
 from __future__ import annotations
 
 import hashlib
+import io
 import logging
 import re
 import uuid
+import zipfile
 from collections.abc import Callable
 
 import httpx
@@ -27,12 +29,17 @@ _GOOGLE_DRIVE_RE = re.compile(
 _SHOW_TOUR_RE = re.compile(
     r"(?:show\.tours|showandtour\.com)/(?P<id>[A-Za-z0-9_-]+)"
 )
+_DROPBOX_RE = re.compile(
+    r"(?:www\.)?dropbox\.com/(?:sh|scl/fo)/(?P<id>[A-Za-z0-9_-]+)"
+)
 
 
 def detect_platform(url: str) -> str | None:
     """Return a platform key for *url*, or ``None`` if unrecognised."""
     if _GOOGLE_DRIVE_RE.search(url):
         return "google_drive"
+    if _DROPBOX_RE.search(url):
+        return "dropbox"
     if _SHOW_TOUR_RE.search(url):
         return "show_tour"
     return None
@@ -102,11 +109,25 @@ class GoogleDriveImporter:
 # Show & Tour importer
 # ---------------------------------------------------------------------------
 
-_SHOW_TOUR_API = "https://show.tours/api/v2/download"
-
 
 class ShowTourImporter:
-    """Download images from a Show & Tour delivery link."""
+    """Download images from a Show & Tour delivery link.
+
+    Show & Tour delivery pages are HTML galleries.  We scrape the page for
+    image URLs using multiple strategies:
+
+    1. ``og:image`` meta tags (reliable, usually the hero shot)
+    2. ``<img>`` tags whose ``src`` points to a CDN/image host
+    3. JSON data embedded in ``<script>`` tags (``"url":`` or ``"src":``)
+    4. ``<a>`` download links pointing to image files
+
+    This is intentionally broad because delivery page markup varies.
+    """
+
+    _IMAGE_URL_RE = re.compile(
+        r'https?://[^\s"\'<>]+\.(?:jpg|jpeg|png|webp|heic|tiff)(?:\?[^\s"\'<>]*)?',
+        re.IGNORECASE,
+    )
 
     @staticmethod
     def extract_project_id(url: str) -> str:
@@ -116,19 +137,43 @@ class ShowTourImporter:
             raise ValueError(f"Cannot extract Show & Tour project ID from: {url}")
         return m.group("id")
 
-    async def list_images(self, url: str) -> list[dict]:
-        """Fetch the image list for a delivery URL."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(
-                _SHOW_TOUR_API,
-                params={"deliveryURL": url},
-            )
+    async def list_images(self, url: str) -> list[str]:
+        """Fetch the delivery page and extract all unique image URLs."""
+        async with httpx.AsyncClient(
+            timeout=30,
+            follow_redirects=True,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            },
+        ) as client:
+            resp = await client.get(url)
             resp.raise_for_status()
-        data = resp.json()
-        # The API may return a list directly or nest under a key.
-        if isinstance(data, list):
-            return data
-        return data.get("images", data.get("files", []))
+
+        html = resp.text
+
+        # Collect all image-like URLs from the page source.
+        raw_urls = self._IMAGE_URL_RE.findall(html)
+
+        # Deduplicate while preserving order, ignore tiny thumbnails.
+        seen: set[str] = set()
+        image_urls: list[str] = []
+        for u in raw_urls:
+            # Skip common thumbnail / icon patterns
+            if any(skip in u.lower() for skip in ("favicon", "logo", "icon", "sprite", "thumb_small")):
+                continue
+            canonical = u.split("?")[0]  # dedupe ignoring query params
+            if canonical not in seen:
+                seen.add(canonical)
+                image_urls.append(u)
+
+        if not image_urls:
+            logger.warning("Show & Tour page at %s contained no image URLs", url)
+
+        return image_urls
 
     async def download_file(self, image_url: str) -> tuple[str, bytes]:
         """Download an image from its direct URL."""
@@ -138,6 +183,60 @@ class ShowTourImporter:
         # Derive filename from the URL path.
         filename = image_url.rstrip("/").rsplit("/", 1)[-1].split("?")[0] or "image.jpg"
         return filename, resp.content
+
+
+# ---------------------------------------------------------------------------
+# Dropbox importer
+# ---------------------------------------------------------------------------
+
+_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic", "gif", "tiff", "tif", "bmp"}
+
+
+class DropboxImporter:
+    """Download images from a publicly-shared Dropbox folder.
+
+    Dropbox shared folder links (``/sh/`` or ``/scl/fo/``) support
+    ``?dl=1`` which returns a ZIP archive of the entire folder.  This
+    avoids needing a Dropbox API token for public links.
+    """
+
+    @staticmethod
+    def _to_direct_url(url: str) -> str:
+        """Convert a Dropbox shared link to a direct-download URL."""
+        # Strip any existing query params and force dl=1
+        base = url.split("?")[0]
+        return f"{base}?dl=1"
+
+    @staticmethod
+    def _is_image(filename: str) -> bool:
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        return ext in _IMAGE_EXTENSIONS
+
+    async def download_folder_zip(self, url: str) -> list[tuple[str, bytes]]:
+        """Download the shared folder as a ZIP and extract image files.
+
+        Returns a list of ``(filename, data)`` tuples.
+        """
+        dl_url = self._to_direct_url(url)
+        async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+            resp = await client.get(dl_url)
+            resp.raise_for_status()
+
+        images: list[tuple[str, bytes]] = []
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+                # Use just the filename, strip any directory prefix
+                filename = info.filename.rsplit("/", 1)[-1]
+                if not self._is_image(filename):
+                    continue
+                data = zf.read(info)
+                if len(data) == 0:
+                    continue
+                images.append((filename, data))
+
+        return images
 
 
 # ---------------------------------------------------------------------------
@@ -182,18 +281,30 @@ async def import_from_link(
             if on_progress is not None:
                 on_progress(idx, total)
 
-    elif platform == "show_tour":
-        importer_st = ShowTourImporter()
-        images = await importer_st.list_images(url)
+    elif platform == "dropbox":
+        importer_db = DropboxImporter()
+        images = await importer_db.download_folder_zip(url)
         total = len(images)
 
-        for idx, img in enumerate(images, 1):
-            image_url = img if isinstance(img, str) else img.get("url", img.get("src", ""))
-            if not image_url:
-                logger.warning("Show & Tour image entry has no URL — skipping: %s", img)
-                if on_progress is not None:
-                    on_progress(idx, total)
-                continue
+        for idx, (filename, data) in enumerate(images, 1):
+            try:
+                s3_key = _upload(storage, listing_id, batch_id, filename, data)
+                file_hash = hashlib.sha256(data).hexdigest()
+                results.append({"file_path": s3_key, "file_hash": file_hash})
+            except Exception:
+                logger.exception(
+                    "Failed to import Dropbox image %s — skipping",
+                    filename,
+                )
+            if on_progress is not None:
+                on_progress(idx, total)
+
+    elif platform == "show_tour":
+        importer_st = ShowTourImporter()
+        image_urls = await importer_st.list_images(url)
+        total = len(image_urls)
+
+        for idx, image_url in enumerate(image_urls, 1):
             try:
                 filename, data = await importer_st.download_file(image_url)
                 s3_key = _upload(storage, listing_id, batch_id, filename, data)

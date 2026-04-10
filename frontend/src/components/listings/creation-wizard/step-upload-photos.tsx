@@ -36,6 +36,10 @@ export function StepUploadPhotos({ formData, onUpdate, onNext, onBack }: Props) 
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ total: number; completed: number; status: string } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const listingId = formData.listingId!;
 
@@ -235,6 +239,52 @@ export function StepUploadPhotos({ formData, onUpdate, onNext, onBack }: Props) 
     }
   }
 
+  async function handleImportLink() {
+    if (!importUrl.trim() || !listingId) return;
+    setImporting(true);
+    setImportError(null);
+    setImportProgress(null);
+    try {
+      const result = await apiClient.importFromLink(listingId, importUrl.trim());
+      const pollId = setInterval(async () => {
+        try {
+          const status = await apiClient.getImportStatus(listingId, result.import_id);
+          setImportProgress({ total: status.total_files, completed: status.completed_files, status: status.status });
+          if (status.status === "completed" || status.status === "failed") {
+            clearInterval(pollId);
+            setImporting(false);
+            if (status.status === "failed") {
+              setImportError(status.error_message || "Import failed");
+            } else {
+              toast(`${status.completed_files} photo${status.completed_files !== 1 ? "s" : ""} imported`, "success");
+              setImportUrl("");
+              setImportProgress(null);
+              // Refresh uploaded assets list
+              try {
+                const assets = await apiClient.getAssets(listingId);
+                const mapped = assets.map((a) => ({
+                  id: a.id,
+                  filename: a.file_path?.split("/").pop() ?? "",
+                  url: a.thumbnail_url ?? "",
+                }));
+                onUpdate({ uploadedAssets: mapped });
+              } catch {
+                // Fallback: just trigger next step
+              }
+            }
+          }
+        } catch {
+          clearInterval(pollId);
+          setImporting(false);
+          setImportError("Failed to check import status");
+        }
+      }, 2000);
+    } catch (err) {
+      setImporting(false);
+      setImportError(err instanceof Error ? err.message : "Import failed");
+    }
+  }
+
   const canProceed = formData.uploadedAssets.length > 0;
 
   return (
@@ -371,6 +421,50 @@ export function StepUploadPhotos({ formData, onUpdate, onNext, onBack }: Props) 
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Import from Link */}
+      <div className="mt-6 pt-6 border-t border-slate-100">
+        <p className="text-sm text-slate-500 mb-3">
+          Or import directly from a delivery link
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Paste Google Drive, Dropbox, or Show & Tour link..."
+            value={importUrl}
+            onChange={(e) => setImportUrl(e.target.value)}
+            disabled={importing}
+            className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all"
+          />
+          <button
+            onClick={handleImportLink}
+            disabled={importing || !importUrl.trim()}
+            className="px-4 py-2.5 rounded-lg bg-[#F97316] text-white text-sm font-medium hover:bg-[#EA580C] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+          >
+            {importing ? "Importing..." : "Import"}
+          </button>
+        </div>
+        {importProgress && (
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-slate-500 mb-1">
+              <span>{importProgress.status === "running" ? "Downloading photos..." : importProgress.status}</span>
+              <span>{importProgress.completed}/{importProgress.total}</span>
+            </div>
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#F97316] rounded-full transition-all duration-300"
+                style={{ width: importProgress.total > 0 ? `${(importProgress.completed / importProgress.total) * 100}%` : "0%" }}
+              />
+            </div>
+          </div>
+        )}
+        {importError && (
+          <p className="mt-2 text-sm text-red-500">{importError}</p>
+        )}
+        <p className="mt-2 text-xs text-slate-400">
+          Supports Google Drive, Dropbox shared folders, and Show &amp; Tour delivery links
+        </p>
       </div>
 
       {/* Already-uploaded summary */}

@@ -7,17 +7,12 @@ import { useAuth } from "@/contexts/auth-context";
 import apiClient from "@/lib/api-client";
 import { trackEvent, AnalyticsEvents } from "@/lib/analytics";
 
-const PLAN_DISPLAY: Record<string, { name: string; price: string; features: string[] }> = {
-  lite: { name: "Lite", price: "$9/mo", features: ["Basic AI Listing Descriptions", "Standard Photo Curation", "MLS-Ready Exports"] },
-  active_agent: { name: "Active Agent", price: "$29/mo", features: ["Unlimited AI Listing Descriptions", "Advanced Market Analytics HUD", "Priority Cloud Rendering"] },
-  team: { name: "Team", price: "$99/mo", features: ["Everything in Active Agent", "Team Collaboration", "API Access"] },
+const PLAN_DISPLAY: Record<string, { name: string; price: string; founding: string; features: string[] }> = {
+  free: { name: "Free", price: "$0/mo", founding: "$0/mo", features: ["Pay-as-you-go ($0.50/credit)", "AI photo analysis", "MLS + marketing bundles"] },
+  lite: { name: "Lite", price: "$19/mo", founding: "$13/mo", features: ["25 credits/month (~2 listings)", "Tier 2 AI vision", "Your logo + brand colors"] },
+  active_agent: { name: "Active Agent", price: "$49/mo", founding: "$34/mo", features: ["75 credits/month (~6 listings)", "Full white-label", "Social content generation"] },
+  team: { name: "Team", price: "$99/mo", founding: "$69/mo", features: ["250 credits/month (~20 listings)", "Unlimited listings/month", "Full white-label + API access"] },
 };
-
-const ADDONS = [
-  { id: "video_tour", name: "AI Video Tour", description: "Automated cinematic fly-throughs", price: 49, priceLabel: "+$49" },
-  { id: "floorplan", name: "3D Floorplan", description: "Interactive spatial visualization", price: 79, priceLabel: "+$79" },
-  { id: "social_pack", name: "Social Pack", description: "Multi-platform campaign delivery", price: 39, priceLabel: "+$39" },
-];
 
 export default function RegisterPage() {
   return (
@@ -43,7 +38,6 @@ function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState(referralParam || "");
-  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -63,15 +57,6 @@ function RegisterForm() {
 
   const planInfo = plan ? PLAN_DISPLAY[plan] : PLAN_DISPLAY["active_agent"];
 
-  function toggleAddon(id: string) {
-    setSelectedAddons((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -82,7 +67,6 @@ function RegisterForm() {
       trackEvent(AnalyticsEvents.SIGNUP, {
         plan: plan || "active_agent",
         referral_code: referralCode || null,
-        has_addons: selectedAddons.size > 0,
       });
 
       if (claimId) {
@@ -150,8 +134,11 @@ function RegisterForm() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-[var(--color-text)]">{planInfo.price}</p>
-                  <p className="text-[10px] text-slate-400 uppercase">Per Month</p>
+                  <p className="text-2xl font-bold text-[var(--color-text)]">{planInfo.founding}</p>
+                  <p className="text-[10px] text-slate-400 uppercase">
+                    <span className="line-through mr-1">{planInfo.price !== planInfo.founding ? planInfo.price : ""}</span>
+                    Founding Price
+                  </p>
                 </div>
               </div>
               <ul className="space-y-1.5">
@@ -256,44 +243,6 @@ function RegisterForm() {
                 <p className="text-[10px] text-slate-400 mt-1">
                   Required: 8+ characters including an uppercase, lowercase, and digit.
                 </p>
-              </div>
-
-              {/* Mission Add-Ons */}
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
-                  Mission Add-Ons
-                </p>
-                <div className="space-y-2">
-                  {ADDONS.map((addon) => (
-                    <button
-                      key={addon.id}
-                      type="button"
-                      onClick={() => toggleAddon(addon.id)}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left ${
-                        selectedAddons.has(addon.id)
-                          ? "border-[#F97316] bg-[#F97316]/5"
-                          : "border-slate-200 bg-white hover:border-slate-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          selectedAddons.has(addon.id) ? "border-[#F97316] bg-[#F97316]" : "border-slate-300"
-                        }`}>
-                          {selectedAddons.has(addon.id) && (
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-[var(--color-text)]">{addon.name}</p>
-                          <p className="text-[11px] text-slate-400">{addon.description}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-semibold text-[#F97316]">{addon.priceLabel}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Referral Code */}

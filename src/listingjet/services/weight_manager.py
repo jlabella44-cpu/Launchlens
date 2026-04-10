@@ -1,9 +1,18 @@
+import logging
 from typing import Literal
 
 GLOBAL_BASELINE_WEIGHT = 1.0  # updated after Juke eval set reaches 200 examples
 WEIGHT_MIN = 0.1
 WEIGHT_MAX = 2.0
 BLEND_LISTING_THRESHOLD = 10  # listings (not events) before full tenant weights
+COLD_START_THRESHOLD = 3  # listings below which a weight can be safely reset
+
+logger = logging.getLogger(__name__)
+
+# Outcome boost blending: how much weight outcome data gets vs base score
+# Ramps from 0→OUTCOME_MAX_INFLUENCE as closed listings grow past MIN_OUTCOMES
+OUTCOME_MIN_SAMPLES = 3
+OUTCOME_MAX_INFLUENCE = 0.15  # max 15% adjustment from outcome data
 
 
 class WeightManager:
@@ -36,7 +45,13 @@ class WeightManager:
         # Regression-to-mean: 0.01 pull toward 1.0 on every update
         pull = 0.01 if current_weight > 1.0 else -0.01
         new_weight = current_weight + delta - pull
-        return max(WEIGHT_MIN, min(WEIGHT_MAX, new_weight))
+        clamped = max(WEIGHT_MIN, min(WEIGHT_MAX, new_weight))
+        if clamped == WEIGHT_MIN or clamped == WEIGHT_MAX:
+            logger.warning(
+                "weight_clamped action=%s current=%.3f new=%.3f boundary=%.1f",
+                action, current_weight, new_weight, clamped,
+            )
+        return clamped
 
     def apply_decay(self, weight: float, days_since_update: int) -> float:
         """Regress stale weights toward 1.0 after 90 days of inactivity."""
@@ -45,10 +60,34 @@ class WeightManager:
         decay = min(0.1 * ((days_since_update - 90) / 30), 0.5)  # max 50% decay
         return weight * (1 - decay) + 1.0 * decay
 
+    def apply_outcome_boost(
+        self,
+        base_score: float,
+        outcome_boost: float,
+        sample_count: int,
+    ) -> float:
+        """Apply outcome-based boost from PhotoOutcomeCorrelation data.
+
+        The influence ramps up as sample_count grows, capped at
+        OUTCOME_MAX_INFLUENCE.  A boost of 1.1 with full influence
+        raises the score by ~1.5%.
+        """
+        if sample_count < OUTCOME_MIN_SAMPLES or outcome_boost == 1.0:
+            return base_score
+
+        # Ramp influence: 3 samples → 33%, 10+ → 100% of max influence
+        ramp = min((sample_count - OUTCOME_MIN_SAMPLES + 1) / 7.0, 1.0)
+        influence = ramp * OUTCOME_MAX_INFLUENCE
+
+        # Apply boost as a blend: score * (1 + influence * (boost - 1))
+        adjusted = base_score * (1.0 + influence * (outcome_boost - 1.0))
+        return min(1.0, max(0.0, adjusted))
+
     def score(self, features: dict) -> float:
         """
         Composite scoring for photo selection.
         Formula: (quality*0.5 + commercial*0.3 + hero_bonus*0.2) * room_weight
+        Then optionally adjusted by outcome_boost from Phase 5 correlations.
         Clamped to [0.0, 1.0].
         Phase 2: XGBoost model (see TODOS.md TODO-4).
         """
@@ -58,4 +97,57 @@ class WeightManager:
         room_weight = features.get("room_weight", 1.0)
 
         composite = (quality * 0.5) + (commercial * 0.3) + (hero_bonus * 0.2)
-        return min(1.0, max(0.0, composite * room_weight))
+        base = min(1.0, max(0.0, composite * room_weight))
+
+        # Phase 5: outcome boost from real sale performance data
+        outcome_boost = features.get("outcome_boost", 1.0)
+        outcome_samples = features.get("outcome_samples", 0)
+        if outcome_boost != 1.0 and outcome_samples >= OUTCOME_MIN_SAMPLES:
+            base = self.apply_outcome_boost(base, outcome_boost, outcome_samples)
+
+        return base
+
+    # ------------------------------------------------------------------
+    # Monitoring & cold-start protection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def check_health(weights: list[dict]) -> dict:
+        """Return health statistics for a set of tenant learning weights.
+
+        *weights* is a list of dicts with keys ``room_label``, ``weight``,
+        and ``labeled_listing_count``.
+
+        Returns a summary dict useful for admin dashboards and alerts.
+        """
+        if not weights:
+            return {
+                "total_rooms": 0,
+                "min_weight": None,
+                "max_weight": None,
+                "at_floor": 0,
+                "at_ceiling": 0,
+                "cold_start_rooms": 0,
+                "cold_start_labels": [],
+            }
+
+        ws = [w["weight"] for w in weights]
+        cold = [
+            w["room_label"]
+            for w in weights
+            if w["labeled_listing_count"] < COLD_START_THRESHOLD
+        ]
+        return {
+            "total_rooms": len(weights),
+            "min_weight": min(ws),
+            "max_weight": max(ws),
+            "at_floor": sum(1 for v in ws if v <= WEIGHT_MIN),
+            "at_ceiling": sum(1 for v in ws if v >= WEIGHT_MAX),
+            "cold_start_rooms": len(cold),
+            "cold_start_labels": cold,
+        }
+
+    @staticmethod
+    def should_reset_cold_start(labeled_listing_count: int) -> bool:
+        """Return True if a weight has too few observations to be reliable."""
+        return labeled_listing_count < COLD_START_THRESHOLD

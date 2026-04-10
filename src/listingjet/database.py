@@ -5,13 +5,21 @@ from sqlalchemy.orm import DeclarativeBase
 
 from listingjet.config import settings
 
+# When PgBouncer is enabled (transaction-pool mode), asyncpg's prepared-
+# statement cache must be disabled because PgBouncer may route successive
+# queries to different server connections where the statements don't exist.
+_connect_args: dict = {}
+if settings.db_use_pgbouncer:
+    _connect_args["statement_cache_size"] = 0
+
 engine = create_async_engine(
     settings.async_database_url,
     echo=False,
-    pool_size=50,
-    max_overflow=20,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
     pool_recycle=300,
     pool_pre_ping=True,
+    connect_args=_connect_args,
 )
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 

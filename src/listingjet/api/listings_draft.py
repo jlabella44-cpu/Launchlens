@@ -87,6 +87,10 @@ async def start_pipeline(
     if listing.state != ListingState.DRAFT:
         raise HTTPException(status_code=409, detail=f"Can only start pipeline for DRAFT listings, current: {listing.state.value}")
 
+    # Verify AI processing consent
+    if not current_user.ai_consent_at:
+        raise HTTPException(status_code=403, detail="AI processing consent required. Update consent in account settings.")
+
     # Verify listing has assets
     asset_count = (await db.execute(
         select(Asset.id).where(Asset.listing_id == listing_id).limit(1)

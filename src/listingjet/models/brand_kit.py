@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,3 +27,15 @@ class BrandKit(TenantScopedModel):
         DateTime(timezone=True), nullable=True
     )
     canva_user_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # White-label settings (Team/Enterprise)
+    custom_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    domain_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    white_label_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    app_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    tagline: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    favicon_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    login_bg_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    email_header_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    email_footer_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    powered_by_visible: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

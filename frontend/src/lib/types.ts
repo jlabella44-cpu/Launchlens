@@ -597,10 +597,94 @@ export interface IdxFeedConfigCreate {
   poll_interval_minutes?: number;
 }
 
+// -- Performance Intelligence --
+
+export interface PerformanceInsight {
+  type: string;
+  data: Record<string, unknown>;
+  sample_size: number;
+}
+
+export interface PerformanceOverview {
+  tenant_id: string;
+  total_outcomes: number;
+  insights: PerformanceInsight[];
+  sufficient_data: boolean;
+}
+
+export interface ListingPerformance {
+  listing_id: string;
+  outcome: Record<string, unknown>;
+  comparisons: Record<string, unknown>;
+  sample_size: number;
+}
+
 export interface HealthWeights {
   media: number;
   content: number;
   velocity: number;
   syndication: number;
   market: number;
+}
+
+// Performance Intelligence types (Phase 5)
+export interface RoomCorrelation {
+  room: string;
+  boost: number;
+  avg_dom: number | null;
+  sample_count: number;
+}
+
+export interface HeroInsight {
+  room: string;
+  boost: number;
+  avg_dom: number | null;
+  avg_price_ratio: number | null;
+  sample_count: number;
+}
+
+export interface QualityImpact {
+  bucket: string;
+  boost: number;
+  avg_dom: number | null;
+  sample_count: number;
+}
+
+export interface PerformanceInsightsResponse {
+  summary: string;
+  outcomes_count: number;
+  avg_dom: number | null;
+  avg_price_ratio: number | null;
+  grade_distribution: Record<string, number>;
+  top_rooms: RoomCorrelation[];
+  hero_insights: HeroInsight[];
+  quality_impact: QualityImpact[];
+}
+
+export interface ListingOutcomeResponse {
+  listing_id: string;
+  status: string;
+  original_price: number | null;
+  final_price: number | null;
+  sale_price: number | null;
+  price_ratio: number | null;
+  days_on_market: number | null;
+  days_to_contract: number | null;
+  price_change_count: number;
+  photo_count: number | null;
+  hero_room_label: string | null;
+  outcome_grade: string | null;
+  idx_source: string | null;
+  sold_date: string | null;
+}
+
+export interface OutcomeSummaryResponse {
+  total_tracked: number;
+  total_closed: number;
+  total_pending: number;
+  total_active: number;
+  avg_dom: number | null;
+  avg_price_ratio: number | null;
+  grade_distribution: Record<string, number>;
+  listings: ListingOutcomeResponse[];
 }

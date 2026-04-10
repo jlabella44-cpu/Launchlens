@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from listingjet.models.idx_feed_config import IdxFeedConfig
 from listingjet.models.listing import Listing
 from listingjet.models.performance_event import PerformanceEvent
+from listingjet.services.field_encryption import decrypt
+from listingjet.services.outcome_tracker import ingest_outcome
 from listingjet.services.reso_adapter import RESOAdapter
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class IdxFeedPoller:
         try:
             adapter = RESOAdapter(
                 base_url=config.base_url,
-                api_key=config.api_key_encrypted,  # TODO: decrypt in production
+                api_key=decrypt(config.api_key_encrypted),
             )
 
             # Get listings for this tenant that are in delivered state
@@ -87,6 +89,22 @@ class IdxFeedPoller:
                         source=config.name,
                         recorded_at=now,
                     ))
+
+                # Phase 5: Ingest outcome when listing goes Pending or Closed
+                if mls_status in ("Pending", "Closed"):
+                    try:
+                        await ingest_outcome(
+                            session=session,
+                            listing_id=listing.id,
+                            tenant_id=config.tenant_id,
+                            idx_data=prop,
+                            source=config.name,
+                        )
+                    except Exception:
+                        logger.warning(
+                            "idx_poll.outcome_ingest_failed listing=%s",
+                            listing.id,
+                        )
 
                 # Record days on market
                 dom = prop.get("DaysOnMarket")

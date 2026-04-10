@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # Database — auto-converts postgresql:// to postgresql+asyncpg:// if needed
     database_url: str
     database_url_sync: str = ""
+    db_pool_size: int = 10
+    db_max_overflow: int = 5
+    db_use_pgbouncer: bool = False
 
     @property
     def async_database_url(self) -> str:
@@ -30,7 +33,7 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    jwt_expiry_hours: int = 1
+    jwt_expiry_minutes: int = 15
     jwt_refresh_expiry_days: int = 7
 
     @field_validator("jwt_secret")
@@ -115,6 +118,10 @@ class Settings(BaseSettings):
     # RESO MLS
     reso_api_url: str = ""
     reso_api_key: str = ""
+
+    # Field-level encryption (Fernet key for IDX API keys, etc.)
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    field_encryption_key: str = ""
 
     # Canva
     canva_api_key: str = ""

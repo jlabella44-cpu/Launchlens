@@ -21,6 +21,8 @@ async def _register(client: AsyncClient, plan_tier: str = "active_agent") -> tup
         "name": "E2E Agent",
         "company_name": "E2E Realty",
         "plan_tier": plan_tier,
+        "consent": True,
+        "ai_consent": True,
     })
     assert resp.status_code == 200, resp.text
     token = resp.json()["access_token"]
@@ -330,6 +332,8 @@ async def test_api_contracts_auth(async_client: AsyncClient):
     resp = await async_client.post("/auth/register", json={
         "email": email, "password": "StrongPass1!", "name": "Contract Test", "company_name": "Test Co",
         "plan_tier": "free",
+        "consent": True,
+        "ai_consent": True,
     })
     assert resp.status_code == 200
     body = resp.json()
@@ -442,3 +446,123 @@ async def test_api_contracts_unauthenticated(async_client: AsyncClient):
         else:
             resp = await async_client.post(path, json={})
         assert resp.status_code in (401, 403, 422), f"{method} {path} returned {resp.status_code}"
+
+
+# ── Test: AI Consent Required for Registration ─────────────────────
+
+
+@pytest.mark.asyncio
+async def test_no_ai_consent_blocks_pipeline(async_client: AsyncClient, db_session):
+    """User who opts out of AI consent can register but can't start pipeline."""
+    email = f"no-ai-{uuid.uuid4().hex[:8]}@test.com"
+    resp = await async_client.post("/auth/register", json={
+        "email": email,
+        "password": "StrongPass1!",
+        "name": "No AI",
+        "company_name": "TestCo",
+        "plan_tier": "active_agent",
+        "consent": True,
+        "ai_consent": False,
+    })
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    me = await async_client.get("/auth/me", headers=_auth(token))
+    tenant_id = me.json()["tenant_id"]
+
+    await _add_credits(async_client, db_session, tenant_id, 50)
+
+    # Create listing + assets
+    listing_id = await _create_listing(async_client, token)
+    await async_client.post(f"/listings/{listing_id}/assets", json={
+        "assets": [{"file_path": "s3://b/p.jpg", "file_hash": "abc"}],
+    }, headers=_auth(token))
+
+    # Pipeline start should be blocked
+    resp = await async_client.post(f"/listings/{listing_id}/start-pipeline", json={
+        "selected_addons": [],
+    }, headers=_auth(token))
+    assert resp.status_code == 403
+    assert "consent" in resp.json()["detail"].lower()
+
+
+# ── Test: AI Consent Toggle ────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ai_consent_toggle(async_client: AsyncClient):
+    """User can grant and revoke AI processing consent."""
+    token, _ = await _register(async_client)
+
+    # Revoke consent
+    resp = await async_client.post("/auth/ai-consent", json={"consent": False}, headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["ai_consent"] is False
+
+    # Re-grant consent
+    resp = await async_client.post("/auth/ai-consent", json={"consent": True}, headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["ai_consent"] is True
+
+
+# ── Test: Pipeline Start + Asset Upload E2E ────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_listing_create_upload_start(async_client: AsyncClient, db_session):
+    """Full flow: register → create listing → upload assets → start pipeline."""
+    token, tenant_id = await _register(async_client, plan_tier="active_agent")
+    await _add_credits(async_client, db_session, tenant_id, 50)
+
+    # Create listing
+    listing_id = await _create_listing(async_client, token)
+
+    # Register assets
+    resp = await async_client.post(f"/listings/{listing_id}/assets", json={
+        "assets": [
+            {"file_path": f"s3://bucket/{listing_id}/photo_{i}.jpg", "file_hash": f"hash{i:03d}"}
+            for i in range(5)
+        ],
+    }, headers=_auth(token))
+    assert resp.status_code in (200, 201)
+
+    # Start pipeline
+    resp = await async_client.post(f"/listings/{listing_id}/start-pipeline", json={
+        "selected_addons": [],
+    }, headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["state"] == "uploading"
+    assert "workflow_id" in body
+
+
+# ── Test: Admin Tenant + Credit Management E2E ─────────────────────
+
+
+@pytest.mark.asyncio
+async def test_admin_tenant_credit_flow(async_client: AsyncClient, db_session):
+    """Admin registers → promotes to superadmin → manages tenant credits."""
+    from tests.conftest import promote_to_superadmin
+
+    token, tenant_id = await _register(async_client, plan_tier="free")
+    await promote_to_superadmin(async_client, token)
+
+    # View tenant credits
+    resp = await async_client.get(f"/admin/tenants/{tenant_id}/credits", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["credit_balance"] >= 0
+
+    # Adjust credits
+    resp = await async_client.post(
+        f"/admin/tenants/{tenant_id}/credits/adjust",
+        json={"amount": 100, "reason": "E2E test bonus"},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["balance_after"] >= 100
+
+    # Verify in tenant list
+    resp = await async_client.get("/admin/tenants", headers=_auth(token))
+    assert resp.status_code == 200
+    tenants = resp.json()["items"]
+    tenant = next(t for t in tenants if t["id"] == tenant_id)
+    assert tenant["credit_balance"] >= 100

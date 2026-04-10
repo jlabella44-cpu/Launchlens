@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { TimelineChart } from "@/components/analytics/timeline-chart";
 import { StateBreakdown } from "@/components/analytics/state-breakdown";
 import { CreditHistory } from "@/components/analytics/credit-history";
+import { PerformanceIntelligence } from "@/components/analytics/performance-intelligence";
 import apiClient from "@/lib/api-client";
 import type {
   AnalyticsOverview,
@@ -15,12 +16,15 @@ import type {
   AnalyticsCredits,
 } from "@/lib/types";
 
+type Tab = "overview" | "performance";
+
 function AnalyticsContent() {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
   const [timeline, setTimeline] = useState<AnalyticsTimeline | null>(null);
   const [credits, setCredits] = useState<AnalyticsCredits | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
+  const [tab, setTab] = useState<Tab>("overview");
 
   useEffect(() => {
     async function fetchAll() {
@@ -78,7 +82,7 @@ function AnalyticsContent() {
             Analytics
           </h1>
           <div className="flex gap-2">
-            {[7, 30, 90].map((days) => (
+            {tab === "overview" && [7, 30, 90].map((days) => (
               <button
                 key={days}
                 onClick={() => setTimeRange(days)}
@@ -94,93 +98,119 @@ function AnalyticsContent() {
           </div>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: "Total Listings", value: overview?.total_listings ?? 0 },
-            { label: "Delivered", value: overview?.delivered ?? 0 },
-            {
-              label: "Success Rate",
-              value: overview?.success_rate_pct != null
-                ? `${overview.success_rate_pct}%`
-                : "N/A",
-            },
-            {
-              label: "Avg Pipeline",
-              value: overview?.avg_pipeline_minutes != null
-                ? `${overview.avg_pipeline_minutes}m`
-                : "N/A",
-            },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 * i }}
+        {/* Tab Switcher */}
+        <div className="flex gap-1 p-1 bg-white/5 rounded-lg w-fit">
+          {([
+            { key: "overview" as Tab, label: "Overview" },
+            { key: "performance" as Tab, label: "Performance" },
+          ]).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-2 text-sm rounded-md transition-colors ${
+                tab === t.key
+                  ? "bg-[var(--color-primary)] text-white shadow-sm"
+                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-white/10"
+              }`}
             >
-              <GlassCard tilt={false} className="text-center">
-                <p className="text-2xl sm:text-3xl font-bold text-[var(--color-primary)]">
-                  {stat.value}
-                </p>
-                <p className="text-xs sm:text-sm text-[var(--color-text-secondary)] mt-1">
-                  {stat.label}
-                </p>
-              </GlassCard>
-            </motion.div>
+              {t.label}
+            </button>
           ))}
         </div>
 
-        {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <GlassCard tilt={false}>
-              <h2
-                className="text-lg font-semibold text-[var(--color-text)] mb-4"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Listings Over Time
-              </h2>
-              <TimelineChart data={timeline?.data ?? []} />
-            </GlassCard>
-          </motion.div>
+        {tab === "performance" ? (
+          <PerformanceIntelligence />
+        ) : (
+          <>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { label: "Total Listings", value: overview?.total_listings ?? 0 },
+                { label: "Delivered", value: overview?.delivered ?? 0 },
+                {
+                  label: "Success Rate",
+                  value: overview?.success_rate_pct != null
+                    ? `${overview.success_rate_pct}%`
+                    : "N/A",
+                },
+                {
+                  label: "Avg Pipeline",
+                  value: overview?.avg_pipeline_minutes != null
+                    ? `${overview.avg_pipeline_minutes}m`
+                    : "N/A",
+                },
+              ].map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 * i }}
+                >
+                  <GlassCard tilt={false} className="text-center">
+                    <p className="text-2xl sm:text-3xl font-bold text-[var(--color-primary)]">
+                      {stat.value}
+                    </p>
+                    <p className="text-xs sm:text-sm text-[var(--color-text-secondary)] mt-1">
+                      {stat.label}
+                    </p>
+                  </GlassCard>
+                </motion.div>
+              ))}
+            </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <GlassCard tilt={false}>
-              <h2
-                className="text-lg font-semibold text-[var(--color-text)] mb-4"
-                style={{ fontFamily: "var(--font-heading)" }}
+            {/* Charts Row 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
               >
-                Pipeline Breakdown
-              </h2>
-              <StateBreakdown byState={overview?.by_state ?? {}} />
-            </GlassCard>
-          </motion.div>
-        </div>
+                <GlassCard tilt={false}>
+                  <h2
+                    className="text-lg font-semibold text-[var(--color-text)] mb-4"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Listings Over Time
+                  </h2>
+                  <TimelineChart data={timeline?.data ?? []} />
+                </GlassCard>
+              </motion.div>
 
-        {/* Charts Row 2 */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <GlassCard tilt={false}>
-            <h2
-              className="text-lg font-semibold text-[var(--color-text)] mb-4"
-              style={{ fontFamily: "var(--font-heading)" }}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <GlassCard tilt={false}>
+                  <h2
+                    className="text-lg font-semibold text-[var(--color-text)] mb-4"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Pipeline Breakdown
+                  </h2>
+                  <StateBreakdown byState={overview?.by_state ?? {}} />
+                </GlassCard>
+              </motion.div>
+            </div>
+
+            {/* Charts Row 2 */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
             >
-              Credit Balance History
-            </h2>
-            <CreditHistory data={credits?.data ?? []} />
-          </GlassCard>
-        </motion.div>
+              <GlassCard tilt={false}>
+                <h2
+                  className="text-lg font-semibold text-[var(--color-text)] mb-4"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  Credit Balance History
+                </h2>
+                <CreditHistory data={credits?.data ?? []} />
+              </GlassCard>
+            </motion.div>
+          </>
+        )}
       </motion.div>
     </>
   );

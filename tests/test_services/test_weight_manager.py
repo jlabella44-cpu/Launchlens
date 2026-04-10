@@ -51,3 +51,79 @@ def test_labeled_listing_count_not_override_event_count():
     wm = WeightManager()
     weight = wm.blend(TENANT, ROOM, labeled_listing_count=1, tenant_weight=1.5)
     assert weight < 1.5  # still blended, not pure tenant
+
+
+# ---- Phase 5: Outcome boost tests ----
+
+
+def test_outcome_boost_no_effect_below_min_samples():
+    wm = WeightManager()
+    base = 0.8
+    result = wm.apply_outcome_boost(base, outcome_boost=1.2, sample_count=2)
+    assert result == base  # no effect, below minimum
+
+
+def test_outcome_boost_positive_with_enough_samples():
+    wm = WeightManager()
+    result = wm.apply_outcome_boost(0.8, outcome_boost=1.2, sample_count=10)
+    assert result > 0.8  # boost should increase score
+
+
+def test_outcome_boost_negative_with_enough_samples():
+    wm = WeightManager()
+    result = wm.apply_outcome_boost(0.8, outcome_boost=0.8, sample_count=10)
+    assert result < 0.8  # poor performance should decrease score
+
+
+def test_outcome_boost_neutral():
+    wm = WeightManager()
+    result = wm.apply_outcome_boost(0.8, outcome_boost=1.0, sample_count=100)
+    assert result == 0.8  # no change from neutral boost
+
+
+def test_outcome_boost_clamped_to_bounds():
+    wm = WeightManager()
+    # Very high boost shouldn't exceed 1.0
+    result = wm.apply_outcome_boost(0.95, outcome_boost=1.5, sample_count=100)
+    assert result <= 1.0
+    # Very low boost shouldn't go below 0.0
+    result = wm.apply_outcome_boost(0.1, outcome_boost=0.5, sample_count=100)
+    assert result >= 0.0
+
+
+def test_score_with_outcome_boost():
+    wm = WeightManager()
+    base_score = wm.score({
+        "quality_score": 80,
+        "commercial_score": 70,
+        "hero_candidate": False,
+        "room_weight": 1.0,
+    })
+    boosted_score = wm.score({
+        "quality_score": 80,
+        "commercial_score": 70,
+        "hero_candidate": False,
+        "room_weight": 1.0,
+        "outcome_boost": 1.2,
+        "outcome_samples": 10,
+    })
+    assert boosted_score > base_score
+
+
+def test_score_ignores_outcome_boost_below_min():
+    wm = WeightManager()
+    base_score = wm.score({
+        "quality_score": 80,
+        "commercial_score": 70,
+        "hero_candidate": False,
+        "room_weight": 1.0,
+    })
+    same_score = wm.score({
+        "quality_score": 80,
+        "commercial_score": 70,
+        "hero_candidate": False,
+        "room_weight": 1.0,
+        "outcome_boost": 1.5,
+        "outcome_samples": 1,  # below MIN_SAMPLES
+    })
+    assert same_score == base_score

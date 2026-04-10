@@ -27,11 +27,12 @@ async def _create_tenant(db: AsyncSession, **overrides) -> Tenant:
         plan="pro",
         stripe_customer_id=f"cus_{uuid.uuid4().hex[:8]}",
         stripe_subscription_id=f"sub_{uuid.uuid4().hex[:8]}",
-        credit_balance=20,
+        initial_balance=20,
         included_credits=50,
         rollover_cap=25,
     )
     defaults.update(overrides)
+    initial_balance = defaults.pop("initial_balance", 0)
     tenant = Tenant(**defaults)
     db.add(tenant)
     await db.flush()
@@ -39,7 +40,7 @@ async def _create_tenant(db: AsyncSession, **overrides) -> Tenant:
     # Also create a CreditAccount so the credit service can find it
     credit_account = CreditAccount(
         tenant_id=tenant.id,
-        balance=defaults.get("credit_balance", 0),
+        balance=initial_balance,
         rollover_cap=defaults.get("rollover_cap", 0),
     )
     db.add(credit_account)
@@ -131,7 +132,9 @@ async def test_webhook_subscription_deleted_preserves_credits(async_client: Asyn
     t = await _get_tenant(db_session, tenant.id)
     assert t.plan == "free"
     assert t.included_credits == 0
-    assert t.credit_balance == 20  # preserved
+    # Credits live in CreditAccount, not Tenant
+    acct = await _get_credit_account(db_session, tenant.id)
+    assert acct.balance == 20  # preserved
 
 
 @pytest.mark.asyncio
