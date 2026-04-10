@@ -3,14 +3,16 @@ Team API — manage team members within a tenant.
 
 Endpoints:
   GET    /team/members              — list users in current tenant (admin+)
-  POST   /team/members              — invite new member (admin+)
+  POST   /team/members              — invite new member (admin+); sends
+                                       an invite email with an accept link
   PATCH  /team/members/{member_id}/role — change role (admin+)
   DELETE /team/members/{member_id}  — remove member (admin+)
   GET    /team/me                   — current user profile + role
 """
 
+import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -23,13 +25,21 @@ from listingjet.api.schemas.listing_permission import (
 )
 from listingjet.api.schemas.team import (
     InviteTeamMemberRequest,
+    InviteTeamMemberResponse,
     TeamMemberResponse,
     UpdateRoleRequest,
 )
+from listingjet.config import settings
 from listingjet.database import get_db
 from listingjet.models.listing_permission import ListingPermission
+from listingjet.models.tenant import Tenant
 from listingjet.models.user import User, UserRole
-from listingjet.services.auth import hash_password
+from listingjet.services.auth import generate_invite_token
+from listingjet.services.email import get_email_service
+
+logger = logging.getLogger(__name__)
+
+INVITE_EXPIRY_HOURS = 72
 
 router = APIRouter()
 
@@ -60,16 +70,38 @@ async def list_members(
         .where(User.tenant_id == current_user.tenant_id)
         .order_by(User.created_at)
     )
-    return result.scalars().all()
+    members = result.scalars().all()
+    return [_to_team_member_response(u) for u in members]
 
 
-@router.post("/members", response_model=TeamMemberResponse, status_code=201)
+def _to_team_member_response(user: User) -> TeamMemberResponse:
+    return TeamMemberResponse(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        created_at=user.created_at,
+        pending_invite=user.password_hash is None,
+    )
+
+
+def _build_invite_accept_url(raw_token: str) -> str:
+    base = (settings.frontend_url or "https://app.listingjet.com").rstrip("/")
+    return f"{base}/accept-invite?token={raw_token}"
+
+
+@router.post("/members", response_model=InviteTeamMemberResponse, status_code=201)
 async def invite_member(
     body: InviteTeamMemberRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Invite (create) a new team member in the current tenant. Requires admin+."""
+    """Invite a new team member. Creates a pending user row, generates a
+    signed invite token, and emails the invitee an accept link.
+
+    The admin does NOT set the invitee's password — the invitee sets it
+    themselves via POST /auth/accept-invite.
+    """
     _require_admin(current_user)
 
     # Validate requested role
@@ -91,18 +123,50 @@ async def invite_member(
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    # Generate invite token. Raw goes in the email, hash goes in the DB.
+    raw_token, token_hash = generate_invite_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)
+
     user = User(
         id=uuid.uuid4(),
         tenant_id=current_user.tenant_id,
         email=email,
-        password_hash=hash_password(body.password),
+        password_hash=None,  # will be set when the invitee accepts
         name=body.name,
         role=requested_role,
+        invite_token_hash=token_hash,
+        invite_expires_at=expires_at,
+        invited_by_user_id=current_user.id,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return user
+
+    # Send the invite email. Fire-and-forget — failure to send should not
+    # block the invitation record.
+    try:
+        tenant = await db.get(Tenant, current_user.tenant_id)
+        email_svc = get_email_service()
+        email_svc.send_notification(
+            user.email,
+            "team_member_invite",
+            inviter_name=current_user.name or current_user.email,
+            tenant_name=tenant.name if tenant else "your team",
+            accept_url=_build_invite_accept_url(raw_token),
+            expires_hours=INVITE_EXPIRY_HOURS,
+        )
+    except Exception as exc:
+        logger.warning(
+            "team_invite.email_failed user=%s error=%s", user.id, exc
+        )
+
+    return InviteTeamMemberResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        role=user.role.value,
+        invite_expires_at=expires_at,
+    )
 
 
 @router.patch("/members/{member_id}/role", response_model=TeamMemberResponse)

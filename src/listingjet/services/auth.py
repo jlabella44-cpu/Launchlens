@@ -1,4 +1,6 @@
+import hashlib
 import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -33,6 +35,21 @@ def verify_password_constant_time(plain: str, hashed: str | None) -> bool:
     """Verify password with constant-time behaviour even when user doesn't exist."""
     target = hashed if hashed is not None else _DUMMY_HASH
     return bcrypt.checkpw(plain.encode(), target.encode())
+
+
+# --- Invitation tokens ---------------------------------------------------
+# Raw tokens are emailed to invitees; only their SHA-256 hash is stored in
+# the DB so a read-only database leak cannot be used to accept invitations.
+
+
+def generate_invite_token() -> tuple[str, str]:
+    """Return (raw_token, hash). Raw goes in the email link, hash goes to DB."""
+    raw = secrets.token_urlsafe(32)
+    return raw, hash_invite_token(raw)
+
+
+def hash_invite_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def create_access_token(user: User) -> str:
