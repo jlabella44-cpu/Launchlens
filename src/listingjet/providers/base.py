@@ -81,7 +81,7 @@ class VirtualStagingProvider(ABC):
         image_url: str,
         room_type: str,
         style: str = "modern",
-    ) -> str:
+    ) -> bytes:
         """Transform an empty/unfurnished room photo into a staged version.
 
         Args:
@@ -90,7 +90,7 @@ class VirtualStagingProvider(ABC):
             style: Staging style (modern, contemporary, minimalist, coastal, etc.)
 
         Returns:
-            URL of the staged image.
+            Raw PNG/JPEG bytes of the staged image.
         """
         ...
 

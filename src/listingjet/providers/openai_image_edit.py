@@ -1,97 +1,98 @@
 """OpenAI image editing provider — object removal and enhancement.
 
-Uses GPT-4V for understanding + DALL-E for inpainting/editing.
+Uses gpt-image-1.5 via /v1/images/edits so the model actually looks at the
+input image (unlike DALL-E 3's text-only /v1/images/generations endpoint).
 """
-import logging
+from __future__ import annotations
 
-import httpx
+import logging
 
 from listingjet.config import settings
 
+from ._openai_edits import (
+    OpenAIEditError,
+    edit_single_image,
+    fetch_image_bytes,
+)
 from .base import ImageEditProvider
 
 logger = logging.getLogger(__name__)
 
 
+_ENHANCEMENT_PROMPTS = {
+    "brighten": (
+        "Keep this exact same real estate photo but brighten the scene as if "
+        "it was shot during golden-hour natural sunlight. Preserve the room "
+        "layout, architecture, furniture, and finishes exactly as shown. "
+        "Balanced exposure, warm tones, crisp shadows, no blown highlights."
+    ),
+    "fix_lighting": (
+        "Rebalance the lighting in this real estate photo so exposure is even "
+        "across the frame, shadows are softened, and white balance reads "
+        "neutral-warm. Preserve the room layout, architecture, furniture, "
+        "and finishes exactly as shown. No HDR halos, no blown highlights."
+    ),
+    "improve_quality": (
+        "Upscale and sharpen this real estate photo to magazine quality while "
+        "preserving the room layout, architecture, furniture, and finishes "
+        "exactly as shown. Natural colors, no filters, no over-processing."
+    ),
+    "declutter": (
+        "Remove personal items, clutter, stray objects, and visual noise from "
+        "this real estate photo. Preserve the room layout, architecture, "
+        "walls, flooring, and primary furniture exactly as shown. Surfaces "
+        "should look clean and styled, not repainted."
+    ),
+}
+
+
 class OpenAIImageEditProvider(ImageEditProvider):
-    """Image editor using OpenAI's image generation API."""
+    """Image editor using gpt-image-1.5 via /v1/images/edits."""
 
     provider_name = "openai"
 
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key or settings.openai_api_key
-        self._base_url = "https://api.openai.com/v1"
 
     async def remove_object(self, image_url: str, object_description: str) -> bytes:
-        """Remove an object by generating a clean version of the image.
-
-        Uses DALL-E 3 to regenerate the image area without the specified object.
-        """
+        """Remove an object from a real estate photo while preserving the rest."""
         prompt = (
-            f"A clean, professional real estate listing photo. "
-            f"The image should look exactly like the original photo but with "
-            f"the {object_description} completely removed. "
-            f"Fill the area naturally with the surrounding background. "
-            f"Photorealistic, high quality, no artifacts."
+            f"Remove the {object_description} from this real estate photo. "
+            f"Preserve the room layout, architecture, furniture, lighting, "
+            f"and finishes exactly as shown. Fill the area where the "
+            f"{object_description} was with a natural continuation of the "
+            f"surrounding background — walls, floor, ceiling, or whatever is "
+            f"adjacent. Photorealistic, no artifacts, no warping."
         )
 
-        async with httpx.AsyncClient(timeout=90) as client:
-            response = await client.post(
-                f"{self._base_url}/images/generations",
-                headers={"Authorization": f"Bearer {self._api_key}"},
-                json={
-                    "model": "dall-e-3",
-                    "prompt": prompt,
-                    "n": 1,
-                    "size": "1792x1024",
-                    "quality": "hd",
-                    "response_format": "url",
-                },
+        try:
+            image_bytes, content_type = await fetch_image_bytes(image_url)
+            result = await edit_single_image(
+                api_key=self._api_key,
+                image_bytes=image_bytes,
+                image_content_type=content_type,
+                prompt=prompt,
+                provider_label="openai_image_edit",
             )
-            response.raise_for_status()
-            data = response.json()
-            result_url = data["data"][0]["url"]
-
-            # Download the generated image
-            img_resp = await client.get(result_url)
-            img_resp.raise_for_status()
-
+        except OpenAIEditError:
+            raise
         logger.info("image_edit.remove object=%s", object_description)
-        return img_resp.content
+        return result
 
     async def enhance(self, image_url: str, enhancement: str) -> bytes:
-        """Enhance an image using DALL-E.
+        """Enhance an image — brighten, fix_lighting, improve_quality, declutter."""
+        prompt = _ENHANCEMENT_PROMPTS.get(enhancement, _ENHANCEMENT_PROMPTS["improve_quality"])
 
-        Supported enhancements: brighten, fix_lighting, improve_quality, declutter
-        """
-        enhancement_prompts = {
-            "brighten": "A bright, well-lit version of this real estate photo with natural sunlight streaming in, warm tones, and clear visibility of all details. Professional real estate photography.",
-            "fix_lighting": "A professionally lit version of this real estate photo with balanced exposure, no harsh shadows, warm white balance, and clear details in all areas. Professional HDR real estate photography.",
-            "improve_quality": "A high-resolution, professional-grade version of this real estate photo with sharp details, perfect white balance, vibrant but natural colors, and magazine-quality composition.",
-            "declutter": "A clean, tidy version of this real estate photo with personal items, clutter, and mess removed. Surfaces are clear, rooms look spacious and move-in ready. Photorealistic.",
-        }
-
-        prompt = enhancement_prompts.get(enhancement, enhancement_prompts["improve_quality"])
-
-        async with httpx.AsyncClient(timeout=90) as client:
-            response = await client.post(
-                f"{self._base_url}/images/generations",
-                headers={"Authorization": f"Bearer {self._api_key}"},
-                json={
-                    "model": "dall-e-3",
-                    "prompt": prompt,
-                    "n": 1,
-                    "size": "1792x1024",
-                    "quality": "hd",
-                    "response_format": "url",
-                },
+        try:
+            image_bytes, content_type = await fetch_image_bytes(image_url)
+            result = await edit_single_image(
+                api_key=self._api_key,
+                image_bytes=image_bytes,
+                image_content_type=content_type,
+                prompt=prompt,
+                provider_label="openai_image_edit",
             )
-            response.raise_for_status()
-            data = response.json()
-            result_url = data["data"][0]["url"]
-
-            img_resp = await client.get(result_url)
-            img_resp.raise_for_status()
-
+        except OpenAIEditError:
+            raise
         logger.info("image_edit.enhance type=%s", enhancement)
-        return img_resp.content
+        return result

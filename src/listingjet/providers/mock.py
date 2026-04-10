@@ -148,8 +148,8 @@ class MockImageEditProvider(ImageEditProvider):
 class MockVirtualStagingProvider(VirtualStagingProvider):
     provider_name = "mock"
 
-    async def stage_image(self, image_url: str, room_type: str, style: str = "modern") -> str:
-        return f"s3://listingjet-dev/staged/{room_type}-{style}-mock.jpg"
+    async def stage_image(self, image_url: str, room_type: str, style: str = "modern") -> bytes:
+        return b"\xff\xd8\xff\xe0mock-staged-jpeg-" + f"{room_type}-{style}".encode()
 
 
 class MockTemplateProvider(TemplateProvider):
