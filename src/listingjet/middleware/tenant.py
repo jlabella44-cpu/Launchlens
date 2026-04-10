@@ -5,7 +5,11 @@ from starlette.responses import JSONResponse
 
 from listingjet.config import settings
 
-_PUBLIC_PATHS = {"/health", "/health/deep", "/auth/register", "/auth/login", "/auth/refresh", "/auth/forgot-password", "/auth/reset-password", "/billing/webhook", "/demo/upload", "/addons", "/branding"}
+_PUBLIC_PATHS = {"/health", "/health/deep", "/auth/register", "/auth/login", "/auth/refresh", "/auth/forgot-password", "/auth/reset-password", "/auth/accept-invite", "/billing/webhook", "/demo/upload", "/addons", "/branding"}
+
+# Prefix matches for routes with a path parameter that must be public
+# (e.g. GET /auth/invite/{token}, the public invite lookup).
+_PUBLIC_PREFIXES = ("/auth/invite/",)
 
 
 class TenantMiddleware:
@@ -15,7 +19,11 @@ class TenantMiddleware:
             return await call_next(request)
 
         path = request.url.path
-        if path in _PUBLIC_PATHS or (path.startswith("/demo/") and request.method == "GET"):
+        if (
+            path in _PUBLIC_PATHS
+            or any(path.startswith(p) for p in _PUBLIC_PREFIXES)
+            or (path.startswith("/demo/") and request.method == "GET")
+        ):
             return await call_next(request)
 
         auth = request.headers.get("Authorization", "")

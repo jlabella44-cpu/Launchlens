@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
+    # Frontend base URL — used for constructing links in transactional emails
+    # (invite accept, password reset, etc).
+    frontend_url: str = "https://app.listingjet.com"
+
     # S3
     s3_bucket_name: str = "listingjet-dev"
     aws_region: str = "us-east-1"

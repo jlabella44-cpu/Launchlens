@@ -237,6 +237,35 @@ def _social_reminder_followup(**kwargs) -> tuple[str, str]:
     return subject, html_body
 
 
+def team_member_invite(
+    *,
+    inviter_name: str,
+    tenant_name: str,
+    accept_url: str,
+    expires_hours: int = 72,
+) -> tuple[str, str]:
+    """TEAM_MEMBER_INVITE — invitation to join a tenant's team."""
+    subject = f"{inviter_name} invited you to {tenant_name} on ListingJet"
+    content = (
+        f"<h2 style=\"color:#0F1B2D;margin:0 0 16px;\">You've been invited</h2>"
+        f"<p style=\"font-size:16px;color:#334155;\">"
+        f"<strong>{inviter_name}</strong> invited you to join "
+        f"<strong>{tenant_name}</strong> on ListingJet. "
+        f"Click the button below to set your password and get started."
+        f"</p>"
+        f"<p style=\"margin:32px 0;\">{_CTA_BUTTON.format(url=accept_url, label='Accept Invitation')}</p>"
+        f"<p style=\"font-size:14px;color:#64748B;\">"
+        f"This invitation expires in {expires_hours} hours. "
+        f"If the button doesn't work, copy and paste this link into your browser:"
+        f"</p>"
+        f"<p style=\"font-size:13px;color:#64748B;word-break:break-all;\">{accept_url}</p>"
+        f"<p style=\"font-size:13px;color:#94A3B8;margin-top:24px;\">"
+        f"If you weren't expecting this invitation, you can safely ignore this email."
+        f"</p>"
+    )
+    return subject, _render(content)
+
+
 # Registry mapping template names to functions
 TEMPLATES: dict[str, callable] = {
     "listing_delivered": listing_delivered,
@@ -251,4 +280,5 @@ TEMPLATES: dict[str, callable] = {
     "welcome_drip_5": welcome_drip_5,
     "social_reminder": _social_reminder,
     "social_reminder_followup": _social_reminder_followup,
+    "team_member_invite": team_member_invite,
 }

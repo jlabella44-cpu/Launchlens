@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
 from listingjet.api.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from listingjet.api.schemas.team import AcceptInviteRequest, InviteInfoResponse
 from listingjet.config.tiers import TIER_DEFAULTS
 from listingjet.config.tiers import TIER_TO_PLAN as _TIER_TO_PLAN
 from listingjet.database import get_db
@@ -20,6 +22,7 @@ from listingjet.services.auth import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_invite_token,
     hash_password,
     set_auth_cookies,
     verify_password_constant_time,
@@ -564,3 +567,95 @@ async def google_login(
     refresh = create_refresh_token(user)
     body = TokenResponse(access_token=access, refresh_token=refresh)
     return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
+
+
+# ---------------------------------------------------------------------------
+# Team invite acceptance
+# ---------------------------------------------------------------------------
+
+
+async def _lookup_pending_invite(db: AsyncSession, raw_token: str) -> User:
+    """Resolve a raw invite token to its pending User row, or raise 404/410."""
+    if not raw_token:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    token_hash = hash_invite_token(raw_token)
+    user = (
+        await db.execute(
+            select(User).where(User.invite_token_hash == token_hash)
+        )
+    ).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if user.invite_expires_at is None or user.invite_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Invitation expired")
+    return user
+
+
+@router.get("/invite/{token}", response_model=InviteInfoResponse)
+async def get_invite_info(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    _rl=Depends(rate_limit(30, 60)),
+):
+    """Public lookup of a pending invitation. Used by the accept page to
+    display the invitee's email and the tenant they're joining before they
+    set a password.
+    """
+    user = await _lookup_pending_invite(db, token)
+    tenant = await db.get(Tenant, user.tenant_id)
+    inviter = (
+        await db.get(User, user.invited_by_user_id)
+        if user.invited_by_user_id
+        else None
+    )
+    return InviteInfoResponse(
+        email=user.email,
+        tenant_name=tenant.name if tenant else "this team",
+        inviter_name=(inviter.name or inviter.email) if inviter else None,
+        expires_at=user.invite_expires_at,
+    )
+
+
+@router.post("/accept-invite", response_model=TokenResponse)
+async def accept_invite(
+    body: AcceptInviteRequest,
+    db: AsyncSession = Depends(get_db),
+    _rl=Depends(rate_limit(10, 60)),
+):
+    """Accept a team invitation: set the invitee's password and log them in.
+
+    The invite token is consumed on success — invite_token_hash and
+    invite_expires_at are cleared, preventing replay.
+    """
+    user = await _lookup_pending_invite(db, body.token)
+
+    if user.password_hash is not None:
+        # The row already has a password — the invite was already accepted
+        # (shouldn't happen because we clear the token on accept, but guard
+        # anyway in case of concurrent requests).
+        raise HTTPException(status_code=409, detail="Invitation already accepted")
+
+    user.password_hash = hash_password(body.password)
+    if body.name:
+        user.name = body.name
+    user.invite_token_hash = None
+    user.invite_expires_at = None
+    # consent_at: the invitee is accepting the terms of service by creating
+    # their account just like a self-registration.
+    user.consent_at = datetime.now(timezone.utc)
+    user.consent_version = "2026-04-03"
+
+    await emit_event(
+        session=db,
+        event_type="user.invite_accepted",
+        payload={"user_id": str(user.id), "email": user.email},
+        tenant_id=str(user.tenant_id),
+    )
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info("auth.invite_accepted user=%s tenant=%s", user.id, user.tenant_id)
+    access = create_access_token(user)
+    refresh = create_refresh_token(user)
+    token_body = TokenResponse(access_token=access, refresh_token=refresh)
+    return set_auth_cookies(JSONResponse(content=token_body.model_dump()), access, refresh)
