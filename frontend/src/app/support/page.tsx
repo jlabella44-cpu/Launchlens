@@ -54,6 +54,7 @@ function SupportPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SupportTicketDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -68,11 +69,12 @@ function SupportPage() {
   const [creating, setCreating] = useState(false);
 
   const fetchTickets = useCallback(async () => {
+    setTicketsError(null);
     try {
       const res = await apiClient.getSupportTickets(statusFilter === "all" ? undefined : statusFilter);
       setTickets(res.items);
-    } catch {
-      // silently handle
+    } catch (err) {
+      setTicketsError(err instanceof Error ? err.message : "Failed to load tickets");
     } finally {
       setLoading(false);
     }
@@ -210,6 +212,18 @@ function SupportPage() {
           <div className="space-y-2">
             {loading ? (
               [1, 2, 3].map((i) => <div key={i} className="h-16 rounded-xl bg-[var(--color-surface)] animate-pulse border border-[var(--color-card-border)]" />)
+            ) : ticketsError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900/40 p-4 text-center">
+                <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                  Couldn&apos;t load tickets. {ticketsError}
+                </p>
+                <button
+                  onClick={() => { setLoading(true); fetchTickets(); }}
+                  className="px-4 py-1.5 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
             ) : tickets.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)] text-center py-8">No tickets yet. Try the AI chat first!</p>
             ) : (
