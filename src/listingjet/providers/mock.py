@@ -70,6 +70,65 @@ class MockVisionProvider(VisionProvider):
             "bathrooms": bathrooms,
         })
 
+    async def analyze_with_prompt_multi(
+        self, image_urls: list[str], prompt: str
+    ) -> str:
+        if not image_urls:
+            raise ValueError("image_urls must be non-empty")
+        return json.dumps({
+            "floor_label": "First Floor",
+            "level": 1,
+            "structure": "main_house",
+            "overall_width_meters": 12.0,
+            "overall_height_meters": 9.0,
+            "wall_height_meters": 2.7,
+            "rooms": [
+                {
+                    "label": "living_room",
+                    "polygon": [[0.0, 0.0], [0.5, 0.0], [0.5, 0.4], [0.0, 0.4]],
+                    "width_meters": 6.0,
+                    "height_meters": 4.5,
+                    "doors": [{"wall": "south", "position": 0.5}],
+                    "windows": [{"wall": "east", "position": 0.3}],
+                    "wall_color": "#E8E2D0",
+                    "flooring": "hardwood",
+                    "decor_tags": ["beige walls", "white trim"],
+                    "furniture": [
+                        {"type": "sectional", "x": 0.3, "y": 0.5, "rotation_degrees": 0},
+                        {"type": "coffee_table", "x": 0.5, "y": 0.5, "rotation_degrees": 0},
+                    ],
+                },
+                {
+                    "label": "kitchen",
+                    "polygon": [[0.5, 0.0], [1.0, 0.0], [1.0, 0.4], [0.5, 0.4]],
+                    "width_meters": 5.0,
+                    "height_meters": 4.5,
+                    "doors": [{"wall": "west", "position": 0.5}],
+                    "windows": [],
+                    "wall_color": "#FFFFFF",
+                    "flooring": "tile",
+                    "decor_tags": ["white cabinets"],
+                    "furniture": [
+                        {"type": "kitchen_island", "x": 0.5, "y": 0.5, "rotation_degrees": 0},
+                    ],
+                },
+                {
+                    "label": "bedroom",
+                    "polygon": [[0.0, 0.4], [0.5, 0.4], [0.5, 1.0], [0.0, 1.0]],
+                    "width_meters": 6.0,
+                    "height_meters": 5.0,
+                    "doors": [{"wall": "north", "position": 0.3}],
+                    "windows": [{"wall": "west", "position": 0.5}],
+                    "wall_color": "#D6CFC4",
+                    "flooring": "carpet",
+                    "decor_tags": [],
+                    "furniture": [
+                        {"type": "queen_bed", "x": 0.5, "y": 0.5, "rotation_degrees": 0},
+                    ],
+                },
+            ],
+        })
+
 
 class MockLLMProvider(LLMProvider):
     async def complete(self, prompt: str, context: dict, temperature: float | None = None, system_prompt: str | None = None) -> str:

@@ -12,6 +12,7 @@ with workflow.unsafe.imports_passed_through():
         run_content,
         run_coverage,
         run_distribution,
+        run_dollhouse_render,
         run_floorplan,
         run_health_score,
         run_ingestion,
@@ -117,6 +118,19 @@ class ListingPipeline:
             start_to_close_timeout=_VISION_TIER2_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
+
+        # Dollhouse render is best-effort — failures never block the pipeline.
+        try:
+            await workflow.execute_activity(
+                run_dollhouse_render, ctx,
+                start_to_close_timeout=_DEFAULT_TIMEOUT,
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except Exception as exc:
+            workflow.logger.warning(
+                "dollhouse_render_failed listing=%s error=%s", input.listing_id, exc
+            )
+
         packaging_result = await workflow.execute_activity(
             run_packaging, ctx,
             start_to_close_timeout=_DEFAULT_TIMEOUT,

@@ -19,6 +19,7 @@ import { SocialPreview } from "@/components/listings/social-preview";
 import { SharePanel } from "@/components/listings/share-panel";
 import { ActivityLog } from "@/components/listings/activity-log";
 import { HealthPanel } from "@/components/listings/health-panel";
+import { DollhouseCard } from "@/components/listings/dollhouse-card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 function ListingDetail() {
@@ -430,6 +431,9 @@ function ListingDetail() {
               </h3>
               <PackageViewer selections={selections} />
             </div>
+
+            {/* 3D Dollhouse */}
+            <DollhouseCard listingId={id} />
 
             {/* Video Assets */}
             {showVideo && (

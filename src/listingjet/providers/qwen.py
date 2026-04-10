@@ -191,3 +191,29 @@ class QwenVisionProvider(VisionProvider):
         except Exception:
             record_provider_call("qwen_vision", False)
             raise
+
+    async def analyze_with_prompt_multi(
+        self, image_urls: list[str], prompt: str
+    ) -> str:
+        if not image_urls:
+            raise ValueError("image_urls must be non-empty")
+        content: list[dict] = [{"type": "text", "text": prompt}]
+        for url in image_urls:
+            content.append({"type": "image_url", "image_url": {"url": url}})
+        payload = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": content}],
+            "max_tokens": 4000,
+        }
+        try:
+            async with self._semaphore:
+                body = await _post(self._endpoint, self._api_key, payload, "qwen_vision")
+            result = body["choices"][0]["message"]["content"]
+            input_tokens, output_tokens = _extract_usage(body)
+            record_provider_call("qwen_vision", True)
+            if input_tokens or output_tokens:
+                record_token_usage("qwen_vision", input_tokens, output_tokens)
+            return result
+        except Exception:
+            record_provider_call("qwen_vision", False)
+            raise

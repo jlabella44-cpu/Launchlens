@@ -93,6 +93,12 @@ async def run_floorplan(context: AgentContext) -> dict:
 
 
 @activity.defn
+async def run_dollhouse_render(context: AgentContext) -> dict:
+    from listingjet.agents.dollhouse_render import DollhouseRenderAgent
+    return await DollhouseRenderAgent().instrumented_execute(context)
+
+
+@activity.defn
 async def run_video(context: AgentContext) -> dict:
     from listingjet.agents.video import VideoAgent
     return await VideoAgent().instrumented_execute(context)
@@ -250,7 +256,7 @@ from listingjet.activities.social_event import run_social_event  # noqa: E402, I
 # Collect all activities for worker registration
 ALL_ACTIVITIES = [
     run_ingestion, run_vision_tier1, run_vision_tier2,
-    run_coverage, run_floorplan, run_packaging, run_content, run_brand,
+    run_coverage, run_floorplan, run_dollhouse_render, run_packaging, run_content, run_brand,
     run_social_content, run_photo_compliance, run_mls_export, run_distribution,
     run_video, run_chapters, run_social_cuts, run_learning,
     run_link_import, run_property_verification,

@@ -27,6 +27,18 @@ class VisionProvider(ABC):
         """Send an image with a custom prompt. Returns raw text response."""
         raise NotImplementedError
 
+    async def analyze_with_prompt_multi(
+        self, image_urls: list[str], prompt: str
+    ) -> str:
+        """Send multiple images with a single prompt. Returns raw text response.
+
+        Default implementation falls back to the first image only; providers
+        that natively support multi-image input should override.
+        """
+        if not image_urls:
+            raise ValueError("image_urls must be non-empty")
+        return await self.analyze_with_prompt(image_urls[0], prompt)
+
 
 class LLMProvider(ABC):
     @abstractmethod
