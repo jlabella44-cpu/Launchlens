@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { motion } from "framer-motion";
 
 interface EmptyStateProps {
   icon?: ReactNode;
   title: string;
   description: string;
   action?: ReactNode;
+  className?: string;
 }
 
 const DEFAULT_ICON = (
@@ -18,9 +20,14 @@ const DEFAULT_ICON = (
   </svg>
 );
 
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`flex flex-col items-center justify-center py-16 px-4 text-center${className ? ` ${className}` : ""}`}
+    >
       <div className="mb-4">{icon || DEFAULT_ICON}</div>
       <h3
         className="text-lg font-semibold text-[var(--color-text)] mb-1"
@@ -32,6 +39,6 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         {description}
       </p>
       {action}
-    </div>
+    </motion.div>
   );
 }

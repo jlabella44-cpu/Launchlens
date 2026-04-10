@@ -88,7 +88,7 @@ export function ActivityLog({ listingId }: ActivityLogProps) {
   }, [listingId]);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-5">
+    <div className="bg-[var(--color-card)] rounded-2xl border border-[var(--color-card-border)] p-5">
       <h3
         className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4"
         style={{ fontFamily: "var(--font-heading)" }}
@@ -117,7 +117,7 @@ export function ActivityLog({ listingId }: ActivityLogProps) {
       {!loading && !error && entries.length > 0 && (
         <div className="relative">
           {/* Timeline line */}
-          <div className="absolute left-[15px] top-4 bottom-4 w-px bg-slate-100" />
+          <div className="absolute left-[15px] top-4 bottom-4 w-px bg-[var(--color-card-border)]" />
 
           <ul className="space-y-5">
             {entries.map((entry) => (
@@ -125,7 +125,7 @@ export function ActivityLog({ listingId }: ActivityLogProps) {
                 {/* Avatar */}
                 <div
                   className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-white relative z-10"
-                  style={{ backgroundColor: "var(--color-primary, #F97316)" }}
+                  style={{ backgroundColor: "var(--color-primary, #0F1B2D)" }}
                 >
                   {userInitials(entry.user_name, entry.user_email)}
                 </div>

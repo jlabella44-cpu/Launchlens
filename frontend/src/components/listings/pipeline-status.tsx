@@ -73,9 +73,9 @@ export function PipelineStatus({ state }: PipelineStatusProps) {
             dotColor = "bg-emerald-500";
             labelColor = "text-[var(--color-text-secondary)]";
           } else if (isCurrent) {
-            dotColor = "bg-blue-500";
-            dotScale = "ring-2 ring-blue-200 ring-offset-1 scale-125";
-            labelColor = "text-blue-600 font-semibold";
+            dotColor = "bg-[var(--color-cta)]";
+            dotScale = "ring-2 ring-[var(--color-cta)]/30 ring-offset-1 scale-125";
+            labelColor = "text-[var(--color-cta)] font-semibold";
           } else {
             dotColor = "bg-slate-200 dark:bg-slate-600";
             labelColor = "text-[var(--color-text-tertiary)]";
@@ -91,6 +91,7 @@ export function PipelineStatus({ state }: PipelineStatusProps) {
                       <path d="M3.5 7L6 9.5L10.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
+                  <span className="sr-only">{stage.label}: {isError && isActive ? "error" : isPast ? "complete" : isCurrent ? "active" : "pending"}</span>
                 </div>
                 <span className={`text-[11px] leading-tight whitespace-nowrap ${labelColor}`}>
                   {stage.label}

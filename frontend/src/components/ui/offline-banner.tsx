@@ -26,6 +26,7 @@ export function OfflineBanner() {
           initial={{ y: -40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -40, opacity: 0 }}
+          role="alert"
           className="fixed top-0 left-0 right-0 z-[100] bg-yellow-500 text-white text-center py-2 text-sm font-medium shadow-md"
         >
           You are offline. Changes will not be saved.

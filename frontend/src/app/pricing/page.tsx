@@ -246,7 +246,7 @@ export default function PricingPage() {
                 transition={{ delay: 0.15 + i * 0.08 }}
                 className={`rounded-2xl p-6 flex flex-col ${
                   isRecommended
-                    ? "bg-[#0B1120] text-white ring-2 ring-[#F97316]"
+                    ? "bg-[var(--color-primary)] text-white ring-2 ring-[#F97316]"
                     : "bg-[var(--color-surface)] border border-[var(--color-card-border)]"
                 }`}
               >
@@ -372,7 +372,7 @@ export default function PricingPage() {
           transition={{ delay: 0.6 }}
           className="mb-16"
         >
-          <div className="bg-[#0B1120] rounded-2xl p-8 text-center">
+          <div className="bg-[var(--color-primary)] rounded-2xl p-8 text-center">
             <div className="inline-flex items-center gap-2 mb-3">
               <span className="w-2 h-2 rounded-full bg-[#F97316] animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-[#F97316]">Founding 200</span>

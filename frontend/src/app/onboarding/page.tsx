@@ -116,11 +116,11 @@ function OnboardingFlow() {
   const progressPercent = ((currentStep + 1) / STEPS.length) * 100;
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] flex flex-col">
+    <div className="min-h-screen bg-[var(--color-background)] flex flex-col">
       {/* Header */}
       <header className="pt-10 pb-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <svg className="w-6 h-6 text-[#F97316]" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-6 h-6 text-[var(--color-cta)]" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3.5 18.5L9.5 12.5L13 16L22 6L20.5 4.5L13 12L9.5 8.5L2 16L3.5 18.5Z" />
           </svg>
           <span
@@ -138,7 +138,7 @@ function OnboardingFlow() {
       {/* Progress Bar */}
       <div className="max-w-md mx-auto w-full px-6 mb-10">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-[#F97316] border-b-2 border-[#F97316] pb-0.5">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-cta)] border-b-2 border-[var(--color-cta)] pb-0.5">
             Mission Status
           </span>
           <span className="text-[10px] uppercase tracking-wider text-slate-400">
@@ -147,7 +147,7 @@ function OnboardingFlow() {
         </div>
         <div className="h-0.5 bg-slate-200 rounded-full">
           <motion.div
-            className="h-full bg-[#F97316] rounded-full"
+            className="h-full bg-[var(--color-cta)] rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${progressPercent}%` }}
             transition={{ duration: 0.4 }}
@@ -178,7 +178,7 @@ function OnboardingFlow() {
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                     isActive
-                      ? "bg-[#0B1120] text-white"
+                      ? "bg-[var(--color-primary)] text-white"
                       : isCompleted
                       ? "bg-green-100 text-green-600"
                       : "bg-slate-100 text-slate-400"
@@ -207,7 +207,7 @@ function OnboardingFlow() {
                       {step.title}
                     </h3>
                     {isActive && !isCompleted && (
-                      <span className="text-[9px] uppercase tracking-wider font-bold bg-[#F97316] text-white px-2 py-0.5 rounded">
+                      <span className="text-[9px] uppercase tracking-wider font-bold bg-[var(--color-cta)] text-white px-2 py-0.5 rounded">
                         Current
                       </span>
                     )}
@@ -228,7 +228,7 @@ function OnboardingFlow() {
                   {/* Action button */}
                   {isActive && !isCompleted ? (
                     <Link href={step.actionHref}>
-                      <button className="mt-4 px-5 py-2 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shadow-md shadow-orange-200">
+                      <button className="mt-4 px-5 py-2 rounded-full bg-[var(--color-cta)] hover:brightness-90 text-white text-sm font-semibold transition-all inline-flex items-center gap-1.5 shadow-md">
                         {step.actionLabel}
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />

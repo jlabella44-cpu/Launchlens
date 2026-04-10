@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">
         <div className="max-w-sm text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
             <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
             If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset link.
             The link expires in 15 minutes.
           </p>
-          <Link href="/login" className="text-[#F97316] font-medium hover:underline text-sm">
+          <Link href="/login" className="text-[var(--color-cta)] font-medium hover:underline text-sm">
             Back to sign in
           </Link>
         </div>
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">
       <div className="w-full max-w-sm">
         <h1
           className="text-2xl font-bold text-[var(--color-text)] mb-2"
@@ -84,19 +84,19 @@ export default function ForgotPasswordPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+              className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
               placeholder="pilot@listingjet.ai"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            <p role="alert" className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-200"
+            className="w-full py-3 rounded-full bg-[var(--color-cta)] hover:brightness-90 text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             {loading ? "Sending..." : "Send reset link"}
           </button>
@@ -104,7 +104,7 @@ export default function ForgotPasswordPage() {
 
         <p className="mt-6 text-center text-sm text-[var(--color-text-secondary)]">
           Remember your password?{" "}
-          <Link href="/login" className="text-[#F97316] font-medium hover:underline">
+          <Link href="/login" className="text-[var(--color-cta)] font-medium hover:underline">
             Sign in
           </Link>
         </p>

@@ -20,7 +20,7 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">
         <div className="max-w-sm text-center">
           <h1 className="text-2xl font-bold text-[var(--color-text)] mb-3" style={{ fontFamily: "var(--font-heading)" }}>
             Invalid Reset Link
@@ -28,7 +28,7 @@ function ResetPasswordForm() {
           <p className="text-[var(--color-text-secondary)] mb-6">
             This password reset link is missing or invalid. Please request a new one.
           </p>
-          <Link href="/forgot-password" className="text-[#F97316] font-medium hover:underline">
+          <Link href="/forgot-password" className="text-[var(--color-cta)] font-medium hover:underline">
             Request new reset link
           </Link>
         </div>
@@ -70,7 +70,7 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">
         <div className="max-w-sm text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
             <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -85,7 +85,7 @@ function ResetPasswordForm() {
           </p>
           <Link
             href="/login"
-            className="inline-block px-6 py-2.5 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors shadow-lg shadow-orange-200"
+            className="inline-block px-6 py-2.5 rounded-full bg-[var(--color-cta)] hover:brightness-90 text-white font-semibold text-sm transition-all shadow-md"
           >
             Sign in
           </Link>
@@ -95,7 +95,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">
       <div className="w-full max-w-sm">
         <h1
           className="text-2xl font-bold text-[var(--color-text)] mb-2"
@@ -119,7 +119,7 @@ function ResetPasswordForm() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+              className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
               placeholder="••••••••"
             />
           </div>
@@ -135,19 +135,19 @@ function ResetPasswordForm() {
               minLength={8}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F97316]/30 focus:border-[#F97316] transition-all text-sm"
+              className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)]/30 focus:border-[var(--color-cta)] transition-all text-sm"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            <p role="alert" className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-full bg-[#F97316] hover:bg-[#ea580c] text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-200"
+            className="w-full py-3 rounded-full bg-[var(--color-cta)] hover:brightness-90 text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             {loading ? "Resetting..." : "Reset password"}
           </button>
@@ -161,7 +161,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#F97316] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[var(--color-cta)] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <ResetPasswordForm />

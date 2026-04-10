@@ -149,6 +149,16 @@ a, button, input, select, textarea {
   color: #4A5B70;
 }
 
+/* Reduced motion: disable all animations for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Prevent horizontal overflow on mobile */
 html, body {
   overflow-x: hidden;

@@ -24,11 +24,11 @@ const TIER_LABELS: Record<string, string> = {
 const BUNDLE_NAMES = ["Solo Mission", "Squadron", "Air Wing", "Global Fleet"];
 
 const TX_TYPE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  purchase: { bg: "bg-green-50", text: "text-green-700", label: "Confirmed" },
-  bonus: { bg: "bg-green-50", text: "text-green-700", label: "Confirmed" },
-  rollover: { bg: "bg-blue-50", text: "text-blue-700", label: "Adjustment" },
-  usage: { bg: "bg-red-50", text: "text-red-600", label: "Deployed" },
-  refund: { bg: "bg-green-50", text: "text-green-700", label: "Confirmed" },
+  purchase: { bg: "bg-[var(--color-success)]/10", text: "text-[var(--color-success)]", label: "Confirmed" },
+  bonus: { bg: "bg-[var(--color-success)]/10", text: "text-[var(--color-success)]", label: "Confirmed" },
+  rollover: { bg: "bg-[var(--color-secondary)]/10", text: "text-[var(--color-secondary)]", label: "Adjustment" },
+  usage: { bg: "bg-[var(--color-error)]/10", text: "text-[var(--color-error)]", label: "Deployed" },
+  refund: { bg: "bg-[var(--color-success)]/10", text: "text-[var(--color-success)]", label: "Confirmed" },
 };
 
 /** Live counter showing remaining Founding 200 spots. */
@@ -247,7 +247,7 @@ function BillingContent() {
                       key={bundle.id}
                       className={`rounded-2xl p-5 text-center transition-all ${
                         isRecommended
-                          ? "bg-[#0B1120] text-white ring-2 ring-[#F97316]"
+                          ? "bg-[var(--color-primary)] text-white ring-2 ring-[#F97316]"
                           : "bg-[var(--color-surface)] border border-[var(--color-card-border)]"
                       }`}
                     >
@@ -383,7 +383,7 @@ function BillingContent() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-[#0B1120] to-[#1a2744] rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+          className="bg-gradient-to-r from-[var(--color-primary)] to-[#1a2744] rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
         >
           <div>
             <div className="flex items-center gap-2 mb-2">

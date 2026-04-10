@@ -47,6 +47,10 @@ export function AddressAutocomplete({
   return (
     <div className="relative" ref={dropdownRef}>
       <input
+        role="combobox"
+        aria-expanded={places.isOpen}
+        aria-controls="address-listbox"
+        aria-autocomplete="list"
         value={places.query || value || ""}
         onChange={(e) => {
           places.setQuery(e.target.value);
@@ -62,11 +66,13 @@ export function AddressAutocomplete({
         autoComplete="off"
       />
       {places.isOpen && places.predictions.length > 0 && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-white border border-[var(--color-border)] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div id="address-listbox" role="listbox" className="absolute z-50 top-full mt-1 w-full bg-white border border-[var(--color-border)] rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {places.predictions.map((p) => (
             <button
               key={p.place_id}
               type="button"
+              role="option"
+              aria-selected={false}
               className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--color-primary)]/10 transition-colors cursor-pointer"
               onClick={async () => {
                 const addr = await places.selectPlace(p.place_id);
