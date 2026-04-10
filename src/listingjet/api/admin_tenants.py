@@ -56,7 +56,7 @@ async def list_tenants(
     items = []
     for t in tenants:
         resp = TenantResponse.model_validate(t)
-        resp.credit_balance = balance_map.get(t.id, 0)
+        resp.credit_balance = int(balance_map.get(t.id, 0))
         items.append(resp)
 
     return {
@@ -92,7 +92,7 @@ async def get_tenant(
     credit_acct = (await db.execute(
         select(CreditAccount).where(CreditAccount.tenant_id == tenant_id)
     )).scalar_one_or_none()
-    balance = credit_acct.balance if credit_acct else 0
+    balance = int(credit_acct.balance) if credit_acct else 0
 
     return TenantDetailResponse(
         id=tenant.id,
@@ -190,7 +190,7 @@ async def get_tenant_credits(
     credit_acct = (await db.execute(
         select(CreditAccount).where(CreditAccount.tenant_id == tenant_id)
     )).scalar_one_or_none()
-    balance = credit_acct.balance if credit_acct else 0
+    balance = int(credit_acct.balance) if credit_acct else 0
 
     result = await db.execute(
         select(CreditTransaction)
