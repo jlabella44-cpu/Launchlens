@@ -159,12 +159,19 @@ def create_app() -> FastAPI:
         redoc_url=None if is_production else "/redoc",
         openapi_url=None if is_production else "/openapi.json",
     )
-    # CORS — must be added before other middleware so OPTIONS preflight works
+    # CORS — must be added before other middleware so OPTIONS preflight works.
+    # allow_origin_regex matches:
+    #   - listingjet*.vercel.app (preview deployments)
+    #   - (subdomain.)listingjet.com / listingjet.ai (production + white-label)
+    # Kept in sync with _validate_redirect_url in api/billing.py.
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_origin_regex=r"https://listingjet[a-z0-9-]*\.vercel\.app",
+        allow_origin_regex=(
+            r"https://listingjet[a-z0-9-]*\.vercel\.app"
+            r"|https://([a-z0-9-]+\.)?listingjet\.(com|ai)"
+        ),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],

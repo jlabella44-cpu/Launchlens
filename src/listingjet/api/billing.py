@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from urllib.parse import urlparse
 
@@ -30,17 +31,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Hardcoded fallback: any HTTPS subdomain of listingjet.com or listingjet.ai
+# (plus their apex domains). Kept in sync with CORS middleware in main.py.
+_VERCEL_ORIGIN_RE = re.compile(r"https://listingjet[a-z0-9-]*\.vercel\.app")
+_LISTINGJET_ORIGIN_RE = re.compile(r"https://([a-z0-9-]+\.)?listingjet\.(com|ai)")
+
 
 def _validate_redirect_url(url: str) -> None:
-    """Reject redirect URLs that don't match a configured CORS origin or Vercel pattern."""
-    import re
+    """Reject redirect URLs that don't match a configured CORS origin or a known listingjet domain."""
     allowed = {o.strip().rstrip("/") for o in settings.cors_origins.split(",")}
     parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
     if origin in allowed:
         return
-    # Also allow the same Vercel pattern used in CORS middleware
-    if re.fullmatch(r"https://listingjet[a-z0-9-]*\.vercel\.app", origin):
+    if _LISTINGJET_ORIGIN_RE.fullmatch(origin):
+        return
+    if _VERCEL_ORIGIN_RE.fullmatch(origin):
         return
     raise HTTPException(status_code=400, detail="Redirect URL not allowed")
 
