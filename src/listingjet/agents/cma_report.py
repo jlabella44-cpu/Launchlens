@@ -14,6 +14,7 @@ from listingjet.models.cma_report import CMAReport
 from listingjet.models.listing import Listing
 from listingjet.models.property_data import PropertyData
 from listingjet.providers import get_llm_provider
+from listingjet.services.comparables import ComparablesService
 from listingjet.services.pii_filter import sanitize_for_prompt
 from listingjet.services.storage import StorageService
 
@@ -87,10 +88,17 @@ class CMAReportAgent(BaseAgent):
     agent_name = "cma_report"
     requires_ai_consent = True
 
-    def __init__(self, llm_provider=None, storage_service=None, session_factory=None):
+    def __init__(
+        self,
+        llm_provider=None,
+        storage_service=None,
+        session_factory=None,
+        comparables_service: ComparablesService | None = None,
+    ):
         self._llm = llm_provider or get_llm_provider(agent=self.agent_name)
         self._storage = storage_service or StorageService()
         self._session_factory = session_factory or AsyncSessionLocal
+        self._comparables = comparables_service or ComparablesService()
 
     async def execute(self, context: AgentContext) -> dict:
         async with self.session_scope(context) as (session, listing_id, tenant_id):
@@ -117,9 +125,8 @@ class CMAReportAgent(BaseAgent):
                 "price": meta.get("price"),
             }
 
-            # Generate synthetic comparables from property data
-            # In production, this would call ATTOM historical sales API or scrapers
-            comparables = self._generate_comparables(subject)
+            # Fetch comparables — Repliers if enabled + configured, synthetic fallback otherwise.
+            comparables = await self._comparables.fetch(subject)
 
             # Generate analysis narrative via LLM
             comps_text = "\n".join(
@@ -191,42 +198,3 @@ class CMAReportAgent(BaseAgent):
             })
 
         return {"comparables_count": len(comparables), "s3_key": s3_key}
-
-    def _generate_comparables(self, subject: dict) -> list[dict]:
-        """Generate comparable sales data.
-
-        In production, this would query ATTOM historical sales API or
-        enhanced scrapers. For now, generates realistic synthetic data
-        based on the subject property's attributes.
-        """
-        import random
-
-        base_sqft = subject.get("sqft") or 1800
-        base_price = subject.get("price") or 400_000
-        base_beds = subject.get("beds") or 3
-        base_baths = subject.get("baths") or 2
-        base_ppsf = base_price / base_sqft if base_sqft > 0 else 220
-
-        streets = [
-            "Oak Ave", "Maple Dr", "Pine St", "Cedar Ln", "Elm Blvd",
-            "Birch Ct", "Willow Way", "Ash Rd",
-        ]
-        city = subject.get("address", "").split(",")[1].strip() if "," in subject.get("address", "") else "Austin"
-
-        comps = []
-        for i in range(6):
-            sqft_delta = random.randint(-200, 200)
-            sqft = max(800, base_sqft + sqft_delta)
-            ppsf = round(base_ppsf + random.uniform(-30, 30), 2)
-            price = round(sqft * ppsf / 1000) * 1000
-
-            comps.append({
-                "address": f"{random.randint(100, 999)} {streets[i]}, {city}",
-                "beds": base_beds + random.choice([-1, 0, 0, 1]),
-                "baths": base_baths + random.choice([-0.5, 0, 0, 0.5]),
-                "sqft": sqft,
-                "price": price,
-                "price_per_sqft": ppsf,
-            })
-
-        return comps
