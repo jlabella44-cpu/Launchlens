@@ -46,11 +46,14 @@ async def cleanup_expired_demos(session: AsyncSession, storage: StorageService |
         )
         assets = asset_result.scalars().all()
         for asset in assets:
-            try:
-                storage.delete(asset.file_path)
-                s3_cleaned += 1
-            except Exception:
-                logger.warning("Failed to delete S3 object: %s", asset.file_path)
+            for key in (asset.file_path, asset.proxy_path):
+                if not key:
+                    continue
+                try:
+                    storage.delete(key)
+                    s3_cleaned += 1
+                except Exception:
+                    logger.warning("Failed to delete S3 object: %s", key)
 
     asset_delete = await session.execute(
         delete(Asset).where(Asset.listing_id.in_(listing_ids))

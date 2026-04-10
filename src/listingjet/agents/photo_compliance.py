@@ -58,6 +58,7 @@ class PhotoComplianceResult:
 
 class PhotoComplianceAgent(BaseAgent):
     agent_name = "photo_compliance"
+    requires_ai_consent = True
 
     def __init__(self, vision_provider=None, storage_service=None, session_factory=None):
         self._vision = vision_provider or get_tier2_vision_provider()

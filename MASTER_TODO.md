@@ -37,7 +37,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] **HIGH-2: PII (email addresses) logged in plaintext** — masked as `u***@e***.com` in all log output
 - [x] **HIGH-3: No token revocation** — Redis-backed blocklist on logout; TTL matches token lifetime
 - [x] **HIGH-4: No account lockout after failed login attempts** — Redis-based lockout (5 attempts / 15min)
-- [ ] **HIGH-7: No consent management for third-party AI processing**
+- [x] **HIGH-7: No consent management for third-party AI processing** — register page + settings toggle + agent-level guards via `requires_ai_consent` flag + audit log on grant/revoke
 - [x] **Rate limiting on auth endpoints** — Redis rate limiter already applied via `rate_limit()` dependency
 
 ### Data Integrity
@@ -48,15 +48,13 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ### Deployment
 - [ ] **Deploy backend with new analytics endpoints** (ECR push + ECS redeploy)
 - [ ] **Test analytics page on production**
-- [ ] **Investigate stuck Lenexa listing** (`uploading` since Apr 1)
-- [ ] **Review and approve Parkville listing** through review queue
 - [ ] **Merge PR #109** once CI passes
 - [ ] **4 unpushed commits on local master** — decide: PR these or reset to origin
 
 ### Vision Pipeline
 - [x] **Add per-image logging** — already logging before/after each T1 and T2 analysis with asset ID and proxy status
 - [x] **Add timeouts** — 30s `asyncio.wait_for` per image on both T1 and T2; individual failures logged and skipped
-- [ ] **Build proxy image pipeline** — generate 1024px proxies during ingestion (4x speedup, 90MB → 3MB); plan at `docs/PROXY-IMAGE-PIPELINE.md`
+- [x] **Build proxy image pipeline** — 1024px proxies generated during ingestion, vision T1/T2 + floorplan use proxy-first resolution, S3 cleanup on listing delete and demo expiry (full-res + proxy)
 
 ---
 
@@ -160,7 +158,7 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] **No automatic market tracking** — added `MarketTracker` using ATTOM API (zero agent setup)
 
 ### Deferred to Post-Launch
-- [ ] Password reset flow
+- [x] Password reset flow — `/auth/forgot-password` + `/auth/reset-password` implemented with 15-min JWT tokens, rate limited, frontend pages wired (blocked only on SES prod access for email delivery)
 - [ ] OAuth / SSO (enterprise tier)
 - [ ] User invitation flow (invite to existing tenant)
 - [ ] Dark mode (Phase 2)

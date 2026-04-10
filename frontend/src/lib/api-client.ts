@@ -177,6 +177,7 @@ class ApiClient {
     companyName: string,
     planTier?: string,
     consent: boolean = true,
+    aiConsent: boolean = true,
   ): Promise<TokenResponse> {
     return this.request<TokenResponse>("/auth/register", {
       method: "POST",
@@ -187,8 +188,19 @@ class ApiClient {
         company_name: companyName,
         plan_tier: planTier || undefined,
         consent,
+        ai_consent: aiConsent,
       }),
     });
+  }
+
+  async updateAiConsent(consent: boolean): Promise<{ ai_consent: boolean; ai_consent_at: string | null }> {
+    return this.request<{ ai_consent: boolean; ai_consent_at: string | null }>(
+      "/auth/ai-consent",
+      {
+        method: "POST",
+        body: JSON.stringify({ consent }),
+      }
+    );
   }
 
   async login(email: string, password: string): Promise<TokenResponse> {

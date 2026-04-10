@@ -32,6 +32,7 @@ _DEFAULT_STYLE = "modern"
 
 class VirtualStagingAgent(BaseAgent):
     agent_name = "virtual_staging"
+    requires_ai_consent = True
 
     def __init__(self, staging_provider=None, storage_service=None, session_factory=None):
         self._provider = staging_provider or get_virtual_staging_provider()

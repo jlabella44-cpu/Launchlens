@@ -84,5 +84,7 @@ class UserResponse(BaseModel):
     role: str
     tenant_id: uuid.UUID
     created_at: datetime
+    ai_consent_at: datetime | None = None
+    ai_consent_version: str | None = None
 
     model_config = {"from_attributes": True}

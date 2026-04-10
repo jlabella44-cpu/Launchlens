@@ -105,6 +105,7 @@ Return ONLY valid JSON. No markdown, no commentary.
 
 class FloorplanAgent(BaseAgent):
     agent_name = "floorplan"
+    requires_ai_consent = True
 
     def __init__(self, vision_provider=None, session_factory=None, storage=None):
         self._vision_provider = vision_provider or get_tier2_vision_provider()

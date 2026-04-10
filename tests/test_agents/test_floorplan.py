@@ -1,7 +1,7 @@
 # tests/test_agents/test_floorplan.py
 import json
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -22,6 +22,16 @@ def _fake_storage():
         side_effect=lambda key, expires_in=3600: f"https://fake.example/{key}"
     )
     return storage
+
+
+@pytest.fixture(autouse=True)
+def patch_storage():
+    """Safety net: mock the module-level get_storage() so any code path
+    that falls through to the default storage still avoids boto3."""
+    mock = MagicMock()
+    mock.presigned_url.side_effect = lambda key, **kw: f"https://s3.example.com/{key}?signed=1"
+    with patch("listingjet.agents.floorplan.get_storage", return_value=mock):
+        yield mock
 
 
 def test_dollhouse_scene_model_exists():

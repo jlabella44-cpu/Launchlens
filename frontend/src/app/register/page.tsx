@@ -39,6 +39,7 @@ function RegisterForm() {
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState(referralParam || "");
   const [consent, setConsent] = useState(false);
+  const [aiConsent, setAiConsent] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -62,7 +63,7 @@ function RegisterForm() {
     setError("");
     setLoading(true);
     try {
-      await register(email, password, name, companyName, plan || undefined, consent);
+      await register(email, password, name, companyName, plan || undefined, consent, aiConsent);
 
       trackEvent(AnalyticsEvents.SIGNUP, {
         plan: plan || "active_agent",
@@ -268,7 +269,7 @@ function RegisterForm() {
                 )}
               </div>
 
-              {/* Consent */}
+              {/* ToS Consent */}
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -285,8 +286,23 @@ function RegisterForm() {
                   and{" "}
                   <Link href="/privacy" className="text-[var(--color-cta)] hover:underline" target="_blank">
                     Privacy Policy
-                  </Link>, and consent to my listing data being processed by third-party AI
-                  services as described therein.
+                  </Link>.
+                </span>
+              </label>
+
+              {/* AI Processing Consent (separate, optional) */}
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={aiConsent}
+                  onChange={(e) => setAiConsent(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#F97316] focus:ring-[#F97316]/30"
+                />
+                <span className="text-xs text-slate-500">
+                  I consent to my listing photos and data being processed by third-party AI
+                  services (vision analysis, video generation, content writing) to produce my
+                  marketing package. You can change this later in Settings — without it, AI
+                  features are disabled.
                 </span>
               </label>
 
