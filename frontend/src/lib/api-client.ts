@@ -775,6 +775,27 @@ class ApiClient {
     return this.request(`/listings/${listingId}/microsite`, { method: "DELETE" });
   }
 
+  // 3D Dollhouse
+  async getDollhouse(listingId: string): Promise<{
+    scene_json: {
+      version: number;
+      wall_height_meters: number;
+      floors: Array<{
+        floor_label: string;
+        level: number;
+        structure: string;
+        dimensions: { width_meters: number; height_meters: number };
+        rooms: Array<{ label: string; best_photo_asset_id: string | null }>;
+      }>;
+      render_key?: string | null;
+    };
+    render_url: string | null;
+    room_count: number;
+    created_at: string;
+  }> {
+    return this.request(`/listings/${listingId}/dollhouse`);
+  }
+
   // Image Editing
   async removeObject(listingId: string, assetId: string, objectDescription: string): Promise<{ original_asset_id: string; edited_asset_id: string; s3_key: string; edit_type: string }> {
     return this.request(`/listings/${listingId}/assets/remove-object`, {

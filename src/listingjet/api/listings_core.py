@@ -340,8 +340,18 @@ async def get_dollhouse(
     if not scene:
         raise HTTPException(status_code=404, detail="Dollhouse not ready — upload a floorplan and run the pipeline")
 
+    render_url: str | None = None
+    render_key = (scene.scene_json or {}).get("render_key")
+    if render_key:
+        try:
+            from listingjet.services.storage import get_storage
+            render_url = get_storage().presigned_url(render_key)
+        except Exception:
+            render_url = None
+
     return {
         "scene_json": scene.scene_json,
+        "render_url": render_url,
         "room_count": scene.room_count,
         "created_at": scene.created_at.isoformat(),
     }
