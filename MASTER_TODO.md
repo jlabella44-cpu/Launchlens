@@ -48,8 +48,6 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ### Deployment
 - [ ] **Deploy backend with new analytics endpoints** (ECR push + ECS redeploy)
 - [ ] **Test analytics page on production**
-- [ ] **Investigate stuck Lenexa listing** (`uploading` since Apr 1)
-- [ ] **Review and approve Parkville listing** through review queue
 - [ ] **Merge PR #109** once CI passes
 - [ ] **4 unpushed commits on local master** — decide: PR these or reset to origin
 
