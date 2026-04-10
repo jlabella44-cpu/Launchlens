@@ -206,13 +206,31 @@ async def update_ai_consent(
 ):
     """Record or revoke AI processing consent for the current user."""
     from datetime import datetime, timezone
+
+    from listingjet.services.audit import audit_log
+
     user = await db.get(User, current_user.id)
+    previous_state = user.ai_consent_at is not None
     if body.consent:
         user.ai_consent_at = datetime.now(timezone.utc)
         user.ai_consent_version = "1.0"
     else:
         user.ai_consent_at = None
         user.ai_consent_version = None
+
+    await audit_log(
+        session=db,
+        user_id=user.id,
+        action="user.ai_consent.granted" if body.consent else "user.ai_consent.revoked",
+        resource_type="user",
+        resource_id=str(user.id),
+        tenant_id=user.tenant_id,
+        details={
+            "previous": previous_state,
+            "current": body.consent,
+            "version": "1.0" if body.consent else None,
+        },
+    )
     await db.commit()
     return {"ai_consent": body.consent, "ai_consent_at": str(user.ai_consent_at) if user.ai_consent_at else None}
 

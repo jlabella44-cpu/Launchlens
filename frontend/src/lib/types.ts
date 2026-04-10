@@ -13,6 +13,8 @@ export interface UserResponse {
   name: string;
   role: string;
   tenant_id: string;
+  ai_consent_at?: string | null;
+  ai_consent_version?: string | null;
 }
 
 export interface ListingResponse {

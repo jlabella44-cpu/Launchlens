@@ -33,6 +33,7 @@ Return ONLY valid JSON:
 
 class ChapterAgent(BaseAgent):
     agent_name = "chapter"
+    requires_ai_consent = True
 
     def __init__(self, vision_provider=None, session_factory=None):
         self._vision_provider = vision_provider or get_tier2_vision_provider()

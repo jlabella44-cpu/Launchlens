@@ -11,6 +11,7 @@ from listingjet.models.listing import Listing
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers import get_tier2_vision_provider
 from listingjet.services.metrics import record_cost
+from listingjet.services.storage import get_storage
 
 from .base import AgentContext, BaseAgent
 
@@ -53,6 +54,7 @@ Return ONLY valid JSON with this structure:
 
 class FloorplanAgent(BaseAgent):
     agent_name = "floorplan"
+    requires_ai_consent = True
 
     def __init__(self, vision_provider=None, session_factory=None):
         self._vision_provider = vision_provider or get_tier2_vision_provider()
@@ -80,8 +82,11 @@ class FloorplanAgent(BaseAgent):
                 if not floorplan_asset:
                     return {"room_count": 0, "skipped": True, "reason": "No floorplan asset found"}
 
+                storage = get_storage()
+                image_key = floorplan_asset.proxy_path or floorplan_asset.file_path
+                image_url = storage.presigned_url(image_key)
                 raw_response = await self._vision_provider.analyze_with_prompt(
-                    image_url=floorplan_asset.file_path,
+                    image_url=image_url,
                     prompt=FLOORPLAN_EXTRACTION_PROMPT,
                 )
 
