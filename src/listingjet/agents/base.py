@@ -33,10 +33,30 @@ class AgentContext:
 class BaseAgent(ABC):
     agent_name: str  # subclasses must define this class variable
 
+    # Set to True on agents that send tenant data to third-party AI providers.
+    # Enforced by instrumented_execute(): halts the workflow if no user in the
+    # tenant has AI consent granted (defense-in-depth if consent is revoked
+    # after the pipeline starts).
+    requires_ai_consent: bool = False
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, "agent_name") or "agent_name" not in cls.__dict__:
             raise TypeError(f"{cls.__name__} must define agent_name class variable")
+
+    async def _check_ai_consent(self, context: AgentContext) -> None:
+        """Re-verify AI consent mid-pipeline. No-op if requires_ai_consent is False."""
+        if not self.requires_ai_consent:
+            return
+        # Import here to avoid circular imports at module load.
+        from listingjet.database import AsyncSessionLocal
+        from listingjet.services.ai_consent import require_tenant_ai_consent
+
+        session_factory = getattr(self, "_session_factory", None) or AsyncSessionLocal
+        async with session_factory() as session:
+            await require_tenant_ai_consent(
+                session, context.tenant_id, agent_name=self.agent_name
+            )
 
     @abstractmethod
     async def execute(self, context: AgentContext): ...
@@ -45,6 +65,7 @@ class BaseAgent(ABC):
         """Wrap execute() with OpenTelemetry tracing and step metrics."""
         async with agent_span(self.agent_name, context.listing_id, context.tenant_id) as span:
             with StepTimer(self.agent_name):
+                await self._check_ai_consent(context)
                 result = await self.execute(context)
                 if span and isinstance(result, dict):
                     for key, value in result.items():

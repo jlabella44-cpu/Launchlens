@@ -34,6 +34,7 @@ from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.models.video_asset import VideoAsset
 from listingjet.services.endpoint_rate_limit import rate_limit
+from listingjet.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -290,6 +291,20 @@ async def delete_listing(
         txn = await credit_svc.refund_credits(db, current_user.tenant_id, str(listing_id))
         if txn:
             credits_refunded = txn.amount
+
+    # Delete S3 objects for this listing's assets (full-res + proxies) before dropping rows
+    asset_rows = (await db.execute(
+        select(Asset.file_path, Asset.proxy_path).where(Asset.listing_id == listing_id)
+    )).all()
+    storage = get_storage()
+    for file_path, proxy_path in asset_rows:
+        for key in (file_path, proxy_path):
+            if not key:
+                continue
+            try:
+                storage.delete(key)
+            except Exception:
+                logger.warning("delete_listing.s3_delete_failed listing=%s key=%s", listing_id, key)
 
     # Delete all related records
     for model in (

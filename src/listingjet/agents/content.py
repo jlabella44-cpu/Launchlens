@@ -81,6 +81,7 @@ def _tone_to_config(intensity: int) -> tuple[str, float]:
 
 class ContentAgent(BaseAgent):
     agent_name = "content"
+    requires_ai_consent = True
 
     def __init__(self, llm_provider=None, session_factory=None):
         self._llm_provider = llm_provider or get_llm_provider(agent=self.agent_name)

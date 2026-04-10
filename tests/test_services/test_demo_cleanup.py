@@ -88,3 +88,23 @@ async def test_cleanup_with_storage_deletes_s3(db_session):
     result = await cleanup_expired_demos(db_session, storage=storage)
     assert result["s3_cleaned"] == 1
     storage.delete.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_with_storage_deletes_proxies_too(db_session):
+    """Both file_path and proxy_path should be removed from S3 when set."""
+    from unittest.mock import MagicMock
+    listing = await _make_demo(db_session, expired=True)
+    # Add proxy_path to the existing asset
+    asset = (await db_session.execute(
+        select(Asset).where(Asset.listing_id == listing.id)
+    )).scalar_one()
+    asset.proxy_path = f"s3://bucket/demo/{listing.id}/proxies/photo.jpg"
+    await db_session.flush()
+
+    storage = MagicMock()
+    result = await cleanup_expired_demos(db_session, storage=storage)
+    assert result["s3_cleaned"] == 2  # full-res + proxy
+    deleted_keys = {call.args[0] for call in storage.delete.call_args_list}
+    assert asset.file_path in deleted_keys
+    assert asset.proxy_path in deleted_keys

@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 class VideoAgent(BaseAgent):
     agent_name = "video"
+    requires_ai_consent = True
 
     def __init__(
         self,
