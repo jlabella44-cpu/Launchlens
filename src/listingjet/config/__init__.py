@@ -179,6 +179,7 @@ class Settings(BaseSettings):
     email_from: str = "noreply@listingjet.ai"
     email_enabled: bool = False
     ses_enabled: bool = False
+    resend_api_key: str = ""
 
     # Video (Kling AI)
     kling_access_key: str = ""
