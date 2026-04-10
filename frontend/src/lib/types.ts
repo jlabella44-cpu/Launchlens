@@ -402,13 +402,36 @@ export interface TeamMemberResponse {
   email: string;
   role: string;
   created_at: string;
+  // True when the user has been invited but has not yet accepted —
+  // password_hash is null on the backend.
+  pending_invite?: boolean;
 }
 
 export interface InviteTeamMemberRequest {
   email: string;
   name?: string;
-  password: string;
   role?: string;
+}
+
+export interface InviteTeamMemberResponse {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  invite_expires_at: string;
+}
+
+export interface InviteInfoResponse {
+  email: string;
+  tenant_name: string;
+  inviter_name: string | null;
+  expires_at: string;
+}
+
+export interface AcceptInviteRequest {
+  token: string;
+  password: string;
+  name?: string;
 }
 
 export interface ListingPermissionResponse {

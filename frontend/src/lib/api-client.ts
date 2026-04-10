@@ -42,6 +42,9 @@ import type {
   RejectRequest,
   TeamMemberResponse,
   InviteTeamMemberRequest,
+  InviteTeamMemberResponse,
+  InviteInfoResponse,
+  AcceptInviteRequest,
   ListingPermissionResponse,
   SharedListingResponse,
   AuditLogEntryResponse,
@@ -524,8 +527,19 @@ class ApiClient {
     return this.request("/team/me");
   }
 
-  async inviteTeamMember(data: InviteTeamMemberRequest): Promise<TeamMemberResponse> {
+  async inviteTeamMember(data: InviteTeamMemberRequest): Promise<InviteTeamMemberResponse> {
     return this.request("/team/members", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getInviteInfo(token: string): Promise<InviteInfoResponse> {
+    return this.request(`/auth/invite/${encodeURIComponent(token)}`);
+  }
+
+  async acceptInvite(data: AcceptInviteRequest): Promise<{ access_token: string; refresh_token: string }> {
+    return this.request("/auth/accept-invite", {
       method: "POST",
       body: JSON.stringify(data),
     });

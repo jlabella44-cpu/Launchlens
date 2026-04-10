@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
+import { useToast } from "@/components/ui/toast";
 import apiClient from "@/lib/api-client";
 import type { TeamMemberResponse, InviteTeamMemberRequest, BlanketGrantResponse } from "@/lib/types";
 
@@ -35,6 +36,7 @@ function formatDate(iso: string): string {
 }
 
 function TeamManagement() {
+  const { toast } = useToast();
   const [members, setMembers] = useState<TeamMemberResponse[]>([]);
   const [myProfile, setMyProfile] = useState<TeamMemberResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,10 +45,13 @@ function TeamManagement() {
   const [inviting, setInviting] = useState(false);
   const [inviteForm, setInviteForm] = useState<InviteTeamMemberRequest>({
     email: "",
-    password: "",
     name: "",
     role: "agent",
   });
+
+  // Remove-member confirmation modal state
+  const [removeTarget, setRemoveTarget] = useState<TeamMemberResponse | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const [blanketGrants, setBlanketGrants] = useState<Record<string, BlanketGrantResponse | null>>({});
 
@@ -93,16 +98,18 @@ function TeamManagement() {
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     setInviting(true);
+    const email = inviteForm.email.trim().toLowerCase();
     try {
       await apiClient.inviteTeamMember({
         ...inviteForm,
-        email: inviteForm.email.trim().toLowerCase(),
+        email,
       });
       setShowInvite(false);
-      setInviteForm({ email: "", password: "", name: "", role: "agent" });
+      setInviteForm({ email: "", name: "", role: "agent" });
+      toast(`Invitation sent to ${email}`, "success");
       await fetchData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to invite member");
+      toast(err instanceof Error ? err.message : "Failed to invite member", "error");
     } finally {
       setInviting(false);
     }
@@ -113,7 +120,7 @@ function TeamManagement() {
       await apiClient.updateTeamMemberRole(memberId, newRole);
       await fetchData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update role");
+      toast(err instanceof Error ? err.message : "Failed to update role", "error");
     }
   }
 
@@ -132,19 +139,23 @@ function TeamManagement() {
         setBlanketGrants((prev) => ({ ...prev, [memberId]: null }));
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update listing access");
+      toast(err instanceof Error ? err.message : "Failed to update listing access", "error");
       await fetchData();
     }
   }
 
-  async function handleRemove(memberId: string, memberName: string | null) {
-    const label = memberName || "this member";
-    if (!window.confirm(`Remove ${label} from your team? This action cannot be undone.`)) return;
+  async function confirmRemove() {
+    if (!removeTarget) return;
+    setRemoving(true);
     try {
-      await apiClient.removeTeamMember(memberId);
+      await apiClient.removeTeamMember(removeTarget.id);
+      toast("Member removed", "success");
+      setRemoveTarget(null);
       await fetchData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to remove member");
+      toast(err instanceof Error ? err.message : "Failed to remove member", "error");
+    } finally {
+      setRemoving(false);
     }
   }
 
@@ -226,11 +237,15 @@ function TeamManagement() {
                 className="p-6 rounded-2xl border border-[var(--color-card-border)] bg-[var(--color-surface)]"
               >
                 <h3
-                  className="text-lg font-bold text-[var(--color-text)] mb-4"
+                  className="text-lg font-bold text-[var(--color-text)] mb-1"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Invite New Member
                 </h3>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+                  We&apos;ll email them a link to set their own password. No need
+                  to share credentials.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
@@ -255,19 +270,6 @@ function TeamManagement() {
                       onChange={(e) => setInviteForm((f) => ({ ...f, name: e.target.value || undefined }))}
                       className="w-full px-3 py-2 rounded-lg border border-[var(--color-card-border)] bg-[var(--color-bg)] text-[var(--color-text)] text-sm focus:outline-none focus:border-[#F97316] transition-colors"
                       placeholder="Jane Doe"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
-                      Password *
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={inviteForm.password}
-                      onChange={(e) => setInviteForm((f) => ({ ...f, password: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-lg border border-[var(--color-card-border)] bg-[var(--color-bg)] text-[var(--color-text)] text-sm focus:outline-none focus:border-[#F97316] transition-colors"
-                      placeholder="Temporary password"
                     />
                   </div>
                   <div>
@@ -362,6 +364,14 @@ function TeamManagement() {
                           {isSelf && (
                             <span className="ml-2 text-[10px] text-[var(--color-text-secondary)]">(you)</span>
                           )}
+                          {member.pending_invite && (
+                            <span
+                              className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              title="This user has not yet accepted their invitation"
+                            >
+                              Pending
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -433,7 +443,7 @@ function TeamManagement() {
                     <div className="flex justify-end">
                       {isAdmin && !isSelf && (
                         <button
-                          onClick={() => handleRemove(member.id, member.name)}
+                          onClick={() => setRemoveTarget(member)}
                           className="p-1.5 rounded-md text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           title="Remove member"
                         >
@@ -460,6 +470,85 @@ function TeamManagement() {
           </div>
         </footer>
       </main>
+
+      {/* Remove-member confirmation modal */}
+      <AnimatePresence>
+        {removeTarget && (
+          <motion.div
+            key="remove-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-member-title"
+            onClick={() => !removing && setRemoveTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-2xl border border-[var(--color-card-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                  <svg
+                    className="w-5 h-5 text-red-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.268 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3
+                    id="remove-member-title"
+                    className="text-base font-bold text-[var(--color-text)]"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Remove team member
+                  </h3>
+                  <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                    Are you sure you want to remove{" "}
+                    <span className="font-semibold text-[var(--color-text)]">
+                      {removeTarget.name || removeTarget.email}
+                    </span>
+                    ? They&apos;ll immediately lose access to this workspace.
+                    This cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button
+                  type="button"
+                  onClick={() => setRemoveTarget(null)}
+                  disabled={removing}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-[var(--color-text-secondary)] border border-[var(--color-card-border)] hover:text-[var(--color-text)] transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRemove}
+                  disabled={removing}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  {removing ? "Removing..." : "Remove"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

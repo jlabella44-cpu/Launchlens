@@ -17,6 +17,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   register: (email: string, password: string, name: string, companyName: string, planTier?: string, consent?: boolean, aiConsent?: boolean) => Promise<void>;
+  acceptInvite: (token: string, password: string, name?: string) => Promise<void>;
   logout: () => void | Promise<void>;
 }
 
@@ -86,6 +87,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const acceptInvite = useCallback(
+    async (token: string, password: string, name?: string) => {
+      const res = await apiClient.acceptInvite({ token, password, name });
+      if (res.access_token) {
+        localStorage.setItem("listingjet_token", res.access_token);
+        apiClient.setToken(res.access_token);
+      }
+      const me = await apiClient.me();
+      setUser(me);
+      localStorage.setItem("listingjet_logged_in", "1");
+    },
+    []
+  );
+
   const logout = useCallback(async () => {
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL || "/api"}/auth/logout`, {
@@ -102,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, register, acceptInvite, logout }}>
       {children}
     </AuthContext.Provider>
   );
