@@ -193,5 +193,12 @@ class Settings(BaseSettings):
     property_verification_enabled: bool = True
     scraper_rate_limit_seconds: int = 5
 
+    # Repliers (MLS data aggregator — https://docs.repliers.io)
+    # Used for real CMA comparables; falls back to synthetic data when unset.
+    repliers_api_key: str = ""
+    repliers_api_base: str = "https://api.repliers.io"
+    repliers_cma_enabled: bool = False
+    repliers_timeout_seconds: int = 10
+
 
 settings = Settings()
