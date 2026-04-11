@@ -7,6 +7,8 @@ from sqlalchemy import select
 from listingjet.agents.base import AgentContext
 from listingjet.agents.cma_report import CMAReportAgent
 from listingjet.models.cma_report import CMAReport
+from listingjet.providers.repliers import RepliersClient
+from listingjet.services.comparables import ComparablesService
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -96,10 +98,7 @@ async def test_cma_agent_uses_injected_comparables_service(db_session, listing):
 @pytest.mark.asyncio
 async def test_cma_agent_falls_back_to_service_when_no_repliers(db_session, listing):
     """When ComparablesService returns synthetic comps, the agent still produces a valid report."""
-    from listingjet.services.comparables import ComparablesService
-
     # Use the real service but with an unconfigured Repliers client → hits synthetic path.
-    from listingjet.providers.repliers import RepliersClient
     real_service = ComparablesService(
         repliers_client=RepliersClient(api_key="", base_url="https://fake"),
     )
