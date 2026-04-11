@@ -895,11 +895,11 @@ class ApiClient {
     listingId: string,
     selectedAddons: string[] = [],
   ): Promise<{ listing_id: string; state: string; credits_deducted: number; workflow_id: string }> {
-    const { data, error } = await fetchClient.POST("/listings/{listing_id}/start-pipeline" as any, {
+    const { data, error, response } = await fetchClient.POST("/listings/{listing_id}/start-pipeline" as any, {
       params: { path: { listing_id: listingId } },
       body: { selected_addons: selectedAddons },
     });
-    if (error) throw this._toError(error);
+    if (error) throw this._toError(error, response);
     return data as any;
   }
 

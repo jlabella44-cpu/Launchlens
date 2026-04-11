@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlan } from "@/contexts/plan-context";
@@ -48,6 +48,26 @@ const INITIAL_FORM_DATA: WizardFormData = {
   useBundle: false,
 };
 
+const WIZARD_STORAGE_KEY = "listingjet_wizard_draft_v1";
+
+interface PersistedWizardState {
+  formData: WizardFormData;
+  step: number;
+}
+
+function loadPersistedState(): PersistedWizardState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(WIZARD_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedWizardState;
+    if (!parsed?.formData?.listingId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 const STEPS = [
   { label: "Property Details", number: 1 },
   { label: "Upload Photos", number: 2 },
@@ -57,12 +77,52 @@ const STEPS = [
 ];
 
 export function WizardContainer() {
+  const [hydrated, setHydrated] = useState(false);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<WizardFormData>(INITIAL_FORM_DATA);
   const [submitting, setSubmitting] = useState(false);
+  const [creditBlock, setCreditBlock] = useState<{ message: string } | null>(null);
+  const [resumed, setResumed] = useState(false);
   const router = useRouter();
   const { billingModel, canAffordListing, creditBalance, listingCreditCost, refresh } = usePlan();
   const { toast } = useToast();
+
+  // Hydrate from localStorage once on mount (only if a persisted listingId exists)
+  useEffect(() => {
+    const persisted = loadPersistedState();
+    if (persisted) {
+      setFormData(persisted.formData);
+      setStep(persisted.step);
+      setResumed(true);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist whenever the wizard has a listingId (i.e., after step 1 created the listing).
+  // Skip until we've finished hydrating so we don't overwrite on first paint.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (typeof window === "undefined") return;
+    if (formData.listingId) {
+      try {
+        window.localStorage.setItem(
+          WIZARD_STORAGE_KEY,
+          JSON.stringify({ formData, step }),
+        );
+      } catch {
+        // quota or serialization failure — best-effort only
+      }
+    }
+  }, [hydrated, formData, step]);
+
+  const clearPersistedWizard = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(WIZARD_STORAGE_KEY);
+    } catch {
+      // best effort
+    }
+  }, []);
 
   const showCreditWarning = billingModel === "credit" && !canAffordListing;
 
@@ -87,21 +147,52 @@ export function WizardContainer() {
       const result = await apiClient.startPipeline(formData.listingId, addons);
 
       await refresh();
+      clearPersistedWizard();
       toast(
         `Listing created! ${result.credits_deducted} credits deducted. Processing has begun.`,
         "success"
       );
       router.push(`/listings/${formData.listingId}`);
     } catch (err: any) {
-      const msg = err?.message || "Failed to start pipeline";
-      toast(msg, "error");
+      if (err?.status === 402) {
+        setCreditBlock({ message: err?.message || "Insufficient credits." });
+      } else {
+        toast(err?.message || "Failed to start pipeline", "error");
+      }
     } finally {
       setSubmitting(false);
     }
-  }, [formData, refresh, toast, router]);
+  }, [formData, refresh, toast, router, clearPersistedWizard]);
+
+  const handleStartOver = useCallback(() => {
+    clearPersistedWizard();
+    setFormData(INITIAL_FORM_DATA);
+    setStep(1);
+    setResumed(false);
+  }, [clearPersistedWizard]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
+      {resumed && (
+        <div className="mb-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-[var(--color-text)]">
+              Resumed your draft
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+              We kept your property details, uploaded photos, and add-on selections from last time.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleStartOver}
+            className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-background)] transition-colors"
+          >
+            Start over
+          </button>
+        </div>
+      )}
+
       {/* Insufficient credits warning */}
       {showCreditWarning && (
         <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
@@ -202,6 +293,50 @@ export function WizardContainer() {
           )}
         </motion.div>
       </AnimatePresence>
+
+      {creditBlock && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="credit-block-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-[var(--color-background)] border border-[var(--color-border)] shadow-xl p-6">
+            <h2 id="credit-block-title" className="text-lg font-semibold text-[var(--color-text)]">
+              Not enough credits to start processing
+            </h2>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              {creditBlock.message}
+            </p>
+            <div className="mt-4 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3">
+              <p className="text-sm font-medium text-[var(--color-text)]">
+                Your draft is saved.
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                Your property details, uploaded photos, and add-on selections are safe.
+                Top up your credits and return here — nothing you&apos;ve entered will be lost.
+              </p>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCreditBlock(null)}
+                className="px-4 py-2 rounded-full text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] transition-colors"
+              >
+                Keep editing
+              </button>
+              <a
+                href="/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-full bg-[var(--color-primary)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                Buy credits
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
