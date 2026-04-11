@@ -203,6 +203,26 @@ function DashboardContent() {
           </div>
         </GlassCard>
 
+        {/* First-run hero CTA — promoted above the stat cards for new accounts */}
+        {listings.length === 0 && (
+          <GlassCard tilt={false}>
+            <EmptyState
+              icon={
+                <svg className="w-12 h-12 text-[#F97316]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              }
+              title="Ready for your first listing?"
+              description="Upload a few property photos and ListingJet's AI will generate MLS-ready marketing materials in minutes. No manual copywriting, no design software."
+              action={
+                <Link href="/listings/new">
+                  <Button variant="primary">Create your first listing</Button>
+                </Link>
+              }
+            />
+          </GlassCard>
+        )}
+
         {/* Stat Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <motion.div
