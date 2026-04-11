@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "http://api.listingjet.ai/:path*"
+      "destination": "https://api.listingjet.ai/:path*"
     }
   ],
   "env": {
