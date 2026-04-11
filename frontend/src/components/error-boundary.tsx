@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ReactNode } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -42,7 +43,16 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-[var(--color-text-secondary)] mb-4">
               {this.state.error?.message || "An unexpected error occurred."}
             </p>
-            <Button onClick={this.handleReset}>Try Again</Button>
+            <div className="flex items-center justify-center gap-3">
+              <Button onClick={this.handleReset}>Try Again</Button>
+              <Link
+                href="/dashboard"
+                onClick={this.handleReset}
+                className="text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+              >
+                Go to Dashboard
+              </Link>
+            </div>
           </div>
         </div>
       );
