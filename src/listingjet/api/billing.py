@@ -115,10 +115,23 @@ async def create_portal(
     tenant = await db.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
-    if not tenant.stripe_customer_id:
-        raise HTTPException(status_code=400, detail="No billing account — complete checkout first")
 
     svc = BillingService()
+
+    # Create the Stripe customer on-demand so users who have not yet purchased
+    # a subscription can still manage payment methods + see invoices.
+    if not tenant.stripe_customer_id:
+        try:
+            tenant.stripe_customer_id = svc.create_customer(
+                email=current_user.email,
+                name=tenant.name,
+                tenant_id=str(tenant.id),
+            )
+            await db.commit()
+        except stripe_mod.StripeError as e:
+            logger.error("stripe_customer_create_error type=%s message=%s", type(e).__name__, str(e))
+            raise HTTPException(status_code=502, detail="Billing portal temporarily unavailable")
+
     try:
         url = svc.create_portal_session(
             customer_id=tenant.stripe_customer_id,

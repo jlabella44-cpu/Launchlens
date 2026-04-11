@@ -5,7 +5,7 @@ from starlette.responses import JSONResponse
 
 from listingjet.config import settings
 
-_PUBLIC_PATHS = {"/health", "/health/deep", "/auth/register", "/auth/login", "/auth/refresh", "/auth/forgot-password", "/auth/reset-password", "/auth/accept-invite", "/billing/webhook", "/demo/upload", "/addons", "/branding"}
+_PUBLIC_PATHS = {"/health", "/health/deep", "/auth/register", "/auth/login", "/auth/refresh", "/auth/forgot-password", "/auth/reset-password", "/auth/accept-invite", "/billing/webhook", "/demo/upload", "/addons", "/branding", "/founding/remaining", "/analytics/events"}
 
 # Prefix matches for routes with a path parameter that must be public
 # (e.g. GET /auth/invite/{token}, the public invite lookup).

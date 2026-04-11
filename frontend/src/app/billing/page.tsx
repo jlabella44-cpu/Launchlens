@@ -369,7 +369,10 @@ function BillingContent() {
                   const { portal_url } = await apiClient.billingPortal(window.location.href);
                   window.location.href = portal_url;
                 } catch (err: unknown) {
-                  alert(err instanceof Error ? err.message : "Failed to open billing portal");
+                  toast(
+                    err instanceof Error ? err.message : "Failed to open billing portal",
+                    "error",
+                  );
                 }
               }}
               className="px-6 py-3 rounded-full border border-[var(--color-border)] text-sm font-semibold text-[var(--color-text-secondary)] hover:border-amber-400 hover:text-amber-600 hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
