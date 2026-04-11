@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from listingjet.api.deps import get_current_user, get_db
+from listingjet.api.deps import get_db, require_superadmin
 from listingjet.models.cma_report import CMAReport
 from listingjet.models.listing import Listing
 from listingjet.models.user import User
@@ -31,10 +31,15 @@ class CMAReportResponse(BaseModel):
 async def generate_cma_report(
     listing_id: uuid.UUID,
     _rl=Depends(rate_limit(5, 60)),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Generate a CMA report for a listing. Runs synchronously (typically <30s)."""
+    """Generate a CMA report for a listing.
+
+    Superadmin-gated while Repliers is on the synthetic/fallback path — the
+    feature will open to tenant users once we move off the synthetic comparables
+    and start paying for real MLS data.
+    """
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -57,10 +62,10 @@ async def generate_cma_report(
 @router.get("/{listing_id}/cma-report")
 async def get_cma_report(
     listing_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve the most recent CMA report for a listing."""
+    """Retrieve the most recent CMA report for a listing. Superadmin-only (see POST)."""
     report = (await db.execute(
         select(CMAReport).where(
             CMAReport.listing_id == listing_id,
