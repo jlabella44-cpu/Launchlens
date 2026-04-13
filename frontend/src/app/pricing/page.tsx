@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Nav } from "@/components/layout/nav";
 import apiClient from "@/lib/api-client";
+import { useToast } from "@/components/ui/toast";
 
 const PRICE_IDS: Record<string, string> = {
   lite: "price_1TH4J9RZ4TuRrBpyUHm6Eg5p",
@@ -114,6 +115,7 @@ export default function PricingPage() {
   const [stagingListings, setStagingListings] = useState(1);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const router = useRouter();
+  const { toast } = useToast();
 
   async function handleTierCheckout(tierKey: string) {
     const token = localStorage.getItem("listingjet_token");
@@ -126,7 +128,13 @@ export default function PricingPage() {
       return;
     }
     const priceId = PRICE_IDS[tierKey];
-    if (!priceId) return;
+    if (!priceId) {
+      // Tiers without a Stripe price configured (e.g. Team) route to contact sales.
+      window.location.href = `mailto:hello@listingjet.ai?subject=${encodeURIComponent(
+        `Interested in the ${tierKey} plan`,
+      )}`;
+      return;
+    }
     setCheckoutLoading(tierKey);
     try {
       const res = await apiClient.billingCheckout(
@@ -139,6 +147,7 @@ export default function PricingPage() {
       window.location.href = res.checkout_url;
     } catch (err) {
       console.error("Checkout failed:", err);
+      toast(err instanceof Error ? err.message : "Checkout failed", "error");
       setCheckoutLoading(null);
     }
   }
