@@ -37,11 +37,11 @@ class NetworkStack(Stack):
             service=ec2.GatewayVpcEndpointAwsService.S3,
         )
 
-        # Secrets Manager Interface Endpoint
-        self.vpc.add_interface_endpoint(
-            "SecretsManagerEndpoint",
-            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-        )
+        # NOTE: A Secrets Manager interface endpoint was previously provisioned
+        # here but removed for cost — interface endpoints cost ~$7.20/mo per AZ
+        # (~$14.40/mo across our two AZs). Secrets are read once at task start,
+        # so the NAT-routed traffic is negligible by comparison. Re-add only if
+        # secret-fetch volume increases significantly.
 
         # Security group: ALB (public-facing)
         self.alb_sg = ec2.SecurityGroup(

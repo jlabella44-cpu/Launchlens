@@ -55,15 +55,16 @@ class ServicesStack(Stack):
         super().__init__(scope, id, **kwargs)
 
         # ECR repositories
+        # Keep last 10 images — sufficient for rollbacks; reduces ECR storage cost.
         self.api_repo = ecr.Repository(
             self, "ApiRepo",
             repository_name="listingjet-api",
-            lifecycle_rules=[ecr.LifecycleRule(max_image_count=20)],
+            lifecycle_rules=[ecr.LifecycleRule(max_image_count=10)],
         )
         self.worker_repo = ecr.Repository(
             self, "WorkerRepo",
             repository_name="listingjet-worker",
-            lifecycle_rules=[ecr.LifecycleRule(max_image_count=20)],
+            lifecycle_rules=[ecr.LifecycleRule(max_image_count=10)],
         )
 
         # ECS cluster with CloudMap namespace for service discovery
@@ -210,12 +211,33 @@ class ServicesStack(Stack):
         )
 
         # --- S3 media bucket -------------------------------------------------
+        # Lifecycle rules:
+        #   * Abort incomplete multipart uploads after 7 days (uploads abandoned
+        #     mid-flight otherwise accrue storage indefinitely).
+        #   * Transition noncurrent versions to STANDARD_IA after 30 days, then
+        #     expire them after 90 days. Current versions are never expired.
         self.media_bucket = s3.Bucket(
             self, "MediaBucket",
             bucket_name=f"listingjet-media-{Stack.of(self).account}-{Stack.of(self).region}",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             encryption=s3.BucketEncryption.S3_MANAGED,
             versioned=True,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    id="AbortIncompleteMultipartUploads",
+                    abort_incomplete_multipart_upload_after=Duration.days(7),
+                ),
+                s3.LifecycleRule(
+                    id="ExpireNoncurrentVersions",
+                    noncurrent_version_transitions=[
+                        s3.NoncurrentVersionTransition(
+                            storage_class=s3.StorageClass.INFREQUENT_ACCESS,
+                            transition_after=Duration.days(30),
+                        ),
+                    ],
+                    noncurrent_version_expiration=Duration.days(90),
+                ),
+            ],
         )
 
         # --- IAM: Grant S3 + CloudWatch to API and Worker task roles ----------
@@ -252,7 +274,7 @@ class ServicesStack(Stack):
                 log_group=logs.LogGroup(
                     self, "WorkerLogs",
                     log_group_name="/launchlens/worker",
-                    retention=logs.RetentionDays.ONE_MONTH,
+                    retention=logs.RetentionDays.TWO_WEEKS,
                 ),
             ),
             environment=base_env,
@@ -318,7 +340,7 @@ class ServicesStack(Stack):
                 log_group=logs.LogGroup(
                     self, "TemporalLogs",
                     log_group_name="/launchlens/temporal",
-                    retention=logs.RetentionDays.ONE_MONTH,
+                    retention=logs.RetentionDays.TWO_WEEKS,
                 ),
             ),
             environment={
