@@ -27,6 +27,20 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] **Run missing migrations on prod DB**
 - [ ] **Separate dev/prod S3 buckets** — both currently use `listingjet-dev`
 - [ ] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*`
+- [ ] **Pre-launch infra revert** — apply `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (RDS/Redis/ECS upsizing, Multi-AZ, Container Insights, budget ceiling)
+
+### Cost Optimization — Data to Collect from AWS
+After the cost-optimization branch is deployed and has run for **at least 7 days** (ideally 14), gather the following and bring it back to the next session for further right-sizing decisions. Commands documented in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md`.
+
+- [ ] **AWS Cost Explorer** — last 30 days, group by Service. Identifies the actual top spenders (NAT data transfer, Fargate, RDS, etc.).
+- [ ] **AWS Compute Optimizer — ECS** — recommendations for `listingjet-api`, `listingjet-worker`, `listingjet-temporal`. Confirms or refines the manual right-sizing.
+- [ ] **AWS Compute Optimizer — RDS** — recommendation for the `Postgres` instance.
+- [ ] **CloudWatch — NAT Gateway `BytesOutToDestination`** — last 7 days. Decides whether ECR/CloudWatch Logs interface endpoints (~$14/mo each) are worth adding.
+- [ ] **CloudWatch — ECS service CPU/Memory utilization** — `Average` and `Maximum` for the API and Worker over 7 days.
+- [ ] **S3 Storage Lens / bucket metrics** — current size + version count on `listingjet-media-*` bucket. Validates the lifecycle policy is doing its job.
+- [ ] **CloudWatch Logs storage** — total `IncomingBytes` per log group over 7 days. Catches noisy log producers.
+- [ ] **Trusted Advisor cost checks** (if Business/Enterprise support) — automated recommendations.
+- [ ] **AWS Cost Optimization Hub** — turn it on; it surfaces Savings Plans, Reserved Instance, and rightsizing opportunities for free.
 
 ---
 

@@ -222,3 +222,116 @@ Approximate `us-east-1` spend with the current configuration:
 Post-launch with items 1-7 reverted (Multi-AZ on, larger tasks,
 2-node Redis): expect **~$300-450/mo** as the floor before traffic
 costs.
+
+---
+
+## Appendix — Data to collect from AWS before the next optimization pass
+
+Wait at least **7 days** (ideally 14) after deploying the
+cost-optimization branch so CloudWatch and Compute Optimizer have
+real data. Then run / capture the following and hand it back for the
+next round of decisions.
+
+### 1. Cost Explorer breakdown (run in the AWS console)
+
+```
+AWS Console → Billing → Cost Explorer
+  - Time range: Last 30 days
+  - Granularity: Daily
+  - Group by: Service
+  - Save the resulting table or screenshot
+```
+
+Then a second view filtered to the top service (likely EC2-Other,
+which is where NAT data transfer hides):
+
+```
+  - Filter: Service = "EC2 - Other"
+  - Group by: Usage type
+```
+
+### 2. Compute Optimizer recommendations (console)
+
+```
+AWS Console → Compute Optimizer
+  - ECS services tab → grab recommendations for
+      listingjet-api, listingjet-worker, listingjet-temporal
+  - RDS tab        → grab the Postgres recommendation
+```
+
+(Compute Optimizer is free; it auto-enables once Container Insights
+is on, but you can also opt in manually.)
+
+### 3. ECS utilization (CLI)
+
+```sh
+# Worker — last 7 days, hourly samples
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ECS \
+  --metric-name CPUUtilization \
+  --dimensions Name=ServiceName,Value=listingjet-worker \
+               Name=ClusterName,Value=listingjet \
+  --start-time $(date -u -d '7 days ago' +%FT%T) \
+  --end-time   $(date -u +%FT%T) \
+  --period 3600 \
+  --statistics Average Maximum
+
+# Repeat with --metric-name MemoryUtilization
+# Repeat with ServiceName=listingjet-api
+# Repeat with ServiceName=listingjet-temporal
+```
+
+### 4. NAT Gateway data volume (CLI)
+
+```sh
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/NATGateway \
+  --metric-name BytesOutToDestination \
+  --start-time $(date -u -d '7 days ago' +%FT%T) \
+  --end-time   $(date -u +%FT%T) \
+  --period 86400 \
+  --statistics Sum
+```
+
+If average daily egress > **5 GB**, ECR + CloudWatch Logs interface
+endpoints (~$14/mo each across 2 AZs) likely pay for themselves.
+
+### 5. S3 bucket size + version count (CLI)
+
+```sh
+# Current + noncurrent storage for the media bucket
+aws s3api list-objects-v2 \
+  --bucket listingjet-media-<account>-<region> \
+  --query '[sum(Contents[].Size), length(Contents)]'
+
+aws s3api list-object-versions \
+  --bucket listingjet-media-<account>-<region> \
+  --query '[sum(Versions[?IsLatest==`false`].Size), length(Versions[?IsLatest==`false`])]'
+```
+
+If noncurrent versions are still growing fast, tighten the lifecycle
+expiration window.
+
+### 6. CloudWatch Logs ingest by group (CLI)
+
+```sh
+aws logs describe-log-groups --query 'logGroups[].[logGroupName, storedBytes]' --output table
+```
+
+The biggest entries are the ones to either (a) lower retention
+further or (b) reduce log verbosity in the application.
+
+### 7. Enable Cost Optimization Hub (one-time, console)
+
+```
+AWS Console → Billing → Cost Optimization Hub → Get started
+```
+
+Free; surfaces consolidated Savings Plans, Reserved Instance, and
+rightsizing recommendations across the account.
+
+---
+
+Bring the output of items 1-6 (and any Compute Optimizer screenshots)
+to the next session and we can apply a second, data-driven
+optimization pass.
