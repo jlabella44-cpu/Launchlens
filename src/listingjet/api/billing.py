@@ -32,14 +32,19 @@ router = APIRouter()
 
 
 def _validate_redirect_url(url: str) -> None:
-    """Reject redirect URLs that don't match a configured CORS origin or Vercel pattern."""
+    """Reject redirect URLs that don't match a configured CORS origin, the
+    canonical production domains, or the preview Vercel pattern."""
     import re
     allowed = {o.strip().rstrip("/") for o in settings.cors_origins.split(",")}
     parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
     if origin in allowed:
         return
-    # Also allow the same Vercel pattern used in CORS middleware
+    # Always allow the canonical production domains so env var drift in
+    # cors_origins can never break checkout/portal redirects in prod.
+    if re.fullmatch(r"https://(www\.)?listingjet\.(ai|com)", origin):
+        return
+    # Allow preview deployments on the Vercel pattern used in CORS middleware.
     if re.fullmatch(r"https://listingjet[a-z0-9-]*\.vercel\.app", origin):
         return
     raise HTTPException(status_code=400, detail="Redirect URL not allowed")
