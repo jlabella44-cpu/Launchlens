@@ -220,6 +220,24 @@ class ApiClient {
     return data as UserResponse;
   }
 
+  /** Exchange a refresh token for a new access token. Returns the new
+   *  access_token on success, or null on failure (caller should log out). */
+  async refreshAccessToken(refreshToken: string): Promise<string | null> {
+    try {
+      const res = await this.request<TokenResponse>("/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (res?.access_token) {
+        this.setToken(res.access_token);
+        return res.access_token;
+      }
+    } catch {
+      // fall through
+    }
+    return null;
+  }
+
   async googleLogin(idToken: string): Promise<TokenResponse> {
     return this.request<TokenResponse>("/auth/google", {
       method: "POST",
