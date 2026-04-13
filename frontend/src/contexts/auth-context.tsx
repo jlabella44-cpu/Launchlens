@@ -48,15 +48,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (refreshingRef.current) return refreshingRef.current;
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (!refreshToken) return null;
-    const p = apiClient.refreshAccessToken(refreshToken).finally(() => {
-      refreshingRef.current = null;
-    });
+    const p = apiClient
+      .refreshAccessToken(refreshToken)
+      .then((res) => {
+        if (!res?.access_token) return null;
+        localStorage.setItem("listingjet_token", res.access_token);
+        if (res.refresh_token) {
+          localStorage.setItem(REFRESH_TOKEN_KEY, res.refresh_token);
+        }
+        return res.access_token;
+      })
+      .finally(() => {
+        refreshingRef.current = null;
+      });
     refreshingRef.current = p;
-    const newToken = await p;
-    if (newToken) {
-      localStorage.setItem("listingjet_token", newToken);
-    }
-    return newToken;
+    return p;
   }, []);
 
   const clearSession = useCallback(() => {

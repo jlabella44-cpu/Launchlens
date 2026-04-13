@@ -220,17 +220,26 @@ class ApiClient {
     return data as UserResponse;
   }
 
-  /** Exchange a refresh token for a new access token. Returns the new
-   *  access_token on success, or null on failure (caller should log out). */
-  async refreshAccessToken(refreshToken: string): Promise<string | null> {
+  /** Exchange a refresh token for a new access + refresh token pair.
+   *  The backend reads the refresh token from the Authorization header (not
+   *  the body), so we call fetch directly to avoid this.request() overriding
+   *  the header with the current access token. Returns the TokenResponse on
+   *  success, or null on failure (caller should log out). */
+  async refreshAccessToken(refreshToken: string): Promise<TokenResponse | null> {
     try {
-      const res = await this.request<TokenResponse>("/auth/refresh", {
+      const resp = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${refreshToken}`,
+        },
+        credentials: "include",
       });
-      if (res?.access_token) {
-        this.setToken(res.access_token);
-        return res.access_token;
+      if (!resp.ok) return null;
+      const data = (await resp.json()) as TokenResponse;
+      if (data?.access_token) {
+        this.setToken(data.access_token);
+        return data;
       }
     } catch {
       // fall through
