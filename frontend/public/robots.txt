@@ -9,4 +9,4 @@ Disallow: /analytics
 Disallow: /billing
 Disallow: /onboarding
 
-Sitemap: https://app.listingjet.com/sitemap.xml
+Sitemap: https://listingjet.ai/sitemap.xml

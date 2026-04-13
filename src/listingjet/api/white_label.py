@@ -94,7 +94,7 @@ async def get_branding(
 
     # Try custom domain lookup (strips port for local dev)
     domain = host.split(":")[0] if host else ""
-    if domain and domain not in ("localhost", "app.listingjet.com", "api.listingjet.ai"):
+    if domain and domain not in ("localhost", "listingjet.ai", "api.listingjet.ai"):
         from listingjet.database import AsyncSessionLocal
         async with AsyncSessionLocal() as admin_db:
             result = await admin_db.execute(

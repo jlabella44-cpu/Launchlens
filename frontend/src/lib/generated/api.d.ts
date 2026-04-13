@@ -2194,9 +2194,9 @@ export interface components {
         /**
          * CheckoutRequest
          * @example {
-         *       "cancel_url": "https://app.listingjet.com/billing?cancelled=1",
+         *       "cancel_url": "https://listingjet.ai/billing?cancelled=1",
          *       "price_id": "price_1OaBcDEfGhIjKlMn",
-         *       "success_url": "https://app.listingjet.com/billing?success=1"
+         *       "success_url": "https://listingjet.ai/billing?success=1"
          *     }
          */
         CheckoutRequest: {
@@ -2312,9 +2312,9 @@ export interface components {
          * CreditPurchaseRequest
          * @example {
          *       "bundle_size": 10,
-         *       "cancel_url": "https://app.listingjet.com/credits?cancelled=1",
+         *       "cancel_url": "https://listingjet.ai/credits?cancelled=1",
          *       "idempotency_key": "buy-10-credits-2024-01-15",
-         *       "success_url": "https://app.listingjet.com/credits?success=1"
+         *       "success_url": "https://listingjet.ai/credits?success=1"
          *     }
          */
         CreditPurchaseRequest: {

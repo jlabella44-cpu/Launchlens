@@ -57,8 +57,8 @@ class DistributionAgent(BaseAgent):
                             "listing_delivered",
                             name=admin_user.name or "there",
                             address=address,
-                            download_url=f"https://app.listingjet.com/listings/{context.listing_id}/download",
-                            listing_url=f"https://app.listingjet.com/listings/{context.listing_id}",
+                            download_url=f"https://listingjet.ai/listings/{context.listing_id}/download",
+                            listing_url=f"https://listingjet.ai/listings/{context.listing_id}",
                         )
                 except Exception:
                     logger.exception("listing_delivered email failed for listing %s", context.listing_id)

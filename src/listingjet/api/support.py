@@ -454,7 +454,7 @@ async def admin_reply(
                 html_body=(
                     f"<p>Our team replied to your support ticket:</p>"
                     f"<hr><p>{body.content}</p><hr>"
-                    f"<p><a href='https://app.listingjet.com/support'>View in ListingJet</a></p>"
+                    f"<p><a href='https://listingjet.ai/support'>View in ListingJet</a></p>"
                 ),
             )
     except Exception:

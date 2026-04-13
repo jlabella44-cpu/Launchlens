@@ -11,8 +11,8 @@ class CheckoutRequest(BaseModel):
             "examples": [
                 {
                     "price_id": "price_1OaBcDEfGhIjKlMn",
-                    "success_url": "https://app.listingjet.com/billing?success=1",
-                    "cancel_url": "https://app.listingjet.com/billing?cancelled=1",
+                    "success_url": "https://listingjet.ai/billing?success=1",
+                    "cancel_url": "https://listingjet.ai/billing?cancelled=1",
                 }
             ]
         }

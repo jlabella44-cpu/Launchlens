@@ -97,7 +97,7 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
             user.email,
             "welcome_drip_1",
             name=user.name or "there",
-            upload_url="https://app.listingjet.com/listings",
+            upload_url="https://listingjet.ai/listings",
         )
     except Exception:
         logger.exception("welcome email failed for user=%s", user.id)
@@ -282,7 +282,7 @@ async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depend
                 subject="Reset your ListingJet password",
                 html_body=(
                     f"<p>You requested a password reset.</p>"
-                    f"<p><a href='https://app.listingjet.com/reset-password?token={reset_token}'>"
+                    f"<p><a href='https://listingjet.ai/reset-password?token={reset_token}'>"
                     f"Click here to reset your password</a></p>"
                     f"<p>This link expires in 15 minutes.</p>"
                     f"<p>If you didn't request this, you can safely ignore this email.</p>"

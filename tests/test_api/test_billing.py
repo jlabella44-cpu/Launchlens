@@ -51,8 +51,8 @@ def test_create_checkout_session(mock_stripe):
     url = svc.create_checkout_session(
         customer_id="cus_test123",
         price_id="price_pro",
-        success_url="https://app.listingjet.com/billing?success=true",
-        cancel_url="https://app.listingjet.com/billing?canceled=true",
+        success_url="https://listingjet.ai/billing?success=true",
+        cancel_url="https://listingjet.ai/billing?canceled=true",
     )
     assert url == "https://checkout.stripe.com/pay/cs_test"
 
@@ -63,7 +63,7 @@ def test_create_portal_session(mock_stripe):
     svc = BillingService()
     url = svc.create_portal_session(
         customer_id="cus_test123",
-        return_url="https://app.listingjet.com/billing",
+        return_url="https://listingjet.ai/billing",
     )
     assert url == "https://billing.stripe.com/session/xyz"
 

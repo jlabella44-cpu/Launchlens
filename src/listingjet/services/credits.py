@@ -153,7 +153,7 @@ class CreditService:
                     "credits_low",
                     name=admin_user.name or "there",
                     balance=str(balance),
-                    buy_url="https://app.listingjet.com/billing/credits",
+                    buy_url="https://listingjet.ai/billing/credits",
                 )
         except Exception:
             logger.exception("credits_low email failed for tenant %s", tenant_id)
