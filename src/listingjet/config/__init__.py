@@ -75,7 +75,7 @@ class Settings(BaseSettings):
 
     # Frontend base URL — used for constructing links in transactional emails
     # (invite accept, password reset, etc).
-    frontend_url: str = "https://app.listingjet.com"
+    frontend_url: str = "https://listingjet.ai"
 
     # S3
     s3_bucket_name: str = "listingjet-dev"

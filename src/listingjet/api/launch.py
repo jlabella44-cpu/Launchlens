@@ -76,5 +76,5 @@ async def get_referral_code(
 
     return {
         "code": code,
-        "url": f"https://app.listingjet.com/register?ref={code}",
+        "url": f"https://listingjet.ai/register?ref={code}",
     }

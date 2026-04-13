@@ -34,7 +34,7 @@ class SocialReminderService:
             email_svc.send_notification(
                 to_email, template, address=address, event_type=event_type,
                 listing_id=str(listing_id), event_id=str(event_id),
-                social_url=f"https://app.listingjet.com/listings/{listing_id}/social?event={event_id}",
+                social_url=f"https://listingjet.ai/listings/{listing_id}/social?event={event_id}",
             )
         except Exception:
             logger.exception("social_reminder email failed for listing %s", listing_id)

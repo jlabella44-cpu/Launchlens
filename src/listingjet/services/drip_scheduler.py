@@ -31,7 +31,7 @@ DRIP_SCHEDULE = [
     (10, "welcome_drip_5"),
 ]
 
-APP_URL = "https://app.listingjet.com"
+APP_URL = "https://listingjet.ai"
 
 
 async def run_drip_emails(db: AsyncSession) -> int:

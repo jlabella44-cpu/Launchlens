@@ -23,7 +23,7 @@ const josefinSans = Josefin_Sans({
 export const metadata: Metadata = {
   title: "ListingJet — Put Your Listings on Autopilot",
   description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",
-  metadataBase: new URL("https://app.listingjet.com"),
+  metadataBase: new URL("https://listingjet.ai"),
   openGraph: {
     title: "ListingJet — Put Your Listings on Autopilot",
     description: "AI-powered listing media automation. From raw photos to marketing-ready assets in minutes.",

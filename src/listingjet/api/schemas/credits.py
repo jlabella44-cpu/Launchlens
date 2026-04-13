@@ -54,8 +54,8 @@ class CreditPurchaseRequest(BaseModel):
             "examples": [
                 {
                     "bundle_size": 50,
-                    "success_url": "https://app.listingjet.com/credits?success=1",
-                    "cancel_url": "https://app.listingjet.com/credits?cancelled=1",
+                    "success_url": "https://listingjet.ai/credits?success=1",
+                    "cancel_url": "https://listingjet.ai/credits?cancelled=1",
                     "idempotency_key": "buy-50-credits-2026-04-06",
                 }
             ]

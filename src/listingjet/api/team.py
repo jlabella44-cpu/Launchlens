@@ -86,7 +86,7 @@ def _to_team_member_response(user: User) -> TeamMemberResponse:
 
 
 def _build_invite_accept_url(raw_token: str) -> str:
-    base = (settings.frontend_url or "https://app.listingjet.com").rstrip("/")
+    base = (settings.frontend_url or "https://listingjet.ai").rstrip("/")
     return f"{base}/accept-invite?token={raw_token}"
 
 
