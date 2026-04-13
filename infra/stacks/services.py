@@ -72,11 +72,13 @@ class ServicesStack(Stack):
         # individual services can opt into Spot pricing (~70% off) where the
         # workload tolerates 2-minute eviction notices. The API and Temporal
         # services keep the FARGATE default; only the Worker uses Spot.
+        # Container Insights v2 disabled pre-launch to skip the per-task
+        # observability cost. Re-enable before onboarding paying customers.
         self.cluster = ecs.Cluster(
             self, "Cluster",
             cluster_name="listingjet",
             vpc=vpc,
-            container_insights_v2=ecs.ContainerInsights.ENABLED,
+            container_insights_v2=ecs.ContainerInsights.DISABLED,
             default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
                 name="listingjet.local",
             ),
@@ -107,10 +109,14 @@ class ServicesStack(Stack):
         }
 
         # --- API Service (Fargate + ALB) ------------------------------------
+        # Pre-launch sizing: 0.5 vCPU / 1 GB. FastAPI + uvicorn idles below
+        # 100 MB; this gives headroom for dev/QA traffic. Bump back to
+        # 1 vCPU / 2 GB before opening to real users (auto-scaling already
+        # caps at 4 tasks).
         api_task = ecs.FargateTaskDefinition(
             self, "ApiTask",
-            cpu=1024,
-            memory_limit_mib=2048,
+            cpu=512,
+            memory_limit_mib=1024,
         )
 
         api_container = api_task.add_container(
@@ -265,10 +271,15 @@ class ServicesStack(Stack):
         api_task.task_role.add_to_policy(cloudwatch_policy)
 
         # --- Worker Service (Fargate, no ALB) --------------------------------
+        # Pre-launch sizing: 1 vCPU / 2 GB. Sufficient for ad-hoc test
+        # pipelines (vision, packaging, single-clip Kling renders). FFmpeg
+        # video stitching for full virtual tours wants more — bump back to
+        # 2 vCPU / 4 GB (or higher) before users start pushing real workloads,
+        # and confirm with Compute Optimizer once we have a few weeks of data.
         worker_task = ecs.FargateTaskDefinition(
             self, "WorkerTask",
-            cpu=2048,
-            memory_limit_mib=4096,
+            cpu=1024,
+            memory_limit_mib=2048,
         )
 
         worker_task.add_container(

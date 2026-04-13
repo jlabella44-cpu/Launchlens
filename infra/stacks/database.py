@@ -41,6 +41,9 @@ class DatabaseStack(Stack):
             engine=rds.DatabaseInstanceEngine.postgres(
                 version=rds.PostgresEngineVersion.VER_16,
             ),
+            # Pre-launch sizing: t4g.micro (2 vCPU burstable, 1 GB RAM).
+            # Comfortably handles app schema + Temporal state at zero load.
+            # Upsize to t4g.small or t4g.medium before real traffic arrives.
             instance_type=ec2.InstanceType.of(
                 ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.MICRO,
             ),
@@ -57,6 +60,9 @@ class DatabaseStack(Stack):
             # Pre-launch: migrate to an encrypted instance before real users.
             # See docs/PRE_LAUNCH_INFRA_CHECKLIST.md for the cutover plan.
             multi_az=False,
+            # Pre-launch: 1-day backup retention. PITR window is short, but no
+            # production data to protect yet. Restore retention to 7 days
+            # before onboarding customers.
             backup_retention=Duration.days(1),
             deletion_protection=True,
             removal_policy=RemovalPolicy.SNAPSHOT,
@@ -82,10 +88,13 @@ class DatabaseStack(Stack):
         # an empty cache; the API rewarms over the following minutes. Switch
         # back to a 2-node replication group with automatic_failover_enabled
         # if Redis becomes load-bearing for durable state.
+        # Pre-launch sizing: cache.t4g.micro (2 vCPU burstable, ~0.5 GB RAM).
+        # Plenty for cache + rate-limit counters + SSE pub/sub at zero load.
+        # Upsize to cache.t4g.small (or larger) before real traffic.
         self.redis_cluster = elasticache.CfnReplicationGroup(
             self, "RedisRg",
             replication_group_description="ListingJet Redis (single node)",
-            cache_node_type="cache.t4g.small",
+            cache_node_type="cache.t4g.micro",
             engine="redis",
             engine_version="7.1",
             num_cache_clusters=1,
