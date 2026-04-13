@@ -234,7 +234,15 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     event_type = event.type
     event_id = event.id  # Used as reference_id for idempotency
-    data_object = event["data"]["object"]
+    # Convert Stripe's StripeObject to a plain dict — the handlers below use
+    # `.get()` extensively, which StripeObject does not expose.
+    raw_object = event["data"]["object"]
+    if hasattr(raw_object, "to_dict_recursive"):
+        data_object = raw_object.to_dict_recursive()
+    elif hasattr(raw_object, "to_dict"):
+        data_object = raw_object.to_dict()
+    else:
+        data_object = dict(raw_object)
     credit_svc = CreditService()
 
     if event_type == "checkout.session.completed":
