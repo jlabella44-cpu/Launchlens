@@ -342,12 +342,20 @@ async def _handle_checkout_completed(
     resolved_plan = None
     if sub_id:
         try:
-            sub = stripe_mod.Subscription.retrieve(sub_id, api_key=svc._api_key)
-            if sub.get("items", {}).get("data"):
-                price_id = sub["items"]["data"][0].get("price", {}).get("id", "")
+            sub_obj = stripe_mod.Subscription.retrieve(sub_id, api_key=svc._api_key)
+            # Convert StripeObject → dict (StripeObject does not expose .get)
+            if hasattr(sub_obj, "to_dict_recursive"):
+                sub = sub_obj.to_dict_recursive()
+            elif hasattr(sub_obj, "to_dict"):
+                sub = sub_obj.to_dict()
+            else:
+                sub = dict(sub_obj)
+            items = sub.get("items", {}).get("data", [])
+            if items:
+                price_id = items[0].get("price", {}).get("id", "")
                 resolved_plan = svc.resolve_plan(price_id)
         except Exception:
-            logger.error("Could not fetch subscription %s for plan resolution — leaving plan unchanged", sub_id)
+            logger.exception("Could not fetch subscription %s for plan resolution — leaving plan unchanged", sub_id)
 
     if resolved_plan:
         apply_plan_credits(tenant, resolved_plan)
