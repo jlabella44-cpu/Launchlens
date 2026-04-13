@@ -67,7 +67,11 @@ class ServicesStack(Stack):
             lifecycle_rules=[ecr.LifecycleRule(max_image_count=10)],
         )
 
-        # ECS cluster with CloudMap namespace for service discovery
+        # ECS cluster with CloudMap namespace for service discovery.
+        # FARGATE and FARGATE_SPOT capacity providers are registered so that
+        # individual services can opt into Spot pricing (~70% off) where the
+        # workload tolerates 2-minute eviction notices. The API and Temporal
+        # services keep the FARGATE default; only the Worker uses Spot.
         self.cluster = ecs.Cluster(
             self, "Cluster",
             cluster_name="listingjet",
@@ -76,6 +80,7 @@ class ServicesStack(Stack):
             default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
                 name="listingjet.local",
             ),
+            enable_fargate_capacity_providers=True,
         )
 
         # Shared secrets
@@ -316,6 +321,12 @@ class ServicesStack(Stack):
         worker_task.task_role.add_to_policy(s3_list_policy)
         worker_task.task_role.add_to_policy(cloudwatch_policy)
 
+        # Worker runs Temporal activities, which are inherently retry-safe:
+        # if a Spot reclamation interrupts an activity, Temporal reschedules it
+        # on the next available worker (potentially redoing one external API
+        # call). 100% Spot is acceptable here; switch to a mixed strategy
+        # (e.g. weight=4 Spot + weight=1 on-demand) if Spot capacity in
+        # us-east-1 ever becomes unreliable for our task size.
         self.worker_service = ecs.FargateService(
             self, "WorkerService",
             cluster=self.cluster,
@@ -323,6 +334,12 @@ class ServicesStack(Stack):
             desired_count=1,
             service_name="listingjet-worker",
             assign_public_ip=False,
+            capacity_provider_strategies=[
+                ecs.CapacityProviderStrategy(
+                    capacity_provider="FARGATE_SPOT",
+                    weight=1,
+                ),
+            ],
         )
 
         # --- Temporal Service (Fargate, internal only) -----------------------

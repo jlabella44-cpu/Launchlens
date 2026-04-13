@@ -76,14 +76,20 @@ class DatabaseStack(Stack):
             allow_all_outbound=False,
         )
 
+        # Single-node Redis. Used for caching, rate limiting, SSE pub/sub, and
+        # auth lockout — all features degrade gracefully on outage. A node
+        # failure triggers an ElastiCache-managed replacement (~5-15 min) with
+        # an empty cache; the API rewarms over the following minutes. Switch
+        # back to a 2-node replication group with automatic_failover_enabled
+        # if Redis becomes load-bearing for durable state.
         self.redis_cluster = elasticache.CfnReplicationGroup(
             self, "RedisRg",
-            replication_group_description="ListingJet Redis replication group",
+            replication_group_description="ListingJet Redis (single node)",
             cache_node_type="cache.t4g.small",
             engine="redis",
             engine_version="7.1",
-            num_cache_clusters=2,
-            automatic_failover_enabled=True,
+            num_cache_clusters=1,
+            automatic_failover_enabled=False,
             cache_subnet_group_name=redis_subnet_group.ref,
             security_group_ids=[redis_sg.security_group_id],
         )
