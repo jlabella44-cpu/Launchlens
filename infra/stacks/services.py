@@ -315,7 +315,7 @@ class ServicesStack(Stack):
                 ),
             ),
             environment={
-                "DB": "postgresql",
+                "DB": "postgres12",
                 "DB_PORT": "5432",
                 "POSTGRES_SEEDS": db_instance.db_instance_endpoint_address,
             },
