@@ -73,7 +73,7 @@ class DatabaseStack(Stack):
         )
 
         self.redis_cluster = elasticache.CfnReplicationGroup(
-            self, "Redis",
+            self, "RedisRg",
             replication_group_description="ListingJet Redis replication group",
             cache_node_type="cache.t4g.small",
             engine="redis",
