@@ -274,12 +274,19 @@ class ServicesStack(Stack):
                 "SMTP_PASSWORD": ecs.Secret.from_secrets_manager(app_secrets, "SMTP_PASSWORD"),
             },
             command=["worker"],
+            # The worker doesn't serve HTTP — it touches /tmp/worker-heartbeat
+            # every 15s (src/listingjet/workflows/worker.py). A hung worker
+            # stops touching it; this check fails after ~2 min of no updates.
             health_check=ecs.HealthCheck(
-                command=["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8081/health')\" || exit 1"],
+                command=[
+                    "CMD-SHELL",
+                    "find /tmp/worker-heartbeat -mmin -2 | grep -q . || exit 1",
+                ],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
-                start_period=Duration.seconds(30),
+                # Worker needs time to connect to Temporal + write first heartbeat.
+                start_period=Duration.seconds(60),
             ),
         )
 
