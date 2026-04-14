@@ -50,7 +50,6 @@ class ServicesStack(Stack):
         id: str,
         vpc: ec2.IVpc,
         db_instance: rds.DatabaseInstance,
-        redis_cluster: elasticache.CfnReplicationGroup,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -89,7 +88,13 @@ class ServicesStack(Stack):
             "APP_ENV": "production",
             "ENVIRONMENT": "production",
             "AWS_REGION": Stack.of(self).region,
-            "REDIS_URL": f"redis://{redis_cluster.attr_primary_end_point_address}:{redis_cluster.attr_primary_end_point_port}/0",
+            # TEMPORARY: hardcoded to the currently-deployed Redis CacheCluster
+            # endpoint so Services stops importing the Redis export from
+            # Database, allowing Database to rename Redis -> RedisRg without a
+            # circular-export deadlock. A follow-up PR restores this to
+            # `redis_cluster.attr_primary_end_point_address` once RedisRg
+            # exists and is ready to be consumed.
+            "REDIS_URL": "redis://lis-re-10delv4c2sqbw.fjbwkc.0001.use1.cache.amazonaws.com:6379/0",
             "CORS_ORIGINS": "http://localhost:3000,https://listingjet.ai,https://www.listingjet.ai",
             "TEMPORAL_HOST": "temporal.listingjet.local:7233",
             "S3_BUCKET_NAME": "listingjet-dev",
