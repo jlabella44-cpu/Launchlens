@@ -51,7 +51,10 @@ class DatabaseStack(Stack):
             credentials=rds.Credentials.from_generated_secret("listingjet"),
             allocated_storage=20,
             max_allocated_storage=50,
-            storage_encrypted=True,
+            # Matches live kjyxgeldpfef (unencrypted). Pre-launch only — must
+            # migrate to an encrypted instance before onboarding real users.
+            # See docs/PRE_LAUNCH_INFRA_CHECKLIST.md for the cutover plan.
+            storage_encrypted=False,
             multi_az=True,
             backup_retention=Duration.days(7),
             deletion_protection=True,
