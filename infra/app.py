@@ -2,7 +2,6 @@
 """ListingJet CDK application — instantiates all infrastructure stacks."""
 
 import aws_cdk as cdk
-from stacks.cdn import ListingJetCDN
 from stacks.ci import CIStack
 from stacks.database import DatabaseStack
 from stacks.monitoring import MonitoringStack
@@ -33,13 +32,6 @@ services = ServicesStack(
     redis_cluster=database.redis_cluster,
     env=env,
 )
-
-cdn = ListingJetCDN(
-    app, "ListingJetCDN",
-    media_bucket=services.media_bucket,
-    env=env,
-)
-cdn.add_dependency(services)
 
 monitoring = MonitoringStack(
     app, "ListingJetMonitoring",
