@@ -28,6 +28,8 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] **Separate dev/prod S3 buckets** — both currently use `listingjet-dev`
 - [ ] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*`
 - [ ] **Pre-launch infra revert** — apply `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (RDS/Redis/ECS upsizing, Multi-AZ, Container Insights, budget ceiling)
+- [ ] **🚨 RDS encrypted-storage migration** — live DB `kjyxgeldpfef` is unencrypted; must migrate to encrypted instance before real user data lands. One-shot ~30-60 min downtime window. Full cutover plan in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section A).
+- [ ] **🚨 Replace `SMTP_PASSWORD` placeholder with real credentials** — `listingjet/app` secret has `PLACEHOLDER_SMTP_PASSWORD`. Pick SES or Resend, generate real SMTP password, update secret, force ECS redeployment. See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section B).
 
 ### Cost Optimization — Data to Collect from AWS
 After the cost-optimization branch is deployed and has run for **at least 7 days** (ideally 14), gather the following and bring it back to the next session for further right-sizing decisions. Commands documented in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md`.
