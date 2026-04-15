@@ -7,6 +7,75 @@ includes the file, the change, and the reasoning.
 
 ---
 
+## 🚨 Data-safety must-fixes (do these FIRST, before any revert work)
+
+### A. Migrate RDS to encrypted storage
+
+The live RDS instance `kjyxgeldpfef` was created with
+`StorageEncrypted=False`. CDK no longer declares the property (matches
+live's "property absent" state to avoid CloudFormation replacement
+loops — see `infra/stacks/database.py` near the `storage_encrypted`
+comment). Before any real user data lands, migrate to an encrypted
+instance.
+
+**Cutover plan (one-shot ~30-60 min downtime window, zero users = safe
+to schedule whenever):**
+
+1. Take a fresh manual snapshot of `kjyxgeldpfef`:
+   ```
+   aws rds create-db-snapshot \
+     --db-instance-identifier listingjetdatabase-postgres9dc8bb04-kjyxgeldpfef \
+     --db-snapshot-identifier pre-encryption-migration-$(date +%Y%m%d)
+   ```
+2. Copy the snapshot with encryption enabled (AWS cannot encrypt in
+   place — this is the only path):
+   ```
+   aws rds copy-db-snapshot \
+     --source-db-snapshot-identifier pre-encryption-migration-<date> \
+     --target-db-snapshot-identifier pre-encryption-migration-<date>-encrypted \
+     --kms-key-id alias/aws/rds
+   ```
+3. Restore the encrypted snapshot into a new RDS instance with a
+   different identifier. Let it come up on an encrypted volume.
+4. Update `DATABASE_URL` in Secrets Manager (`listingjet/app`) to point
+   at the new instance endpoint.
+5. Restart ECS services so tasks pick up the new `DATABASE_URL`.
+6. Confirm app connectivity + run a read/write sanity check.
+7. Delete the old unencrypted `kjyxgeldpfef` (disable deletion
+   protection first).
+8. Update `infra/stacks/database.py` to re-add
+   `storage_encrypted=True` now that live matches. Also update the
+   CDK-managed resource to point at the new instance (cdk import or
+   adopt-via-logical-ID-rename).
+
+### B. Replace `SMTP_PASSWORD` placeholder with a real value
+
+The `listingjet/app` secret currently has `SMTP_PASSWORD` set to a
+placeholder (`PLACEHOLDER_SMTP_PASSWORD`). The app's email code path
+will fail at call time once triggered.
+
+**Pick a provider and generate real credentials:**
+
+- **AWS SES** (see MASTER_TODO "SES production access" item):
+  1. Request SES production access (pending AWS approval).
+  2. Create an SES SMTP IAM user, generate SMTP credentials.
+  3. Store the real password in Secrets Manager under `SMTP_PASSWORD`.
+  4. Set `smtp_host`, `smtp_port`, `smtp_user`, `email_from` in
+     `listingjet/app` or env overrides.
+- **Resend** (mentioned in PR #223 body):
+  1. Sign up, verify domain `listingjet.ai` via DNS.
+  2. Generate API key → that's the SMTP password.
+  3. Store in Secrets Manager.
+
+After updating the secret, force a new ECS deployment so tasks pick
+up the new value:
+```
+aws ecs update-service --cluster listingjet --service listingjet-api --force-new-deployment
+aws ecs update-service --cluster listingjet --service listingjet-worker --force-new-deployment
+```
+
+---
+
 ## Critical — must revert before launch
 
 These changes meaningfully degrade the user experience or data safety
