@@ -50,31 +50,40 @@ class ServicesStack(Stack):
         id: str,
         vpc: ec2.IVpc,
         db_instance: rds.DatabaseInstance,
+        redis_cluster: elasticache.CfnReplicationGroup,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
 
         # ECR repositories
+        # Keep last 10 images — sufficient for rollbacks; reduces ECR storage cost.
         self.api_repo = ecr.Repository(
             self, "ApiRepo",
             repository_name="listingjet-api",
-            lifecycle_rules=[ecr.LifecycleRule(max_image_count=20)],
+            lifecycle_rules=[ecr.LifecycleRule(max_image_count=10)],
         )
         self.worker_repo = ecr.Repository(
             self, "WorkerRepo",
             repository_name="listingjet-worker",
-            lifecycle_rules=[ecr.LifecycleRule(max_image_count=20)],
+            lifecycle_rules=[ecr.LifecycleRule(max_image_count=10)],
         )
 
-        # ECS cluster with CloudMap namespace for service discovery
+        # ECS cluster with CloudMap namespace for service discovery.
+        # FARGATE and FARGATE_SPOT capacity providers are registered so that
+        # individual services can opt into Spot pricing (~70% off) where the
+        # workload tolerates 2-minute eviction notices. The API and Temporal
+        # services keep the FARGATE default; only the Worker uses Spot.
+        # Container Insights v2 disabled pre-launch to skip the per-task
+        # observability cost. Re-enable before onboarding paying customers.
         self.cluster = ecs.Cluster(
             self, "Cluster",
             cluster_name="listingjet",
             vpc=vpc,
-            container_insights_v2=ecs.ContainerInsights.ENABLED,
+            container_insights_v2=ecs.ContainerInsights.DISABLED,
             default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
                 name="listingjet.local",
             ),
+            enable_fargate_capacity_providers=True,
         )
 
         # Shared secrets
@@ -88,23 +97,21 @@ class ServicesStack(Stack):
             "APP_ENV": "production",
             "ENVIRONMENT": "production",
             "AWS_REGION": Stack.of(self).region,
-            # TEMPORARY: hardcoded to the currently-deployed Redis CacheCluster
-            # endpoint so Services stops importing the Redis export from
-            # Database, allowing Database to rename Redis -> RedisRg without a
-            # circular-export deadlock. A follow-up PR restores this to
-            # `redis_cluster.attr_primary_end_point_address` once RedisRg
-            # exists and is ready to be consumed.
-            "REDIS_URL": "redis://lis-re-10delv4c2sqbw.fjbwkc.0001.use1.cache.amazonaws.com:6379/0",
+            "REDIS_URL": f"redis://{redis_cluster.attr_primary_end_point_address}:{redis_cluster.attr_primary_end_point_port}/0",
             "CORS_ORIGINS": "http://localhost:3000,https://listingjet.ai,https://www.listingjet.ai",
             "TEMPORAL_HOST": "temporal.listingjet.local:7233",
             "S3_BUCKET_NAME": "listingjet-dev",
         }
 
         # --- API Service (Fargate + ALB) ------------------------------------
+        # Pre-launch sizing: 0.5 vCPU / 1 GB. FastAPI + uvicorn idles below
+        # 100 MB; this gives headroom for dev/QA traffic. Bump back to
+        # 1 vCPU / 2 GB before opening to real users (auto-scaling already
+        # caps at 4 tasks).
         api_task = ecs.FargateTaskDefinition(
             self, "ApiTask",
-            cpu=1024,
-            memory_limit_mib=2048,
+            cpu=512,
+            memory_limit_mib=1024,
         )
 
         api_container = api_task.add_container(
@@ -210,12 +217,33 @@ class ServicesStack(Stack):
         )
 
         # --- S3 media bucket -------------------------------------------------
+        # Lifecycle rules:
+        #   * Abort incomplete multipart uploads after 7 days (uploads abandoned
+        #     mid-flight otherwise accrue storage indefinitely).
+        #   * Transition noncurrent versions to STANDARD_IA after 30 days, then
+        #     expire them after 90 days. Current versions are never expired.
         self.media_bucket = s3.Bucket(
             self, "MediaBucket",
             bucket_name=f"listingjet-media-{Stack.of(self).account}-{Stack.of(self).region}",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             encryption=s3.BucketEncryption.S3_MANAGED,
             versioned=True,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    id="AbortIncompleteMultipartUploads",
+                    abort_incomplete_multipart_upload_after=Duration.days(7),
+                ),
+                s3.LifecycleRule(
+                    id="ExpireNoncurrentVersions",
+                    noncurrent_version_transitions=[
+                        s3.NoncurrentVersionTransition(
+                            storage_class=s3.StorageClass.INFREQUENT_ACCESS,
+                            transition_after=Duration.days(30),
+                        ),
+                    ],
+                    noncurrent_version_expiration=Duration.days(90),
+                ),
+            ],
         )
 
         # --- IAM: Grant S3 + CloudWatch to API and Worker task roles ----------
@@ -238,10 +266,15 @@ class ServicesStack(Stack):
         api_task.task_role.add_to_policy(cloudwatch_policy)
 
         # --- Worker Service (Fargate, no ALB) --------------------------------
+        # Pre-launch sizing: 1 vCPU / 2 GB. Sufficient for ad-hoc test
+        # pipelines (vision, packaging, single-clip Kling renders). FFmpeg
+        # video stitching for full virtual tours wants more — bump back to
+        # 2 vCPU / 4 GB (or higher) before users start pushing real workloads,
+        # and confirm with Compute Optimizer once we have a few weeks of data.
         worker_task = ecs.FargateTaskDefinition(
             self, "WorkerTask",
-            cpu=2048,
-            memory_limit_mib=4096,
+            cpu=1024,
+            memory_limit_mib=2048,
         )
 
         worker_task.add_container(
@@ -252,7 +285,7 @@ class ServicesStack(Stack):
                 log_group=logs.LogGroup(
                     self, "WorkerLogs",
                     log_group_name="/launchlens/worker",
-                    retention=logs.RetentionDays.ONE_MONTH,
+                    retention=logs.RetentionDays.TWO_WEEKS,
                 ),
             ),
             environment=base_env,
@@ -294,6 +327,12 @@ class ServicesStack(Stack):
         worker_task.task_role.add_to_policy(s3_list_policy)
         worker_task.task_role.add_to_policy(cloudwatch_policy)
 
+        # Worker runs Temporal activities, which are inherently retry-safe:
+        # if a Spot reclamation interrupts an activity, Temporal reschedules it
+        # on the next available worker (potentially redoing one external API
+        # call). 100% Spot is acceptable here; switch to a mixed strategy
+        # (e.g. weight=4 Spot + weight=1 on-demand) if Spot capacity in
+        # us-east-1 ever becomes unreliable for our task size.
         self.worker_service = ecs.FargateService(
             self, "WorkerService",
             cluster=self.cluster,
@@ -301,6 +340,12 @@ class ServicesStack(Stack):
             desired_count=1,
             service_name="listingjet-worker",
             assign_public_ip=False,
+            capacity_provider_strategies=[
+                ecs.CapacityProviderStrategy(
+                    capacity_provider="FARGATE_SPOT",
+                    weight=1,
+                ),
+            ],
         )
 
         # --- Temporal Service (Fargate, internal only) -----------------------
@@ -318,7 +363,7 @@ class ServicesStack(Stack):
                 log_group=logs.LogGroup(
                     self, "TemporalLogs",
                     log_group_name="/launchlens/temporal",
-                    retention=logs.RetentionDays.ONE_MONTH,
+                    retention=logs.RetentionDays.TWO_WEEKS,
                 ),
             ),
             environment={

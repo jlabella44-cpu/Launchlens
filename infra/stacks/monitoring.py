@@ -5,6 +5,9 @@ from aws_cdk import (
     Stack,
 )
 from aws_cdk import (
+    aws_budgets as budgets,
+)
+from aws_cdk import (
     aws_cloudwatch as cw,
 )
 from aws_cdk import (
@@ -134,6 +137,67 @@ class MonitoringStack(Stack):
             alarm_description="RDS CPU utilization above 80% for 10 minutes",
         )
         cpu_alarm.add_alarm_action(alarm_action)
+
+        # --- AWS Budget: monthly cost ceiling --------------------------------
+        # Sends an email at 80% actual, 100% actual, and 100% forecasted.
+        # Limit is intentionally conservative for the pre-launch footprint
+        # (~$100/mo expected). Raise once real users start driving spend.
+        budgets.CfnBudget(
+            self, "MonthlyCostBudget",
+            budget=budgets.CfnBudget.BudgetDataProperty(
+                budget_name="listingjet-monthly",
+                budget_type="COST",
+                time_unit="MONTHLY",
+                budget_limit=budgets.CfnBudget.SpendProperty(
+                    amount=150,
+                    unit="USD",
+                ),
+            ),
+            notifications_with_subscribers=[
+                budgets.CfnBudget.NotificationWithSubscribersProperty(
+                    notification=budgets.CfnBudget.NotificationProperty(
+                        notification_type="ACTUAL",
+                        comparison_operator="GREATER_THAN",
+                        threshold=80,
+                        threshold_type="PERCENTAGE",
+                    ),
+                    subscribers=[
+                        budgets.CfnBudget.SubscriberProperty(
+                            subscription_type="EMAIL",
+                            address=alert_email,
+                        ),
+                    ],
+                ),
+                budgets.CfnBudget.NotificationWithSubscribersProperty(
+                    notification=budgets.CfnBudget.NotificationProperty(
+                        notification_type="ACTUAL",
+                        comparison_operator="GREATER_THAN",
+                        threshold=100,
+                        threshold_type="PERCENTAGE",
+                    ),
+                    subscribers=[
+                        budgets.CfnBudget.SubscriberProperty(
+                            subscription_type="EMAIL",
+                            address=alert_email,
+                        ),
+                    ],
+                ),
+                budgets.CfnBudget.NotificationWithSubscribersProperty(
+                    notification=budgets.CfnBudget.NotificationProperty(
+                        notification_type="FORECASTED",
+                        comparison_operator="GREATER_THAN",
+                        threshold=100,
+                        threshold_type="PERCENTAGE",
+                    ),
+                    subscribers=[
+                        budgets.CfnBudget.SubscriberProperty(
+                            subscription_type="EMAIL",
+                            address=alert_email,
+                        ),
+                    ],
+                ),
+            ],
+        )
 
         # --- CloudWatch Dashboard ---------------------------------------------
         self.dashboard = cw.Dashboard(

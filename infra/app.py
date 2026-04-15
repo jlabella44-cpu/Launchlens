@@ -29,6 +29,7 @@ services = ServicesStack(
     app, "ListingJetServices",
     vpc=network.vpc,
     db_instance=database.db_instance,
+    redis_cluster=database.redis_cluster,
     env=env,
 )
 
