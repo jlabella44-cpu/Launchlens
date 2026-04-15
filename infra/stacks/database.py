@@ -42,7 +42,7 @@ class DatabaseStack(Stack):
                 version=rds.PostgresEngineVersion.VER_16,
             ),
             instance_type=ec2.InstanceType.of(
-                ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.SMALL,
+                ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.MICRO,
             ),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
@@ -51,12 +51,13 @@ class DatabaseStack(Stack):
             credentials=rds.Credentials.from_generated_secret("listingjet"),
             allocated_storage=20,
             max_allocated_storage=50,
-            # Matches live kjyxgeldpfef (unencrypted). Pre-launch only — must
-            # migrate to an encrypted instance before onboarding real users.
+            # storage_encrypted intentionally omitted: live kjyxgeldpfef was
+            # created without the property set, so emitting it at all (even
+            # =False) makes CFN treat the resource as needing replacement.
+            # Pre-launch: migrate to an encrypted instance before real users.
             # See docs/PRE_LAUNCH_INFRA_CHECKLIST.md for the cutover plan.
-            storage_encrypted=False,
-            multi_az=True,
-            backup_retention=Duration.days(7),
+            multi_az=False,
+            backup_retention=Duration.days(1),
             deletion_protection=True,
             removal_policy=RemovalPolicy.SNAPSHOT,
         )
