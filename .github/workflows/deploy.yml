@@ -74,6 +74,16 @@ jobs:
           docker push $REGISTRY/$ECR_REPO_API:$IMAGE_TAG
           docker push $REGISTRY/$ECR_REPO_API:latest
 
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO_API }}:${{ github.sha }}
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL"
+
       - name: Run database migrations
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}

@@ -82,5 +82,40 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test
         run: alembic upgrade head
 
-      - name: Run tests
-        run: pytest --tb=short -q --timeout=30
+      - name: Run tests with coverage
+        run: pytest --tb=short -q --timeout=30 --cov=listingjet --cov-report=xml:coverage.xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build

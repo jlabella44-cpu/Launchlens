@@ -170,3 +170,44 @@ async def admin_retry_listing(
     await db.commit()
 
     return {"listing_id": str(listing.id), "state": "uploading"}
+
+
+@router.post("/listings/{listing_id}/shadow-approve")
+async def admin_shadow_approve_listing(
+    listing_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Send the shadow_review_approved signal to the listing's Temporal workflow.
+
+    Shadow review is an automated QA pathway that unblocks the Phase 2
+    pipeline without a human approve action.  The workflow's
+    _shadow_approved flag is set; the workflow can act on it via a
+    wait_condition in a future iteration.
+    """
+    listing = (await db.execute(
+        select(Listing).where(Listing.id == listing_id)
+    )).scalar_one_or_none()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    if listing.state not in {ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Listing must be awaiting or in review; current state: {listing.state.value}",
+        )
+
+    try:
+        from listingjet.temporal_client import get_temporal_client
+        client = get_temporal_client()
+        await client.signal_shadow_review_approved(str(listing_id))
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to send shadow review signal to workflow")
+
+    await audit_log(
+        db, admin_user.id, "shadow_approve", "listing", str(listing_id),
+        tenant_id=listing.tenant_id,
+    )
+    await db.commit()
+
+    return {"listing_id": str(listing_id), "signal": "shadow_review_approved"}

@@ -23,7 +23,7 @@ ListingJet is a multi-tenant real estate listing media SaaS. Photographers and a
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, React Three Fiber |
 | Observability | OpenTelemetry (OTLP), CloudWatch metrics (`services/metrics.py`), Sentry |
 | Testing | pytest-asyncio (500+ tests), Playwright E2E (9 specs) |
-| CI/CD | GitHub Actions (lint, test, docker), deploy gated on tests |
+| CI/CD | GitHub Actions (lint, test + coverage, frontend build/lint/vitest, docker), deploy gated on tests + Trivy CRITICAL scan |
 | Privacy/Compliance | GDPR Art. 6/7 + CCPA: separate AI consent, audit log, agent-level guards, data export, cascade deletion, Fernet field encryption for IDX keys |
 
 ---
@@ -81,7 +81,7 @@ src/listingjet/
     photo_compliance.py      PhotoComplianceAgent: detect people/signs/branding in photos  [AI]
     content.py               ContentAgent: dual-tone descriptions (mls_safe + marketing), FHA filter  [AI]
     brand.py                 BrandAgent: template render → S3 flyer
-    learning.py              LearningAgent: read override events, update per-tenant weights, 90-day decay
+    learning.py              LearningAgent: read override events, update per-tenant weights, backfill ScoringEvent outcomes, trigger WeightManager.train_model() after each update cycle
     performance_intelligence.py  PerformanceIntelligenceAgent: photo→outcome correlations (Phase 5)
     distribution.py          DistributionAgent: → DELIVERED, emit pipeline.completed
     social_content.py        SocialContentAgent: IG + FB captions, FHA filtered (gated)  [AI]
@@ -118,7 +118,7 @@ src/listingjet/
     data_retention.py        cleanup_delivered_outbox (30d), cleanup_expired_exports (90d), cleanup_old_health_history (90d)
     demo_cleanup.py          cleanup_expired_demos (proxy + full-res S3)
     fha_filter.py            fha_check(): 8 FHA regex patterns
-    weight_manager.py        WeightManager: blend, score, apply_update, apply_decay (90-day regression to 1.0)
+    weight_manager.py        WeightManager: blend, score (rule-based → XGBoost when ≥50 labeled events), apply_update, apply_decay (90-day regression to 1.0), train_model() (XGBoost phase 2)
     plan_limits.py           PLAN_LIMITS dict, check_listing_quota, check_asset_quota
     storage.py               StorageService: S3 upload/download/presigned URL/delete
     rate_limiter.py          Redis token bucket rate limiter (middleware)
@@ -143,7 +143,7 @@ src/listingjet/
     openai_vision.py         OpenAIVisionProvider (GPT-4V) + record_provider_call("openai_gpt4v", ...)
     claude.py                ClaudeProvider (Anthropic) + record_provider_call("claude", ...)
 
-  api/
+  api/   [all routes are under the /v1 prefix; /health is unversioned]
     auth.py                  /auth/register, /login, /logout, /refresh, /me, /ai-consent, /forgot-password, /reset-password (audit-logged)
     listings_core.py         POST/GET /listings, GET/PATCH/DELETE /listings/{id} (S3 cleanup incl. proxies on delete)
     listings_draft.py        POST /listings/{id}/start-pipeline (AI consent guard + credit deduction)
@@ -205,7 +205,7 @@ tests/
   test_agents/               agent unit tests + E2E pipeline smoke (23 agents)
   test_api/                  auth, billing, listings, assets, admin, plan_limits, admin_credits, addons, credits, dollhouse, demo, etc.
   test_integration/          test_credit_lifecycle.py — full register→credits→listing→webhook→admin flows + AI consent coverage
-                             test_s11_15_workflows.py — /credits/service-costs, /admin/audit-log (filters+pagination), billing page init flow, admin dashboard workflow, credit purchase + webhook fulfillment
+                             test_s11_15_workflows.py — /credits/service-costs, /admin/audit-log (filters+pagination), billing page init flow, admin dashboard workflow, Stripe checkout shape, webhook bundle fulfillment
   test_middleware/           tenant middleware, security headers
   test_providers/            mock, factory, storage, rate_limiter, vision, canva, kling, claude providers
   test_services/             events, outbox, fha_filter, weight_manager, credits, ai_consent, audit, account_lifecycle, data_retention, notifications, email_templates, endcard, drip_scheduler, link_import, outcome_tracker, help_agent
@@ -251,7 +251,7 @@ frontend/src/
     auth-context.tsx         AuthProvider + useAuth() (register takes consent + aiConsent)
     plan-context.tsx         PlanProvider + usePlan() + isFeatureGated()
   lib/
-    api-client.ts            All API calls; updateAiConsent(), register(email,...,consent,aiConsent)
+    api-client.ts            All API calls; base URL = NEXT_PUBLIC_API_URL + "/v1"; updateAiConsent(), register(email,...,consent,aiConsent)
     types.ts                 UserResponse (id, email, role, tenant_id, ai_consent_at, ai_consent_version), ListingResponse, etc.
     generated/api.d.ts       Canonical types generated from FastAPI OpenAPI spec (npm run generate-api)
 ```
@@ -399,9 +399,9 @@ Third-party AI processing (Google Vision, Qwen, Claude, Kling, virtual staging) 
 | Workflow | File | Trigger |
 |----------|------|---------|
 | Lint | `.github/workflows/lint.yml` | push / PR |
-| Test | `.github/workflows/test.yml` | push / PR — 2 Postgres service containers |
+| Test | `.github/workflows/test.yml` | push / PR — `test` job: 2 Postgres service containers, pytest + coverage upload to Codecov; `frontend` job: npm ci, lint, vitest, next build |
 | Docker | `.github/workflows/docker.yml` | push to main |
-| Deploy | `.github/workflows/deploy.yml` | push to main / workflow_dispatch — runs tests, then ECS run-task `migrate` (aborts on failure), then force-new-deployment |
+| Deploy | `.github/workflows/deploy.yml` | push to main / workflow_dispatch — runs tests, builds Docker image, Trivy CRITICAL scan (blocks deploy on new CVEs), ECS run-task `migrate` (aborts on failure), force-new-deployment |
 
 ---
 

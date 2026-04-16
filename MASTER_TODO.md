@@ -97,7 +97,7 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [x] Lint & verify (ruff + TypeScript checks) — both pass clean
 
 ### E2E Tests (Session 16)
-- [ ] Integration test cases (run after sessions 11–15 are merged)
+- [x] Integration test cases — 16 tests in `test_s11_15_workflows.py` covering all session 11-15 feature gaps
 
 ### Stub Fixes (Session 18)
 - [x] **Implement real video cutting** — already implemented with FFmpeg (H.264, aspect-ratio scaling, padding)
@@ -124,7 +124,7 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [x] Create `README.md` — 244 lines with architecture diagram, quick start, tech stack, CI badges
 - [x] Update `.env.example` — added JWT refresh, v3 Stripe tiers, LLM provider, Canva OAuth, SES, property data keys
 - [x] Create `CHANGELOG.md` — 226 lines documenting features by milestone
-- [ ] Update `PROJECT_OVERVIEW_FOR_LLM.md`
+- [x] Update `PROJECT_OVERVIEW_FOR_LLM.md`
 - [x] Add CI badge to README — test + lint badges present
 
 ### Learning Loop (Session 22)
@@ -182,13 +182,13 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [ ] Usage-based billing / metering
 - [ ] Tenant deletion / deactivation (soft-delete pattern)
 - [ ] Workflow cancellation / compensation
-- [ ] Shadow review signal flow (implemented but not triggered by API)
+- [x] Shadow review signal flow — `POST /admin/listings/{id}/shadow-approve` sends Temporal signal; `signal_shadow_review_approved` added to TemporalClient
 - [ ] LearningAgent as separate Temporal workflow
 - [ ] Workflow versioning / migration strategy
-- [ ] Security scanning (Trivy, Snyk)
-- [ ] Coverage reporting (codecov)
+- [x] Security scanning — Trivy CRITICAL scan in deploy.yml (blocks deploy on unfixed CVEs)
+- [x] Coverage reporting — pytest-cov + Codecov upload in test.yml
 - [ ] Release automation (semantic-release)
-- [ ] Frontend CI (npm test, next build)
+- [x] Frontend CI — `frontend` job in test.yml: npm ci, lint, vitest run, next build
 - [ ] Docker image push to registry (ECR/GHCR)
 - [ ] Deployment workflows (staging, production)
 - [ ] 3D dollhouse viewer component

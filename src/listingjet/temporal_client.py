@@ -59,6 +59,12 @@ class TemporalClient:
         handle = client.get_workflow_handle(workflow_id)
         await handle.signal(ListingPipeline.human_review_completed)
 
+    async def signal_shadow_review_approved(self, listing_id: str) -> None:
+        client = await self._connect()
+        workflow_id = f"listing-pipeline-{listing_id}"
+        handle = client.get_workflow_handle(workflow_id)
+        await handle.signal(ListingPipeline.shadow_review_approved)
+
 
 _temporal_client: TemporalClient | None = None
 
