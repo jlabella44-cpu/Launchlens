@@ -83,4 +83,17 @@ class LearningAgent(BaseAgent):
                 if weights_updated > 0:
                     await self.emit(session, context, "learning.completed", {"weights_updated": weights_updated})
 
+                # Retrain XGBoost with all labeled events for this tenant
+                if weights_updated > 0:
+                    labeled_events = (await session.execute(
+                        select(ScoringEvent).where(
+                            ScoringEvent.tenant_id == tenant_id,
+                            ScoringEvent.outcome.isnot(None),
+                        )
+                    )).scalars().all()
+                    WeightManager.train_model([
+                        {"features": ev.features, "outcome": ev.outcome}
+                        for ev in labeled_events
+                    ])
+
         return {"weights_updated": weights_updated}

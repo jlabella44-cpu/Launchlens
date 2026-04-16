@@ -118,7 +118,7 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [x] Response models — `ActionResponse` on approve/reject/retry, `CancelResponse` on cancel, `PipelineStatusResponse` on pipeline-status
 - [x] Standardize pagination — `PaginatedResponse` generic added; paginated `/admin/tenants` and `/credits/transactions`
 - [x] Rate limit headers (`X-RateLimit-*`) — `X-RateLimit-Limit` and `X-RateLimit-Remaining` on all responses
-- [ ] API versioning — `/api/v1/` prefix (optional)
+- [x] API versioning — `/api/v1/` prefix — all feature routes under `/v1`, health unversioned; conftest transport wrapper rewrites test paths
 
 ### Documentation (Session 21)
 - [x] Create `README.md` — 244 lines with architecture diagram, quick start, tech stack, CI badges
@@ -132,7 +132,7 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [x] Photo reorder endpoint — `POST /{listing_id}/package/reorder` already in `listings_media.py`
 - [x] Performance event ingestion — already writes to `PerformanceEvent` on delivery (`distribution.py`) and export (`listings_media.py`)
 - [x] Weight decay — `apply_decay` method already exists in `weight_manager.py` (90-day decay toward 1.0)
-- [ ] XGBoost model upgrade (Phase 2 of weight manager)
+- [x] XGBoost model upgrade (Phase 2 of weight manager) — `train_model()` in WeightManager, triggered from LearningAgent after weight updates; falls back to rule-based when < 50 samples
 
 ### Listing Permissions — Remaining Phases
 - [ ] Phase C: Cross-tenant email invitations (needs SES production access)

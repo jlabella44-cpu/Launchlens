@@ -1,6 +1,14 @@
 import pytest
 
-from listingjet.services.weight_manager import WeightManager
+import listingjet.services.weight_manager as wm_module
+from listingjet.services.weight_manager import MIN_TRAIN_SAMPLES, WeightManager
+
+
+@pytest.fixture(autouse=True)
+def _reset_xgb_model():
+    wm_module._xgb_model = None
+    yield
+    wm_module._xgb_model = None
 
 TENANT = "tenant-abc"
 ROOM = "kitchen"
@@ -127,3 +135,68 @@ def test_score_ignores_outcome_boost_below_min():
         "outcome_samples": 1,  # below MIN_SAMPLES
     })
     assert same_score == base_score
+
+
+# ---- XGBoost Phase 2 tests ----
+
+
+def _make_events(n: int, outcome: str = "approval") -> list[dict]:
+    return [
+        {
+            "features": {"quality_score": 70, "commercial_score": 60, "hero_candidate": False, "room_weight": 1.0},
+            "outcome": outcome,
+        }
+        for _ in range(n)
+    ]
+
+
+def test_train_model_skipped_below_min_samples():
+    events = _make_events(MIN_TRAIN_SAMPLES - 1)
+    result = WeightManager.train_model(events)
+    assert result is False
+    assert wm_module._xgb_model is None
+
+
+def test_train_model_succeeds_with_sufficient_samples():
+    positives = _make_events(MIN_TRAIN_SAMPLES // 2, "approval")
+    negatives = _make_events(MIN_TRAIN_SAMPLES // 2, "rejection")
+    result = WeightManager.train_model(positives + negatives)
+    assert result is True
+    assert wm_module._xgb_model is not None
+
+
+def test_score_uses_rule_based_when_no_model():
+    wm = WeightManager()
+    features = {"quality_score": 80, "commercial_score": 60, "hero_candidate": False, "room_weight": 1.0}
+    assert wm_module._xgb_model is None
+    rule_score = WeightManager._rule_based_score(features)
+    assert wm.score(features) == pytest.approx(rule_score)
+
+
+def test_score_uses_xgb_when_model_trained():
+    positives = _make_events(MIN_TRAIN_SAMPLES // 2, "approval")
+    negatives = _make_events(MIN_TRAIN_SAMPLES // 2, "rejection")
+    WeightManager.train_model(positives + negatives)
+    assert wm_module._xgb_model is not None
+
+    wm = WeightManager()
+    score = wm.score({"quality_score": 90, "commercial_score": 85, "hero_candidate": True, "room_weight": 1.2})
+    assert 0.0 <= score <= 1.0
+
+
+def test_train_model_ignores_unlabeled_events():
+    # Mix of labeled and unlabeled — only labeled count toward the threshold
+    labeled = _make_events(MIN_TRAIN_SAMPLES // 2, "approval") + _make_events(MIN_TRAIN_SAMPLES // 2, "rejection")
+    unlabeled = [{"features": {}, "outcome": None}] * 100
+    result = WeightManager.train_model(labeled + unlabeled)
+    assert result is True
+
+
+def test_to_feature_vector_defaults():
+    fv = WeightManager._to_feature_vector({})
+    assert fv == [0.5, 0.5, 0.0, 1.0]
+
+
+def test_to_feature_vector_hero():
+    fv = WeightManager._to_feature_vector({"quality_score": 100, "commercial_score": 0, "hero_candidate": True, "room_weight": 1.5})
+    assert fv == [1.0, 0.0, 1.0, 1.5]

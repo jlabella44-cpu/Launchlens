@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import jwt
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -13,6 +14,28 @@ from listingjet.database import Base, get_db
 from listingjet.main import app
 
 TEST_DB_URL = "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
+
+
+class _V1Transport(httpx.AsyncBaseTransport):
+    """Rewrites request paths to prepend /v1 so test calls use bare paths."""
+
+    _UNVERSIONED = frozenset({"/health", "/ready", "/metrics"})
+
+    def __init__(self, wrapped: httpx.AsyncBaseTransport) -> None:
+        self._wrapped = wrapped
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path not in self._UNVERSIONED and not path.startswith("/v1"):
+            new_url = request.url.copy_with(path=f"/v1{path}")
+            request = httpx.Request(
+                method=request.method,
+                url=new_url,
+                headers=request.headers,
+                stream=request.stream,
+                extensions=request.extensions,
+            )
+        return await self._wrapped.handle_async_request(request)
 
 
 @pytest.fixture(scope="session")
@@ -185,7 +208,7 @@ async def async_client(test_engine):
 
     with patch("listingjet.services.credits.CreditService.deduct_credits", side_effect=_noop_deduct):
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=_V1Transport(ASGITransport(app=app)), base_url="http://test"
         ) as client:
             yield client
 

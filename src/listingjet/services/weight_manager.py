@@ -1,11 +1,18 @@
 import logging
 from typing import Literal
 
+try:
+    import xgboost as xgb
+    _XGB_AVAILABLE = True
+except ImportError:
+    _XGB_AVAILABLE = False
+
 GLOBAL_BASELINE_WEIGHT = 1.0  # updated after Juke eval set reaches 200 examples
 WEIGHT_MIN = 0.1
 WEIGHT_MAX = 2.0
 BLEND_LISTING_THRESHOLD = 10  # listings (not events) before full tenant weights
 COLD_START_THRESHOLD = 3  # listings below which a weight can be safely reset
+MIN_TRAIN_SAMPLES = 50  # minimum labeled events before XGBoost training runs
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +20,13 @@ logger = logging.getLogger(__name__)
 # Ramps from 0→OUTCOME_MAX_INFLUENCE as closed listings grow past MIN_OUTCOMES
 OUTCOME_MIN_SAMPLES = 3
 OUTCOME_MAX_INFLUENCE = 0.15  # max 15% adjustment from outcome data
+
+_POSITIVE_OUTCOMES = frozenset({"approval", "swap_to"})
+_NEGATIVE_OUTCOMES = frozenset({"rejection", "swap_from"})
+
+# Module-level model cache — shared across all WeightManager instances.
+# Reset to None when retrain produces a new model or in tests.
+_xgb_model: "xgb.Booster | None" = None
 
 
 class WeightManager:
@@ -83,21 +97,41 @@ class WeightManager:
         adjusted = base_score * (1.0 + influence * (outcome_boost - 1.0))
         return min(1.0, max(0.0, adjusted))
 
-    def score(self, features: dict) -> float:
-        """
-        Composite scoring for photo selection.
-        Formula: (quality*0.5 + commercial*0.3 + hero_bonus*0.2) * room_weight
-        Then optionally adjusted by outcome_boost from Phase 5 correlations.
-        Clamped to [0.0, 1.0].
-        Phase 2: XGBoost model (see TODOS.md TODO-4).
-        """
+    @staticmethod
+    def _to_feature_vector(features: dict) -> list[float]:
+        return [
+            features.get("quality_score", 50) / 100.0,
+            features.get("commercial_score", 50) / 100.0,
+            1.0 if features.get("hero_candidate", False) else 0.0,
+            features.get("room_weight", 1.0),
+        ]
+
+    @staticmethod
+    def _rule_based_score(features: dict) -> float:
         quality = features.get("quality_score", 50) / 100.0
         commercial = features.get("commercial_score", 50) / 100.0
         hero_bonus = 1.0 if features.get("hero_candidate", False) else 0.0
         room_weight = features.get("room_weight", 1.0)
-
         composite = (quality * 0.5) + (commercial * 0.3) + (hero_bonus * 0.2)
-        base = min(1.0, max(0.0, composite * room_weight))
+        return min(1.0, max(0.0, composite * room_weight))
+
+    def _xgb_score(self, features: dict) -> float:
+        fv = self._to_feature_vector(features)
+        dmat = xgb.DMatrix([fv])
+        return float(_xgb_model.predict(dmat)[0])
+
+    def score(self, features: dict) -> float:
+        """
+        Composite scoring for photo selection.
+        Dispatches to XGBoost when a trained model is cached, otherwise uses
+        the rule-based formula (quality*0.5 + commercial*0.3 + hero_bonus*0.2) * room_weight.
+        Optionally adjusted by outcome_boost from Phase 5 correlations.
+        Clamped to [0.0, 1.0].
+        """
+        if _xgb_model is not None and _XGB_AVAILABLE:
+            base = self._xgb_score(features)
+        else:
+            base = self._rule_based_score(features)
 
         # Phase 5: outcome boost from real sale performance data
         outcome_boost = features.get("outcome_boost", 1.0)
@@ -106,6 +140,46 @@ class WeightManager:
             base = self.apply_outcome_boost(base, outcome_boost, outcome_samples)
 
         return base
+
+    @staticmethod
+    def train_model(events: list[dict]) -> bool:
+        """Train XGBoost binary classifier on labeled ScoringEvents.
+
+        *events* is a list of dicts with keys ``features`` (dict) and
+        ``outcome`` (str).  Returns True if a new model was cached.
+        """
+        global _xgb_model
+
+        if not _XGB_AVAILABLE:
+            logger.warning("xgboost not installed — skipping model training")
+            return False
+
+        labeled = [
+            e for e in events
+            if e.get("outcome") in _POSITIVE_OUTCOMES | _NEGATIVE_OUTCOMES
+        ]
+
+        if len(labeled) < MIN_TRAIN_SAMPLES:
+            logger.info(
+                "xgb_train_skipped reason=insufficient_samples count=%d required=%d",
+                len(labeled), MIN_TRAIN_SAMPLES,
+            )
+            return False
+
+        X = [WeightManager._to_feature_vector(e.get("features", {})) for e in labeled]
+        y = [1.0 if e["outcome"] in _POSITIVE_OUTCOMES else 0.0 for e in labeled]
+
+        dtrain = xgb.DMatrix(X, label=y)
+        params = {
+            "max_depth": 4,
+            "eta": 0.1,
+            "objective": "binary:logistic",
+            "eval_metric": "logloss",
+            "verbosity": 0,
+        }
+        _xgb_model = xgb.train(params, dtrain, num_boost_round=50)
+        logger.info("xgb_model_trained samples=%d", len(labeled))
+        return True
 
     # ------------------------------------------------------------------
     # Monitoring & cold-start protection

@@ -69,7 +69,7 @@ import type {
   ListingOutcomeResponse,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000") + "/v1";
 
 const fetchClient = createClient<paths>({ baseUrl: API_URL });
 
