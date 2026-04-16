@@ -3,6 +3,7 @@ import io
 import json
 import zipfile
 from datetime import datetime, timezone
+from typing import Literal
 
 from sqlalchemy import select
 
@@ -16,20 +17,34 @@ from listingjet.services.storage import StorageService
 
 from .base import AgentContext, BaseAgent
 
+# MLS photo dimension profiles (max long-side px, JPEG quality)
+MLS_PROFILES: dict[str, dict] = {
+    "default":      {"max_px": 2048, "quality": 85},
+    "reso":         {"max_px": 2048, "quality": 85},
+    "bright_mls":   {"max_px": 2048, "quality": 90},
+    "crmls":        {"max_px": 1024, "quality": 85},
+    "mred":         {"max_px": 1024, "quality": 85},
+    "fmls":         {"max_px": 800,  "quality": 80},
+}
 
-def _resize_photo(photo_bytes: bytes) -> bytes:
-    """Resize photo to max 2048px, JPEG quality 85, strip EXIF. Falls back to original on error."""
+MLSProfile = Literal["default", "reso", "bright_mls", "crmls", "mred", "fmls"]
+
+
+def _resize_photo(photo_bytes: bytes, profile: str = "default") -> bytes:
+    """Resize photo to MLS profile dimensions, JPEG quality, strip EXIF. Falls back to original."""
     try:
         from PIL import Image
 
+        spec = MLS_PROFILES.get(profile, MLS_PROFILES["default"])
+        max_dim = spec["max_px"]
+        quality = spec["quality"]
+
         img = Image.open(io.BytesIO(photo_bytes))
         img = img.convert("RGB")
-        # Strip EXIF by creating a new image without info
-        max_dim = 2048
         if max(img.size) > max_dim:
             img.thumbnail((max_dim, max_dim), Image.LANCZOS)
         buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=85)
+        img.save(buf, format="JPEG", quality=quality)
         return buf.getvalue()
     except Exception:
         return photo_bytes
@@ -66,11 +81,13 @@ class MLSExportAgent(BaseAgent):
         session_factory=None,
         content_result=None,
         flyer_s3_key=None,
+        mls_profile: str = "default",
     ):
         self._storage = storage_service or StorageService()
         self._session_factory = session_factory or AsyncSessionLocal
         self._content_result = content_result or {}
         self._flyer_s3_key = flyer_s3_key
+        self._mls_profile = mls_profile
 
     async def execute(self, context: AgentContext) -> dict:
         async with self.session_scope(context) as (session, listing_id, tenant_id):
@@ -107,7 +124,7 @@ class MLSExportAgent(BaseAgent):
 
                     try:
                         raw = self._storage.download(asset.file_path)
-                        resized = _resize_photo(raw)
+                        resized = _resize_photo(raw, self._mls_profile)
                     except Exception:
                         continue  # skip failed photos
 

@@ -11,6 +11,7 @@ from listingjet.api import (
     admin_listings,
     admin_providers,
     admin_tenants,
+    admin_usage,
     admin_users,
     analytics,
     auth,
@@ -21,6 +22,7 @@ from listingjet.api import (
     cma,
     credits,
     demo,
+    email_blast,
     health,
     help_agent,
     image_edit,
@@ -195,6 +197,7 @@ def create_app() -> FastAPI:
     v1.include_router(admin_users.router, prefix="/admin", tags=["admin"])
     v1.include_router(admin_listings.router, prefix="/admin", tags=["admin"])
     v1.include_router(admin_providers.router, prefix="/admin", tags=["admin"])
+    v1.include_router(admin_usage.router, prefix="/admin", tags=["admin"])
     v1.include_router(demo.router, prefix="/demo", tags=["demo"])
     v1.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
     v1.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
@@ -205,6 +208,7 @@ def create_app() -> FastAPI:
     v1.include_router(properties.router, prefix="/properties", tags=["properties"])
     v1.include_router(cma.router, prefix="/listings", tags=["listings"])
     v1.include_router(microsite.router, prefix="/listings", tags=["listings"])
+    v1.include_router(email_blast.router, prefix="/listings", tags=["listings"])
     v1.include_router(image_edit.router, prefix="/listings", tags=["image-editing"])
     v1.include_router(team.router, prefix="/team", tags=["team"])
     v1.include_router(sse.router, prefix="/sse", tags=["sse"])

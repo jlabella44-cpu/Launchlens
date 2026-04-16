@@ -176,8 +176,8 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 ### Deferred to Post-Launch
 - [x] Password reset flow — `/auth/forgot-password` + `/auth/reset-password` implemented with 15-min JWT tokens, rate limited, frontend pages wired (blocked only on SES prod access for email delivery)
 - [ ] OAuth / SSO (enterprise tier)
-- [ ] User invitation flow (invite to existing tenant)
-- [ ] Dark mode (Phase 2)
+- [x] User invitation flow (invite to existing tenant) — `POST/DELETE /team/invite`, `POST /team/invite/{token}/accept` in `team.py`
+- [x] Dark mode (Phase 2) — `ThemeToggle` component + comprehensive `.dark` CSS variables in `globals.css`
 - [ ] Stripe Connect (marketplace payouts)
 - [ ] Usage-based billing / metering
 - [x] Tenant deletion / deactivation — migration 050 adds `deactivated_at`; `DELETE /admin/tenants/{id}` soft-deletes, `POST /reactivate` restores; 403 guard in start_pipeline
@@ -187,16 +187,16 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [ ] Workflow versioning / migration strategy
 - [x] Security scanning — Trivy CRITICAL scan in deploy.yml (blocks deploy on unfixed CVEs)
 - [x] Coverage reporting — pytest-cov + Codecov upload in test.yml
-- [ ] Release automation (semantic-release)
+- [x] Release automation (semantic-release) — `.releaserc.json` + `.github/workflows/release.yml`
 - [x] Frontend CI — `frontend` job in test.yml: npm ci, lint, vitest run, next build
-- [ ] Docker image push to registry (ECR/GHCR)
+- [x] Docker image push to registry (ECR/GHCR) — worker image tagged and pushed in `deploy.yml`
 - [ ] Deployment workflows (staging, production)
-- [ ] 3D dollhouse viewer component
-- [ ] Email blast generation
-- [ ] Property website generation
-- [ ] Image resizing for MLS specs
+- [x] 3D dollhouse viewer component — `DollhouseViewer` Canvas-based floorplan renderer; wired into `DollhouseCard`
+- [x] Email blast generation — `POST /listings/{id}/email-blast` LLM-generated HTML+text email
+- [x] Property website generation — `POST /listings/{id}/microsite` in `microsite.py`; `ListingMicrosite` model
+- [x] Image resizing for MLS specs — `MLS_PROFILES` dict in `mls_export.py`; `MLSExportAgent` accepts `mls_profile` param
 - [x] Per-user limits — `max_listings_per_day_per_user` in PLAN_LIMITS (free=3, lite=10, active_agent=25, team=∞); checked in start_pipeline behind `bypass_limits` flag
-- [ ] Real-time usage dashboard
+- [x] Real-time usage dashboard — `GET /admin/usage-stream` SSE + `UsageDashboard` React component
 - [x] Configurable limits via admin API — `GET/PATCH /admin/tenants/{id}/limits`; `plan_overrides` JSONB merged on top of plan defaults
 - [x] Admin override to bypass limits — `bypass_limits` boolean on Tenant (migration 050); skips credit deduction + daily quota in start_pipeline
-- [ ] S3 local mock (LocalStack)
+- [x] S3 local mock (LocalStack) — `localstack` service in `docker-compose.yml`; init script creates `listingjet-media-local` bucket

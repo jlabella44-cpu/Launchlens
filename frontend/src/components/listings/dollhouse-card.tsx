@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import apiClient from "@/lib/api-client";
+import { DollhouseViewer } from "./dollhouse-viewer";
 
 type DollhouseResponse = Awaited<ReturnType<typeof apiClient.getDollhouse>>;
 
@@ -67,19 +68,16 @@ export function DollhouseCard({ listingId }: DollhouseCardProps) {
         </h3>
       </div>
 
-      {data.render_url ? (
-        <div className="relative group">
-          <div className="rounded-xl overflow-hidden border border-slate-100 bg-[#FAF7F0]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={data.render_url}
-              alt="3D dollhouse render of the property"
-              className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.02]"
-            />
-          </div>
-          <p className="mt-3 text-[10px] uppercase tracking-wider text-slate-300">
-            Interactive view coming soon
-          </p>
+      {data.scene_json?.floors?.length ? (
+        <DollhouseViewer sceneJson={data.scene_json} />
+      ) : data.render_url ? (
+        <div className="rounded-xl overflow-hidden border border-slate-100 bg-[#FAF7F0]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={data.render_url}
+            alt="3D dollhouse render of the property"
+            className="w-full h-auto object-contain"
+          />
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">

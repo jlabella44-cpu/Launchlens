@@ -74,6 +74,16 @@ jobs:
           docker push $REGISTRY/$ECR_REPO_API:$IMAGE_TAG
           docker push $REGISTRY/$ECR_REPO_API:latest
 
+      - name: Tag and push Worker image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker tag $REGISTRY/$ECR_REPO_API:$IMAGE_TAG $REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG
+          docker tag $REGISTRY/$ECR_REPO_API:latest $REGISTRY/$ECR_REPO_WORKER:latest
+          docker push $REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_REPO_WORKER:latest
+
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
