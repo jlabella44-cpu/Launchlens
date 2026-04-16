@@ -28,7 +28,33 @@ async def health():
         checks["database"] = f"error: {e}"
 
     all_ok = all(v == "ok" for v in checks.values())
-    return {"status": "ok" if all_ok else "degraded", "checks": checks}
+    return {"status": "ok" if all_ok else "degraded", "checks": checks, "version": settings.app_env}
+
+
+@router.get("/ready")
+async def ready():
+    """Readiness check — returns 200 only when DB and Redis are reachable."""
+    ok = True
+
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(sqlalchemy.text("SELECT 1"))
+    except Exception as e:
+        logger.warning("Readiness check: database failed: %s", e)
+        ok = False
+
+    try:
+        r = aioredis.from_url(settings.redis_url, socket_connect_timeout=2)
+        await r.ping()
+        await r.aclose()
+    except Exception as e:
+        logger.warning("Readiness check: redis failed: %s", e)
+        ok = False
+
+    return JSONResponse(
+        status_code=200 if ok else 503,
+        content={"ready": ok},
+    )
 
 
 @router.get("/health/deep")

@@ -1,0 +1,185 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO_API: listingjet-api
+  ECR_REPO_WORKER: listingjet-worker
+  ECS_CLUSTER: listingjet-staging
+  ECS_SERVICE_API: listingjet-api-staging
+  ECS_SERVICE_WORKER: listingjet-worker-staging
+  IMAGE_TAG: staging-${{ github.sha }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: listingjet
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: listingjet_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
+      DATABASE_URL_SYNC: "postgresql://listingjet:password@localhost:5433/listingjet_test"
+      JWT_SECRET: "test-secret-that-is-at-least-32-characters-long"
+      REDIS_URL: "redis://localhost:6379/0"
+      USE_MOCK_PROVIDERS: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: python -m alembic upgrade head
+      - run: python -m pytest --tb=short -q
+
+  deploy-staging:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $REGISTRY/$ECR_REPO_API:$IMAGE_TAG \
+            -t $REGISTRY/$ECR_REPO_API:staging \
+            .
+          docker push $REGISTRY/$ECR_REPO_API:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_REPO_API:staging
+
+      - name: Tag and push Worker image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker tag $REGISTRY/$ECR_REPO_API:$IMAGE_TAG $REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG
+          docker tag $REGISTRY/$ECR_REPO_API:staging $REGISTRY/$ECR_REPO_WORKER:staging
+          docker push $REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_REPO_WORKER:staging
+
+      - name: Run database migrations
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          NETWORK_CONFIG=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE_API \
+            --query 'services[0].networkConfiguration' \
+            --output json)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster $ECS_CLUSTER \
+            --task-definition $ECS_SERVICE_API \
+            --launch-type FARGATE \
+            --network-configuration "$NETWORK_CONFIG" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"$ECS_SERVICE_API\",\"command\":[\"migrate\"]}]}" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Migration task: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster $ECS_CLUSTER --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster $ECS_CLUSTER \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "ERROR: Migration task failed with exit code $EXIT_CODE"
+            exit 1
+          fi
+          echo "Migrations completed successfully"
+
+      - name: Deploy to staging
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE_API \
+            --force-new-deployment \
+            --query 'service.deployments[0].status' \
+            --output text
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE_WORKER \
+            --force-new-deployment \
+            --query 'service.deployments[0].status' \
+            --output text
+
+      - name: Wait for services to stabilize
+        run: |
+          echo "Waiting for API service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE_API
+          echo "Waiting for Worker service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE_WORKER
+
+      - name: Smoke test
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
+        run: |
+          echo "Running smoke tests against $STAGING_URL"
+
+          # Health check
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "$STAGING_URL/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: /health returned $STATUS"
+            exit 1
+          fi
+          echo "✓ /health → 200"
+
+          # Ready check
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "$STAGING_URL/ready")
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: /ready returned $STATUS"
+            exit 1
+          fi
+          echo "✓ /ready → 200"
+
+          # Version check — verify correct image is running
+          VERSION=$(curl -sf "$STAGING_URL/health" | jq -r '.version // empty')
+          echo "✓ Version: $VERSION"
+
+      - name: Notify Sentry (staging environment)
+        if: always()
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          curl -sL https://sentry.io/api/0/organizations/${{ secrets.SENTRY_ORG }}/releases/ \
+            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\":\"$IMAGE_TAG\",\"environment\":\"staging\",\"projects\":[\"listingjet\"]}" || true

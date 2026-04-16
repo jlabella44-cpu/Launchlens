@@ -190,7 +190,7 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [x] Release automation (semantic-release) — `.releaserc.json` + `.github/workflows/release.yml`
 - [x] Frontend CI — `frontend` job in test.yml: npm ci, lint, vitest run, next build
 - [x] Docker image push to registry (ECR/GHCR) — worker image tagged and pushed in `deploy.yml`
-- [ ] Deployment workflows (staging, production)
+- [x] Deployment workflows (staging, production) — `staging.yml` triggers on `staging` branch; runs tests → build/push → migrate → deploy → wait stable → smoke test (`/health` + `/ready`)
 - [x] 3D dollhouse viewer component — `DollhouseViewer` Canvas-based floorplan renderer; wired into `DollhouseCard`
 - [x] Email blast generation — `POST /listings/{id}/email-blast` LLM-generated HTML+text email
 - [x] Property website generation — `POST /listings/{id}/microsite` in `microsite.py`; `ListingMicrosite` model
