@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import UUID, Boolean, DateTime, Float, Integer, String, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from listingjet.database import Base
@@ -24,4 +25,7 @@ class Tenant(Base):
     # Review settings
     auto_approve_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     auto_approve_threshold: Mapped[float] = mapped_column(Float, default=85.0, server_default="85.0")
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    bypass_limits: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    plan_overrides: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

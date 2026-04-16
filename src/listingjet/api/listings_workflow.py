@@ -292,6 +292,13 @@ async def cancel_listing(
     listing.state = ListingState.CANCELLED
     await db.commit()
 
+    # Attempt to cancel running Temporal workflow (best-effort, swallowed if not running)
+    try:
+        client = get_temporal_client()
+        await client.cancel_workflow(str(listing_id))
+    except Exception:
+        pass
+
     return {"listing_id": str(listing.id), "state": listing.state.value, "credits_refunded": credits_refunded}
 
 

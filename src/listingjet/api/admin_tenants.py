@@ -29,16 +29,23 @@ router = APIRouter()
 async def list_tenants(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
+    include_deactivated: bool = Query(default=False),
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
     """List all tenants with pagination. Requires superadmin role."""
     from listingjet.models.credit_account import CreditAccount
 
-    total = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
+    base_query = select(Tenant)
+    count_query = select(func.count(Tenant.id))
+    if not include_deactivated:
+        base_query = base_query.where(Tenant.deactivated_at.is_(None))
+        count_query = count_query.where(Tenant.deactivated_at.is_(None))
+
+    total = (await db.execute(count_query)).scalar() or 0
     offset = (page - 1) * page_size
     result = await db.execute(
-        select(Tenant).order_by(Tenant.created_at.desc()).offset(offset).limit(page_size)
+        base_query.order_by(Tenant.created_at.desc()).offset(offset).limit(page_size)
     )
     tenants = result.scalars().all()
 
@@ -350,3 +357,111 @@ async def reset_weight(
     )
     await db.commit()
     return {"room_label": room_label, "old_weight": old_weight, "new_weight": 1.0, "reset": True}
+
+
+# ── Tenant Activation Controls ────────────────────────────────────
+
+
+@router.delete("/tenants/{tenant_id}")
+async def deactivate_tenant(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Soft-delete a tenant by setting deactivated_at. Does NOT delete data."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    if tenant.deactivated_at is not None:
+        raise HTTPException(status_code=409, detail="Tenant is already deactivated")
+
+    from datetime import datetime, timezone
+    tenant.deactivated_at = datetime.now(timezone.utc)
+    await audit_log(db, admin_user.id, "deactivate_tenant", "tenant", str(tenant_id), tenant_id=tenant_id)
+    await db.commit()
+    return {"tenant_id": str(tenant_id), "deactivated": True, "deactivated_at": tenant.deactivated_at.isoformat()}
+
+
+@router.post("/tenants/{tenant_id}/reactivate")
+async def reactivate_tenant(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Clear deactivated_at to restore a previously deactivated tenant."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    if tenant.deactivated_at is None:
+        raise HTTPException(status_code=409, detail="Tenant is not deactivated")
+
+    tenant.deactivated_at = None
+    await audit_log(db, admin_user.id, "reactivate_tenant", "tenant", str(tenant_id), tenant_id=tenant_id)
+    await db.commit()
+    return {"tenant_id": str(tenant_id), "deactivated": False}
+
+
+@router.get("/tenants/{tenant_id}/limits")
+async def get_tenant_limits(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Return the effective plan limits for a tenant (plan defaults merged with any per-tenant overrides)."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    from listingjet.services.plan_limits import get_limits
+    effective = get_limits(tenant.plan, overrides=tenant.plan_overrides)
+    return {
+        "tenant_id": str(tenant_id),
+        "plan": tenant.plan,
+        "bypass_limits": tenant.bypass_limits,
+        "plan_overrides": tenant.plan_overrides or {},
+        "effective_limits": effective,
+    }
+
+
+@router.patch("/tenants/{tenant_id}/limits")
+async def update_tenant_limits(
+    tenant_id: uuid.UUID,
+    body: dict,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Set per-tenant limit overrides and/or bypass_limits flag. Pass null values to clear an override."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    changes = {}
+    if "bypass_limits" in body:
+        changes["bypass_limits"] = {"old": tenant.bypass_limits, "new": body["bypass_limits"]}
+        tenant.bypass_limits = bool(body["bypass_limits"])
+
+    if "plan_overrides" in body:
+        overrides = body["plan_overrides"]
+        if overrides is None:
+            changes["plan_overrides"] = "cleared"
+            tenant.plan_overrides = None
+        else:
+            if not isinstance(overrides, dict):
+                raise HTTPException(status_code=400, detail="plan_overrides must be a JSON object")
+            changes["plan_overrides"] = overrides
+            tenant.plan_overrides = overrides
+
+    await audit_log(
+        db, admin_user.id, "update_limits", "tenant", str(tenant_id),
+        tenant_id=tenant_id, details=changes,
+    )
+    await db.commit()
+
+    from listingjet.services.plan_limits import get_limits
+    return {
+        "tenant_id": str(tenant_id),
+        "plan": tenant.plan,
+        "bypass_limits": tenant.bypass_limits,
+        "plan_overrides": tenant.plan_overrides or {},
+        "effective_limits": get_limits(tenant.plan, overrides=tenant.plan_overrides),
+    }

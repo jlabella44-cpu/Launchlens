@@ -16,7 +16,6 @@ with workflow.unsafe.imports_passed_through():
         run_floorplan,
         run_health_score,
         run_ingestion,
-        run_learning,
         run_microsite_generator,
         run_mls_export,
         run_packaging,
@@ -32,6 +31,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from listingjet.activities.social_event import run_social_event
     from listingjet.agents.base import AgentContext
+    from listingjet.workflows.learning_workflow import LearningWorkflow
 
 
 @dataclass
@@ -248,12 +248,19 @@ class ListingPipeline:
         except Exception as exc:
             workflow.logger.warning("microsite_failed listing=%s error=%s", input.listing_id, exc)
 
-        # Step 6: Learn from human overrides for this listing
-        await workflow.execute_activity(
-            run_learning, ctx,
-            start_to_close_timeout=_DEFAULT_TIMEOUT,
-            retry_policy=_DEFAULT_RETRY,
-        )
+        # Step 6: Kick off learning in a decoupled child workflow (non-blocking)
+        try:
+            await workflow.start_child_workflow(
+                LearningWorkflow.run,
+                ctx,
+                id=f"learning-{input.listing_id}",
+                task_queue=workflow.info().task_queue,
+                parent_close_policy=workflow.ParentClosePolicy.ABANDON,
+            )
+        except Exception as exc:
+            workflow.logger.warning(
+                "learning_workflow_start_failed listing=%s error=%s", input.listing_id, exc
+            )
 
         # Step 7: Create social event for reminders (non-blocking)
         try:

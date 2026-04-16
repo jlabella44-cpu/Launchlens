@@ -3,7 +3,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
@@ -102,6 +102,26 @@ async def start_pipeline(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    if tenant.deactivated_at is not None:
+        raise HTTPException(status_code=403, detail="Tenant account is deactivated")
+
+    if not tenant.bypass_limits:
+        from datetime import datetime, timezone
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        user_today_count = (await db.execute(
+            select(func.count(Listing.id)).where(
+                Listing.tenant_id == current_user.tenant_id,
+                Listing.created_at >= today_start,
+            )
+        )).scalar() or 0
+        from listingjet.services.plan_limits import check_user_daily_quota, get_limits
+        effective_limits = get_limits(tenant.plan, overrides=tenant.plan_overrides)
+        if not check_user_daily_quota(effective_limits, user_today_count):
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily listing limit reached ({effective_limits.get('max_listings_per_day_per_user', 10)} per day). Try again tomorrow.",
+            )
+
     credit_svc = CreditService()
 
     # Calculate total cost
@@ -124,17 +144,18 @@ async def start_pipeline(
 
     total_cost = base_cost + addon_cost
 
-    # Deduct base listing credits
-    try:
-        await credit_svc.deduct_credits(
-            db, tenant.id, base_cost,
-            transaction_type="listing_debit",
-            reference_type="listing",
-            reference_id=str(listing_id),
-            description=f"Listing at {listing.address.get('street', 'new listing')}",
-        )
-    except InsufficientCreditsError:
-        raise HTTPException(status_code=402, detail=f"Insufficient credits. Need {total_cost}, purchase more to continue.")
+    if not tenant.bypass_limits:
+        # Deduct base listing credits
+        try:
+            await credit_svc.deduct_credits(
+                db, tenant.id, base_cost,
+                transaction_type="listing_debit",
+                reference_type="listing",
+                reference_id=str(listing_id),
+                description=f"Listing at {listing.address.get('street', 'new listing')}",
+            )
+        except InsufficientCreditsError:
+            raise HTTPException(status_code=402, detail=f"Insufficient credits. Need {total_cost}, purchase more to continue.")
 
     listing.credit_cost = base_cost
 
@@ -149,7 +170,7 @@ async def start_pipeline(
 
         addon_credit_cost = 0 if is_bundle else catalog_entry.credit_cost
         txn = None
-        if addon_credit_cost > 0:
+        if not tenant.bypass_limits and addon_credit_cost > 0:
             try:
                 txn = await credit_svc.deduct_credits(
                     db, tenant.id, addon_credit_cost,
@@ -172,7 +193,7 @@ async def start_pipeline(
         db.add(purchase)
 
     # Bundle credit deduction (single charge for all included addons)
-    if is_bundle:
+    if not tenant.bypass_limits and is_bundle:
         try:
             await credit_svc.deduct_credits(
                 db, tenant.id, addon_cost,

@@ -65,6 +65,20 @@ class TemporalClient:
         handle = client.get_workflow_handle(workflow_id)
         await handle.signal(ListingPipeline.shadow_review_approved)
 
+    async def cancel_workflow(self, listing_id: str) -> None:
+        """Request cancellation of the listing pipeline workflow.
+
+        Best-effort — swallows RPCError if the workflow is already
+        completed, not found, or not running.
+        """
+        try:
+            client = await self._connect()
+            workflow_id = f"listing-pipeline-{listing_id}"
+            handle = client.get_workflow_handle(workflow_id)
+            await handle.cancel()
+        except Exception:
+            logger.debug("cancel_workflow noop listing=%s", listing_id)
+
 
 _temporal_client: TemporalClient | None = None
 

@@ -180,10 +180,10 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [ ] Dark mode (Phase 2)
 - [ ] Stripe Connect (marketplace payouts)
 - [ ] Usage-based billing / metering
-- [ ] Tenant deletion / deactivation (soft-delete pattern)
-- [ ] Workflow cancellation / compensation
+- [x] Tenant deletion / deactivation — migration 050 adds `deactivated_at`; `DELETE /admin/tenants/{id}` soft-deletes, `POST /reactivate` restores; 403 guard in start_pipeline
+- [x] Workflow cancellation / compensation — `cancel_workflow()` on TemporalClient; `cancel_listing` now sends Temporal cancellation signal after DB state update
 - [x] Shadow review signal flow — `POST /admin/listings/{id}/shadow-approve` sends Temporal signal; `signal_shadow_review_approved` added to TemporalClient
-- [ ] LearningAgent as separate Temporal workflow
+- [x] LearningAgent as separate Temporal workflow — `LearningWorkflow` in `workflows/learning_workflow.py`; pipeline Step 6 now fires child workflow with `ABANDON` policy (non-blocking, registered in worker)
 - [ ] Workflow versioning / migration strategy
 - [x] Security scanning — Trivy CRITICAL scan in deploy.yml (blocks deploy on unfixed CVEs)
 - [x] Coverage reporting — pytest-cov + Codecov upload in test.yml
@@ -195,8 +195,8 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [ ] Email blast generation
 - [ ] Property website generation
 - [ ] Image resizing for MLS specs
-- [ ] Per-user limits (only per-tenant for now)
+- [x] Per-user limits — `max_listings_per_day_per_user` in PLAN_LIMITS (free=3, lite=10, active_agent=25, team=∞); checked in start_pipeline behind `bypass_limits` flag
 - [ ] Real-time usage dashboard
-- [ ] Configurable limits via admin API
-- [ ] Admin override to bypass limits
+- [x] Configurable limits via admin API — `GET/PATCH /admin/tenants/{id}/limits`; `plan_overrides` JSONB merged on top of plan defaults
+- [x] Admin override to bypass limits — `bypass_limits` boolean on Tenant (migration 050); skips credit deduction + daily quota in start_pipeline
 - [ ] S3 local mock (LocalStack)
