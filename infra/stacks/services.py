@@ -92,6 +92,36 @@ class ServicesStack(Stack):
             self, "AppSecrets", "listingjet/app",
         )
 
+        # --- S3 media bucket -------------------------------------------------
+        # Lifecycle rules:
+        #   * Abort incomplete multipart uploads after 7 days (uploads abandoned
+        #     mid-flight otherwise accrue storage indefinitely).
+        #   * Transition noncurrent versions to STANDARD_IA after 30 days, then
+        #     expire them after 90 days. Current versions are never expired.
+        self.media_bucket = s3.Bucket(
+            self, "MediaBucket",
+            bucket_name=f"listingjet-media-{Stack.of(self).account}-{Stack.of(self).region}",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            versioned=True,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    id="AbortIncompleteMultipartUploads",
+                    abort_incomplete_multipart_upload_after=Duration.days(7),
+                ),
+                s3.LifecycleRule(
+                    id="ExpireNoncurrentVersions",
+                    noncurrent_version_transitions=[
+                        s3.NoncurrentVersionTransition(
+                            storage_class=s3.StorageClass.INFREQUENT_ACCESS,
+                            transition_after=Duration.days(30),
+                        ),
+                    ],
+                    noncurrent_version_expiration=Duration.days(90),
+                ),
+            ],
+        )
+
         # Common environment variables
         base_env = {
             "APP_ENV": "production",
@@ -100,7 +130,7 @@ class ServicesStack(Stack):
             "REDIS_URL": f"redis://{redis_cluster.attr_primary_end_point_address}:{redis_cluster.attr_primary_end_point_port}/0",
             "CORS_ORIGINS": "http://localhost:3000,https://listingjet.ai,https://www.listingjet.ai",
             "TEMPORAL_HOST": "temporal.listingjet.local:7233",
-            "S3_BUCKET_NAME": "listingjet-dev",
+            "S3_BUCKET_NAME": self.media_bucket.bucket_name,
         }
 
         # --- API Service (Fargate + ALB) ------------------------------------
@@ -121,7 +151,7 @@ class ServicesStack(Stack):
                 stream_prefix="api",
                 log_group=logs.LogGroup(
                     self, "ApiLogs",
-                    log_group_name="/launchlens/api",
+                    log_group_name="/listingjet/api",
                     retention=logs.RetentionDays.ONE_MONTH,
                 ),
             ),
@@ -216,53 +246,14 @@ class ServicesStack(Stack):
             scale_out_cooldown=Duration.seconds(60),
         )
 
-        # --- S3 media bucket -------------------------------------------------
-        # Lifecycle rules:
-        #   * Abort incomplete multipart uploads after 7 days (uploads abandoned
-        #     mid-flight otherwise accrue storage indefinitely).
-        #   * Transition noncurrent versions to STANDARD_IA after 30 days, then
-        #     expire them after 90 days. Current versions are never expired.
-        self.media_bucket = s3.Bucket(
-            self, "MediaBucket",
-            bucket_name=f"listingjet-media-{Stack.of(self).account}-{Stack.of(self).region}",
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            encryption=s3.BucketEncryption.S3_MANAGED,
-            versioned=True,
-            lifecycle_rules=[
-                s3.LifecycleRule(
-                    id="AbortIncompleteMultipartUploads",
-                    abort_incomplete_multipart_upload_after=Duration.days(7),
-                ),
-                s3.LifecycleRule(
-                    id="ExpireNoncurrentVersions",
-                    noncurrent_version_transitions=[
-                        s3.NoncurrentVersionTransition(
-                            storage_class=s3.StorageClass.INFREQUENT_ACCESS,
-                            transition_after=Duration.days(30),
-                        ),
-                    ],
-                    noncurrent_version_expiration=Duration.days(90),
-                ),
-            ],
-        )
-
         # --- IAM: Grant S3 + CloudWatch to API and Worker task roles ----------
-        s3_bucket_arn = "arn:aws:s3:::listingjet-dev"
-        s3_policy = iam.PolicyStatement(
-            actions=["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-            resources=[f"{s3_bucket_arn}/*"],
-        )
-        s3_list_policy = iam.PolicyStatement(
-            actions=["s3:ListBucket"],
-            resources=[s3_bucket_arn],
-        )
+        # Use CDK grant helpers so the bucket ARN is always in sync with the
+        # MediaBucket construct above — no hardcoded ARNs.
+        self.media_bucket.grant_read_write(api_task.task_role)
         cloudwatch_policy = iam.PolicyStatement(
             actions=["cloudwatch:PutMetricData"],
             resources=["*"],
         )
-
-        api_task.task_role.add_to_policy(s3_policy)
-        api_task.task_role.add_to_policy(s3_list_policy)
         api_task.task_role.add_to_policy(cloudwatch_policy)
 
         # --- Worker Service (Fargate, no ALB) --------------------------------
@@ -284,7 +275,7 @@ class ServicesStack(Stack):
                 stream_prefix="worker",
                 log_group=logs.LogGroup(
                     self, "WorkerLogs",
-                    log_group_name="/launchlens/worker",
+                    log_group_name="/listingjet/worker",
                     retention=logs.RetentionDays.TWO_WEEKS,
                 ),
             ),
@@ -323,8 +314,7 @@ class ServicesStack(Stack):
             ),
         )
 
-        worker_task.task_role.add_to_policy(s3_policy)
-        worker_task.task_role.add_to_policy(s3_list_policy)
+        self.media_bucket.grant_read_write(worker_task.task_role)
         worker_task.task_role.add_to_policy(cloudwatch_policy)
 
         # Worker runs Temporal activities, which are inherently retry-safe:
@@ -362,7 +352,7 @@ class ServicesStack(Stack):
                 stream_prefix="temporal",
                 log_group=logs.LogGroup(
                     self, "TemporalLogs",
-                    log_group_name="/launchlens/temporal",
+                    log_group_name="/listingjet/temporal",
                     retention=logs.RetentionDays.TWO_WEEKS,
                 ),
             ),

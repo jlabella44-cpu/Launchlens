@@ -25,8 +25,8 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] **Run `cdk deploy`** to apply IAM changes permanently (currently inline policies)
 - [x] **Apply `property_data` table migration** (blocker — obs #1028) — fixed entrypoint.sh stamp bug that was skipping 023+024; explicit ECS migrate task added to deploy.yml
 - [x] **Run missing migrations on prod DB** — `alembic upgrade head` via deploy.yml `Run database migrations` step (ECS run-task); manual runbook at `scripts/run_prod_migrations.sh`
-- [ ] **Separate dev/prod S3 buckets** — both currently use `listingjet-dev`
-- [ ] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*`
+- [x] **Separate dev/prod S3 buckets** — `S3_BUCKET_NAME` env var and IAM now wired to CDK-managed `listingjet-media-{account}-{region}` bucket via `grant_read_write()`; deploy will provision the prod bucket
+- [x] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*` — updated in `infra/stacks/services.py`
 - [ ] **Pre-launch infra revert** — apply `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (RDS/Redis/ECS upsizing, Multi-AZ, Container Insights, budget ceiling)
 - [ ] **🚨 RDS encrypted-storage migration** — live DB `kjyxgeldpfef` is unencrypted; must migrate to encrypted instance before real user data lands. One-shot ~30-60 min downtime window. Full cutover plan in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section A).
 - [ ] **🚨 Replace `SMTP_PASSWORD` placeholder with real credentials** — `listingjet/app` secret has `PLACEHOLDER_SMTP_PASSWORD`. Pick SES or Resend, generate real SMTP password, update secret, force ECS redeployment. See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section B).
