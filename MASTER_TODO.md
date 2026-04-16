@@ -65,7 +65,7 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [ ] **Deploy backend with new analytics endpoints** (ECR push + ECS redeploy)
 - [ ] **Test analytics page on production**
 - [ ] **Merge PR #109** once CI passes
-- [ ] **4 unpushed commits on local master** — decide: PR these or reset to origin
+- [x] **4 unpushed commits on local master** — already pushed; local main == origin/main
 
 ### Vision Pipeline
 - [x] **Add per-image logging** — already logging before/after each T1 and T2 analysis with asset ID and proxy status
