@@ -23,8 +23,8 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 ### Infrastructure
 - [ ] **SES production access** — wait for AWS approval, then verify
 - [ ] **Run `cdk deploy`** to apply IAM changes permanently (currently inline policies)
-- [ ] **Apply `property_data` table migration** (blocker — obs #1028)
-- [ ] **Run missing migrations on prod DB**
+- [x] **Apply `property_data` table migration** (blocker — obs #1028) — fixed entrypoint.sh stamp bug that was skipping 023+024; explicit ECS migrate task added to deploy.yml
+- [x] **Run missing migrations on prod DB** — `alembic upgrade head` via deploy.yml `Run database migrations` step (ECS run-task); manual runbook at `scripts/run_prod_migrations.sh`
 - [ ] **Separate dev/prod S3 buckets** — both currently use `listingjet-dev`
 - [ ] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*`
 - [ ] **Pre-launch infra revert** — apply `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (RDS/Redis/ECS upsizing, Multi-AZ, Container Insights, budget ceiling)
