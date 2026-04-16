@@ -154,7 +154,8 @@ src/listingjet/
     listings_workflow.py     /start-pipeline retry semantics, pipeline-status endpoint
     listings_permissions.py  Cross-tenant grants (Phase B blanket, Phase C per-listing)
     assets.py                GET /assets
-    credits.py               GET /credits/balance, GET /credits/transactions (paginated)
+    analytics.py             GET /analytics/overview, /timeline, /usage, /credits (paginated)
+    credits.py               GET /credits/balance, /transactions (paginated), /pricing, /service-costs; POST /credits/purchase
     addons.py                Addon catalog, purchase, fulfillment
     demo.py                  POST /demo/upload, GET /demo/{id}, POST /demo/{id}/claim
     billing.py               Checkout, status, portal, webhook
@@ -177,23 +178,34 @@ src/listingjet/
     tenant.py                TenantMiddleware: JWT decode → request.state.tenant_id; _PUBLIC_PATHS skip list
 
 alembic/versions/
-  Chain runs 001 → 048+ linearly (no merges, no gaps).
+  Chain runs 001 → 049 linearly (no merges, no gaps).
   Highlights:
   001 Initial schema + RLS policies on all tenant-scoped tables
   010 credit_transactions table
-  011-013 Brand kit
+  011-013 Brand kit + voice samples
+  018 import_jobs table
   020 Query indexes (tenant_id, listing_id, state)
+  023 property_data table (ATTOM/MLS cross-reference)
   024 ListingState.CANCELLED enum value
   027 Additional performance indexes
-  041 Last of the pre-credit-refactor migrations
-  046 Drop legacy Tenant.credit_balance — CreditAccount is sole source of truth
-  048 User AI consent fields (ai_consent_at, ai_consent_version) + backfill
+  028 User GDPR consent fields
+  034 addon_catalog seed data
+  040 Social features (listing_events, social_accounts, notifications)
+  041 listing_health_scores, health_score_history, idx_feed_configs
+  042 listing_outcomes, performance_insights (Phase 5)
+  043 White-label columns on brand_kits
+  044 FORCE ROW LEVEL SECURITY on all tenant-isolated tables
+  046 Drop Tenant.credit_balance — CreditAccount is sole source of truth
+  047 tenant_health_weights table
+  048 User AI consent fields (ai_consent_at, ai_consent_version)
+  049 Team invite tokens; password_hash nullable for pending invites
 
 tests/
   conftest.py                test_engine (NullPool, port 5433), db_session, async_client, JWT helpers, promote_to_superadmin
   test_agents/               agent unit tests + E2E pipeline smoke (23 agents)
   test_api/                  auth, billing, listings, assets, admin, plan_limits, admin_credits, addons, credits, dollhouse, demo, etc.
   test_integration/          test_credit_lifecycle.py — full register→credits→listing→webhook→admin flows + AI consent coverage
+                             test_s11_15_workflows.py — /credits/service-costs, /admin/audit-log (filters+pagination), billing page init flow, admin dashboard workflow, credit purchase + webhook fulfillment
   test_middleware/           tenant middleware, security headers
   test_providers/            mock, factory, storage, rate_limiter, vision, canva, kling, claude providers
   test_services/             events, outbox, fha_filter, weight_manager, credits, ai_consent, audit, account_lifecycle, data_retention, notifications, email_templates, endcard, drip_scheduler, link_import, outcome_tracker, help_agent
@@ -280,7 +292,7 @@ async with (session.begin() if not session.in_transaction() else session.begin_n
 ### Credit System
 - `CreditTransaction` records every credit event with signed `amount` and denormalized `balance_after`
 - `transaction_type`: `purchase` | `usage` | `admin_adjustment` | `expiration` | `bonus`
-- `Tenant.credit_balance` is denormalized for fast balance reads (updated atomically with transaction insert)
+- `CreditAccount` is the **sole source of truth** for balances (`granted_balance` + `purchased_balance`); `Tenant.credit_balance` was dropped in migration 046
 - Negative balance guard enforced in `POST /admin/tenants/{id}/credits/adjust`
 - All adjustments emit a `credits.admin_adjustment` audit event via the outbox
 
@@ -351,6 +363,8 @@ Third-party AI processing (Google Vision, Qwen, Claude, Kling, virtual staging) 
 | POST | /admin/tenants/{id}/credits/adjust | Manual credit adjustment |
 | GET | /admin/credits/summary | Platform credit stats (this month) |
 | GET | /admin/analytics/revenue | Revenue breakdown, top tenants by usage |
+| GET | /admin/audit-log | Paginated audit log (filter: action, resource_type, tenant_id) |
+| GET | /admin/events/recent | Recent system events feed |
 
 ---
 
@@ -387,6 +401,7 @@ Third-party AI processing (Google Vision, Qwen, Claude, Kling, virtual staging) 
 | Lint | `.github/workflows/lint.yml` | push / PR |
 | Test | `.github/workflows/test.yml` | push / PR — 2 Postgres service containers |
 | Docker | `.github/workflows/docker.yml` | push to main |
+| Deploy | `.github/workflows/deploy.yml` | push to main / workflow_dispatch — runs tests, then ECS run-task `migrate` (aborts on failure), then force-new-deployment |
 
 ---
 
