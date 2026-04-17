@@ -1,4 +1,35 @@
-"""RDS PostgreSQL and ElastiCache Redis."""
+"""RDS PostgreSQL and ElastiCache Redis.
+
+⚠️  CDK DRIFT WARNING — encryption migration 2026-04-17 ⚠️
+
+The live RDS instance for this stack is now
+`listingjet-postgres-encrypted` (StorageEncrypted=True, restored from an
+encrypted snapshot of the old `listingjetdatabase-postgres9dc8bb04-kjyxgeldpfef`
+instance, which has been deleted). That migration was done via `aws rds`
+CLI, NOT through CDK, so CloudFormation still thinks this stack's `Postgres`
+logical resource is the deleted physical instance.
+
+DO NOT run `cdk deploy` on `ListingJetDatabase` until this drift is
+reconciled. A normal deploy here would at best fail, at worst recreate a
+brand-new empty Postgres on top of the real data.
+
+Reconciliation plan (future session):
+1. Rewrite this construct with `removal_policy=RemovalPolicy.RETAIN` and
+   remove the `Postgres` resource from the template.
+2. `cdk deploy` to release the (now missing) old resource from CFN
+   tracking without deleting anything.
+3. Re-add `Postgres` with `storage_encrypted=True` and all other
+   properties matching the live new instance.
+4. `cdk import` to adopt the live new instance under the same logical
+   ID — CFN requires every property to match exactly, so expect a few
+   retry cycles.
+
+Until then: app runs fine (DATABASE_URL secret already points at the
+new instance); Redis + SGs + subnet group in this stack are untouched
+and safe to `cdk deploy` individually via `--exclusively` if needed.
+
+See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` §A for the original runbook.
+"""
 
 from aws_cdk import (
     Duration,
@@ -54,11 +85,11 @@ class DatabaseStack(Stack):
             credentials=rds.Credentials.from_generated_secret("listingjet"),
             allocated_storage=20,
             max_allocated_storage=50,
-            # storage_encrypted intentionally omitted: live kjyxgeldpfef was
-            # created without the property set, so emitting it at all (even
-            # =False) makes CFN treat the resource as needing replacement.
-            # Pre-launch: migrate to an encrypted instance before real users.
-            # See docs/PRE_LAUNCH_INFRA_CHECKLIST.md for the cutover plan.
+            # storage_encrypted: the LIVE instance is now encrypted (see file
+            # header). This construct still omits the property because the
+            # logical→physical mapping in CFN is stale — adding
+            # storage_encrypted=True here without first reconciling state
+            # would tell CFN to replace the resource, wiping live data.
             multi_az=False,
             # Pre-launch: 1-day backup retention. PITR window is short, but no
             # production data to protect yet. Restore retention to 7 days
