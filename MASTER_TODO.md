@@ -31,6 +31,13 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] **🚨 RDS encrypted-storage migration** — live DB `kjyxgeldpfef` is unencrypted; must migrate to encrypted instance before real user data lands. One-shot ~30-60 min downtime window. Full cutover plan in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section A).
 - [ ] **🚨 Replace `SMTP_PASSWORD` placeholder with real credentials** — `listingjet/app` secret has `PLACEHOLDER_SMTP_PASSWORD`. Pick SES or Resend, generate real SMTP password, update secret, force ECS redeployment. See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section B).
 
+### Post-Apr-14 Infra Followups (from the drift-fix + #226 deploy session)
+- [ ] **Migrate Postgres to encrypted storage** — `kjyxgeldpfef` currently unencrypted; `storage_encrypted` is intentionally omitted from CDK to match live template shape. Pre-launch must-fix: snapshot → `restore-db-instance-from-db-snapshot --storage-encrypted` → swap the CDK reference. See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md`.
+- [ ] **Replace real SMTP_PASSWORD** in `listingjet/app` Secrets Manager (currently `PLACEHOLDER_SMTP_PASSWORD`) once email provider (Resend or SES prod) is chosen.
+- [ ] **Delete orphan S3 bucket** `listingjet-media-265911026550-us-east-1` — never used; app uses `listingjet-dev`. Safe: `aws s3 rb s3://listingjet-media-265911026550-us-east-1 --force`.
+- [ ] **Rotate the `handoff-safety-20260414-0830` snapshot** out of retention once the DB has been migrated to encrypted storage (it's a pre-migration safety net; keep at least until the new encrypted instance is verified).
+- [ ] **Verify `deletion_protection` stays True** on the real Postgres — today's rollbacks toggled it off once. Good safety net, add CloudWatch alarm if CDK lets it drift again.
+
 ### Cost Optimization — Data to Collect from AWS
 After the cost-optimization branch is deployed and has run for **at least 7 days** (ideally 14), gather the following and bring it back to the next session for further right-sizing decisions. Commands documented in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md`.
 
