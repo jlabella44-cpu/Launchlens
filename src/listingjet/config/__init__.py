@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     frontend_url: str = "https://listingjet.ai"
 
     # S3
-    s3_bucket_name: str = "listingjet-dev"
+    s3_bucket_name: str = ""
     aws_region: str = "us-east-1"
 
     # Monitoring
