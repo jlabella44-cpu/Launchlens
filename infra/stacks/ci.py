@@ -21,6 +21,7 @@ class CIStack(Stack):
         scope: Construct,
         id: str,
         api_repo: ecr.IRepository,
+        worker_repo: ecr.IRepository,
         cluster: ecs.ICluster,
         **kwargs,
     ) -> None:
@@ -50,8 +51,10 @@ class CIStack(Stack):
             ),
         )
 
-        # ECR push permissions
+        # ECR push permissions — both repos share a Dockerfile; the deploy
+        # workflow tags one build to both and pushes.
         api_repo.grant_pull_push(self.deploy_role)
+        worker_repo.grant_pull_push(self.deploy_role)
 
         # ECS deploy permissions
         self.deploy_role.add_to_policy(
