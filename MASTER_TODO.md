@@ -22,14 +22,14 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 
 ### Infrastructure
 - [ ] **SES production access** — wait for AWS approval, then verify
-- [ ] **Run `cdk deploy`** to apply IAM changes permanently (currently inline policies)
+- [x] **Run `cdk deploy`** — deployed 2026-04-16 from main. Only `ListingJetServices` drifted; applied task-def rollover + `/launchlens/*` → `/listingjet/*` log groups + S3 bucket cutover. All ECS services healthy on new task defs (api:15, worker:14, temporal:7).
 - [x] **Apply `property_data` table migration** (blocker — obs #1028) — fixed entrypoint.sh stamp bug that was skipping 023+024; explicit ECS migrate task added to deploy.yml
 - [x] **Run missing migrations on prod DB** — `alembic upgrade head` via deploy.yml `Run database migrations` step (ECS run-task); manual runbook at `scripts/run_prod_migrations.sh`
-- [x] **Separate dev/prod S3 buckets** — `S3_BUCKET_NAME` env var and IAM now wired to CDK-managed `listingjet-media-{account}-{region}` bucket via `grant_read_write()`; deploy will provision the prod bucket
-- [x] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*` — updated in `infra/stacks/services.py`
+- [x] **Separate dev/prod S3 buckets** — cutover deployed 2026-04-16. Live bucket is `listingjet-media-265911026550-us-east-1`; old `listingjet-dev` (913 objects / ~3 GB of pre-launch test data) and empty `listingjet-prod` were deleted post-deploy. Stale default `s3_bucket_name = "listingjet-dev"` remains in `src/listingjet/config/__init__.py:81` — harmless in prod (env var overrides), but a local-dev fallback landmine; fix in a follow-up.
+- [x] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*` — deployed 2026-04-16. Old `/launchlens/*` log groups were replaced on deploy; historical logs under the old names are gone (retention was 30 days so no meaningful loss).
 - [ ] **Pre-launch infra revert** — apply `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (RDS/Redis/ECS upsizing, Multi-AZ, Container Insights, budget ceiling)
 - [ ] **🚨 RDS encrypted-storage migration** — live DB `kjyxgeldpfef` is unencrypted; must migrate to encrypted instance before real user data lands. One-shot ~30-60 min downtime window. Full cutover plan in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section A).
-- [ ] **🚨 Replace `SMTP_PASSWORD` placeholder with real credentials** — `listingjet/app` secret has `PLACEHOLDER_SMTP_PASSWORD`. Pick SES or Resend, generate real SMTP password, update secret, force ECS redeployment. See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section B).
+- [ ] **🚨 Confirm email provider — SMTP path appears abandoned in favor of Resend.** Verified live state on 2026-04-16: `listingjet/app` has `RESEND_API_KEY` set to a real `re_...` value (36 chars), `EMAIL_ENABLED=true`, and `SMTP_PASSWORD` is **empty string** (not the old `PLACEHOLDER_SMTP_PASSWORD`). Action: audit `src/listingjet/notifications/` for any remaining SMTP callers (if none, drop `SMTP_PASSWORD` from the secret + `.env.example`); otherwise pick one provider and delete the other path. SES production access is still pending (sandbox: 1/sec, 200/day cap).
 
 ### Post-Apr-14 Infra Followups (from the drift-fix + #226 deploy session)
 - [ ] **Migrate Postgres to encrypted storage** — `kjyxgeldpfef` currently unencrypted; `storage_encrypted` is intentionally omitted from CDK to match live template shape. Pre-launch must-fix: snapshot → `restore-db-instance-from-db-snapshot --storage-encrypted` → swap the CDK reference. See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md`.
