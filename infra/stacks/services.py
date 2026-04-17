@@ -195,6 +195,7 @@ class ServicesStack(Stack):
             protocol=elbv2.ApplicationProtocol.HTTP,
             assign_public_ip=False,
             service_name="listingjet-api",
+            min_healthy_percent=100,
         )
 
         self.api_service.target_group.configure_health_check(
@@ -330,6 +331,7 @@ class ServicesStack(Stack):
             desired_count=1,
             service_name="listingjet-worker",
             assign_public_ip=False,
+            min_healthy_percent=100,
             capacity_provider_strategies=[
                 ecs.CapacityProviderStrategy(
                     capacity_provider="FARGATE_SPOT",
@@ -377,5 +379,6 @@ class ServicesStack(Stack):
             desired_count=1,
             service_name="listingjet-temporal",
             assign_public_ip=False,
+            min_healthy_percent=100,
             cloud_map_options=ecs.CloudMapOptions(name="temporal"),
         )
