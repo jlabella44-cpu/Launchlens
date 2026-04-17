@@ -46,6 +46,7 @@ monitoring = MonitoringStack(
 ci = CIStack(
     app, "ListingJetCI",
     api_repo=services.api_repo,
+    worker_repo=services.worker_repo,
     cluster=services.cluster,
     env=env,
 )
