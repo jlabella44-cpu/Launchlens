@@ -11,21 +11,23 @@
 
 ---
 
-## Active branch
+## Branching
 
-All work goes on: **`claude/run-prod-migrations-IerKk`**
+Create a **fresh feature branch per task** off `main`. Name it for the work
+(`fix/…`, `feat/…`, `docs/…`, `chore/…`). Push, open a PR, do not merge to
+`main` without an explicit green light.
 
 ```bash
-git checkout claude/run-prod-migrations-IerKk
-git pull origin claude/run-prod-migrations-IerKk
+git checkout main
+git pull --ff-only origin main
+git checkout -b <branch-name>
+# …work…
+git push -u origin <branch-name>
 ```
 
-Push when done:
-```bash
-git push -u origin claude/run-prod-migrations-IerKk
-```
-
-Do **not** push to `main` or create a PR unless explicitly asked.
+Do **not** push to `main` directly and do **not** amend published commits.
+`gh pr create` is blocked by token perms on this machine — use the compare
+URL printed by `git push` to open the PR manually.
 
 ---
 
@@ -89,33 +91,36 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 
 These all require **external AWS actions** — no code changes needed, just ops work:
 
-### 1. SES production access
-- Still waiting on AWS approval
-- Once approved: create SMTP IAM user → generate credentials → store in `listingjet/app` Secrets Manager as `SMTP_PASSWORD`
-- Also set `smtp_host`, `smtp_port`, `smtp_user`, `email_from`
-- Then force ECS redeploy: `aws ecs update-service --cluster listingjet --service listingjet-api --force-new-deployment`
+### 1. Wire up a working email provider
+Current prod reality (verified 2026-04-16): `email_enabled` is unset in the
+api/worker ECS task defs, so `get_email_service()` returns `NoOpEmailService`
+and **no transactional email is actually being sent**. The
+`listingjet/app` secret has `RESEND_API_KEY` set and `SMTP_PASSWORD` empty,
+but the code has no Resend integration — only `EmailService` (SMTP),
+`SESEmailService`, and `NoOpEmailService` in `src/listingjet/services/email.py`.
 
-### 2. Run `cdk deploy`
-```bash
-cd infra
-pip install -r requirements.txt
-cdk deploy --all
-```
-IAM policies are currently inline (applied manually). `cdk deploy` makes them permanent and managed.
+Pick one and finish the wiring:
+- **Resend via SMTP relay** (simplest): set `SMTP_HOST=smtp.resend.com`,
+  `SMTP_USER=resend`, plumb `RESEND_API_KEY` → `SMTP_PASSWORD` secret,
+  set `EMAIL_ENABLED=true` in task def, redeploy.
+- **Resend native**: add `resend` Python package, write `ResendEmailService`
+  subclass, gate on a new `resend_enabled` setting.
+- **SES**: wait for prod access approval, set `SES_ENABLED=true`,
+  `EMAIL_ENABLED=true`, redeploy.
 
-### 3. RDS encrypted-storage migration (~30-60 min downtime)
+### 2. RDS encrypted-storage migration (~30-60 min downtime)
 The live RDS instance `kjyxgeldpfef` is unencrypted. Full runbook in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` section A:
 1. Snapshot → copy with encryption → restore → update `DATABASE_URL` secret → restart ECS → delete old instance
 2. Then uncomment `storage_encrypted=True` in `infra/stacks/database.py` and re-run `cdk deploy`
 
-### 4. Pre-launch infra revert
+### 3. Pre-launch infra revert
 See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` — infra was deliberately undersized while there are zero users. Before real users land, apply in `infra/stacks/database.py`:
 - RDS: `t4g.micro` → `t4g.small`, backup retention 1 day → 7 days, consider Multi-AZ
 - Redis: `cache.t4g.micro` → `cache.t4g.small`, single-node → 2-node with failover
 - ECS: increase CPU/memory on API and worker task definitions
 - Then `cdk deploy`
 
-### 5. Cost data to collect (after 7–14 days of traffic)
+### 4. Cost data to collect (after 7–14 days of traffic)
 See `MASTER_TODO.md` "Cost Optimization" section — list of AWS Cost Explorer / Compute Optimizer / CloudWatch queries to run and bring back for right-sizing decisions.
 
 ---
