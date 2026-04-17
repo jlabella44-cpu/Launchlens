@@ -79,23 +79,39 @@ jobs:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Derive network config from the running API service so we don't need
-          # to duplicate subnets/security-groups as separate secrets.
-          NETWORK_CONFIG=$(aws ecs describe-services \
+          # Derive network config + task definition + container name from the
+          # running API service. The task def family is CDK-generated
+          # (e.g. ListingJetServicesApiTaskCC6F2D94), so hardcoding the ECR
+          # repo name as the family fails with "TaskDefinition not found".
+          # The container name inside the CDK task def is "api", not the ECR
+          # repo name either.
+          SERVICE_JSON=$(aws ecs describe-services \
             --cluster $ECS_CLUSTER \
             --services $ECS_SERVICE_API \
-            --query 'services[0].networkConfiguration' \
+            --query 'services[0]' \
             --output json)
+          NETWORK_CONFIG=$(echo "$SERVICE_JSON" | jq -c '.networkConfiguration')
+          TASK_DEF_ARN=$(echo "$SERVICE_JSON" | jq -r '.taskDefinition')
+          CONTAINER_NAME=$(aws ecs describe-task-definition \
+            --task-definition "$TASK_DEF_ARN" \
+            --query 'taskDefinition.containerDefinitions[0].name' \
+            --output text)
+
+          echo "Task definition: $TASK_DEF_ARN"
+          echo "Container name:  $CONTAINER_NAME"
 
           # Run a one-shot Fargate task with CMD=migrate against the current
           # task definition. The 'migrate' entrypoint exits non-zero on failure,
           # which propagates here so the deploy is aborted before traffic shifts.
+          OVERRIDES=$(jq -nc \
+            --arg name "$CONTAINER_NAME" \
+            '{containerOverrides: [{name: $name, command: ["migrate"]}]}')
           TASK_ARN=$(aws ecs run-task \
             --cluster $ECS_CLUSTER \
-            --task-definition $ECR_REPO_API \
+            --task-definition "$TASK_DEF_ARN" \
             --launch-type FARGATE \
             --network-configuration "$NETWORK_CONFIG" \
-            --overrides "{\"containerOverrides\":[{\"name\":\"$ECR_REPO_API\",\"command\":[\"migrate\"]}]}" \
+            --overrides "$OVERRIDES" \
             --query 'tasks[0].taskArn' \
             --output text)
 
