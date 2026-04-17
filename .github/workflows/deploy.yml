@@ -92,10 +92,11 @@ jobs:
             --output json)
           NETWORK_CONFIG=$(echo "$SERVICE_JSON" | jq -c '.networkConfiguration')
           TASK_DEF_ARN=$(echo "$SERVICE_JSON" | jq -r '.taskDefinition')
-          CONTAINER_NAME=$(aws ecs describe-task-definition \
-            --task-definition "$TASK_DEF_ARN" \
-            --query 'taskDefinition.containerDefinitions[0].name' \
-            --output text)
+          # Container name matches the CDK construct in infra/stacks/services.py
+          # (`api_task.add_container("api", ...)`). Hardcoded because the GitHub
+          # deploy role lacks ecs:DescribeTaskDefinition. If the container is ever
+          # renamed in the CDK stack, update this string.
+          CONTAINER_NAME="api"
 
           echo "Task definition: $TASK_DEF_ARN"
           echo "Container name:  $CONTAINER_NAME"
