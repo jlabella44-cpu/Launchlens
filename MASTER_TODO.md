@@ -32,9 +32,9 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [ ] **🚨 Confirm email provider — SMTP path appears abandoned in favor of Resend.** Verified live state on 2026-04-16: `listingjet/app` has `RESEND_API_KEY` set to a real `re_...` value (36 chars), `EMAIL_ENABLED=true`, and `SMTP_PASSWORD` is **empty string** (not the old `PLACEHOLDER_SMTP_PASSWORD`). Action: audit `src/listingjet/notifications/` for any remaining SMTP callers (if none, drop `SMTP_PASSWORD` from the secret + `.env.example`); otherwise pick one provider and delete the other path. SES production access is still pending (sandbox: 1/sec, 200/day cap).
 
 ### Post-Apr-14 Infra Followups (from the drift-fix + #226 deploy session)
-- [ ] **Migrate Postgres to encrypted storage** — `kjyxgeldpfef` currently unencrypted; `storage_encrypted` is intentionally omitted from CDK to match live template shape. Pre-launch must-fix: snapshot → `restore-db-instance-from-db-snapshot --storage-encrypted` → swap the CDK reference. See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md`.
-- [ ] **Replace real SMTP_PASSWORD** in `listingjet/app` Secrets Manager (currently `PLACEHOLDER_SMTP_PASSWORD`) once email provider (Resend or SES prod) is chosen.
-- [ ] **Delete orphan S3 bucket** `listingjet-media-265911026550-us-east-1` — never used; app uses `listingjet-dev`. Safe: `aws s3 rb s3://listingjet-media-265911026550-us-east-1 --force`.
+- (RDS encryption migration — see the P0 entry above; same item, single source of truth.)
+- (SMTP password — superseded. Verified live on 2026-04-16: `SMTP_PASSWORD` in `listingjet/app` is an empty string, not a placeholder. Resend is the active provider via `RESEND_API_KEY`. The remaining decision is the email-provider audit/cleanup tracked in the P0 entry above.)
+- (~~Delete orphan S3 bucket `listingjet-media-265911026550-us-east-1`~~ — **DO NOT DELETE.** This is the **live CDK-managed MediaBucket** as of the 2026-04-16 cutover. The actually-orphaned buckets (`listingjet-dev`, `listingjet-prod`) were already deleted on 2026-04-16.)
 - [ ] **Rotate the `handoff-safety-20260414-0830` snapshot** out of retention once the DB has been migrated to encrypted storage (it's a pre-migration safety net; keep at least until the new encrypted instance is verified).
 - [ ] **Verify `deletion_protection` stays True** on the real Postgres — today's rollbacks toggled it off once. Good safety net, add CloudWatch alarm if CDK lets it drift again.
 
@@ -72,7 +72,6 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [ ] **Deploy backend with new analytics endpoints** (ECR push + ECS redeploy)
 - [ ] **Test analytics page on production**
 - [ ] **Merge PR #109** once CI passes
-- [ ] **4 unpushed commits on local master** — decide: PR these or reset to origin
 
 ### Vision Pipeline
 - [x] **Add per-image logging** — already logging before/after each T1 and T2 analysis with asset ID and proxy status

@@ -26,8 +26,17 @@ git push -u origin <branch-name>
 ```
 
 Do **not** push to `main` directly and do **not** amend published commits.
-`gh pr create` is blocked by token perms on this machine — use the compare
-URL printed by `git push` to open the PR manually.
+`gh pr create` works on this machine (verified 2026-04-17) — use it
+directly. Fallback: the compare URL printed by `git push` also works.
+
+---
+
+## Bash commands
+
+Every `Bash` tool call must pass an explicit `timeout`. The harness default
+of 2 minutes will kill long-running commands (`cdk diff`, `pytest`,
+`docker build`, `npm ci`) silently — always set a ceiling that matches the
+expected runtime.
 
 ---
 
