@@ -65,18 +65,27 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push API image
+      - name: Build and push API + Worker image
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # TODO: also push to $ECR_REPO_WORKER once the listingjet-github-deploy
-          # role has grant_pull_push on worker_repo (add in infra/stacks/ci.py +
-          # cdk deploy). Without that grant the push fails with
-          # `ecr:InitiateLayerUpload denied`. See PR #247 (reverted here).
-          docker build -t $REGISTRY/$ECR_REPO_API:$IMAGE_TAG -t $REGISTRY/$ECR_REPO_API:latest .
+          # API and worker share the Dockerfile; the entrypoint selects
+          # api (uvicorn) vs worker (Temporal) mode by env. Tag the single
+          # build to both ECR repos so the worker service (which pulls from
+          # listingjet-worker:latest per infra/stacks/services.py:274) stays
+          # in sync with main. DeployRole was granted push on worker_repo in
+          # PR #249 + cdk deploy ListingJetServices ListingJetCI.
+          docker build \
+            -t $REGISTRY/$ECR_REPO_API:$IMAGE_TAG \
+            -t $REGISTRY/$ECR_REPO_API:latest \
+            -t $REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG \
+            -t $REGISTRY/$ECR_REPO_WORKER:latest \
+            .
           docker push $REGISTRY/$ECR_REPO_API:$IMAGE_TAG
           docker push $REGISTRY/$ECR_REPO_API:latest
+          docker push $REGISTRY/$ECR_REPO_WORKER:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_REPO_WORKER:latest
 
       - name: Run database migrations
         env:
