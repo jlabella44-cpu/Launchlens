@@ -7,6 +7,7 @@ from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from listingjet.activities.pipeline import (
+        MLSExportParams,
         run_brand,
         run_chapters,
         run_content,
@@ -45,6 +46,7 @@ class ListingPipelineInput:
 
 _DEFAULT_RETRY = RetryPolicy(maximum_attempts=3)
 _DEFAULT_TIMEOUT = timedelta(minutes=10)
+_MLS_EXPORT_TIMEOUT = timedelta(minutes=15)
 _VISION_TIER2_TIMEOUT = timedelta(minutes=20)
 
 
@@ -224,10 +226,9 @@ class ListingPipeline:
         )
 
         # Step 3: MLS Export (builds both bundles)
-        from listingjet.activities.pipeline import MLSExportParams
         await workflow.execute_activity(
             run_mls_export, MLSExportParams(ctx, content_result, flyer_key),
-            start_to_close_timeout=timedelta(minutes=15),
+            start_to_close_timeout=_MLS_EXPORT_TIMEOUT,
             retry_policy=_DEFAULT_RETRY,
         )
 
