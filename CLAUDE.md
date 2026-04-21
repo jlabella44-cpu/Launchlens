@@ -148,10 +148,15 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 - Email blast endpoint: `POST /v1/listings/{id}/email-blast`
 - Real-time admin usage SSE: `GET /v1/admin/usage-stream` + `UsageDashboard` component
 - 3D dollhouse viewer: `DollhouseViewer` Canvas component wired into `DollhouseCard`
-- Tenant soft-delete (`deactivated_at`), `bypass_limits`, `plan_overrides` (migration 050)
 - `LearningWorkflow` as standalone Temporal workflow (fire-and-forget from pipeline)
 - Workflow cancellation (`TemporalClient.cancel_workflow()`)
 - Per-user daily quota + configurable plan limits via admin API
+
+---
+
+## Planned work — not yet shipped
+
+- **Tenant admin controls** — soft-delete (`deactivated_at`), `bypass_limits`, and `plan_overrides` columns on `tenants`. Previously listed here as shipped under "migration 050", but neither the migration nor the model changes ever landed (verified 2026-04-20: no occurrence of those identifiers anywhere in the repo; last migration on disk is `049_team_invite_tokens`). Scope for a future PR: migration adding the three columns, `Tenant` model fields, auth/resolution filter on `deactivated_at`, quota/rate-limit bypass on `bypass_limits`, tier-config merge for `plan_overrides`, admin API endpoints. Touches auth + billing — requires manual review per the branching rules below.
 
 ---
 
@@ -212,6 +217,6 @@ Staging ECS resources expected:
 
 - **Never push to `main` directly** — go through the feature branch
 - **Never amend published commits** — create new commits
-- **Migration chain is 001→050 linear** — next migration must be `051_...` with `down_revision = "050_tenant_admin_controls"`
+- **Migration chain is 001→049 linear** — next migration must be `050_...` with `down_revision = "049_team_invite_tokens"`
 - All feature routes are under `/v1` prefix. Health endpoints (`/health`, `/ready`, `/health/deep`) are unversioned.
 - The stop hook in `~/.claude/settings.json` will block you from stopping if there are uncommitted changes or unpushed commits — commit and push before ending the session.
