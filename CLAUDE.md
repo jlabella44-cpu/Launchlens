@@ -61,17 +61,76 @@ cd frontend && npm run lint && npx vitest run
 
 ## Key file locations
 
+> **Package naming:** the repo directory is `launchlens` and the PostgreSQL DB name is `launchlens`, but the Python package, Docker user, and all branding are `listingjet` (renamed 2026-03-29, commit `4c94d1f`). Anything under `src/launchlens/` or `design-system/launchlens/` is pre-rename cruft and has been removed — do **not** recreate those paths.
+
+### Backend — `src/listingjet/`
+
 | What | Where |
 |---|---|
-| API routers | `src/listingjet/api/` |
-| Temporal workflows | `src/listingjet/workflows/` |
-| Pipeline agents | `src/listingjet/agents/` |
+| FastAPI app entry | `main.py` |
+| Temporal worker entry | `worker.py` |
+| Temporal client wrapper | `temporal_client.py` |
+| DB engine / session | `database.py` |
+| Logging + telemetry setup | `logging_config.py`, `telemetry.py` |
+| API routers | `api/` |
+| Per-route Pydantic schemas | `api/schemas/` |
+| Temporal workflows | `workflows/` |
+| Temporal activities | `activities/` |
+| Pipeline agents | `agents/` |
+| SQLAlchemy models | `models/` |
+| Business-logic services | `services/` (auth, billing, credits, email, audit, rate-limit, scrapers, etc.) |
+| AI/media provider adapters | `providers/` (Claude, OpenAI, Gemma, Canva, ElevenLabs, Kling, Google Vision); generated Canva SDK under `providers/canva_generated/`; prompt templates under `providers/templates/` |
+| FastAPI middleware | `middleware/` |
+| Pricing-tier configuration | `config/` (currently `tiers.py`) |
+| Observability (Prometheus + Sentry) | `monitoring/` |
+| Email templates (Jinja) | `templates/email/` |
+| Utility helpers | `utils/` |
+| Shared schemas (stub) | `schemas/` — empty today; active schemas live under `api/schemas/` |
+
+### Backend support
+
+| What | Where |
+|---|---|
 | Alembic migrations | `alembic/versions/` (001→050, linear) |
-| CDK infra | `infra/stacks/` |
-| Frontend pages | `frontend/src/app/` |
-| Frontend components | `frontend/src/components/` |
+| Backend pytest suite | `tests/` |
+| Migration / seed / smoke scripts | `scripts/` |
+
+### Frontend — `frontend/src/`
+
+| What | Where |
+|---|---|
+| App Router pages | `app/` (incl. `admin/`, `analytics/`, `billing/`, `changelog/`, `demo/[id]/`, `faq/`, `review/`, `support/`, `terms/`, `privacy/`, `onboarding/`, `accept-invite/`, `settings/team/`) |
+| Components (root) | `components/` |
+| shadcn/ui primitives | `components/ui/` |
+| Layout components | `components/layout/` |
+| Analytics components | `components/analytics/` |
+| Notification components | `components/notifications/` |
+| Listing creation wizard | `components/listings/creation-wizard/` |
+| React context providers | `contexts/` |
+| Custom React hooks | `hooks/` |
+| Client-side helpers | `lib/` (generated API client under `lib/generated/`) |
+| Frontend tests | `__tests__/` |
+
+### Infra & ops
+
+| What | Where |
+|---|---|
+| CDK stacks | `infra/stacks/` |
+| Dockerfile + compose | `Dockerfile`, `docker-compose.yml`, `docker/` |
+| Design tokens / system | `design-system/listingjet/` |
+| Vercel config | `vercel.json` |
+| Railway config (legacy) | `railway.json` |
+
+### Docs & planning
+
+| What | Where |
+|---|---|
 | Master task list | `MASTER_TODO.md` |
+| General TODOs | `TODO.md`, `TODO-video-template.md` |
 | Pre-launch infra checklist | `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` |
+| Other specs, PRDs, handoffs | `docs/` |
+| LLM-friendly project overview | `PROJECT_OVERVIEW_FOR_LLM.md` |
+| Cloud migration notes | `CLOUD_MIGRATION_GUIDE.md` |
 
 ---
 
