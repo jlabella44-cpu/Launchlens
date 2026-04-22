@@ -41,6 +41,13 @@ async def get_current_user(
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+
+    # Soft-delete gate: even with a valid JWT, users of a deactivated
+    # tenant must be denied. Mirrors the TenantMiddleware check so this
+    # holds when the middleware is bypassed (ASGI transport in tests).
+    tenant = await db.get(Tenant, user.tenant_id)
+    if tenant is None or tenant.deactivated_at is not None:
+        raise HTTPException(status_code=401, detail="Tenant deactivated")
     return user
 
 
@@ -77,6 +84,6 @@ async def get_tenant(
     db: AsyncSession = Depends(get_db),
 ) -> Tenant:
     tenant = await db.get(Tenant, current_user.tenant_id)
-    if not tenant:
+    if not tenant or tenant.deactivated_at is not None:
         raise HTTPException(status_code=404, detail="Tenant not found")
     return tenant

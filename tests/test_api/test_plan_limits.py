@@ -78,6 +78,47 @@ def test_check_asset_quota_over_limit():
     assert check_asset_quota("starter", existing_count=90, adding_count=20) is False
 
 
+def test_get_limits_overrides_merge():
+    """plan_overrides replace matching keys from the base tier."""
+    limits = get_limits("free", {"max_listings_per_month": 500})
+    assert limits["max_listings_per_month"] == 500
+    # non-overridden keys fall through
+    assert limits["max_assets_per_listing"] == 100
+    assert limits["tier2_vision"] is False
+
+
+def test_get_limits_overrides_empty_dict_is_noop():
+    limits_base = get_limits("free")
+    limits_empty = get_limits("free", {})
+    assert limits_base == limits_empty
+
+
+def test_get_limits_overrides_none_is_noop():
+    limits_base = get_limits("free")
+    limits_none = get_limits("free", None)
+    assert limits_base == limits_none
+
+
+def test_get_limits_overrides_adds_new_keys():
+    """Unknown keys in overrides still merge through (feature flags)."""
+    limits = get_limits("free", {"custom_flag": True})
+    assert limits["custom_flag"] is True
+
+
+def test_check_listing_quota_respects_override():
+    from listingjet.services.plan_limits import check_listing_quota
+    assert check_listing_quota("free", current_count=10) is False
+    assert check_listing_quota("free", current_count=10, overrides={"max_listings_per_month": 50}) is True
+
+
+def test_check_asset_quota_respects_override():
+    from listingjet.services.plan_limits import check_asset_quota
+    assert check_asset_quota("free", existing_count=90, adding_count=20) is False
+    assert check_asset_quota(
+        "free", existing_count=90, adding_count=20, overrides={"max_assets_per_listing": 200}
+    ) is True
+
+
 async def _register(client: AsyncClient) -> tuple[str, str]:
     email = f"test-{uuid.uuid4()}@example.com"
     resp = await client.post("/auth/register", json={

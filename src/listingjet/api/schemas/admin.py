@@ -12,6 +12,9 @@ class TenantResponse(BaseModel):
     stripe_subscription_id: str | None
     webhook_url: str | None
     credit_balance: int = 0
+    deactivated_at: datetime | None = None
+    bypass_limits: bool = False
+    plan_overrides: dict | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -26,6 +29,15 @@ class UpdateTenantRequest(BaseModel):
     name: str | None = None
     plan: str | None = None
     webhook_url: str | None = None
+
+
+class SetBypassLimitsRequest(BaseModel):
+    enabled: bool
+
+
+class SetPlanOverridesRequest(BaseModel):
+    # None clears all overrides; empty dict is rejected as a no-op at the endpoint.
+    overrides: dict | None = None
 
 
 class UserResponse(BaseModel):

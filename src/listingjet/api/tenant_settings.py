@@ -162,7 +162,7 @@ async def get_usage(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    limits = get_limits(tenant.plan)
+    limits = get_limits(tenant.plan, tenant.plan_overrides)
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 

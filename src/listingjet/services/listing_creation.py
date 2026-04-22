@@ -87,7 +87,9 @@ class ListingCreationService:
                 )
             )
             current_count = count_result.scalar() or 0
-            if not check_listing_quota(tenant.plan, current_count):
+            if not tenant.bypass_limits and not check_listing_quota(
+                tenant.plan, current_count, tenant.plan_overrides
+            ):
                 raise ListingQuotaExceededError(current_count)
 
         session.add(listing)
