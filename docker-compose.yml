@@ -76,7 +76,6 @@ services:
       - POSTGRES_USER=listingjet
       - POSTGRES_PWD=password
       - POSTGRES_SEEDS=postgres
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
     ports:
       - "7233:7233"
     depends_on:
