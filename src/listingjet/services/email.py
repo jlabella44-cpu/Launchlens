@@ -1,4 +1,4 @@
-"""Email service — SES, SMTP, or NoOp depending on config."""
+"""Email service — Resend, SES, SMTP, or NoOp depending on config."""
 
 import logging
 import smtplib
@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 import boto3
+import httpx
 from botocore.exceptions import ClientError
 
 from listingjet.config import settings
@@ -168,6 +169,38 @@ class SESEmailService(EmailService):
         self.send(to, f"{change_count} changes on {listing_address}", html)
 
 
+class ResendEmailService(EmailService):
+    """Send emails via Resend (https://resend.com)."""
+
+    API_URL = "https://api.resend.com/emails"
+
+    def __init__(self, api_key: str | None = None, sender: str | None = None) -> None:
+        self.api_key = api_key or settings.resend_api_key
+        self.sender = sender or settings.email_from
+
+    def send(self, to: str, subject: str, html_body: str) -> None:
+        try:
+            response = httpx.post(
+                self.API_URL,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": self.sender,
+                    "to": [to],
+                    "subject": subject,
+                    "html": html_body,
+                },
+                timeout=15.0,
+            )
+            response.raise_for_status()
+            logger.info("resend_email_sent", extra={"to": _mask_email(to), "subject": subject})
+        except httpx.HTTPError as e:
+            logger.error("resend_email_failed", extra={"to": _mask_email(to), "error": str(e)})
+            raise
+
+
 class NoOpEmailService(EmailService):
     """Does nothing — used in dev/test."""
 
@@ -185,6 +218,8 @@ def get_email_service() -> EmailService:
     """Return the appropriate email service based on config."""
     if not settings.email_enabled:
         return NoOpEmailService()
+    if settings.resend_api_key:
+        return ResendEmailService()
     if getattr(settings, "ses_enabled", False):
         return SESEmailService()
     return EmailService()
