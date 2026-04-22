@@ -91,6 +91,11 @@ class APIRateLimitMiddleware:
         # Determine rate limit key
         tenant_id = getattr(request.state, "tenant_id", None)
         if tenant_id:
+            # Admin bypass (tenants.bypass_limits=True) skips the token
+            # bucket entirely. Cached in Redis by the admin endpoint.
+            from listingjet.services.tenant_bypass import is_tenant_bypassed
+            if is_tenant_bypassed(tenant_id):
+                return await call_next(request)
             key = f"tenant:{tenant_id}"
         else:
             ip = _extract_client_ip(request)

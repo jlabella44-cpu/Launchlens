@@ -160,6 +160,58 @@ async def test_set_bypass_limits_toggle(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_bypass_limits_writes_redis_cache(async_client: AsyncClient, monkeypatch):
+    """Admin toggle must update the Redis cache that the rate-limit
+    middleware reads, not just the DB row."""
+    calls: list[tuple[str, bool]] = []
+
+    def fake_set(tenant_id: str, enabled: bool) -> None:
+        calls.append((tenant_id, enabled))
+
+    monkeypatch.setattr(
+        "listingjet.api.admin_tenants.set_tenant_bypass", fake_set
+    )
+
+    admin_token, _ = await _register_admin(async_client)
+    _, target_tenant = await _register(async_client)
+
+    await async_client.patch(
+        f"/admin/tenants/{target_tenant}/bypass-limits",
+        json={"enabled": True},
+        headers=_auth(admin_token),
+    )
+    assert (target_tenant, True) in calls
+
+    await async_client.patch(
+        f"/admin/tenants/{target_tenant}/bypass-limits",
+        json={"enabled": False},
+        headers=_auth(admin_token),
+    )
+    assert (target_tenant, False) in calls
+
+
+@pytest.mark.asyncio
+async def test_deactivate_clears_bypass_cache(async_client: AsyncClient, monkeypatch):
+    """Deactivating a tenant must also clear any lingering bypass flag."""
+    calls: list[tuple[str, bool]] = []
+
+    def fake_set(tenant_id: str, enabled: bool) -> None:
+        calls.append((tenant_id, enabled))
+
+    monkeypatch.setattr(
+        "listingjet.api.admin_tenants.set_tenant_bypass", fake_set
+    )
+
+    admin_token, _ = await _register_admin(async_client)
+    _, target_tenant = await _register(async_client)
+
+    await async_client.post(
+        f"/admin/tenants/{target_tenant}/deactivate", headers=_auth(admin_token)
+    )
+    assert (target_tenant, False) in calls
+
+
+@pytest.mark.asyncio
 async def test_set_plan_overrides(async_client: AsyncClient):
     admin_token, _ = await _register_admin(async_client)
     _, target_tenant = await _register(async_client)

@@ -23,6 +23,7 @@ from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.audit import audit_log
 from listingjet.services.events import emit_event
+from listingjet.services.tenant_bypass import set_tenant_bypass
 from listingjet.services.weight_manager import WeightManager
 
 router = APIRouter()
@@ -214,6 +215,10 @@ async def deactivate_tenant(
         )
         await db.commit()
         await db.refresh(tenant)
+        # Clear any lingering rate-limit bypass so a deactivated tenant
+        # can't continue hitting the API at bypass rates while racing
+        # against the middleware's 401.
+        set_tenant_bypass(str(tenant_id), False)
     return tenant
 
 
@@ -267,6 +272,7 @@ async def set_bypass_limits(
         )
     await db.commit()
     await db.refresh(tenant)
+    set_tenant_bypass(str(tenant_id), body.enabled)
     return tenant
 
 
