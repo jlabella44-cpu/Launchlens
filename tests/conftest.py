@@ -40,6 +40,7 @@ def _mock_external_services():
     mock_redis.incr.return_value = 1
     mock_redis.expire.return_value = True
     mock_redis.delete.return_value = 1
+    mock_redis.exists.return_value = 0
     mock_redis.ttl.return_value = 900
     mock_redis.pipeline.return_value = MagicMock(
         __enter__=MagicMock(return_value=MagicMock(
