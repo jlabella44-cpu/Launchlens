@@ -131,6 +131,13 @@ class ServicesStack(Stack):
             "CORS_ORIGINS": "http://localhost:3000,https://listingjet.ai,https://www.listingjet.ai",
             "TEMPORAL_HOST": "temporal.listingjet.local:7233",
             "S3_BUCKET_NAME": self.media_bucket.bucket_name,
+            # Email: Resend via SMTP relay. RESEND_API_KEY from Secrets Manager
+            # is bound to SMTP_PASSWORD below — Resend accepts the API key as
+            # the SMTP auth password.
+            "EMAIL_ENABLED": "true",
+            "SMTP_HOST": "smtp.resend.com",
+            "SMTP_PORT": "587",
+            "SMTP_USER": "resend",
         }
 
         # --- API Service (Fargate + ALB) ------------------------------------
@@ -174,7 +181,12 @@ class ServicesStack(Stack):
                 "ATTOM_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "ATTOM_API_KEY"),
                 "QWEN_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "QWEN_API_KEY"),
                 "VISION_PROVIDER_TIER2": ecs.Secret.from_secrets_manager(app_secrets, "VISION_PROVIDER_TIER2"),
-                "SMTP_PASSWORD": ecs.Secret.from_secrets_manager(app_secrets, "SMTP_PASSWORD"),
+                # Resend API key doubles as the SMTP relay password. Also
+                # exposed as RESEND_API_KEY so the native ResendEmailService
+                # path can be flipped on via `resend_enabled=true` without a
+                # task-def roll.
+                "SMTP_PASSWORD": ecs.Secret.from_secrets_manager(app_secrets, "RESEND_API_KEY"),
+                "RESEND_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "RESEND_API_KEY"),
             },
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
@@ -296,7 +308,9 @@ class ServicesStack(Stack):
                 "ATTOM_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "ATTOM_API_KEY"),
                 "QWEN_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "QWEN_API_KEY"),
                 "VISION_PROVIDER_TIER2": ecs.Secret.from_secrets_manager(app_secrets, "VISION_PROVIDER_TIER2"),
-                "SMTP_PASSWORD": ecs.Secret.from_secrets_manager(app_secrets, "SMTP_PASSWORD"),
+                # Matches the API task def — see comment above.
+                "SMTP_PASSWORD": ecs.Secret.from_secrets_manager(app_secrets, "RESEND_API_KEY"),
+                "RESEND_API_KEY": ecs.Secret.from_secrets_manager(app_secrets, "RESEND_API_KEY"),
             },
             command=["worker"],
             # The worker doesn't serve HTTP — it touches /tmp/worker-heartbeat
