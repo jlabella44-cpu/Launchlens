@@ -154,12 +154,6 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 
 ---
 
-## Planned work — not yet shipped
-
-- **Tenant admin controls** — soft-delete (`deactivated_at`), `bypass_limits`, and `plan_overrides` columns on `tenants`. Previously listed here as shipped under "migration 050", but neither the migration nor the model changes ever landed (verified 2026-04-20: no occurrence of those identifiers anywhere in the repo; last migration on disk is `049_team_invite_tokens`). Scope for a future PR: migration adding the three columns, `Tenant` model fields, auth/resolution filter on `deactivated_at`, quota/rate-limit bypass on `bypass_limits`, tier-config merge for `plan_overrides`, admin API endpoints. Touches auth + billing — requires manual review per the branching rules below.
-
----
-
 ## Remaining P0 items (production blockers)
 
 These all require **external AWS actions** — no code changes needed, just ops work:
