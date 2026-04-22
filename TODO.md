@@ -48,7 +48,7 @@ Items from the code quality audit and UX audit that need design decisions, large
 
 - **Virtual staging + object removal real output (PR #202):** Switched from DALL-E 3 text-only to gpt-image-1.5 with real image input. Before merging, eye a sample of both `stage_image()` and `remove_object()` output on real photos — the model will behave differently than the current broken hallucination.
 
-- **Team invite email template (PR #205):** The `team_member_invite` HTML template in `services/email_templates.py` is a first cut. Send yourself a real invite on staging after #205 merges to verify it renders correctly in a real inbox and the accept link round-trips through #206's frontend.
+- **Team invite email template (PR #205):** The `team_member_invite` HTML template in `services/email_templates.py` is a first cut. Send yourself a real invite on prod after #205 merges (plus the Resend SMTP wiring from #261) to verify it renders correctly in a real inbox and the accept link round-trips through #206's frontend.
 
 ## Housekeeping
 
