@@ -141,7 +141,6 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 - API versioning (`/v1` prefix on all routes); test suite uses transport-level path rewriting so no test changes needed
 - XGBoost phase 2 weight scoring in `weight_manager.py`
 - CI: `test.yml` has frontend job + coverage; `deploy.yml` has Trivy CRITICAL scan + worker image push
-- `staging.yml` workflow: push to `staging` branch → test → build → migrate → deploy → smoke test (`/health` + `/ready`)
 - Release automation: `.releaserc.json` + `release.yml` (semantic-release on `main`)
 - LocalStack in `docker-compose.yml` for local S3 mock
 - MLS image resize profiles (`MLS_PROFILES` in `mls_export.py`)
@@ -189,21 +188,6 @@ See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` — infra was deliberately undersized w
 
 ### 4. Cost data to collect (after 7–14 days of traffic)
 See `MASTER_TODO.md` "Cost Optimization" section — list of AWS Cost Explorer / Compute Optimizer / CloudWatch queries to run and bring back for right-sizing decisions.
-
----
-
-## Staging environment setup (new — needs wiring)
-
-`staging.yml` workflow is ready but needs these GitHub secrets/vars configured under the **`staging` environment** in repo settings:
-
-| Name | Type | Value |
-|---|---|---|
-| `AWS_DEPLOY_ROLE_ARN_STAGING` | Secret | ARN of IAM role for staging deploys |
-| `STAGING_URL` | Variable | e.g. `https://api-staging.listingjet.com` |
-
-Staging ECS resources expected:
-- Cluster: `listingjet-staging`
-- Services: `listingjet-api-staging`, `listingjet-worker-staging`
 
 ---
 

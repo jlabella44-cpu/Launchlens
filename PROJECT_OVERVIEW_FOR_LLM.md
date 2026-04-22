@@ -408,8 +408,9 @@ Third-party AI processing (Google Vision, Qwen, Claude, Kling, virtual staging) 
 | Test | `.github/workflows/test.yml` | push / PR — 2 Postgres service containers, backend + frontend jobs, coverage |
 | Docker | `.github/workflows/docker.yml` | push to main |
 | Deploy (prod) | `.github/workflows/deploy.yml` | push to main — test → build → migrate (ECS run-task) → deploy API/worker/temporal, Trivy CRITICAL scan |
-| Staging | `.github/workflows/staging.yml` | push to `staging` — test → build → migrate → deploy → `/health` + `/ready` smoke |
 | Release | `.github/workflows/release.yml` | push to main — semantic-release via `.releaserc.json` |
+
+No dedicated staging env; pre-prod testing happens locally via `docker-compose up` (postgres, redis, temporal, api, worker, localstack) — see `scripts/e2e_local.sh`.
 
 ---
 
