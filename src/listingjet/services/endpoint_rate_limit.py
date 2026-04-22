@@ -57,6 +57,9 @@ def rate_limit(limit: int, period: int = 60, key_func: Callable | None = None):
         else:
             tenant_id = getattr(request.state, "tenant_id", None)
             if tenant_id:
+                from listingjet.services.tenant_bypass import is_tenant_bypassed
+                if is_tenant_bypassed(tenant_id):
+                    return
                 key = f"tenant:{tenant_id}"
             else:
                 from listingjet.middleware.rate_limit import _extract_client_ip

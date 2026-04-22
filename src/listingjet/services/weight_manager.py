@@ -19,7 +19,6 @@ class WeightManager:
     """
     Single source of truth for Learning Agent weight operations.
     Scoring backend is swappable: rule-based now, XGBoost in Phase 2.
-    See TODOS.md TODO-4 for XGBoost upgrade plan.
     """
 
     def blend(
@@ -89,7 +88,6 @@ class WeightManager:
         Formula: (quality*0.5 + commercial*0.3 + hero_bonus*0.2) * room_weight
         Then optionally adjusted by outcome_boost from Phase 5 correlations.
         Clamped to [0.0, 1.0].
-        Phase 2: XGBoost model (see TODOS.md TODO-4).
         """
         quality = features.get("quality_score", 50) / 100.0
         commercial = features.get("commercial_score", 50) / 100.0

@@ -123,8 +123,10 @@ async def register_assets(
     )
     existing_count = existing_count_result.scalar() or 0
 
-    if not check_asset_quota(tenant.plan, existing_count, len(body.assets)):
-        max_allowed = get_limits(tenant.plan)["max_assets_per_listing"]
+    if not tenant.bypass_limits and not check_asset_quota(
+        tenant.plan, existing_count, len(body.assets), tenant.plan_overrides
+    ):
+        max_allowed = get_limits(tenant.plan, tenant.plan_overrides)["max_assets_per_listing"]
         raise HTTPException(
             status_code=403,
             detail=f"Asset limit reached ({existing_count}/{max_allowed}). Upgrade your plan for more.",

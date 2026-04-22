@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -8,6 +9,8 @@ from listingjet.api.deps import get_db_admin, require_superadmin
 from listingjet.api.schemas.admin import (
     AdjustCreditsRequest,
     CreditTransactionResponse,
+    SetBypassLimitsRequest,
+    SetPlanOverridesRequest,
     TenantCreditsResponse,
     TenantDetailResponse,
     TenantResponse,
@@ -20,6 +23,7 @@ from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.audit import audit_log
 from listingjet.services.events import emit_event
+from listingjet.services.tenant_bypass import set_tenant_bypass
 from listingjet.services.weight_manager import WeightManager
 
 router = APIRouter()
@@ -29,16 +33,27 @@ router = APIRouter()
 async def list_tenants(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
+    include_deactivated: bool = Query(default=False),
     admin_user: User = Depends(require_superadmin),
     db: AsyncSession = Depends(get_db_admin),
 ):
-    """List all tenants with pagination. Requires superadmin role."""
+    """List all tenants with pagination. Requires superadmin role.
+
+    Deactivated tenants are excluded by default; pass
+    ``include_deactivated=true`` to include them.
+    """
     from listingjet.models.credit_account import CreditAccount
 
-    total = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
+    base_filter = [] if include_deactivated else [Tenant.deactivated_at.is_(None)]
+
+    total = (await db.execute(select(func.count(Tenant.id)).where(*base_filter))).scalar() or 0
     offset = (page - 1) * page_size
     result = await db.execute(
-        select(Tenant).order_by(Tenant.created_at.desc()).offset(offset).limit(page_size)
+        select(Tenant)
+        .where(*base_filter)
+        .order_by(Tenant.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
     )
     tenants = result.scalars().all()
 
@@ -102,6 +117,9 @@ async def get_tenant(
         stripe_subscription_id=tenant.stripe_subscription_id,
         webhook_url=tenant.webhook_url,
         credit_balance=balance,
+        deactivated_at=tenant.deactivated_at,
+        bypass_limits=tenant.bypass_limits,
+        plan_overrides=tenant.plan_overrides,
         created_at=tenant.created_at,
         user_count=user_count,
         listing_count=listing_count,
@@ -168,6 +186,123 @@ async def test_webhook(
         "webhook_url": tenant.webhook_url,
         "event_type": "webhook.test",
     }
+
+
+# ── Admin Controls: Soft-Delete, Limit Bypass, Plan Overrides ─────
+
+
+@router.post("/tenants/{tenant_id}/deactivate", response_model=TenantResponse)
+async def deactivate_tenant(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Soft-delete a tenant. Subsequent auth attempts return 401.
+
+    Historical data (listings, credits, audit log) is preserved.
+    Idempotent — deactivating an already-deactivated tenant is a no-op.
+    """
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    if tenant.deactivated_at is None:
+        tenant.deactivated_at = datetime.now(timezone.utc)
+        await audit_log(
+            db, admin_user.id, "deactivate", "tenant", str(tenant_id),
+            tenant_id=tenant_id,
+            details={"deactivated_at": tenant.deactivated_at.isoformat()},
+        )
+        await db.commit()
+        await db.refresh(tenant)
+        # Clear any lingering rate-limit bypass so a deactivated tenant
+        # can't continue hitting the API at bypass rates while racing
+        # against the middleware's 401.
+        set_tenant_bypass(str(tenant_id), False)
+    return tenant
+
+
+@router.post("/tenants/{tenant_id}/activate", response_model=TenantResponse)
+async def activate_tenant(
+    tenant_id: uuid.UUID,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Undo a soft-delete. Clears deactivated_at."""
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    if tenant.deactivated_at is not None:
+        tenant.deactivated_at = None
+        await audit_log(
+            db, admin_user.id, "activate", "tenant", str(tenant_id),
+            tenant_id=tenant_id,
+            details={},
+        )
+        await db.commit()
+        await db.refresh(tenant)
+    return tenant
+
+
+@router.patch("/tenants/{tenant_id}/bypass-limits", response_model=TenantResponse)
+async def set_bypass_limits(
+    tenant_id: uuid.UUID,
+    body: SetBypassLimitsRequest,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Toggle the API rate-limit + plan-quota bypass for a tenant.
+
+    Rate-limit bypass propagates on the tenant's next request (the
+    TenantMiddleware reloads the tenant row each request). Plan quotas
+    are evaluated at call-site against the tenant flag.
+    """
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    old = bool(tenant.bypass_limits)
+    tenant.bypass_limits = body.enabled
+    if old != body.enabled:
+        await audit_log(
+            db, admin_user.id, "set_bypass_limits", "tenant", str(tenant_id),
+            tenant_id=tenant_id,
+            details={"old": old, "new": body.enabled},
+        )
+    await db.commit()
+    await db.refresh(tenant)
+    set_tenant_bypass(str(tenant_id), body.enabled)
+    return tenant
+
+
+@router.patch("/tenants/{tenant_id}/plan-overrides", response_model=TenantResponse)
+async def set_plan_overrides(
+    tenant_id: uuid.UUID,
+    body: SetPlanOverridesRequest,
+    admin_user: User = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db_admin),
+):
+    """Set or clear per-tenant plan-limit overrides.
+
+    Keys in ``overrides`` override the corresponding base-tier value
+    from ``PLAN_LIMITS`` (e.g. ``{"max_listings_per_month": 500}``).
+    Pass ``overrides: null`` to clear all overrides.
+    """
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    old = tenant.plan_overrides
+    tenant.plan_overrides = body.overrides if body.overrides else None
+    await audit_log(
+        db, admin_user.id, "set_plan_overrides", "tenant", str(tenant_id),
+        tenant_id=tenant_id,
+        details={"old": old, "new": tenant.plan_overrides},
+    )
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
 
 
 # ── Credit Management ──────────────────────────────────────────────
