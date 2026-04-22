@@ -33,14 +33,16 @@ ListingJet is a multi-tenant real estate listing media SaaS. Photographers and a
 ```
 src/listingjet/
   main.py                    FastAPI app factory (create_app, lifespan, router mounts)
-  config.py                  Settings (pydantic-settings, .env)
+  config/
+    __init__.py              Settings (pydantic-settings, .env)
+    tiers.py                 TIER_DEFAULTS (v3 pricing), apply_plan_credits, CREDIT_BUNDLES
   database.py                SQLAlchemy engine, AsyncSessionLocal, get_db (sets RLS), get_db_admin
-  temporal_client.py         TemporalClient singleton (start_pipeline, signal_review)
+  temporal_client.py         TemporalClient singleton (start_pipeline, signal_review, cancel_workflow)
   telemetry.py               init_tracing() (OTel TracerProvider + OTLP), agent_span() context manager
 
   models/
     base.py                  TenantScopedModel (id UUID, tenant_id UUID, created_at)
-    tenant.py                Tenant (name, plan, billing_model, stripe_customer_id, stripe_subscription_id, webhook_url, per_listing_credit_cost)
+    tenant.py                Tenant (name, plan, billing_model, stripe_customer_id, stripe_subscription_id, webhook_url, per_listing_credit_cost, deactivated_at, bypass_limits, plan_overrides)
     user.py                  User (email, password_hash, name, role, consent_at/version, ai_consent_at/version)
     listing.py               Listing (address, metadata_, state: ListingState, lock_owner_id, credit_cost, mls_bundle_path, marketing_bundle_path, is_demo, demo_expires_at)
     asset.py                 Asset (listing_id, file_path, proxy_path, file_hash, state, required_for_mls)
@@ -123,6 +125,7 @@ src/listingjet/
     storage.py               StorageService: S3 upload/download/presigned URL/delete
     rate_limiter.py          Redis token bucket rate limiter (middleware)
     endpoint_rate_limit.py   rate_limit() dependency for per-endpoint limits
+    tenant_bypass.py         Redis-cached flag read by the rate-limit middleware to skip tenants with Tenant.bypass_limits=True
     outbox_poller.py         OutboxPoller: polls outbox, delivers to webhook URLs, X-ListingJet-Idempotency-Key
     drip_scheduler.py        Welcome drip email scheduler (1→5 over 10 days)
     notifications.py         notify_pipeline_complete, notify_pipeline_failed, notify_low_balance
@@ -158,12 +161,16 @@ src/listingjet/
     addons.py                Addon catalog, purchase, fulfillment
     demo.py                  POST /demo/upload, GET /demo/{id}, POST /demo/{id}/claim
     billing.py               Checkout, status, portal, webhook
-    admin.py                 Tenant CRUD, user management, platform stats, credit management, revenue analytics
+    admin_tenants.py         Tenant CRUD, credit adjustments, weight-health, admin controls (deactivate, bypass-limits, plan-overrides)
+    admin_users.py           Platform-wide user invite, role changes
+    admin_listings.py        Cross-tenant listings list, retry/edit
+    admin_dashboard.py       Overview stats, revenue analytics, audit log, usage SSE stream
+    admin_providers.py       Provider health + cost dashboards
     microsite.py             Microsite CRUD + public subdomain resolver
     team.py                  Team member invitation + role management
     health.py                /health, /ready, /metrics
     webhooks.py              Stripe webhook entry, credit.bundle_fulfilled, billing.payment_failed
-    deps.py                  get_current_user, require_admin, get_db, get_db_admin
+    deps.py                  get_current_user (enforces Tenant.deactivated_at IS NULL), require_admin, require_superadmin, get_tenant, get_current_tenant, get_db_admin
     deps_permissions.py      Cross-tenant permission resolution (blanket + per-listing grants)
     schemas/
       auth.py                RegisterRequest (consent + ai_consent), LoginRequest, TokenResponse, UserResponse (exposes ai_consent_at/version)
@@ -175,9 +182,12 @@ src/listingjet/
 
   middleware/
     tenant.py                TenantMiddleware: JWT decode → request.state.tenant_id; _PUBLIC_PATHS skip list
+    rate_limit.py            APIRateLimitMiddleware: 60 req/min/tenant token bucket; honors tenant_bypass Redis flag
+    security_headers.py      SecurityHeadersMiddleware (CSP, X-Frame-Options, HSTS)
+    request_id.py            RequestIDMiddleware: attaches X-Request-ID for log correlation
 
 alembic/versions/
-  Chain runs 001 → 048+ linearly (no merges, no gaps).
+  Chain runs 001 → 050 linearly (no merges, no gaps).
   Highlights:
   001 Initial schema + RLS policies on all tenant-scoped tables
   010 credit_transactions table
@@ -188,6 +198,8 @@ alembic/versions/
   041 Last of the pre-credit-refactor migrations
   046 Drop legacy Tenant.credit_balance — CreditAccount is sole source of truth
   048 User AI consent fields (ai_consent_at, ai_consent_version) + backfill
+  049 Team invite tokens (invite_token_hash, invite_expires_at, invited_by_user_id)
+  050 Tenant admin controls (deactivated_at, bypass_limits, plan_overrides)
 
 tests/
   conftest.py                test_engine (NullPool, port 5433), db_session, async_client, JWT helpers, promote_to_superadmin
@@ -278,9 +290,10 @@ async with (session.begin() if not session.in_transaction() else session.begin_n
 `conftest.py` overrides `get_db` and `get_db_admin` to use `test_engine` (NullPool, port 5433).
 
 ### Credit System
+- `CreditAccount` is the sole source of truth for balances (migration 046 dropped the legacy `Tenant.credit_balance` column)
 - `CreditTransaction` records every credit event with signed `amount` and denormalized `balance_after`
 - `transaction_type`: `purchase` | `usage` | `admin_adjustment` | `expiration` | `bonus`
-- `Tenant.credit_balance` is denormalized for fast balance reads (updated atomically with transaction insert)
+- Deduction order is FIFO across `granted_balance` then `purchased_balance`
 - Negative balance guard enforced in `POST /admin/tenants/{id}/credits/adjust`
 - All adjustments emit a `credits.admin_adjustment` audit event via the outbox
 
@@ -335,22 +348,29 @@ Third-party AI processing (Google Vision, Qwen, Claude, Kling, virtual staging) 
 
 ---
 
-## Admin API (all require `require_admin`)
+## Admin API (all require `require_superadmin` unless noted)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | /admin/tenants | List all tenants |
+| GET | /admin/tenants | List tenants (excludes deactivated; pass `?include_deactivated=true`) |
 | GET | /admin/tenants/{id} | Tenant detail (user + listing counts) |
 | PATCH | /admin/tenants/{id} | Update name, plan, webhook_url |
 | POST | /admin/tenants/{id}/test-webhook | Send test event to tenant webhook |
+| POST | /admin/tenants/{id}/deactivate | Soft-delete (idempotent); clears bypass cache |
+| POST | /admin/tenants/{id}/activate | Undo soft-delete |
+| PATCH | /admin/tenants/{id}/bypass-limits | Toggle plan-quota + rate-limit bypass |
+| PATCH | /admin/tenants/{id}/plan-overrides | Set/clear per-tenant plan-limit overrides |
 | GET | /admin/tenants/{id}/users | List users for tenant |
 | POST | /admin/tenants/{id}/users | Invite user to tenant |
 | PATCH | /admin/users/{id}/role | Change user role |
 | GET | /admin/stats | Platform-wide counts |
 | GET | /admin/tenants/{id}/credits | Credit balance + transaction history |
 | POST | /admin/tenants/{id}/credits/adjust | Manual credit adjustment |
+| GET | /admin/tenants/{id}/weight-health | Learning-weight cold-start + boundary stats |
+| POST | /admin/tenants/{id}/weights/reset | Reset a cold-start weight to 1.0 |
 | GET | /admin/credits/summary | Platform credit stats (this month) |
 | GET | /admin/analytics/revenue | Revenue breakdown, top tenants by usage |
+| GET | /admin/usage-stream | Real-time admin usage SSE feed |
 
 ---
 
@@ -385,8 +405,11 @@ Third-party AI processing (Google Vision, Qwen, Claude, Kling, virtual staging) 
 | Workflow | File | Trigger |
 |----------|------|---------|
 | Lint | `.github/workflows/lint.yml` | push / PR |
-| Test | `.github/workflows/test.yml` | push / PR — 2 Postgres service containers |
+| Test | `.github/workflows/test.yml` | push / PR — 2 Postgres service containers, backend + frontend jobs, coverage |
 | Docker | `.github/workflows/docker.yml` | push to main |
+| Deploy (prod) | `.github/workflows/deploy.yml` | push to main — test → build → migrate (ECS run-task) → deploy API/worker/temporal, Trivy CRITICAL scan |
+| Staging | `.github/workflows/staging.yml` | push to `staging` — test → build → migrate → deploy → `/health` + `/ready` smoke |
+| Release | `.github/workflows/release.yml` | push to main — semantic-release via `.releaserc.json` |
 
 ---
 
