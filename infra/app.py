@@ -28,7 +28,6 @@ database = DatabaseStack(
 services = ServicesStack(
     app, "ListingJetServices",
     vpc=network.vpc,
-    db_instance=database.db_instance,
     redis_cluster=database.redis_cluster,
     env=env,
 )
@@ -38,7 +37,6 @@ monitoring = MonitoringStack(
     cluster=services.cluster,
     api_service=services.api_service,
     alb=services.alb,
-    db_instance=database.db_instance,
     alert_email=alert_email,
     env=env,
 )
