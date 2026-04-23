@@ -35,22 +35,12 @@ from aws_cdk import (
     aws_s3 as s3,
 )
 from aws_cdk import (
+    aws_rds as rds,
+)
+from aws_cdk import (
     aws_secretsmanager as sm,
 )
 from constructs import Construct
-
-# ⚠️ TEMPORARY — removed in Phase 6 of RDS reconciliation.
-# See docs/plans/2026-04-21-cdk-rds-encryption-reconciliation.md.
-# During reconciliation, the `db_instance` construct in DatabaseStack
-# cannot be referenced here (its logical id tracks a deleted physical
-# resource). These constants point at the live encrypted instance and
-# the still-present CDK-generated master secret. Verified 2026-04-22
-# via `aws rds describe-db-instances` and `aws secretsmanager describe-secret`.
-_DB_ENDPOINT = "listingjet-postgres-encrypted.c8xiacyu8dyh.us-east-1.rds.amazonaws.com"
-_DB_SECRET_ARN = (
-    "arn:aws:secretsmanager:us-east-1:265911026550:secret:"
-    "ListingJetDatabasePostgresS-2g2B0n8yjwAF-DRYvqm"
-)
 
 
 class ServicesStack(Stack):
@@ -60,6 +50,8 @@ class ServicesStack(Stack):
         id: str,
         vpc: ec2.IVpc,
         redis_cluster: elasticache.CfnReplicationGroup,
+        db_instance: rds.IDatabaseInstance,
+        db_secret: sm.ISecret,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -96,12 +88,6 @@ class ServicesStack(Stack):
         )
 
         # Shared secrets
-        # ⚠️ TEMPORARY: `db_instance.secret` is unreachable during RDS
-        # reconciliation — see top-of-file note. Reference the CDK-generated
-        # master secret by ARN directly so task defs still get username/password.
-        db_secret = sm.Secret.from_secret_complete_arn(
-            self, "DbSecretRef", _DB_SECRET_ARN,
-        )
         app_secrets = sm.Secret.from_secret_name_v2(
             self, "AppSecrets", "listingjet/app",
         )
@@ -389,9 +375,7 @@ class ServicesStack(Stack):
             environment={
                 "DB": "postgres12",
                 "DB_PORT": "5432",
-                # ⚠️ TEMPORARY: hardcoded during RDS reconciliation — swap
-                # back to `db_instance.db_instance_endpoint_address` in Phase 6.
-                "POSTGRES_SEEDS": _DB_ENDPOINT,
+                "POSTGRES_SEEDS": db_instance.db_instance_endpoint_address,
             },
             secrets={
                 "POSTGRES_USER": ecs.Secret.from_secrets_manager(db_secret, "username"),
