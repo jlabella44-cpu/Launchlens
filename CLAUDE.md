@@ -138,14 +138,13 @@ cd frontend && npm run lint && npx vitest run
 
 All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notable recent work:
 
-- API versioning (`/v1` prefix on all routes); test suite uses transport-level path rewriting so no test changes needed
 - XGBoost phase 2 weight scoring in `weight_manager.py`
 - CI: `test.yml` has frontend job + coverage; `deploy.yml` has Trivy CRITICAL scan + worker image push
 - Release automation: `.releaserc.json` + `release.yml` (semantic-release on `main`)
 - LocalStack in `docker-compose.yml` for local S3 mock
 - MLS image resize profiles (`MLS_PROFILES` in `mls_export.py`)
-- Email blast endpoint: `POST /v1/listings/{id}/email-blast`
-- Real-time admin usage SSE: `GET /v1/admin/usage-stream` + `UsageDashboard` component
+- Email blast endpoint: `POST /listings/{id}/email-blast`
+- Real-time admin usage SSE: `GET /admin/usage-stream` + `UsageDashboard` component
 - 3D dollhouse viewer: `DollhouseViewer` Canvas component wired into `DollhouseCard`
 - `LearningWorkflow` as standalone Temporal workflow (fire-and-forget from pipeline)
 - Workflow cancellation (`TemporalClient.cancel_workflow()`)
@@ -171,8 +170,8 @@ cdk diff ListingJetServices     # expect env-var + secret changes only
 cdk deploy ListingJetServices    # rolls task defs
 ```
 
-Then smoke: `scripts/prod_smoke.sh` (validates /health, /ready, demo upload)
-and trigger `POST /v1/auth/forgot-password` on a test account to confirm
+Then smoke: `scripts/prod_smoke.sh` (validates /health, /health/deep, demo upload)
+and trigger `POST /auth/forgot-password` on a test account to confirm
 a real email arrives.
 
 ### 2. RDS encrypted-storage migration (~30-60 min downtime)
@@ -196,6 +195,6 @@ See `MASTER_TODO.md` "Cost Optimization" section — list of AWS Cost Explorer /
 
 - **Never push to `main` directly** — go through the feature branch
 - **Never amend published commits** — create new commits
-- **Migration chain is 001→049 linear** — next migration must be `050_...` with `down_revision = "049_team_invite_tokens"`
-- All feature routes are under `/v1` prefix. Health endpoints (`/health`, `/ready`, `/health/deep`) are unversioned.
+- **Migration chain is 001→050 linear** — next migration must be `051_...` with `down_revision = "050_tenant_admin_controls"`
+- Routes are mounted at their router prefix directly (e.g. `/auth/...`, `/listings/...`, `/demo/...`) — there is no `/v1` prefix in the running app despite past plans. Health endpoints (`/health`, `/health/deep`) are at their literal paths; `/ready` is not implemented.
 - The stop hook in `~/.claude/settings.json` will block you from stopping if there are uncommitted changes or unpushed commits — commit and push before ending the session.
