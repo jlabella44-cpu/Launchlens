@@ -149,25 +149,28 @@ Live RDS `listingjet-postgres-encrypted` is protected by `DeletionProtection=Tru
 
 ---
 
-## Open questions (resolve before starting)
+## Open questions — RESOLVED 2026-04-22
 
-1. **Does the CDK-generated secret for the old instance still exist?**
-   - The construct used `rds.Credentials.from_generated_secret("listingjet")` — CDK created `ListingJetDatabasePostgresS-2g2B0n8yjwAF-DRYvqm`.
-   - The encrypted instance was restored from snapshot; it re-uses the same master credentials, so the secret value is still correct for the new instance.
-   - But CFN may have orphaned the secret resource when the physical DB was deleted. Check: `aws secretsmanager describe-secret --secret-id ListingJetDatabasePostgresS-2g2B0n8yjwAF-DRYvqm`.
-   - If it exists → Phase 4 should include `credentials=rds.Credentials.from_secret(secretsmanager.Secret.from_secret_name_v2(…))` pointing at that secret.
-   - If missing → Phase 4 should use `credentials=rds.Credentials.from_password("listingjet", SecretValue.secrets_manager(...))` or manually manage.
+All four questions verified via AWS CLI against the live account before Phase 1 code was drafted.
 
-2. **Does `rds.PostgresEngineVersion.VER_16_10` exist in this CDK version?**
-   - Some CDK versions only expose major-minor. If only `VER_16` is available, may need the L1 `CfnDBInstance` construct to pin `EngineVersion` exactly.
+1. **CDK-generated secret is still alive.**
+   - `aws secretsmanager describe-secret --secret-id arn:aws:secretsmanager:us-east-1:265911026550:secret:ListingJetDatabasePostgresS-2g2B0n8yjwAF-DRYvqm` → Name `ListingJetDatabasePostgresS-2g2B0n8yjwAF`, `DeletedDate=None`, last changed 2026-04-14 (i.e., after the encryption migration).
+   - Phase 4 should wire `credentials=rds.Credentials.from_secret(sm.Secret.from_secret_complete_arn(self, "DbSecret", _DB_SECRET_ARN))`.
+   - Phase 1 already references this ARN directly (see `services.py` module-level constant).
 
-3. **Is the subnet group still tracked by CFN?**
-   - Live DB uses `listingjetdatabase-postgressubnetgroup9f8a4d6e-ixyvwsoprif1`, which looks like the CDK-generated name.
-   - Verify: `aws cloudformation describe-stack-resources --stack-name ListingJetDatabase | grep SubnetGroup`.
-   - If present, CDK will reference it normally. If orphaned, Phase 4 needs `subnet_group=rds.SubnetGroup.from_subnet_group_name(…)` explicit.
+2. **Engine version is exactly `16.10`** (`aws rds describe-db-instances …`).
+   - Use `rds.PostgresEngineVersion.VER_16_10` if available. If the CDK version in use only exposes `VER_16`, drop to `CfnDBInstance` L1 to pin `EngineVersion: "16.10"` exactly — Phase 5 `cdk import` will fail otherwise.
 
-4. **Is `alias/aws/rds` the canonical ARN or does CDK want the key ID form?**
-   - Live describe output gives key ARN. Test with ARN first; fall back to `kms.Key.from_lookup`.
+3. **Subnet group is still CFN-tracked** (logical id `PostgresSubnetGroup9F8A4D6E`, physical id `listingjetdatabase-postgressubnetgroup9f8a4d6e-ixyvwsoprif1`, status `CREATE_COMPLETE`).
+   - Phase 4 can reference it via the existing construct. No `from_subnet_group_name` lookup needed.
+
+4. **KMS key is the full ARN** `arn:aws:kms:us-east-1:265911026550:key/1482e415-1d7e-4269-b887-1a25d453cf6b` (confirmed by `DBInstance.KmsKeyId`).
+   - Phase 4 uses `kms.Key.from_key_arn(self, "DbKmsKey", <arn>)` — no lookup fallback needed.
+
+### Additional facts confirmed 2026-04-22
+
+- Stale CFN entry still present: `Postgres9DC8BB04` physical id `listingjetdatabase-postgres9dc8bb04-kjyxgeldpfef` status `UPDATE_COMPLETE`. Drift is exactly as described in the Context section.
+- Live instance: status `available`, master username `listingjet`, port `5432`, `StorageEncrypted=true`.
 
 ---
 
@@ -183,6 +186,6 @@ Live RDS `listingjet-postgres-encrypted` is protected by `DeletionProtection=Tru
 - `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` §A — original encryption migration runbook (completed 2026-04-17)
 - `docs/archive/HANDOFF-SESSION-APRIL-2*.md` — prior-session handoff with the original 4-step plan
 - `infra/stacks/database.py` — module-level ⚠️ warning with superseded plan
-- `infra/stacks/services.py:90,364` — `db_instance` consumers
-- `infra/stacks/monitoring.py:122,133,227,228` — `db_instance` consumers
-- `infra/app.py:31,41` — stack-to-stack wiring
+- `infra/stacks/services.py` — `db_instance` consumers (now hardcoded via `_DB_ENDPOINT` / `_DB_SECRET_ARN` module constants after Phase 1)
+- `infra/stacks/monitoring.py` — `db_instance` consumers (now via `_rds_metric()` helper after Phase 1)
+- `infra/app.py` — stack-to-stack wiring (`db_instance=` kwargs dropped from Services + Monitoring after Phase 1)

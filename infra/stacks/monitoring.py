@@ -20,15 +20,30 @@ from aws_cdk import (
     aws_elasticloadbalancingv2 as elbv2,
 )
 from aws_cdk import (
-    aws_rds as rds,
-)
-from aws_cdk import (
     aws_sns as sns,
 )
 from aws_cdk import (
     aws_sns_subscriptions as subs,
 )
 from constructs import Construct
+
+# ⚠️ TEMPORARY — removed in Phase 6 of RDS reconciliation.
+# See docs/plans/2026-04-21-cdk-rds-encryption-reconciliation.md.
+# While `DatabaseStack.db_instance` tracks a deleted physical resource,
+# alarms and dashboards build CloudWatch metrics by DBInstanceIdentifier
+# directly against the live encrypted instance.
+_DB_INSTANCE_ID = "listingjet-postgres-encrypted"
+
+
+def _rds_metric(metric_name: str) -> cw.Metric:
+    """Build an AWS/RDS metric pinned to the live encrypted instance."""
+    return cw.Metric(
+        namespace="AWS/RDS",
+        metric_name=metric_name,
+        dimensions_map={"DBInstanceIdentifier": _DB_INSTANCE_ID},
+        statistic="Average",
+        period=Duration.minutes(5),
+    )
 
 
 class MonitoringStack(Stack):
@@ -39,7 +54,6 @@ class MonitoringStack(Stack):
         cluster: ecs.ICluster,
         api_service,
         alb: elbv2.IApplicationLoadBalancer,
-        db_instance: rds.DatabaseInstance,
         alert_email: str,
         **kwargs,
     ) -> None:
@@ -119,7 +133,7 @@ class MonitoringStack(Stack):
         # --- RDS Storage Low --------------------------------------------------
         storage_alarm = cw.Alarm(
             self, "RdsStorageLow",
-            metric=db_instance.metric_free_storage_space(),
+            metric=_rds_metric("FreeStorageSpace"),
             threshold=4 * 1024 * 1024 * 1024,  # 4 GB
             evaluation_periods=1,
             comparison_operator=cw.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
@@ -130,7 +144,7 @@ class MonitoringStack(Stack):
         # --- RDS CPU High -----------------------------------------------------
         cpu_alarm = cw.Alarm(
             self, "RdsCpuHigh",
-            metric=db_instance.metric_cpu_utilization(),
+            metric=_rds_metric("CPUUtilization"),
             threshold=80,
             evaluation_periods=2,
             comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -224,8 +238,8 @@ class MonitoringStack(Stack):
                 [
                     cw.GraphWidget(
                         title="RDS CPU / Storage",
-                        left=[db_instance.metric_cpu_utilization()],
-                        right=[db_instance.metric_free_storage_space()],
+                        left=[_rds_metric("CPUUtilization")],
+                        right=[_rds_metric("FreeStorageSpace")],
                         width=12,
                     ),
                     cw.GraphWidget(
