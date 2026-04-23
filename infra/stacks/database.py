@@ -1,34 +1,40 @@
 """RDS PostgreSQL and ElastiCache Redis.
 
-⚠️  CDK DRIFT WARNING — encryption migration 2026-04-17 ⚠️
+⚠️  CDK RECONCILIATION — encryption migration, zombie-resource path (2026-04-23) ⚠️
 
-The live RDS instance for this stack is now
-`listingjet-postgres-encrypted` (StorageEncrypted=True, restored from an
-encrypted snapshot of the old `listingjetdatabase-postgres9dc8bb04-kjyxgeldpfef`
-instance, which has been deleted). That migration was done via `aws rds`
-CLI, NOT through CDK, so CloudFormation still thinks this stack's `Postgres`
-logical resource is the deleted physical instance.
+History: the live RDS instance for this stack is
+`listingjet-postgres-encrypted` (StorageEncrypted=True, restored
+2026-04-17 from an encrypted snapshot of the old
+`listingjetdatabase-postgres9dc8bb04-kjyxgeldpfef` instance, which has
+been deleted). That migration was done via `aws rds` CLI, NOT CDK, so
+CloudFormation's `Postgres` logical id (Postgres9DC8BB04) points at a
+physical resource that returns 404 on any describe.
 
-DO NOT run `cdk deploy` on `ListingJetDatabase` until this drift is
-reconciled. A normal deploy here would at best fail, at worst recreate a
-brand-new empty Postgres on top of the real data.
+Reconciliation attempted 2026-04-23 with the RETAIN-flip → remove →
+re-add → import plan. RETAIN flip failed: CFN's v2 RDS resource
+provider calls `describe-db-instances` on any logical-resource update
+(including pure metadata changes like DeletionPolicy) and the 404 is
+terminal. Remove-and-recreate would have the same failure mode during
+the implicit DELETE.
 
-Reconciliation plan (future session):
-1. Rewrite this construct with `removal_policy=RemovalPolicy.RETAIN` and
-   remove the `Postgres` resource from the template.
-2. `cdk deploy` to release the (now missing) old resource from CFN
-   tracking without deleting anything.
-3. Re-add `Postgres` with `storage_encrypted=True` and all other
-   properties matching the live new instance.
-4. `cdk import` to adopt the live new instance under the same logical
-   ID — CFN requires every property to match exactly, so expect a few
-   retry cycles.
+Pivoted to the zombie-resource path:
+- The original `Postgres` construct below is LEFT UNCHANGED. Its
+  synthesized resources (Postgres9DC8BB04, the generated secret, the
+  secret attachment) are CFN zombies — present in the template and in
+  CFN state, but the underlying AWS resources are gone. Do NOT attempt
+  any mutation on them; every mutation will fail.
+- A parallel `PostgresEncrypted` construct below adopts the live
+  encrypted instance via `cdk import`, reusing the existing (still-alive)
+  subnet group + KMS key + secret. Downstream code (services.py,
+  monitoring.py) wires off `self.db_instance_encrypted`.
+- The subnet group `PostgresSubnetGroup9F8A4D6E` is NOT a zombie: its
+  physical resource is alive and in use by the live encrypted
+  instance. Leaving the old construct's auto-generated subnet group in
+  place keeps the live instance's subnet group tracked correctly.
 
-Until then: app runs fine (DATABASE_URL secret already points at the
-new instance); Redis + SGs + subnet group in this stack are untouched
-and safe to `cdk deploy` individually via `--exclusively` if needed.
-
-See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` §A for the original runbook.
+If you ever need to clean up the zombies: that requires delete-stack
+--retain-resources rebuild work, not worth it unless we're consolidating
+infra later.
 """
 
 from aws_cdk import (
@@ -43,7 +49,13 @@ from aws_cdk import (
     aws_elasticache as elasticache,
 )
 from aws_cdk import (
+    aws_kms as kms,
+)
+from aws_cdk import (
     aws_rds as rds,
+)
+from aws_cdk import (
+    aws_secretsmanager as sm,
 )
 from constructs import Construct
 
@@ -97,6 +109,76 @@ class DatabaseStack(Stack):
             backup_retention=Duration.days(1),
             deletion_protection=True,
             removal_policy=RemovalPolicy.SNAPSHOT,
+        )
+
+        # --- RDS PostgreSQL 16 (ENCRYPTED, zombie-path re-add) ---------------
+        # The construct above is a zombie (see file header). The live
+        # encrypted instance `listingjet-postgres-encrypted` is adopted
+        # here via `cdk import` under a NEW logical id. Exact-match
+        # properties against the live instance are required or import
+        # fails; values below were verified 2026-04-23 against
+        # `aws rds describe-db-instances --db-instance-identifier
+        # listingjet-postgres-encrypted`.
+        # NOTE: `rds.Credentials.from_secret()` would implicitly create
+        # an AWS::SecretsManager::SecretTargetAttachment — a NEW resource
+        # that `cdk import` cannot create alongside the adopted instance
+        # (CFN import only adopts existing resources). Using
+        # `from_password` with a dynamic secret reference avoids the
+        # attachment entirely; the live secret already has the correct
+        # host/port from the restore, so no attachment is needed.
+
+        self.db_secret_encrypted = sm.Secret.from_secret_complete_arn(
+            self,
+            "EncryptedDbSecret",
+            (
+                "arn:aws:secretsmanager:us-east-1:265911026550:secret:"
+                "ListingJetDatabasePostgresS-2g2B0n8yjwAF-DRYvqm"
+            ),
+        )
+        encrypted_db_kms_key = kms.Key.from_key_arn(
+            self,
+            "EncryptedDbKmsKey",
+            (
+                "arn:aws:kms:us-east-1:265911026550:key/"
+                "1482e415-1d7e-4269-b887-1a25d453cf6b"
+            ),
+        )
+        encrypted_db_subnet_group = rds.SubnetGroup.from_subnet_group_name(
+            self,
+            "EncryptedDbSubnetGroup",
+            "listingjetdatabase-postgressubnetgroup9f8a4d6e-ixyvwsoprif1",
+        )
+        self.db_instance_encrypted = rds.DatabaseInstance(
+            self,
+            "PostgresEncrypted",
+            engine=rds.DatabaseInstanceEngine.postgres(
+                version=rds.PostgresEngineVersion.VER_16_10,
+            ),
+            instance_type=ec2.InstanceType.of(
+                ec2.InstanceClass.BURSTABLE4_GRAVITON,
+                ec2.InstanceSize.MICRO,
+            ),
+            vpc=vpc,
+            subnet_group=encrypted_db_subnet_group,
+            security_groups=[self.db_sg],
+            database_name="listingjet",
+            credentials=rds.Credentials.from_password(
+                "listingjet",
+                self.db_secret_encrypted.secret_value_from_json("password"),
+            ),
+            allocated_storage=20,
+            storage_type=rds.StorageType.GP2,
+            storage_encrypted=True,
+            storage_encryption_key=encrypted_db_kms_key,
+            parameter_group=rds.ParameterGroup.from_parameter_group_name(
+                self,
+                "EncryptedDbParamGroup",
+                "listingjet-pg16",
+            ),
+            multi_az=False,
+            backup_retention=Duration.days(1),
+            deletion_protection=True,
+            removal_policy=RemovalPolicy.RETAIN,
         )
 
         # --- ElastiCache Redis 7 ---------------------------------------------
