@@ -54,4 +54,4 @@ Items from the code quality audit and UX audit that need design decisions, large
 
 - **Untracked session handoff docs:** `docs/SESSION-HANDOFF-2026-04-07-deploy.md`, `docs/SESSION-HANDOFF-2026-04-07.md`, `docs/SESSION-HANDOFF-VIDEO-QUALITY.md` — historical records of already-shipped PRs. Either commit to `docs/archive/` or delete.
 
-- **Untracked operational docs:** `docs/runbooks/secret-rotation.md` (valuable active runbook) and `scripts/smoke_resend.py` (useful email smoke test) should be committed. `frontend/UX_AUDIT.md` should either be committed as document-of-record or deleted since most items are now resolved.
+- **Untracked operational docs:** `frontend/UX_AUDIT.md` should either be committed as document-of-record or deleted since most items are now resolved. (`docs/runbooks/secret-rotation.md` and `scripts/smoke_resend.py` were committed via PR #260 on 2026-04-22.)
