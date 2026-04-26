@@ -156,23 +156,9 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 
 These all require **external AWS actions** — no code changes needed, just ops work:
 
-### 1. Deploy the email provider wiring (code shipped — needs `cdk deploy`)
-Code wiring landed via PR #261 (2026-04-22): `EMAIL_ENABLED=true`,
-`SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`, and `SMTP_PASSWORD`
-sourced from `RESEND_API_KEY` in Secrets Manager — on both the API and
-Worker task defs in `infra/stacks/services.py`. Native Resend path is
-also wired (PR #260) but gated off (`resend_enabled=false`).
-
-Remaining action:
-```
-cd infra
-cdk diff ListingJetServices     # expect env-var + secret changes only
-cdk deploy ListingJetServices    # rolls task defs
-```
-
-Then smoke: `scripts/prod_smoke.sh` (validates /health, /health/deep, demo upload)
-and trigger `POST /auth/forgot-password` on a test account to confirm
-a real email arrives.
+### ~~1. Email provider wiring~~ ✅ shipped + verified 2026-04-26
+Resend SMTP wiring (PR #261) is live in prod — confirmed by a real Resend
+email received in a prior session.
 
 ### 2. RDS encrypted-storage migration (~30-60 min downtime)
 The live RDS instance `kjyxgeldpfef` is unencrypted. Full runbook in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` section A:
