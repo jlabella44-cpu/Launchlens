@@ -28,8 +28,8 @@ Compiled from: `TODO.md`, `PRE_LAUNCH_AUDIT.md`, `ADMIN_DASHBOARD_PROGRESS.md`, 
 - [x] **Separate dev/prod S3 buckets** — cutover deployed 2026-04-16. Live bucket is `listingjet-media-265911026550-us-east-1`; old `listingjet-dev` (913 objects / ~3 GB of pre-launch test data) and empty `listingjet-prod` were deleted post-deploy. Local-dev fallback landmine (`s3_bucket_name = "listingjet-dev"` default in `src/listingjet/config/__init__.py`) has since been defused — the default is now `""`, so a missing env var fails loudly instead of silently writing to a deleted bucket.
 - [x] **Rename CloudWatch log groups** from `/launchlens/*` to `/listingjet/*` — deployed 2026-04-16. Old `/launchlens/*` log groups were replaced on deploy; historical logs under the old names are gone (retention was 30 days so no meaningful loss).
 - [ ] **Pre-launch infra revert** — apply `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (RDS/Redis/ECS upsizing, Multi-AZ, Container Insights, budget ceiling)
-- [ ] **🚨 RDS encrypted-storage migration** — live DB `kjyxgeldpfef` is unencrypted; must migrate to encrypted instance before real user data lands. One-shot ~30-60 min downtime window. Full cutover plan in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` (section A).
-- [ ] **🚨 Confirm email provider — SMTP path appears abandoned in favor of Resend.** Verified live state on 2026-04-16: `listingjet/app` has `RESEND_API_KEY` set to a real `re_...` value (36 chars), `EMAIL_ENABLED=true`, and `SMTP_PASSWORD` is **empty string** (not the old `PLACEHOLDER_SMTP_PASSWORD`). Action: audit `src/listingjet/notifications/` for any remaining SMTP callers (if none, drop `SMTP_PASSWORD` from the secret + `.env.example`); otherwise pick one provider and delete the other path. SES production access is still pending (sandbox: 1/sec, 200/day cap).
+- [x] **RDS encrypted-storage migration** — shipped 2026-04-23 via PR #268. Live instance is `listingjet-postgres-encrypted` (StorageEncrypted=True, restored from encrypted snapshot 2026-04-17). CDK reconciled via zombie-resource path; see header docstring of `infra/stacks/database.py` for the don't-mutate-the-zombies rule.
+- [x] **Confirm email provider — Resend is the active path.** Resend SMTP wiring (PR #261) is live and verified in prod (real Resend email received). SES production access still pending but no longer a blocker — Resend handles transactional mail.
 
 ### Post-Apr-14 Infra Followups (from the drift-fix + #226 deploy session)
 - (RDS encryption migration — see the P0 entry above; same item, single source of truth.)
@@ -69,9 +69,9 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [x] **Dual credit systems (Audit #8)** — Dropped `Tenant.credit_balance`; `CreditAccount` is sole source of truth (migration 046)
 
 ### Deployment
-- [ ] **Deploy backend with new analytics endpoints** (ECR push + ECS redeploy)
-- [ ] **Test analytics page on production**
-- [ ] **Merge PR #109** once CI passes
+- [x] **Deploy backend with new analytics endpoints** — shipped via PR #109 (merged 2026-04-02) and rolled to prod via deploy.yml.
+- [x] **Test analytics page on production** — shipped with PR #109; redesigned in PR #270 to use `apiClient.getPerformanceOverview()`.
+- [x] **Merge PR #109** — merged 2026-04-02.
 
 ### Vision Pipeline
 - [x] **Add per-image logging** — already logging before/after each T1 and T2 analysis with asset ID and proxy status
