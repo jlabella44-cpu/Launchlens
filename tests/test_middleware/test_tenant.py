@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
+from starlette.requests import Request
 
 
 async def _register(client: AsyncClient) -> str:
@@ -19,6 +20,38 @@ async def _register(client: AsyncClient) -> str:
 async def test_request_without_auth_returns_401(async_client):
     resp = await async_client.get("/listings")
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_allows_cookie_only_request():
+    middleware = __import__(
+        "listingjet.middleware.tenant",
+        fromlist=["TenantMiddleware"],
+    ).TenantMiddleware()
+    request = Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/auth/logout",
+        "headers": [],
+        "query_string": b"",
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "client": ("testclient", 50000),
+    })
+
+    called = False
+
+    async def call_next(_request):
+        nonlocal called
+        called = True
+        from starlette.responses import JSONResponse
+
+        return JSONResponse({"status": "ok"})
+
+    resp = await middleware(request, call_next)
+
+    assert called is True
+    assert resp.status_code == 200
 
 
 @pytest.mark.asyncio

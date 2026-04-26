@@ -178,3 +178,53 @@ async def test_admin_only_endpoint_rejects_non_admin(async_client: AsyncClient, 
     viewer_token = create_access_token(viewer)
     resp = await async_client.get("/admin/health", headers={"Authorization": f"Bearer {viewer_token}"})
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_db_admin_resets_admin_flag_on_every_transaction(monkeypatch):
+    """`SET LOCAL app.is_admin` is transaction-scoped and would be cleared by
+    any mid-request `db.commit()`. The dependency must hook `after_begin` so
+    the flag is re-set on every transaction the session opens."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from listingjet.api import deps
+
+    sync_engine = create_engine("sqlite://")
+    real_sync_session = Session(bind=sync_engine)
+
+    class FakeAsyncSession:
+        def __init__(self):
+            self.sync_session = real_sync_session
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+    monkeypatch.setattr(deps, "AsyncSessionLocal", lambda: FakeAsyncSession())
+
+    gen = deps.get_db_admin()
+    session = await gen.__anext__()
+
+    listeners = list(session.sync_session.dispatch.after_begin)
+    assert listeners, "get_db_admin must register an after_begin listener"
+    listener = listeners[-1]
+
+    executed: list[str] = []
+
+    class FakeConn:
+        def execute(self, stmt):
+            executed.append(str(stmt))
+
+    listener(session.sync_session, None, FakeConn())
+    listener(session.sync_session, None, FakeConn())
+
+    assert len(executed) == 2
+    assert all("SET LOCAL app.is_admin = 'true'" in s for s in executed)
+
+    await gen.aclose()
+
+    remaining = list(session.sync_session.dispatch.after_begin)
+    assert listener not in remaining, "listener must be removed on session teardown"

@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.database import AsyncSessionLocal, get_db
@@ -66,9 +67,21 @@ async def require_superadmin(user: User = Depends(get_current_user)) -> User:
 
 
 async def get_db_admin():
-    """DB session without tenant RLS scope — for admin cross-tenant queries."""
+    """DB session with explicit admin RLS scope for cross-tenant queries.
+
+    `SET LOCAL` is transaction-scoped and would be cleared by any mid-request
+    `db.commit()`. Admin handlers commonly commit and then re-read, so we hook
+    `after_begin` to re-set the flag on every transaction the session opens.
+    """
     async with AsyncSessionLocal() as session:
-        yield session
+        @event.listens_for(session.sync_session, "after_begin")
+        def _set_admin_flag(_session, _transaction, connection):
+            connection.execute(text("SET LOCAL app.is_admin = 'true'"))
+
+        try:
+            yield session
+        finally:
+            event.remove(session.sync_session, "after_begin", _set_admin_flag)
 
 
 async def get_current_tenant(request: Request) -> str:
