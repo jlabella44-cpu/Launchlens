@@ -187,6 +187,7 @@ async def test_get_db_admin_resets_admin_flag_on_every_transaction(monkeypatch):
     the flag is re-set on every transaction the session opens."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
+
     from listingjet.api import deps
 
     sync_engine = create_engine("sqlite://")
