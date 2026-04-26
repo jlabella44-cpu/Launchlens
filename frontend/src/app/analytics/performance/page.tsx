@@ -117,10 +117,8 @@ export default function PerformanceIntelligencePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/analytics/performance", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
-    })
-      .then((r) => r.json())
+    apiClient
+      .getPerformanceOverview()
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
