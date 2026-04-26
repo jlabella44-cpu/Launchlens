@@ -1,5 +1,5 @@
 from fastapi import Request
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -31,16 +31,26 @@ class Base(DeclarativeBase):
 async def get_db(request: Request = None):
     tenant_id = getattr(request.state, "tenant_id", None) if request else None
     async with AsyncSessionLocal() as session:
+        listener = None
         if tenant_id:
-            # SET LOCAL is transaction-scoped, so start one explicitly for it.
-            # Safe: tenant_id is a validated UUID from our JWT, not user input.
+            # SET LOCAL is transaction-scoped, so any mid-request `db.commit()`
+            # would clear `app.current_tenant` and let RLS filter subsequent
+            # reads to zero rows. Re-set the flag on every transaction the
+            # session opens via `after_begin`. Safe: tenant_id is a validated
+            # UUID from our JWT, not user input.
             tid = str(tenant_id).replace("'", "")
-            await session.execute(
-                text(f"SET LOCAL app.current_tenant = '{tid}'"),
-            )
+
+            @event.listens_for(session.sync_session, "after_begin")
+            def _set_current_tenant(_session, _transaction, connection):
+                connection.execute(text(f"SET LOCAL app.current_tenant = '{tid}'"))
+
+            listener = _set_current_tenant
         try:
             yield session
             await session.commit()
         except Exception:
             await session.rollback()
             raise
+        finally:
+            if listener is not None:
+                event.remove(session.sync_session, "after_begin", listener)
