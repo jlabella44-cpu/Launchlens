@@ -28,8 +28,3 @@ Items needing design decisions or pending verification.
 
 - **Team invite email template (PR #205):** The `team_member_invite` HTML template in `services/email_templates.py` is a first cut. Send yourself a real invite on prod after #205 merges (plus the Resend SMTP wiring from #261) to verify it renders correctly in a real inbox and the accept link round-trips through #206's frontend.
 
-## Housekeeping
-
-- **Untracked session handoff docs:** `docs/SESSION-HANDOFF-2026-04-07-deploy.md`, `docs/SESSION-HANDOFF-2026-04-07.md`, `docs/SESSION-HANDOFF-VIDEO-QUALITY.md` — historical records of already-shipped PRs. Either commit to `docs/archive/` or delete.
-
-- **Untracked operational docs:** `frontend/UX_AUDIT.md` should either be committed as document-of-record or deleted since most items are now resolved. (`docs/runbooks/secret-rotation.md` and `scripts/smoke_resend.py` were committed via PR #260 on 2026-04-22.)
