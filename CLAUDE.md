@@ -160,10 +160,15 @@ These all require **external AWS actions** — no code changes needed, just ops 
 Resend SMTP wiring (PR #261) is live in prod — confirmed by a real Resend
 email received in a prior session.
 
-### 2. RDS encrypted-storage migration (~30-60 min downtime)
-The live RDS instance `kjyxgeldpfef` is unencrypted. Full runbook in `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` section A:
-1. Snapshot → copy with encryption → restore → update `DATABASE_URL` secret → restart ECS → delete old instance
-2. Then uncomment `storage_encrypted=True` in `infra/stacks/database.py` and re-run `cdk deploy`
+### ~~2. RDS encrypted-storage migration~~ ✅ shipped 2026-04-23 (PR #268)
+Live instance is `listingjet-postgres-encrypted` (StorageEncrypted=True,
+restored 2026-04-17 from an encrypted snapshot of the original
+`kjyxgeldpfef`, which has been deleted). CDK was reconciled via the
+zombie-resource path (PR #268) — the old `Postgres9DC8BB04` logical id
+is a CFN zombie, and a parallel `PostgresEncrypted` construct adopts
+the live instance via `cdk import`. See the header docstring of
+`infra/stacks/database.py` for the rationale and the don't-mutate-the-
+zombies rule.
 
 ### 3. Pre-launch infra revert
 See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` — infra was deliberately undersized while there are zero users. Before real users land, apply in `infra/stacks/database.py`:
