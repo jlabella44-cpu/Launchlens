@@ -36,7 +36,7 @@ src/listingjet/
   config/
     __init__.py              Settings (pydantic-settings, .env)
     tiers.py                 TIER_DEFAULTS (v3 pricing), apply_plan_credits, CREDIT_BUNDLES
-  database.py                SQLAlchemy engine, AsyncSessionLocal, get_db (sets RLS), get_db_admin
+  database.py                SQLAlchemy engine, AsyncSessionLocal, get_db (after_begin listener re-issues SET LOCAL app.current_tenant on every transaction)
   temporal_client.py         TemporalClient singleton (start_pipeline, signal_review, cancel_workflow)
   telemetry.py               init_tracing() (OTel TracerProvider + OTLP), agent_span() context manager
 
@@ -187,7 +187,7 @@ src/listingjet/
     request_id.py            RequestIDMiddleware: attaches X-Request-ID for log correlation
 
 alembic/versions/
-  Chain runs 001 → 050 linearly (no merges, no gaps).
+  Chain runs 001 → 051 linearly (no merges, no gaps).
   Highlights:
   001 Initial schema + RLS policies on all tenant-scoped tables
   010 credit_transactions table
@@ -196,10 +196,12 @@ alembic/versions/
   024 ListingState.CANCELLED enum value
   027 Additional performance indexes
   041 Last of the pre-credit-refactor migrations
+  044 FORCE ROW LEVEL SECURITY on all tenant tables (table-owner bypass closed)
   046 Drop legacy Tenant.credit_balance — CreditAccount is sole source of truth
   048 User AI consent fields (ai_consent_at, ai_consent_version) + backfill
   049 Team invite tokens (invite_token_hash, invite_expires_at, invited_by_user_id)
   050 Tenant admin controls (deactivated_at, bypass_limits, plan_overrides)
+  051 Admin RLS bypass — tenant_isolation policies accept app.is_admin = 'true' as a bypass
 
 tests/
   conftest.py                test_engine (NullPool, port 5433), db_session, async_client, JWT helpers, promote_to_superadmin
@@ -261,10 +263,10 @@ frontend/src/
 ## Key Patterns
 
 ### Tenant Isolation (RLS)
-- PostgreSQL RLS enabled on all tenant-scoped tables (migration 001)
-- `get_db` dependency sets `SET LOCAL app.current_tenant = '{tenant_id}'` — **transaction-scoped only, never session-scoped**
-- `get_db_admin` skips RLS for cross-tenant admin queries
-- `TenantMiddleware` decodes JWT and sets `request.state.tenant_id` on every request
+- PostgreSQL RLS enabled on all tenant-scoped tables (migration 001), `FORCE ROW LEVEL SECURITY` applied so the table owner cannot bypass (migration 044)
+- `get_db` registers a SQLAlchemy `after_begin` event listener that re-issues `SET LOCAL app.current_tenant = '{tenant_id}'` on **every** transaction the session opens. `SET LOCAL` is transaction-scoped, so a single SET would be cleared by any mid-request `db.commit()`. The listener guarantees the flag survives across commits within one request.
+- `get_db_admin` uses the same `after_begin` pattern to set `SET LOCAL app.is_admin = 'true'`, an explicit bypass that the tenant-isolation policies accept (migration 051)
+- `TenantMiddleware` decodes JWT and sets `request.state.tenant_id`; `_PUBLIC_PATHS` skip-list covers health, auth (register/login/refresh/logout/forgot/reset/accept-invite), demo GET, billing webhook, and analytics events
 
 ### Agent Pattern
 ```python
@@ -385,18 +387,7 @@ Third-party AI processing (Google Vision, Qwen, Claude, Kling, virtual staging) 
 
 ## Database Migrations (Alembic)
 
-| Migration | Description |
-|-----------|-------------|
-| 001 | Initial schema (all core tables) + RLS policies |
-| 002 | Outbox: add tenant_id, listing_id, delivered_at |
-| 003 | Users: add password_hash |
-| 004 | Tenants: stripe_customer_id, stripe_subscription_id |
-| 005 | social_content, demo state, export paths |
-| 006 | dollhouse_scenes table |
-| 007 | video_assets table |
-| 008 | tenants.webhook_url |
-| 009 | api_keys table |
-| 010 | credit_transactions table + tenants.credit_balance |
+The chain runs 001 → 051 linearly. See the `alembic/versions/` highlights in the Repository Layout section above for the load-bearing migrations; for everything else, read `alembic/versions/` directly — file names are descriptive (e.g. `046_drop_legacy_credit_balance.py`).
 
 ---
 
