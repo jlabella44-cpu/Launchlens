@@ -124,7 +124,7 @@ After the cost-optimization branch is deployed and has run for **at least 7 days
 - [x] Response models — `ActionResponse` on approve/reject/retry, `CancelResponse` on cancel, `PipelineStatusResponse` on pipeline-status
 - [x] Standardize pagination — `PaginatedResponse` generic added; paginated `/admin/tenants` and `/credits/transactions`
 - [x] Rate limit headers (`X-RateLimit-*`) — `X-RateLimit-Limit` and `X-RateLimit-Remaining` on all responses
-- [ ] API versioning — `/api/v1/` prefix (optional)
+- [x] **API versioning — declined.** Routes mount at their router prefix directly (no `/v1`). Adding `/api/v1/` would touch every backend router (~25 modules) + every frontend call site + break existing webhook URLs and external API consumers, with no concrete v2 in mind to justify the namespace. Already actively decided against once (per CLAUDE.md). Re-open only if a real v2 surface is on the roadmap.
 
 ### Documentation (Session 21)
 - [x] Create `README.md` — 244 lines with architecture diagram, quick start, tech stack, CI badges
