@@ -213,17 +213,27 @@ class ListingPipeline:
             brand_result = {}
         flyer_key = brand_result.get("flyer_s3_key") if isinstance(brand_result, dict) else None
 
-        # Video post-processing (chapters + social cuts)
-        await workflow.execute_activity(
-            run_chapters, ctx,
-            start_to_close_timeout=_DEFAULT_TIMEOUT,
-            retry_policy=_DEFAULT_RETRY,
-        )
-        await workflow.execute_activity(
-            run_social_cuts, ctx,
-            start_to_close_timeout=_DEFAULT_TIMEOUT,
-            retry_policy=_DEFAULT_RETRY,
-        )
+        # Video post-processing (chapters + social cuts) — tolerated.
+        # These call out to LLMs that occasionally return empty / non-JSON
+        # content; without tolerance one bad completion kills the whole
+        # pipeline before MLS export ever runs. Brand follows the same
+        # pattern just above.
+        try:
+            await workflow.execute_activity(
+                run_chapters, ctx,
+                start_to_close_timeout=_DEFAULT_TIMEOUT,
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except BaseException as exc:
+            workflow.logger.warning("chapters_failed listing=%s error=%s", input.listing_id, exc)
+        try:
+            await workflow.execute_activity(
+                run_social_cuts, ctx,
+                start_to_close_timeout=_DEFAULT_TIMEOUT,
+                retry_policy=_DEFAULT_RETRY,
+            )
+        except BaseException as exc:
+            workflow.logger.warning("social_cuts_failed listing=%s error=%s", input.listing_id, exc)
 
         # Step 3: MLS Export (builds both bundles)
         await workflow.execute_activity(
