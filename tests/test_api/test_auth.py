@@ -154,6 +154,71 @@ async def test_get_me_returns_current_user(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_refresh_with_token_in_json_body(async_client: AsyncClient):
+    """POST /auth/refresh accepts the refresh token in the JSON body — the
+    primary path for the frontend api-client, since it auto-attaches the
+    *access* token on Authorization (which would otherwise shadow it)."""
+    email = f"test-{uuid.uuid4()}@example.com"
+    reg = await async_client.post("/auth/register", json={
+        "email": email, "password": "ValidPass1!", "name": "Reg", "company_name": "Reg LLC",
+        "plan_tier": "free",
+    })
+    assert reg.status_code == 200
+    refresh = reg.json()["refresh_token"]
+
+    resp = await async_client.post("/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 200
+    body = resp.json()
+    # Tokens may be byte-identical to the registration pair when the refresh
+    # lands in the same JWT-second window — assert validity, not novelty.
+    assert decode_token(body["access_token"])["type"] == "access"
+    assert decode_token(body["refresh_token"])["type"] == "refresh"
+
+
+@pytest.mark.asyncio
+async def test_refresh_body_wins_over_access_token_in_authorization_header(async_client: AsyncClient):
+    """The frontend api-client auto-attaches the *access* token on every
+    request. The refresh endpoint must prefer the body so the access token
+    on the Authorization header doesn't trigger 'Not a refresh token'."""
+    email = f"test-{uuid.uuid4()}@example.com"
+    reg = await async_client.post("/auth/register", json={
+        "email": email, "password": "ValidPass1!", "name": "Reg2", "company_name": "Reg2 LLC",
+        "plan_tier": "free",
+    })
+    access = reg.json()["access_token"]
+    refresh = reg.json()["refresh_token"]
+
+    resp = await async_client.post(
+        "/auth/refresh",
+        json={"refresh_token": refresh},
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.asyncio
+async def test_refresh_rejects_access_token(async_client: AsyncClient):
+    """Submitting an access token (wrong type) must 401 with a clear reason."""
+    email = f"test-{uuid.uuid4()}@example.com"
+    reg = await async_client.post("/auth/register", json={
+        "email": email, "password": "ValidPass1!", "name": "Reg3", "company_name": "Reg3 LLC",
+        "plan_tier": "free",
+    })
+    access = reg.json()["access_token"]
+
+    resp = await async_client.post("/auth/refresh", json={"refresh_token": access})
+    assert resp.status_code == 401
+    assert "refresh" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_refresh_missing_token_returns_401(async_client: AsyncClient):
+    resp = await async_client.post("/auth/refresh", json={})
+    assert resp.status_code == 401
+    assert "missing" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
 async def test_admin_only_endpoint_rejects_non_admin(async_client: AsyncClient, db_session):
     """Admin-only route should return 403 for non-admin users."""
     from listingjet.models.tenant import Tenant

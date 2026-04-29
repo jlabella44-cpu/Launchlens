@@ -332,16 +332,44 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
     return {"status": "ok", "message": "Password has been reset. You can now log in."}
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str | None = None
+
+
 @router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(rate_limit(10, 60))])
 async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
-    """Exchange a valid refresh token for a new access + refresh token pair."""
-    # Try cookie first, then Authorization header (backward compat)
-    token = request.cookies.get("refresh_token")
+    """Exchange a valid refresh token for a new access + refresh token pair.
+
+    Token sources, in priority order:
+      1. JSON body field ``refresh_token`` (frontend api-client default)
+      2. ``refresh_token`` httpOnly cookie
+      3. ``Authorization: Bearer <token>`` header (legacy fallback)
+
+    Body comes first because the frontend api-client auto-attaches the
+    *access* token to the Authorization header on every request — using the
+    header as a fallback would shadow a real refresh token in the body and
+    return "Not a refresh token".
+    """
+    token: str | None = None
+    try:
+        raw = await request.json()
+    except Exception:
+        raw = None
+    if isinstance(raw, dict):
+        candidate = raw.get("refresh_token")
+        if isinstance(candidate, str) and candidate:
+            token = candidate
+
+    if not token:
+        token = request.cookies.get("refresh_token")
+
     if not token:
         auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Missing refresh token")
-        token = auth_header.split(" ", 1)[1]
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
 
     payload = decode_token(token)
     if payload.get("type") != "refresh":
@@ -357,8 +385,8 @@ async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
 
     access = create_access_token(user)
     refresh = create_refresh_token(user)
-    body = TokenResponse(access_token=access, refresh_token=refresh)
-    return set_auth_cookies(JSONResponse(content=body.model_dump()), access, refresh)
+    resp_body = TokenResponse(access_token=access, refresh_token=refresh)
+    return set_auth_cookies(JSONResponse(content=resp_body.model_dump()), access, refresh)
 
 
 @router.post("/logout")
