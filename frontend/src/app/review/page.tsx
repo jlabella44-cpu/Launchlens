@@ -314,7 +314,15 @@ function ReviewQueue() {
   async function handleApprove(id: string) {
     setActionLoading(id);
     try {
-      await apiClient.startReview(id);
+      // startReview is a best-effort transition: if the listing is already
+      // IN_REVIEW (e.g. user opened the detail page first), the endpoint
+      // returns 409 — that's fine, we still want to approve.
+      try {
+        await apiClient.startReview(id);
+      } catch (err: unknown) {
+        const status = (err as { status?: number })?.status;
+        if (status !== 409) throw err;
+      }
       await apiClient.approveListing(id);
       setListings((prev) => prev.filter((l) => l.id !== id));
       toast("Listing approved", "success");
