@@ -310,8 +310,19 @@ async def reorder_package(
         if not sel_from or not sel_to:
             continue
 
-        # Swap positions
-        sel_from.position, sel_to.position = sel_to.position, sel_from.position
+        # Swap positions through a NULL stop. Direct swap violates the
+        # uq_package_selections_listing_channel_position unique constraint
+        # mid-flush (Postgres checks per row, not per statement). NULLs are
+        # treated as distinct by the constraint, so parking sel_from at NULL
+        # frees its position for sel_to before sel_from claims its target.
+        original_from_pos = sel_from.position
+        original_to_pos = sel_to.position
+        sel_from.position = None
+        await db.flush()
+        sel_to.position = original_from_pos
+        await db.flush()
+        sel_from.position = original_to_pos
+        await db.flush()
         sel_from.selected_by = "human"
         sel_to.selected_by = "human"
 

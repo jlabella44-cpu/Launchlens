@@ -251,3 +251,56 @@ async def test_retry_failed_listing(async_client: AsyncClient, db_session):
     assert resp.status_code == 200
     body = resp.json()
     assert body["state"] == "uploading"
+
+
+@pytest.mark.asyncio
+async def test_reorder_package_swaps_positions(async_client: AsyncClient, db_session):
+    """Reorder swap must succeed despite the unique(listing_id, channel, position)
+    constraint. Direct in-place swap violated it mid-flush; the staged-via-NULL
+    fix must produce a clean final state with positions exchanged."""
+    from listingjet.models.listing import Listing
+    from listingjet.models.package_selection import PackageSelection
+
+    token, tenant_id = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Reorder St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+    listing_uuid = uuid.UUID(listing_id)
+    tenant_uuid = uuid.UUID(tenant_id)
+
+    listing = await db_session.get(Listing, listing_uuid)
+    listing.state = ListingState.AWAITING_REVIEW
+
+    asset_a, asset_b = uuid.uuid4(), uuid.uuid4()
+    db_session.add_all([
+        PackageSelection(
+            id=uuid.uuid4(), tenant_id=tenant_uuid, listing_id=listing_uuid,
+            asset_id=asset_a, channel="mls", position=0, selected_by="ai",
+            composite_score=0.9,
+        ),
+        PackageSelection(
+            id=uuid.uuid4(), tenant_id=tenant_uuid, listing_id=listing_uuid,
+            asset_id=asset_b, channel="mls", position=1, selected_by="ai",
+            composite_score=0.8,
+        ),
+    ])
+    await db_session.commit()
+
+    resp = await async_client.post(
+        f"/listings/{listing_id}/package/reorder",
+        json={"swaps": [{"from_position": 0, "to_position": 1}]},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["swaps_applied"] == 1
+
+    await db_session.commit()  # drop any cached state
+    rows = (await db_session.execute(
+        PackageSelection.__table__.select().where(
+            PackageSelection.listing_id == listing_uuid
+        )
+    )).all()
+    by_asset = {r.asset_id: r.position for r in rows}
+    assert by_asset[asset_a] == 1
+    assert by_asset[asset_b] == 0
