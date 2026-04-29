@@ -26,9 +26,22 @@ class TemporalClient:
         plan: str = "starter",
         billing_model: str = "legacy",
         enabled_addons: list[str] | None = None,
+        terminate_existing: bool = False,
     ) -> str:
+        """Start the listing pipeline workflow.
+
+        ``terminate_existing=True`` is for retry: if an old workflow with the
+        same ID is still running (stuck/stalled) it is terminated and a new
+        one takes the slot. Without this, ``REJECT_DUPLICATE`` causes
+        "already started" to be swallowed and the retry silently no-ops.
+        """
         client = await self._connect()
         workflow_id = f"listing-pipeline-{listing_id}"
+        reuse_policy = (
+            WorkflowIDReusePolicy.TERMINATE_IF_RUNNING
+            if terminate_existing
+            else WorkflowIDReusePolicy.REJECT_DUPLICATE
+        )
         try:
             handle = await client.start_workflow(
                 ListingPipeline.run,
@@ -41,11 +54,11 @@ class TemporalClient:
                 ),
                 id=workflow_id,
                 task_queue=settings.temporal_task_queue,
-                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+                id_reuse_policy=reuse_policy,
             )
             return handle.id
         except RPCError as exc:
-            if "already started" in str(exc).lower():
+            if not terminate_existing and "already started" in str(exc).lower():
                 logger.warning(
                     "Workflow already running for listing %s, returning existing handle",
                     listing_id,

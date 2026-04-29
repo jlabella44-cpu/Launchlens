@@ -249,6 +249,7 @@ async def retry_pipeline(
             listing_id=str(listing.id),
             tenant_id=str(current_user.tenant_id),
             plan=tenant.plan if tenant else "starter",
+            terminate_existing=True,
         )
     except Exception:
         logger.exception("Pipeline retry trigger failed for listing %s", listing.id)
