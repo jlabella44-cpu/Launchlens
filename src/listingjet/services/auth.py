@@ -123,7 +123,10 @@ def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: s
         path="/",
     )
     # Refresh token uses SameSite=strict — it is only ever sent to our own
-    # /auth/refresh endpoint, so cross-site POST is not needed.
+    # /auth/refresh endpoint, so cross-site POST is not needed. Path is "/"
+    # because the prod edge rewrites /api/auth/refresh → backend /auth/refresh,
+    # and a cookie scoped to /auth/refresh would never be attached when the
+    # browser issues the request against the /api/-prefixed public URL.
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
@@ -131,7 +134,7 @@ def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: s
         secure=is_prod,
         samesite="strict",
         max_age=settings.jwt_refresh_expiry_days * 86400,
-        path="/auth/refresh",
+        path="/",
     )
     # Add Partitioned attribute (CHIPS) in production for third-party cookie
     # isolation.  Starlette doesn't support the Partitioned flag natively, so
@@ -150,5 +153,8 @@ def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: s
 def clear_auth_cookies(response: JSONResponse) -> JSONResponse:
     """Remove auth cookies on logout."""
     response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    # Also clear any legacy cookie set under the old narrow path before the
+    # 2026-04-28 fix, so re-logged-in users don't carry a stale shadow cookie.
     response.delete_cookie("refresh_token", path="/auth/refresh")
     return response
