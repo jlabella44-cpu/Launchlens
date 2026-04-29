@@ -284,6 +284,8 @@ function ListingDetail() {
                           src={a.thumbnail_url}
                           alt={a.file_path.split("/").pop() || "Photo"}
                           className="w-full h-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <svg className="w-6 h-6 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -305,6 +307,8 @@ function ListingDetail() {
                           src={a.thumbnail_url}
                           alt={a.file_path.split('/').pop() || 'Photo'}
                           className="w-full h-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
