@@ -254,6 +254,28 @@ async def test_retry_failed_listing(async_client: AsyncClient, db_session):
 
 
 @pytest.mark.asyncio
+async def test_retry_approved_listing(async_client: AsyncClient, db_session):
+    """A listing whose post-approval workflow died (e.g. an LLM activity
+    blew up before MLS export) is in APPROVED state. It must be retryable
+    so the user has a way to recover without a manual DB poke."""
+    from listingjet.models.listing import Listing
+
+    token, _ = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Approved-stuck St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+
+    listing = await db_session.get(Listing, uuid.UUID(listing_id))
+    listing.state = ListingState.APPROVED
+    await db_session.commit()
+
+    resp = await async_client.post(f"/listings/{listing_id}/retry", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["state"] == "uploading"
+
+
+@pytest.mark.asyncio
 async def test_reorder_package_swaps_positions(async_client: AsyncClient, db_session):
     """Reorder swap must succeed despite the unique(listing_id, channel, position)
     constraint. Direct in-place swap violated it mid-flush; the staged-via-NULL

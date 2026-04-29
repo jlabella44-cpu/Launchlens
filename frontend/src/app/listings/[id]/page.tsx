@@ -379,26 +379,30 @@ function ListingDetail() {
             )}
 
             {/* Error / Retry State */}
-            {["failed", "pipeline_timeout", "uploading", "analyzing"].includes(listing.state) && (
+            {["failed", "pipeline_timeout", "uploading", "analyzing", "approved", "exporting"].includes(listing.state) && (
               <div className={`rounded-2xl p-5 ${
-                ["uploading", "analyzing"].includes(listing.state)
+                ["uploading", "analyzing", "approved", "exporting"].includes(listing.state)
                   ? "bg-amber-50 border border-amber-200"
                   : "bg-red-50 border border-red-200"
               }`}>
                 <h4 className={`font-semibold mb-1 ${
-                  ["uploading", "analyzing"].includes(listing.state) ? "text-amber-800" : "text-red-800"
+                  ["uploading", "analyzing", "approved", "exporting"].includes(listing.state) ? "text-amber-800" : "text-red-800"
                 }`}>
                   {["uploading", "analyzing"].includes(listing.state)
                     ? "Processing Stalled"
+                    : ["approved", "exporting"].includes(listing.state)
+                    ? "Post-Approval Processing Stalled"
                     : "Course Correction Required"}
                 </h4>
                 <p className={`text-sm mb-4 ${
-                  ["uploading", "analyzing"].includes(listing.state) ? "text-amber-600" : "text-red-600"
+                  ["uploading", "analyzing", "approved", "exporting"].includes(listing.state) ? "text-amber-600" : "text-red-600"
                 }`}>
                   {listing.state === "pipeline_timeout"
                     ? "Flight delayed. Processing timed out — this can happen with large photo sets."
                     : ["uploading", "analyzing"].includes(listing.state)
                     ? "This listing appears stuck. Click retry to restart the pipeline."
+                    : ["approved", "exporting"].includes(listing.state)
+                    ? "Approved but the post-approval workflow didn't finish. Click retry to restart from scratch (you'll need to re-review)."
                     : "Turbulence detected. Something went wrong during processing."}
                 </p>
                 <div className="flex gap-3">
