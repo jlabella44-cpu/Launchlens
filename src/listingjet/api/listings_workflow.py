@@ -232,11 +232,23 @@ async def retry_pipeline(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    retryable = {ListingState.FAILED, ListingState.PIPELINE_TIMEOUT, ListingState.UPLOADING, ListingState.ANALYZING}
+    # Includes post-approval states so a Temporal workflow that died after
+    # the user approved (e.g. an LLM activity blew up before MLS export
+    # could run) can still be restarted without a manual DB poke.
+    retryable = {
+        ListingState.FAILED,
+        ListingState.PIPELINE_TIMEOUT,
+        ListingState.UPLOADING,
+        ListingState.ANALYZING,
+        ListingState.AWAITING_REVIEW,
+        ListingState.IN_REVIEW,
+        ListingState.APPROVED,
+        ListingState.EXPORTING,
+    }
     if listing.state not in retryable:
         raise HTTPException(
             status_code=409,
-            detail=f"Can only retry failed or stuck listings, current state: {listing.state.value}",
+            detail=f"Can only retry stuck or failed listings, current state: {listing.state.value}",
         )
 
     listing.state = ListingState.UPLOADING
