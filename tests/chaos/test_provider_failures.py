@@ -242,15 +242,21 @@ class TestContentAgentLLMFailure:
             await agent.execute(ctx)
 
     @pytest.mark.asyncio
-    async def test_llm_returns_invalid_json_raises(self):
-        """If the LLM returns garbage instead of JSON, the agent must raise."""
+    async def test_llm_returns_invalid_json_falls_back(self):
+        """If the LLM returns garbage, the agent falls back to listing metadata
+        description rather than crashing the workflow.
+        """
         broken_llm = AsyncMock()
         broken_llm.complete.return_value = "this is not json at all"
 
         listing_id = uuid.uuid4()
         mock_listing = MagicMock()
         mock_listing.id = listing_id
-        mock_listing.metadata_ = {"beds": 3, "baths": 2}
+        mock_listing.metadata_ = {
+            "beds": 3,
+            "baths": 2,
+            "description": "Charming three-bedroom home with a sunny backyard.",
+        }
 
         vr_result = MagicMock()
         vr_result.scalars.return_value.all.return_value = []
@@ -264,8 +270,10 @@ class TestContentAgentLLMFailure:
 
         agent = ContentAgent(llm_provider=broken_llm, session_factory=factory)
 
-        with pytest.raises(Exception):
-            await agent.execute(ctx)
+        result = await agent.execute(ctx)
+        assert result["mls_safe"] == mock_listing.metadata_["description"]
+        assert result["marketing"] == mock_listing.metadata_["description"]
+        assert result["fha_passed"] is False
 
     @pytest.mark.asyncio
     async def test_llm_connection_error_propagates(self):
