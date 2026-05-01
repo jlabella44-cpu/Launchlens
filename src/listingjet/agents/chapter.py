@@ -1,10 +1,8 @@
 """ChapterAgent — analyzes video keyframes via GPT-4V to generate chapter markers."""
 
-import json
-
 from sqlalchemy import select
 
-from listingjet.agents.base import strip_markdown_fences
+from listingjet.agents.base import parse_llm_json
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.video_asset import VideoAsset
@@ -71,11 +69,8 @@ class ChapterAgent(BaseAgent):
                     prompt=CHAPTER_EXTRACTION_PROMPT,
                 )
 
-                try:
-                    parsed = json.loads(strip_markdown_fences(raw_response))
-                    chapters = parsed.get("chapters", [])
-                except (json.JSONDecodeError, AttributeError):
-                    chapters = []
+                parsed = parse_llm_json(raw_response) or {}
+                chapters = parsed.get("chapters", []) if isinstance(parsed, dict) else []
 
                 video.chapters = chapters
 

@@ -1,8 +1,10 @@
+import json
 import re
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from listingjet.services.metrics import StepTimer
 from listingjet.telemetry import agent_span
@@ -22,6 +24,28 @@ def strip_markdown_fences(text: str) -> str:
     text = text.strip()
     m = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
     return m.group(1).strip() if m else text
+
+
+def parse_llm_json(text: str | None) -> Any:
+    """Parse JSON from an LLM completion, returning None on failure.
+
+    Strips ```json fences before parsing. Tolerates None / empty / whitespace
+    / non-JSON inputs. Use at any agent call site where the LLM may return
+    an empty or malformed completion and the workflow should degrade
+    gracefully instead of crashing.
+    """
+    if not text:
+        return None
+    try:
+        cleaned = strip_markdown_fences(text).strip()
+    except (AttributeError, TypeError):
+        return None
+    if not cleaned:
+        return None
+    try:
+        return json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 @dataclass
