@@ -31,7 +31,7 @@ from listingjet.services.metrics import record_cost
 from listingjet.services.storage import StorageService
 from listingjet.services.video_stitcher import VideoStitcher
 
-from .base import AgentContext, BaseAgent
+from .base import AgentContext, BaseAgent, heartbeat_during
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,10 @@ class VideoAgent(BaseAgent):
         self._semaphore = asyncio.Semaphore(3)  # max 3 concurrent Kling calls
 
     async def execute(self, context: AgentContext) -> dict:
-        async with self.session_scope(context) as (session, listing_id, tenant_id):
+        async with (
+            heartbeat_during(interval=60, detail="video"),
+            self.session_scope(context) as (session, listing_id, tenant_id),
+        ):
                 listing = await session.get(Listing, listing_id)
                 if not listing:
                     raise ValueError(f"Listing {listing_id} not found")

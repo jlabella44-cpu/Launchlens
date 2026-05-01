@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import uuid
@@ -17,6 +18,31 @@ def _safe_heartbeat(detail: object) -> None:
         activity.heartbeat(detail)
     except RuntimeError:
         pass  # Not running inside a Temporal activity (e.g. unit tests)
+
+
+@asynccontextmanager
+async def heartbeat_during(interval: float = 60.0, detail: object = "alive"):
+    """Send Temporal heartbeats every `interval` seconds while the wrapped block runs.
+
+    Use to keep long-running activities (LLM polling, video generation, S3
+    uploads) alive against the activity's heartbeat_timeout. Outside a
+    Temporal activity context, _safe_heartbeat no-ops, so this is safe to
+    use in unit tests without mocking Temporal.
+    """
+    async def _loop():
+        while True:
+            _safe_heartbeat(detail)
+            await asyncio.sleep(interval)
+
+    task = asyncio.create_task(_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 def strip_markdown_fences(text: str) -> str:
