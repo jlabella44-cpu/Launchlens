@@ -1,10 +1,9 @@
-import json
 import logging
 import uuid
 
 from sqlalchemy import select
 
-from listingjet.agents.base import strip_markdown_fences
+from listingjet.agents.base import parse_llm_json
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.dollhouse_scene import DollhouseScene
@@ -210,9 +209,8 @@ class FloorplanAgent(BaseAgent):
             )
             return None
 
-        try:
-            parsed = json.loads(strip_markdown_fences(raw))
-        except (json.JSONDecodeError, AttributeError):
+        parsed = parse_llm_json(raw)
+        if not isinstance(parsed, dict):
             logger.warning("floorplan parse failed asset=%s", floorplan_asset.id)
             return None
 

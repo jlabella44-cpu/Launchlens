@@ -1,8 +1,9 @@
 import json
+import logging
 
 from sqlalchemy import select
 
-from listingjet.agents.base import strip_markdown_fences
+from listingjet.agents.base import parse_llm_json
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
@@ -14,6 +15,8 @@ from listingjet.services.fha_filter import fha_check
 from listingjet.services.pii_filter import sanitize_for_prompt
 
 from .base import AgentContext, BaseAgent
+
+logger = logging.getLogger(__name__)
 
 _PROMPT_TEMPLATE = """\
 Generate social media captions for a real estate listing.
@@ -104,7 +107,16 @@ class SocialContentAgent(BaseAgent):
                 )
 
                 raw = await self._llm_provider.complete(prompt=prompt, context=metadata)
-                data = json.loads(strip_markdown_fences(raw))
+                data = parse_llm_json(raw)
+                if not data or "instagram" not in data or "facebook" not in data:
+                    logger.warning(
+                        "social_content parse failed listing=%s — skipping social content",
+                        listing_id,
+                    )
+                    await self.emit(session, context, "social_content.skipped", {
+                        "reason": "LLM returned empty or malformed JSON",
+                    })
+                    return {"platforms": [], "skipped": True, "reason": "empty_llm_response"}
 
                 # FHA check all captions (handle both hooks and flat format)
                 fha_texts = {}
@@ -122,17 +134,24 @@ class SocialContentAgent(BaseAgent):
                     raw = await self._llm_provider.complete(
                         prompt=prompt + _FHA_RETRY_SUFFIX, context=metadata
                     )
-                    data = json.loads(strip_markdown_fences(raw))
-                    fha_texts = {}
-                    for platform in ("instagram", "facebook"):
-                        hooks = data[platform].get("hooks", [])
-                        if hooks:
-                            for i, hook in enumerate(hooks):
-                                fha_texts[f"{platform}_hook_{i}"] = hook.get("caption", "")
-                        else:
-                            fha_texts[f"{platform}_caption"] = data[platform].get("caption", "")
-                        fha_texts[f"{platform}_cta"] = data[platform].get("cta", "")
-                    fha_result = fha_check(fha_texts)
+                    retry_data = parse_llm_json(raw)
+                    if retry_data and "instagram" in retry_data and "facebook" in retry_data:
+                        data = retry_data
+                        fha_texts = {}
+                        for platform in ("instagram", "facebook"):
+                            hooks = data[platform].get("hooks", [])
+                            if hooks:
+                                for i, hook in enumerate(hooks):
+                                    fha_texts[f"{platform}_hook_{i}"] = hook.get("caption", "")
+                            else:
+                                fha_texts[f"{platform}_caption"] = data[platform].get("caption", "")
+                            fha_texts[f"{platform}_cta"] = data[platform].get("cta", "")
+                        fha_result = fha_check(fha_texts)
+                    else:
+                        logger.warning(
+                            "social_content FHA retry parse failed listing=%s — keeping first attempt",
+                            listing_id,
+                        )
 
                 # Store one SocialContent row per platform
                 # Hooks are stored as JSON array in caption field

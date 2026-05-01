@@ -7,12 +7,11 @@ text overlays. Uses GPT-4V via OpenAIVisionProvider.
 Results are stored as compliance events and returned as a per-photo report.
 Non-blocking: flags issues as warnings, does not prevent export.
 """
-import json
 from dataclasses import dataclass
 
 from sqlalchemy import select
 
-from listingjet.agents.base import _safe_heartbeat, strip_markdown_fences
+from listingjet.agents.base import _safe_heartbeat, parse_llm_json
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing
@@ -69,7 +68,9 @@ class PhotoComplianceAgent(BaseAgent):
         """Analyze a single photo for compliance issues."""
         try:
             raw = await self._vision.analyze_with_prompt(image_url, _COMPLIANCE_PROMPT)
-            data = json.loads(strip_markdown_fences(raw))
+            data = parse_llm_json(raw)
+            if not isinstance(data, dict):
+                raise ValueError("LLM returned empty or non-dict JSON")
             return PhotoComplianceResult(
                 asset_id=asset_id,
                 file_path=file_path,

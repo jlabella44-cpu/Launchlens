@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from listingjet.agents.base import AgentContext, BaseAgent
+from listingjet.agents.base import AgentContext, BaseAgent, parse_llm_json
 
 
 class ConcreteAgent(BaseAgent):
@@ -45,3 +45,42 @@ async def test_agent_name_required():
         class NoNameAgent(BaseAgent):
             async def execute(self, context):
                 pass
+
+
+class TestParseLLMJSON:
+    def test_returns_none_for_none(self):
+        assert parse_llm_json(None) is None
+
+    def test_returns_none_for_empty_string(self):
+        assert parse_llm_json("") is None
+
+    def test_returns_none_for_whitespace(self):
+        assert parse_llm_json("   \n\t  ") is None
+
+    def test_parses_plain_json_object(self):
+        assert parse_llm_json('{"a": 1}') == {"a": 1}
+
+    def test_parses_plain_json_array(self):
+        assert parse_llm_json('[1, 2, 3]') == [1, 2, 3]
+
+    def test_parses_json_with_markdown_fences(self):
+        assert parse_llm_json('```json\n{"a": 1}\n```') == {"a": 1}
+
+    def test_parses_json_with_unlabeled_fences(self):
+        assert parse_llm_json('```\n{"a": 1}\n```') == {"a": 1}
+
+    def test_returns_none_for_empty_fenced_block(self):
+        assert parse_llm_json('```json\n\n```') is None
+
+    def test_returns_none_for_malformed_json(self):
+        assert parse_llm_json('{not valid json}') is None
+
+    def test_returns_none_for_prose(self):
+        assert parse_llm_json("Sorry, I can't help with that.") is None
+
+    def test_returns_none_for_truncated_json(self):
+        assert parse_llm_json('{"a": 1') is None
+
+    def test_handles_non_string_gracefully(self):
+        # Some providers return ints/None when their wrapper degrades.
+        assert parse_llm_json(0) is None  # type: ignore[arg-type]

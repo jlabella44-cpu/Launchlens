@@ -1,8 +1,8 @@
-import json
+import logging
 
 from sqlalchemy import select
 
-from listingjet.agents.base import strip_markdown_fences
+from listingjet.agents.base import parse_llm_json
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.brand_kit import BrandKit
@@ -15,6 +15,8 @@ from listingjet.services.fha_filter import fha_check
 from listingjet.services.pii_filter import sanitize_for_prompt
 
 from .base import AgentContext, BaseAgent
+
+logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES = {
     "en": "English", "es": "Spanish", "fr": "French", "de": "German",
@@ -188,7 +190,18 @@ class ContentAgent(BaseAgent):
                     temperature=temperature,
                     system_prompt=system_prompt,
                 )
-                parsed = json.loads(strip_markdown_fences(raw))
+                parsed = parse_llm_json(raw)
+                if not parsed or "mls_safe" not in parsed or "marketing" not in parsed:
+                    logger.warning(
+                        "content parse failed listing=%s — falling back to listing metadata description",
+                        listing_id,
+                    )
+                    fallback = meta.get("description", "") or ""
+                    await self.emit(session, context, "content.fallback", {
+                        "reason": "LLM returned empty or malformed JSON",
+                        "fallback_length": len(fallback),
+                    })
+                    return {"mls_safe": fallback, "marketing": fallback, "fha_passed": False, "language": language}
                 mls_safe = parsed["mls_safe"]
                 marketing = parsed["marketing"]
 
@@ -213,10 +226,16 @@ class ContentAgent(BaseAgent):
                         temperature=max(0.1, temperature - 0.2),  # Lower temp for FHA retry
                         system_prompt=system_prompt,
                     )
-                    parsed = json.loads(strip_markdown_fences(raw))
-                    mls_safe = parsed["mls_safe"]
-                    marketing = parsed["marketing"]
-                    fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
+                    retry_parsed = parse_llm_json(raw)
+                    if retry_parsed and "mls_safe" in retry_parsed and "marketing" in retry_parsed:
+                        mls_safe = retry_parsed["mls_safe"]
+                        marketing = retry_parsed["marketing"]
+                        fha_result = fha_check({"mls_safe": mls_safe, "marketing": marketing})
+                    else:
+                        logger.warning(
+                            "content FHA retry parse failed listing=%s — keeping first attempt",
+                            listing_id,
+                        )
 
                 await self.emit(session, context, "content.completed", {
                     "fha_passed": fha_result.passed,
