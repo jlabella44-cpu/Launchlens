@@ -1,9 +1,15 @@
 # tests/test_agents/test_base.py
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from listingjet.agents.base import AgentContext, BaseAgent, parse_llm_json
+from listingjet.agents.base import (
+    AgentContext,
+    BaseAgent,
+    heartbeat_during,
+    parse_llm_json,
+)
 
 
 class ConcreteAgent(BaseAgent):
@@ -84,3 +90,38 @@ class TestParseLLMJSON:
     def test_handles_non_string_gracefully(self):
         # Some providers return ints/None when their wrapper degrades.
         assert parse_llm_json(0) is None  # type: ignore[arg-type]
+
+
+class TestHeartbeatDuring:
+    @pytest.mark.asyncio
+    async def test_no_op_outside_temporal_activity(self):
+        """Outside a Temporal activity context, _safe_heartbeat raises
+        RuntimeError internally; the helper must swallow it cleanly."""
+        async with heartbeat_during(interval=0.01, detail="test"):
+            await asyncio.sleep(0.05)
+        # No exception = pass
+
+    @pytest.mark.asyncio
+    async def test_sends_heartbeats_at_interval(self):
+        """When wrapping a long-running block, heartbeats fire periodically."""
+        with patch("listingjet.agents.base._safe_heartbeat") as mock_hb:
+            async with heartbeat_during(interval=0.05, detail="test"):
+                await asyncio.sleep(0.18)
+        # Expect ~3-4 heartbeats over 180ms with 50ms interval.
+        assert mock_hb.call_count >= 2
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_task_cleaned_up_on_exit(self):
+        """The internal heartbeat loop must not leak past the context."""
+        before = len(asyncio.all_tasks())
+        async with heartbeat_during(interval=0.01):
+            assert len(asyncio.all_tasks()) == before + 1
+        await asyncio.sleep(0)  # let cancellation propagate
+        assert len(asyncio.all_tasks()) == before
+
+    @pytest.mark.asyncio
+    async def test_block_exception_propagates(self):
+        """If the wrapped block raises, the exception is not swallowed."""
+        with pytest.raises(ValueError, match="boom"):
+            async with heartbeat_during(interval=0.01):
+                raise ValueError("boom")
