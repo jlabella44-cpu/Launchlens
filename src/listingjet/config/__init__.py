@@ -77,9 +77,17 @@ class Settings(BaseSettings):
     # (invite accept, password reset, etc).
     frontend_url: str = "https://listingjet.ai"
 
-    # S3
+    # S3 / object storage. Set s3_endpoint_url + s3_access_key_id + s3_secret_access_key
+    # to point at an S3-compatible backend (e.g. Cloudflare R2). Empty endpoint URL
+    # means default AWS S3 with the boto3 credential chain (IAM role, env, profile).
     s3_bucket_name: str = ""
     aws_region: str = "us-east-1"
+    s3_endpoint_url: str = ""
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+
+    # CloudWatch metrics — opt-in. Set true on AWS deploys; off everywhere else.
+    cloudwatch_enabled: bool = False
 
     # Monitoring
     sentry_dsn: str = ""
