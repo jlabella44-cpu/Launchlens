@@ -1,6 +1,9 @@
 # src/listingjet/services/storage.py
 """
-S3-backed storage service.
+S3-compatible object storage.
+
+Works with AWS S3 (default) or any S3-compatible backend (e.g. Cloudflare R2)
+when settings.s3_endpoint_url is set.
 
 All asset uploads use a consistent key scheme:
   listings/{listing_id}/{asset_type}/{filename}
@@ -19,14 +22,21 @@ logger = logging.getLogger(__name__)
 
 
 class StorageError(Exception):
-    """Raised when an S3 operation fails."""
+    """Raised when an object storage operation fails."""
 
 
 class StorageService:
     def __init__(self, bucket: str = None, region: str = None):
         self._bucket = bucket or settings.s3_bucket_name
         self._region = region or settings.aws_region
-        self._client = boto3.client("s3", region_name=self._region)
+
+        client_kwargs = {"region_name": self._region}
+        if settings.s3_endpoint_url:
+            client_kwargs["endpoint_url"] = settings.s3_endpoint_url
+        if settings.s3_access_key_id and settings.s3_secret_access_key:
+            client_kwargs["aws_access_key_id"] = settings.s3_access_key_id
+            client_kwargs["aws_secret_access_key"] = settings.s3_secret_access_key
+        self._client = boto3.client("s3", **client_kwargs)
 
     def upload(self, key: str, data: bytes | io.IOBase, content_type: str) -> str:
         """Upload bytes or file-like object. Returns the S3 key."""
