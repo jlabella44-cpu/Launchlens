@@ -1,4 +1,12 @@
-# Cloud Migration Guide — ListingJet
+# Cloud Migration Guide — ListingJet (AWS — SUPERSEDED)
+
+> ⚠️ **SUPERSEDED.** ListingJet is migrating **off AWS** to Render + Supabase +
+> Upstash + Cloudflare R2 + Temporal Cloud. This document describes the original
+> AWS/CDK deployment and is retained only as historical reference for the
+> decommission. For the current deploy target and cutover steps see:
+> - `render.yaml` (Render blueprint)
+> - `docs/runbooks/render-supabase-cutover.md` (compute/DB/cache/Temporal cutover + AWS teardown)
+> - `docs/runbooks/r2-cutover.md` (S3 → R2 storage cutover)
 
 ## Status: NOT YET DEPLOYED — Save for when you're ready
 

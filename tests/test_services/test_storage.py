@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import boto3
 import pytest
 from moto import mock_aws
@@ -36,3 +38,34 @@ def test_upload_file_like_object(s3_service):
     buf = io.BytesIO(b"image-data")
     key = s3_service.upload(key="listings/abc/photo.jpg", data=buf, content_type="image/jpeg")
     assert key == "listings/abc/photo.jpg"
+
+
+def test_default_aws_client_no_endpoint_url():
+    """Without s3_endpoint_url set, boto3 hits AWS (no custom endpoint)."""
+    with patch("listingjet.services.storage.boto3.client") as mock_client:
+        with patch("listingjet.services.storage.settings") as mock_settings:
+            mock_settings.s3_bucket_name = "default-bucket"
+            mock_settings.aws_region = "us-east-1"
+            mock_settings.s3_endpoint_url = ""
+            mock_settings.s3_access_key_id = ""
+            mock_settings.s3_secret_access_key = ""
+            StorageService()
+            kwargs = mock_client.call_args[1]
+            assert kwargs == {"region_name": "us-east-1"}
+
+
+def test_r2_endpoint_and_creds_passed_to_boto3():
+    """When s3_endpoint_url + creds are set (R2 case), they reach boto3."""
+    with patch("listingjet.services.storage.boto3.client") as mock_client:
+        with patch("listingjet.services.storage.settings") as mock_settings:
+            mock_settings.s3_bucket_name = "media"
+            mock_settings.aws_region = "auto"
+            mock_settings.s3_endpoint_url = "https://acct.r2.cloudflarestorage.com"
+            mock_settings.s3_access_key_id = "AKIA-r2"
+            mock_settings.s3_secret_access_key = "secret-r2"
+            StorageService()
+            kwargs = mock_client.call_args[1]
+            assert kwargs["endpoint_url"] == "https://acct.r2.cloudflarestorage.com"
+            assert kwargs["aws_access_key_id"] == "AKIA-r2"
+            assert kwargs["aws_secret_access_key"] == "secret-r2"
+            assert kwargs["region_name"] == "auto"

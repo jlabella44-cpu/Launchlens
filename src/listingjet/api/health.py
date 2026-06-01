@@ -57,8 +57,8 @@ async def deep_health():
 
     # Temporal
     try:
-        from temporalio.client import Client
-        client = await Client.connect(settings.temporal_host, namespace=settings.temporal_namespace)
+        from listingjet.temporal_client import connect_temporal
+        client = await connect_temporal()
         await client.service_client.check_health()
         components["temporal"] = "ok"
     except Exception as e:

@@ -26,8 +26,12 @@ def emit_metric(
     unit: str = "None",
     dimensions: dict[str, str] | None = None,
 ) -> None:
-    """Emit a CloudWatch custom metric. No-op in development."""
+    """Emit a CloudWatch custom metric. No-op in development or when
+    settings.cloudwatch_enabled is False (default for non-AWS environments).
+    """
     if settings.app_env == "development":
+        return
+    if not settings.cloudwatch_enabled:
         return
 
     try:

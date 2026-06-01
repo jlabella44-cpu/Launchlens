@@ -10,6 +10,7 @@ from temporalio.worker import Worker
 from listingjet.activities.pipeline import ALL_ACTIVITIES
 from listingjet.config import settings
 from listingjet.telemetry import init_tracing
+from listingjet.temporal_client import connect_temporal
 from listingjet.workflows.baseline_aggregation import BaselineAggregationWorkflow, run_baseline_aggregation
 from listingjet.workflows.demo_cleanup import DemoCleanupWorkflow, run_demo_cleanup
 from listingjet.workflows.listing_pipeline import ListingPipeline
@@ -59,11 +60,7 @@ def _get_interceptors() -> list:
 async def create_worker() -> Worker:
     init_tracing()
     interceptors = _get_interceptors()
-    client = await Client.connect(
-        settings.temporal_host,
-        namespace=settings.temporal_namespace,
-        interceptors=interceptors,
-    )
+    client = await connect_temporal(interceptors=interceptors)
     return Worker(
         client,
         task_queue=settings.temporal_task_queue,
