@@ -10,13 +10,34 @@ from listingjet.workflows.listing_pipeline import ListingPipeline, ListingPipeli
 logger = logging.getLogger(__name__)
 
 
+async def connect_temporal(**overrides) -> Client:
+    """Connect to Temporal, honoring Temporal Cloud auth from settings.
+
+    Single source of truth for how every entrypoint (API client, worker,
+    health check) reaches Temporal. When ``temporal_api_key`` is set we are
+    talking to Temporal Cloud, which requires TLS — so TLS is enabled
+    automatically whenever an API key is present (and can also be forced on
+    via ``temporal_tls`` for mTLS / TLS-fronted self-hosted clusters).
+
+    ``overrides`` are merged last so callers can pass extras like
+    ``interceptors=...`` without duplicating the auth wiring.
+    """
+    kwargs: dict = {"namespace": settings.temporal_namespace}
+    if settings.temporal_api_key:
+        kwargs["api_key"] = settings.temporal_api_key
+    if settings.temporal_tls or settings.temporal_api_key:
+        kwargs["tls"] = True
+    kwargs.update(overrides)
+    return await Client.connect(settings.temporal_host, **kwargs)
+
+
 class TemporalClient:
     def __init__(self):
         self._client: Client | None = None
 
     async def _connect(self) -> Client:
         if self._client is None:
-            self._client = await Client.connect(settings.temporal_host, namespace=settings.temporal_namespace)
+            self._client = await connect_temporal()
         return self._client
 
     async def start_pipeline(

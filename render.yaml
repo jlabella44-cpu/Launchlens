@@ -1,0 +1,130 @@
+# Render Blueprint — ListingJet backend (API + Temporal worker)
+#
+# This replaces the AWS ECS Fargate deployment. The API and worker share the
+# repo Dockerfile; the entrypoint selects the mode (`api` vs `worker`).
+#
+# Managed data services live OUTSIDE Render and are wired in via the shared
+# env-var group below (all `sync: false`, i.e. set once in the Render
+# dashboard — Render never stores their values in this file):
+#   - Postgres  -> Supabase            (DATABASE_URL / DATABASE_URL_SYNC)
+#   - Redis     -> Upstash             (REDIS_URL, rediss:// TLS)
+#   - Storage   -> Cloudflare R2       (S3_ENDPOINT_URL + S3_* keys)
+#   - Temporal  -> Temporal Cloud      (TEMPORAL_HOST/NAMESPACE/API_KEY)
+#
+# First-time setup and the full cutover steps are in
+# docs/runbooks/render-supabase-cutover.md.
+
+services:
+  - type: web
+    name: listingjet-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: ./entrypoint.sh api
+    plan: starter
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: false
+    # Gate each deploy on a successful migration (mirrors the old ECS one-shot
+    # migrate task). Runs against the new image before traffic shifts; a
+    # non-zero exit aborts the deploy. The `api` startup path also runs a
+    # best-effort catch-up, but this is the authoritative, deploy-blocking run.
+    preDeployCommand: ./entrypoint.sh migrate
+    envVars:
+      - fromGroup: listingjet-shared
+      - key: APP_ENV
+        value: production
+      # Render injects PORT automatically; entrypoint.sh honors it.
+
+  - type: worker
+    name: listingjet-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: ./entrypoint.sh worker
+    plan: starter
+    region: oregon
+    autoDeploy: false
+    envVars:
+      - fromGroup: listingjet-shared
+      - key: APP_ENV
+        value: production
+
+# Shared secrets / config. Set the real values once in the Render dashboard
+# (Environment Groups -> listingjet-shared). Keep this list in sync with
+# .env.production.example — anything there that prod needs can be added here.
+envVarGroups:
+  - name: listingjet-shared
+    envVars:
+      # --- Database (Supabase) ---
+      # Use the Supabase transaction pooler (port 6543) for DATABASE_URL and set
+      # DB_USE_PGBOUNCER=true so asyncpg disables its prepared-statement cache.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_SYNC
+        sync: false
+      - key: DB_USE_PGBOUNCER
+        value: "true"
+      # --- Cache (Upstash, rediss://) ---
+      - key: REDIS_URL
+        sync: false
+      # --- Temporal Cloud ---
+      - key: TEMPORAL_HOST
+        sync: false
+      - key: TEMPORAL_NAMESPACE
+        sync: false
+      - key: TEMPORAL_API_KEY
+        sync: false
+      # --- Object storage (Cloudflare R2) ---
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: auto
+      # CloudWatch is AWS-only — keep it off here.
+      - key: CLOUDWATCH_ENABLED
+        value: "false"
+      # --- Auth / app ---
+      - key: JWT_SECRET
+        sync: false
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://listingjet.ai
+      - key: CORS_ORIGINS
+        value: https://listingjet.ai
+      # --- Payments ---
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # --- AI / media providers ---
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_VISION_API_KEY
+        sync: false
+      - key: CANVA_API_KEY
+        sync: false
+      - key: CANVA_DEFAULT_TEMPLATE_ID
+        sync: false
+      - key: KLING_ACCESS_KEY
+        sync: false
+      - key: KLING_SECRET_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      # --- Email (Resend) ---
+      - key: EMAIL_ENABLED
+        value: "true"
+      - key: RESEND_API_KEY
+        sync: false
+      # --- Monitoring ---
+      - key: SENTRY_DSN
+        sync: false

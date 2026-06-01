@@ -6,7 +6,7 @@
 
 - **Backend:** FastAPI + Temporal + PostgreSQL + Redis, Python 3.12, Alembic migrations
 - **Frontend:** Next.js 16 (App Router), Tailwind CSS v4, TypeScript
-- **Infra:** AWS ECS Fargate + ECR + RDS + ElastiCache + S3, CDK in `infra/`
+- **Infra:** Render (API + worker), Supabase Postgres, Upstash Redis, Cloudflare R2 (media), Temporal Cloud — see `render.yaml`. (Migrated off AWS; the CDK in `infra/` is decommission-only — see `infra/README.md`.)
 - **Tests:** pytest + pytest-cov, vitest for frontend
 
 ---
@@ -152,33 +152,20 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 
 ---
 
-## Remaining P0 items (production blockers)
+## Migration off AWS → Render + Supabase + R2 (in progress)
 
-These all require **external AWS actions** — no code changes needed, just ops work:
+The platform is moving off AWS to **Render** (API + worker), **Supabase**
+(Postgres), **Upstash** (Redis), **Cloudflare R2** (media), and **Temporal
+Cloud**. The **code + config is done**; what remains is operational (provision
+the accounts, sync data, flip DNS, decommission AWS).
 
-### ~~1. Email provider wiring~~ ✅ shipped + verified 2026-04-26
-Resend SMTP wiring (PR #261) is live in prod — confirmed by a real Resend
-email received in a prior session.
+- **Compute / DB / cache / Temporal cutover** → `docs/runbooks/render-supabase-cutover.md`
+- **Storage (S3 → R2) cutover** → `docs/runbooks/r2-cutover.md`
+- **Deploy target** → `render.yaml` (Render blueprint); CI is `.github/workflows/deploy.yml` (test-gated Render deploy hooks).
+- **AWS CDK** in `infra/` is **decommission-only** — used solely for the final `cdk destroy`. See `infra/README.md`.
 
-### ~~2. RDS encrypted-storage migration~~ ✅ shipped 2026-04-23 (PR #268)
-Live instance is `listingjet-postgres-encrypted` (StorageEncrypted=True,
-restored 2026-04-17 from an encrypted snapshot of the original
-`kjyxgeldpfef`, which has been deleted). CDK was reconciled via the
-zombie-resource path (PR #268) — the old `Postgres9DC8BB04` logical id
-is a CFN zombie, and a parallel `PostgresEncrypted` construct adopts
-the live instance via `cdk import`. See the header docstring of
-`infra/stacks/database.py` for the rationale and the don't-mutate-the-
-zombies rule.
-
-### 3. Pre-launch infra revert
-See `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` — infra was deliberately undersized while there are zero users. Before real users land, apply in `infra/stacks/database.py`:
-- RDS: `t4g.micro` → `t4g.small`, backup retention 1 day → 7 days, consider Multi-AZ
-- Redis: `cache.t4g.micro` → `cache.t4g.small`, single-node → 2-node with failover
-- ECS: increase CPU/memory on API and worker task definitions
-- Then `cdk deploy`
-
-### 4. Cost data to collect (after 7–14 days of traffic)
-See `MASTER_TODO.md` "Cost Optimization" section — list of AWS Cost Explorer / Compute Optimizer / CloudWatch queries to run and bring back for right-sizing decisions.
+The old AWS RDS encryption / SES / pre-launch-resize / cost-collection P0 items
+are obsolete under the new stack and have been removed.
 
 ---
 
