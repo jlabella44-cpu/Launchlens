@@ -371,9 +371,12 @@ async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=401, detail="Missing refresh token")
 
-    payload = decode_token(token)
-    if payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Not a refresh token")
+    try:
+        payload = decode_token(token, expected_type="refresh")
+    except HTTPException as exc:
+        if exc.detail == "Wrong token type":
+            raise HTTPException(status_code=401, detail="Not a refresh token")
+        raise
 
     user_id = payload.get("sub")
     if not user_id:

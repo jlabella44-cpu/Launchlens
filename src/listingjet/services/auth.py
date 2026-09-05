@@ -73,11 +73,14 @@ def create_refresh_token(user: User) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def decode_token(token: str) -> dict:
+def decode_token(token: str, *, expected_type: str = "access") -> dict:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if payload.get("type") != expected_type:
+        raise HTTPException(status_code=401, detail="Wrong token type")
 
     # Check Redis blocklist for revoked tokens
     if is_token_revoked(token):

@@ -37,6 +37,8 @@ class TenantMiddleware:
                 settings.jwt_secret,
                 algorithms=["HS256"],
             )
+            if payload.get("type") != "access":
+                return JSONResponse(status_code=401, content={"detail": "Wrong token type"})
             tenant_id = payload.get("tenant_id")
             if not tenant_id:
                 return JSONResponse(status_code=401, content={"detail": "No tenant in token"})
