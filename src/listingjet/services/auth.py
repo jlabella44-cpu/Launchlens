@@ -18,9 +18,18 @@ logger = logging.getLogger(__name__)
 _DUMMY_HASH = bcrypt.hashpw(b"dummy-password-for-timing", bcrypt.gensalt()).decode()
 
 
-def _get_redis():
-    import redis as redis_lib
-    return redis_lib.from_url(settings.redis_url, socket_connect_timeout=2, socket_timeout=2)
+_redis_client = None
+
+
+def get_redis():
+    """Process-wide sync Redis client for auth (blocklist + lockout)."""
+    global _redis_client
+    if _redis_client is None:
+        import redis
+        _redis_client = redis.from_url(
+            settings.redis_url, socket_connect_timeout=2, socket_timeout=2,
+        )
+    return _redis_client
 
 
 def hash_password(plain: str) -> str:
@@ -97,20 +106,19 @@ def revoke_token(token: str) -> None:
         ttl = max(int(exp - datetime.now(timezone.utc).timestamp()), 0)
         if ttl <= 0:
             return  # Already expired, no need to blocklist
-        r = _get_redis()
+        r = get_redis()
         r.set(f"token_revoked:{token}", "1", ex=ttl)
     except Exception:
         logger.warning("token_revoke_failed", exc_info=True)
 
 
 def is_token_revoked(token: str) -> bool:
-    """Check if a token is in the Redis blocklist."""
+    """Check the Redis blocklist. Fails closed: Redis errors reject the request."""
     try:
-        r = _get_redis()
-        return r.exists(f"token_revoked:{token}") > 0
+        return get_redis().exists(f"token_revoked:{token}") > 0
     except Exception:
-        # Fail open — if Redis is unavailable, allow the token
-        return False
+        logger.error("token_revocation_check_failed", exc_info=True)
+        raise HTTPException(status_code=503, detail="Auth backend unavailable")
 
 
 def set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str) -> JSONResponse:
