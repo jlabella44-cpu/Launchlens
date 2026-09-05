@@ -128,10 +128,6 @@ class Settings(BaseSettings):
     # Google OAuth
     google_oauth_client_id: str = ""
 
-    # ClamAV
-    clamav_host: str = "localhost"
-    clamav_port: int = 3310
-
     # OpenTelemetry
     otel_exporter_endpoint: str = ""  # Empty = disabled
 
