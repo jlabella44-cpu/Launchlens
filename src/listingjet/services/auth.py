@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+import redis
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
@@ -116,7 +117,7 @@ def is_token_revoked(token: str) -> bool:
     """Check the Redis blocklist. Fails closed: Redis errors reject the request."""
     try:
         return get_redis().exists(f"token_revoked:{token}") > 0
-    except Exception:
+    except (redis.RedisError, OSError):
         logger.error("token_revocation_check_failed", exc_info=True)
         raise HTTPException(status_code=503, detail="Auth backend unavailable")
 

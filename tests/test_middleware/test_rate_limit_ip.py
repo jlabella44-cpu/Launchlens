@@ -24,6 +24,6 @@ def test_zero_trusted_proxies_ignores_header():
         assert extract_client_ip(_req("203.0.113.5")) == "10.0.0.9"
 
 
-def test_default_is_one_proxy():
+def test_default_is_zero_proxies():
     from listingjet.config import Settings
-    assert Settings.model_fields["trusted_proxy_count"].default == 1
+    assert Settings.model_fields["trusted_proxy_count"].default == 0

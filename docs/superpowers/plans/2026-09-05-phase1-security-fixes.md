@@ -375,9 +375,9 @@ def test_zero_trusted_proxies_ignores_header():
         assert extract_client_ip(_req("203.0.113.5")) == "10.0.0.9"
 
 
-def test_default_is_one_proxy():
+def test_default_is_zero_proxies():
     from listingjet.config import Settings
-    assert Settings.model_fields["trusted_proxy_count"].default == 1
+    assert Settings.model_fields["trusted_proxy_count"].default == 0
 ```
 
 Note on semantics: with `trusted_proxy_count = 1` the code picks `parts[len(parts) - 1]`, the entry the single trusted proxy appended. That is the existing algorithm; the test pins it.
@@ -392,8 +392,9 @@ Expected: FAIL with ImportError on `extract_client_ip`.
 `src/listingjet/config/__init__.py`, after `cors_origins`:
 
 ```python
-    # Reverse proxies in front of the app (Render = 1). 0 ignores X-Forwarded-For.
-    trusted_proxy_count: int = 1
+    # Reverse proxies in front of the app. Defaults to 0 (fail closed: ignores
+    # X-Forwarded-For). Render needs 1; render.yaml sets TRUSTED_PROXY_COUNT=1.
+    trusted_proxy_count: int = 0
 ```
 
 `src/listingjet/middleware/rate_limit.py`: delete the `TRUSTED_PROXY_COUNT` constant and its comment; add `from listingjet.config import settings` to imports; rename `_extract_client_ip` to `extract_client_ip` and use `settings.trusted_proxy_count`:
@@ -586,7 +587,7 @@ git commit -m "fix(security): field encryption raises without a key in productio
 
 ---
 
-### Task 7: Tenant indexes on users, outbox, audit_logs
+### Task 7: Tenant indexes on outbox, audit_logs (`ix_users_tenant_id` already exists from migration 001)
 
 **Files:**
 - Create: `alembic/versions/052_tenant_indexes.py`
@@ -802,7 +803,7 @@ Phase 1 of docs/superpowers/specs/2026-09-05-free-tier-rework-design.md.
 - TRUSTED_PROXY_COUNT from settings (default 1 for Render)
 - Lockout backend errors logged
 - Field encryption raises unkeyed in production
-- tenant_id indexes on users, outbox, audit_logs (migration 052)
+- tenant_id indexes on outbox, audit_logs (migration 052; `ix_users_tenant_id` already exists from migration 001)
 - Upload limit regression test; ClamAV remnants removed
 - next/image hosts from NEXT_PUBLIC_MEDIA_HOST
 

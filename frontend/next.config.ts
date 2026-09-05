@@ -6,6 +6,10 @@ import type { NextConfig } from "next";
 // listing photo.
 const mediaHost = process.env.NEXT_PUBLIC_MEDIA_HOST;
 
+if (process.env.NODE_ENV === "production" && !mediaHost) {
+  throw new Error("NEXT_PUBLIC_MEDIA_HOST is required for production builds");
+}
+
 const nextConfig: NextConfig = {
   images: {
     formats: ["image/webp"],

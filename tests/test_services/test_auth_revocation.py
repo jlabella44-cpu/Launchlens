@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import redis
 from fastapi import HTTPException
 
 from listingjet.services import auth as auth_svc
@@ -22,11 +23,19 @@ def test_is_token_revoked_true_when_key_exists():
 
 def test_is_token_revoked_fails_closed_when_redis_errors():
     r = MagicMock()
-    r.exists.side_effect = ConnectionError("down")
+    r.exists.side_effect = redis.exceptions.ConnectionError("down")
     with patch.object(auth_svc, "get_redis", return_value=r):
         with pytest.raises(HTTPException) as exc:
             auth_svc.is_token_revoked("tok")
     assert exc.value.status_code == 503
+
+
+def test_is_token_revoked_propagates_unexpected_errors():
+    r = MagicMock()
+    r.exists.side_effect = TypeError("boom")
+    with patch.object(auth_svc, "get_redis", return_value=r):
+        with pytest.raises(TypeError):
+            auth_svc.is_token_revoked("tok")
 
 
 def test_get_redis_is_cached():
