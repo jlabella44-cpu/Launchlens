@@ -31,7 +31,7 @@ from listingjet.services.metrics import record_cost
 from listingjet.services.storage import StorageService
 from listingjet.services.video_stitcher import VideoStitcher
 
-from .base import AgentContext, BaseAgent, heartbeat_during
+from .base import AgentContext, BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -57,128 +57,125 @@ class VideoAgent(BaseAgent):
         self._semaphore = asyncio.Semaphore(3)  # max 3 concurrent Kling calls
 
     async def execute(self, context: AgentContext) -> dict:
-        async with (
-            heartbeat_during(interval=60, detail="video"),
-            self.session_scope(context) as (session, listing_id, tenant_id),
-        ):
-                listing = await session.get(Listing, listing_id)
-                if not listing:
-                    raise ValueError(f"Listing {listing_id} not found")
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
+            listing = await session.get(Listing, listing_id)
+            if not listing:
+                raise ValueError(f"Listing {listing_id} not found")
 
-                # Get package selections with asset + vision data
-                selections = (await session.execute(
-                    select(PackageSelection, Asset, VisionResult)
-                    .join(Asset, PackageSelection.asset_id == Asset.id)
-                    .outerjoin(VisionResult, (VisionResult.asset_id == Asset.id) & (VisionResult.tier == 1))
-                    .where(PackageSelection.listing_id == listing_id)
-                    .order_by(PackageSelection.position)
-                )).all()
+            # Get package selections with asset + vision data
+            selections = (await session.execute(
+                select(PackageSelection, Asset, VisionResult)
+                .join(Asset, PackageSelection.asset_id == Asset.id)
+                .outerjoin(VisionResult, (VisionResult.asset_id == Asset.id) & (VisionResult.tier == 1))
+                .where(PackageSelection.listing_id == listing_id)
+                .order_by(PackageSelection.position)
+            )).all()
 
-                if not selections:
-                    return {"skipped": True, "reason": "No package selections"}
+            if not selections:
+                return {"skipped": True, "reason": "No package selections"}
 
-                # Select 12 photos using template slot algorithm
-                selected = self._select_photos(selections)
-                if not selected:
-                    return {"skipped": True, "reason": "No photos above score floor"}
+            # Select 12 photos using template slot algorithm
+            selected = self._select_photos(selections)
+            if not selected:
+                return {"skipped": True, "reason": "No photos above score floor"}
 
-                # Generate clips via Kling
-                clip_results = await self._generate_clips(selected, listing.metadata_)
+            # Generate clips via Kling
+            clip_results = await self._generate_clips(selected, listing.metadata_)
 
-                # Filter out failed clips (poll_task returns dict or None)
-                successful = [(s, r) for s, r in zip(selected, clip_results) if r]
-                if not successful:
-                    return {"status": "failed", "reason": "All clips failed to generate"}
+            # Filter out failed clips (poll_task returns dict or None)
+            successful = [(s, r) for s, r in zip(selected, clip_results) if r]
+            if not successful:
+                return {"status": "failed", "reason": "All clips failed to generate"}
 
-                total_credits = sum(
-                    float(r.get("credits") or 0) for _, r in successful
-                )
-                logger.info(
-                    "video_clips_generated listing=%s clips=%d/%d credits=%.1f",
-                    listing_id, len(successful), self._template.clip_count, total_credits,
-                )
+            total_credits = sum(
+                float(r.get("credits") or 0) for _, r in successful
+            )
+            logger.info(
+                "video_clips_generated listing=%s clips=%d/%d credits=%.1f",
+                listing_id, len(successful), self._template.clip_count, total_credits,
+            )
 
-                if len(successful) < self._template.clip_count:
-                    logger.warning(
-                        "video_clip_count_short listing=%s expected=%d actual=%d",
-                        listing_id, self._template.clip_count, len(successful),
-                    )
-
-                # Download clips to temp files
-                clip_paths = await self._download_clips([r["url"] for _, r in successful])
-
-                # Generate branded end-card from tenant's BrandKit
-                from listingjet.models.brand_kit import BrandKit
-                brand_kit = (await session.execute(
-                    select(BrandKit).where(BrandKit.tenant_id == listing.tenant_id)
-                    .limit(1)
-                )).scalar_one_or_none()
-
-                endcard_path = None
-                if brand_kit:
-                    endcard_png = generate_endcard(
-                        brokerage_name=brand_kit.brokerage_name or "",
-                        agent_name=brand_kit.agent_name or "",
-                        primary_color=brand_kit.primary_color or "#2563EB",
-                        logo_bytes=self._try_download_logo(brand_kit.logo_url),
-                    )
-                    if endcard_png:
-                        endcard_path = self._endcard_to_video(endcard_png)
-                        if endcard_path:
-                            clip_paths.append(endcard_path)
-
-                # Stitch into final video with hard cuts (silent MP4)
-                transitions = [self._template.transition] * len(clip_paths)
-                video_bytes = self._stitcher.stitch(clip_paths, transitions)
-
-                # Upload to S3
-                s3_key = self._storage.upload_bytes(
-                    data=video_bytes,
-                    key=f"videos/{listing_id}/tour.mp4",
-                    content_type="video/mp4",
+            if len(successful) < self._template.clip_count:
+                logger.warning(
+                    "video_clip_count_short listing=%s expected=%d actual=%d",
+                    listing_id, self._template.clip_count, len(successful),
                 )
 
-                # Upsert VideoAsset — replace any previous ai_generated record
-                existing = (await session.execute(
-                    select(VideoAsset).where(
-                        VideoAsset.listing_id == listing_id,
-                        VideoAsset.video_type == "ai_generated",
-                    ).order_by(VideoAsset.created_at.desc()).limit(1)
-                )).scalar_one_or_none()
+            # Download clips to temp files
+            clip_paths = await self._download_clips([r["url"] for _, r in successful])
 
-                if existing:
-                    existing.s3_key = s3_key
-                    existing.duration_seconds = len(successful) * self._template.clip_duration_s
-                    existing.status = "ready"
-                    existing.clip_count = len(successful)
-                    video_asset = existing
-                    logger.info("video_asset_updated listing=%s asset=%s", listing_id, existing.id)
-                else:
-                    video_asset = VideoAsset(
-                        tenant_id=listing.tenant_id,
-                        listing_id=listing_id,
-                        s3_key=s3_key,
-                        video_type="ai_generated",
-                        duration_seconds=len(successful) * self._template.clip_duration_s,
-                        status="ready",
-                        clip_count=len(successful),
-                    )
-                    session.add(video_asset)
+            # Generate branded end-card from tenant's BrandKit
+            from listingjet.models.brand_kit import BrandKit
+            brand_kit = (await session.execute(
+                select(BrandKit).where(BrandKit.tenant_id == listing.tenant_id)
+                .limit(1)
+            )).scalar_one_or_none()
 
-                await self.emit(session, context, "video.completed", {
-                    "listing_id": str(listing_id),
-                    "video_type": "ai_generated",
-                    "clip_count": len(successful),
-                    "total_credits": total_credits,
-                    "s3_key": s3_key,
-                })
+            endcard_path = None
+            if brand_kit:
+                endcard_png = generate_endcard(
+                    brokerage_name=brand_kit.brokerage_name or "",
+                    agent_name=brand_kit.agent_name or "",
+                    primary_color=brand_kit.primary_color or "#2563EB",
+                    logo_bytes=self._try_download_logo(brand_kit.logo_url),
+                )
+                if endcard_png:
+                    endcard_path = self._endcard_to_video(endcard_png)
+                    if endcard_path:
+                        clip_paths.append(endcard_path)
 
-                # Clean up temp files
-                for p in clip_paths:
-                    try:
-                        os.unlink(p)
-                    except OSError:
-                        pass
+            # Stitch into final video with hard cuts (silent MP4)
+            transitions = [self._template.transition] * len(clip_paths)
+            video_bytes = self._stitcher.stitch(clip_paths, transitions)
+
+            # Upload to S3
+            s3_key = self._storage.upload_bytes(
+                data=video_bytes,
+                key=f"videos/{listing_id}/tour.mp4",
+                content_type="video/mp4",
+            )
+
+            # Upsert VideoAsset — replace any previous ai_generated record
+            existing = (await session.execute(
+                select(VideoAsset).where(
+                    VideoAsset.listing_id == listing_id,
+                    VideoAsset.video_type == "ai_generated",
+                ).order_by(VideoAsset.created_at.desc()).limit(1)
+            )).scalar_one_or_none()
+
+            if existing:
+                existing.s3_key = s3_key
+                existing.duration_seconds = len(successful) * self._template.clip_duration_s
+                existing.status = "ready"
+                existing.clip_count = len(successful)
+                video_asset = existing
+                logger.info("video_asset_updated listing=%s asset=%s", listing_id, existing.id)
+            else:
+                video_asset = VideoAsset(
+                    tenant_id=listing.tenant_id,
+                    listing_id=listing_id,
+                    s3_key=s3_key,
+                    video_type="ai_generated",
+                    duration_seconds=len(successful) * self._template.clip_duration_s,
+                    status="ready",
+                    clip_count=len(successful),
+                )
+                session.add(video_asset)
+
+            await self.emit(session, context, "video.completed", {
+                "listing_id": str(listing_id),
+                "video_type": "ai_generated",
+                "clip_count": len(successful),
+                "total_credits": total_credits,
+                "s3_key": s3_key,
+            })
+
+            # Clean up temp files
+            for p in clip_paths:
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
 
         record_cost(self.agent_name, "kling", len(successful))
         return {

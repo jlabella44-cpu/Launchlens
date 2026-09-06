@@ -1,7 +1,7 @@
 """
 Drip email scheduler — sends timed welcome sequence emails to new users.
 
-Schedule: Run this as a periodic task (e.g., Temporal cron or celery beat) once per day.
+Schedule: Run this as a periodic task (e.g., the pipeline worker's periodic loop or celery beat) once per day.
 It queries users by registration date and sends the appropriate drip email.
 
 Drip sequence:

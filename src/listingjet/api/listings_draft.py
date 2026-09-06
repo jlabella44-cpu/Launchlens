@@ -188,7 +188,6 @@ async def start_pipeline(
     listing.state = ListingState.UPLOADING
     await db.commit()
 
-    workflow_id = ""
     try:
         await start_listing_pipeline(db, listing, tenant)
         await db.commit()
@@ -202,5 +201,5 @@ async def start_pipeline(
         listing_id=str(listing_id),
         state=listing.state.value,
         credits_deducted=total_cost,
-        workflow_id=workflow_id,
+        workflow_id="",
     )

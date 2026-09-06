@@ -102,7 +102,7 @@ async def register_assets(
     """Register uploaded S3 assets for a listing and trigger the AI pipeline.
 
     Advances the listing from NEW → UPLOADING and automatically starts the
-    Temporal workflow. Returns 403 if the plan's per-listing asset quota is exceeded.
+    pipeline job. Returns 403 if the plan's per-listing asset quota is exceeded.
     """
     listing = (await db.execute(
         select(Listing).where(

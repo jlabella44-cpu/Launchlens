@@ -59,13 +59,18 @@ async def get_db(request: Request = None):
 
 
 @asynccontextmanager
-async def admin_session():
+async def admin_session(session_factory=None):
     """Session with SET LOCAL app.is_admin = 'true' on every transaction.
 
     For system actors (pipeline worker, periodic jobs) that legitimately read
     across tenants. Mirrors api.deps.get_db_admin.
+
+    `session_factory` defaults to `AsyncSessionLocal` (bound to the app
+    engine / `DATABASE_URL`). Tests should pass a factory bound to the test
+    engine instead — see `tests.conftest.test_session_factory`.
     """
-    async with AsyncSessionLocal() as session:
+    session_factory = session_factory or AsyncSessionLocal
+    async with session_factory() as session:
         @event.listens_for(session.sync_session, "after_begin")
         def _set_admin_flag(_session, _transaction, connection):
             connection.execute(text("SET LOCAL app.is_admin = 'true'"))

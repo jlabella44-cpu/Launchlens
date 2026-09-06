@@ -27,11 +27,10 @@ def event_loop():
 
 @pytest.fixture(autouse=True)
 def _mock_external_services():
-    """Bypass all external services in tests: Redis, Temporal, rate limiters.
+    """Bypass all external services in tests: Redis, rate limiters.
 
     Without this:
     - Redis calls block for 2s each (socket timeout) or hang indefinitely
-    - Temporal Client.connect() hangs for 60s+ trying to reach localhost:7233
     - Rate limiter middleware returns 429 on every request
     """
     import listingjet.middleware.rate_limit as rl_mod
@@ -114,6 +113,18 @@ async def test_engine():
             ],
         )
     await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def test_session_factory(test_engine):
+    """Session factory bound to the test engine (and its session-scoped event loop).
+
+    Pass this to `admin_session(session_factory=...)` in tests instead of
+    letting it default to `AsyncSessionLocal`, which is bound to the app
+    engine / `DATABASE_URL` — using that inside the test event loop after
+    other tests have used it on other loops causes cross-loop asyncpg errors.
+    """
+    return async_sessionmaker(test_engine, expire_on_commit=False)
 
 
 @pytest.fixture

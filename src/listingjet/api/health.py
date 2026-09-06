@@ -34,7 +34,7 @@ async def health():
 
 @router.get("/health/deep")
 async def deep_health():
-    """Deep health check — verifies DB, Redis, and Temporal connectivity."""
+    """Deep health check — verifies DB and Redis connectivity."""
     components = {}
 
     # Database

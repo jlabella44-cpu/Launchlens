@@ -1,7 +1,9 @@
-# Render Blueprint — ListingJet backend (API + Temporal worker)
+# Render Blueprint — ListingJet backend (API + pipeline worker)
 #
 # This replaces the AWS ECS Fargate deployment. The API and worker share the
-# repo Dockerfile; the entrypoint selects the mode (`api` vs `worker`).
+# repo Dockerfile; the entrypoint selects the mode (`api` vs `worker`). The
+# pipeline worker (src/listingjet/pipeline/worker.py) polls a job table in
+# Postgres — there is no separate orchestration service to provision.
 #
 # Managed data services live OUTSIDE Render and are wired in via the shared
 # env-var group below (all `sync: false`, i.e. set once in the Render
@@ -9,7 +11,6 @@
 #   - Postgres  -> Supabase            (DATABASE_URL / DATABASE_URL_SYNC)
 #   - Redis     -> Upstash             (REDIS_URL, rediss:// TLS)
 #   - Storage   -> Cloudflare R2       (S3_ENDPOINT_URL + S3_* keys)
-#   - Temporal  -> Temporal Cloud      (TEMPORAL_HOST/NAMESPACE/API_KEY)
 #
 # First-time setup and the full cutover steps are in
 # docs/runbooks/render-supabase-cutover.md.
@@ -70,13 +71,6 @@ envVarGroups:
         value: "1"
       # --- Cache (Upstash, rediss://) ---
       - key: REDIS_URL
-        sync: false
-      # --- Temporal Cloud ---
-      - key: TEMPORAL_HOST
-        sync: false
-      - key: TEMPORAL_NAMESPACE
-        sync: false
-      - key: TEMPORAL_API_KEY
         sync: false
       # --- Object storage (Cloudflare R2) ---
       - key: S3_BUCKET_NAME

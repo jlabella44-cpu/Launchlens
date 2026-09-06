@@ -2,7 +2,7 @@
 """Local end-to-end pipeline smoke test against docker-compose.
 
 Runs the 16-step pre-launch checklist documented in the pre-launch plan
-against the compose stack (postgres, redis, temporal, api, worker,
+against the compose stack (postgres, redis, api, worker,
 optionally LocalStack + mailpit + httpbin).
 
 Usage:

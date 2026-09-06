@@ -118,8 +118,7 @@ async def test_cancel_cancels_jobs(async_client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_deep_health_reports_worker_not_temporal(async_client):
+async def test_deep_health_reports_worker(async_client):
     resp = await async_client.get("/health/deep")
     data = resp.json()
-    assert "temporal" not in data
     assert "worker" in data

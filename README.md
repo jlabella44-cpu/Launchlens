@@ -22,15 +22,15 @@ ListingJet is an AI-powered real estate listing media platform. Photographers an
 │  /auth  /listings  /assets  /billing  /admin  /demo  /webhook/sse    │
 │  Middleware: JWT decode → RLS tenant isolation                       │
 └─────────┬───────────────────────────────────┬────────────────────────┘
-          │ SQLAlchemy 2.0 async              │ Temporal SDK
+          │ SQLAlchemy 2.0 async              │ Job-table polling
           ▼                                   ▼
 ┌─────────────────────┐        ┌─────────────────────────────────────┐
-│   PostgreSQL 16     │        │         Temporal Workflow           │
-│   (RLS enabled)     │        │                                     │
+│   PostgreSQL 16     │        │      Pipeline Worker (in-process)   │
+│   (RLS enabled)     │        │      src/listingjet/pipeline/       │
 │   10 tables +       │        │  Phase 1: Ingest → Vision → Cover   │
 │   credit_transactions│        │           → Package → AWAIT_REVIEW │
 └─────────────────────┘        │                    │                 │
-                                │             signal: approve         │
+                                │             listing approved        │
 ┌─────────────────────┐        │                    ▼                 │
 │     Redis 7         │        │  Phase 2: Content ──────────────────┤
 │  Rate limiting      │        │           ├─ Brand (parallel)       │
@@ -71,7 +71,7 @@ ListingJet is an AI-powered real estate listing media platform. Photographers an
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0 async, Alembic |
-| Orchestration | Temporal (durable workflow + activities) |
+| Orchestration | In-process pipeline worker polling a Postgres job table (`src/listingjet/pipeline/`) |
 | Database | PostgreSQL 16 with Row-Level Security |
 | Cache / Queue | Redis 7 (rate limiting, SSE pub/sub) |
 | Storage | AWS S3 (boto3) |
@@ -108,7 +108,7 @@ cp .env.example .env
 ### 2. Start infrastructure
 
 ```bash
-docker compose up -d postgres redis temporal temporal-ui
+docker compose up -d postgres redis
 ```
 
 ### 3. Run migrations
@@ -124,8 +124,9 @@ python -m alembic upgrade head
 # Terminal 1 — API server
 uvicorn listingjet.main:app --reload --port 8000
 
-# Terminal 2 — Temporal worker
-python -m listingjet.workflows.worker
+# Terminal 2 — pipeline worker (standalone; the API also runs it in-process
+# unless WORKER_ENABLED=false)
+python -m listingjet.pipeline.worker
 ```
 
 ### 5. (Optional) Start the frontend
@@ -143,7 +144,6 @@ npm run dev
 |---------|-----|
 | API | http://localhost:8000 |
 | API Docs (Swagger) | http://localhost:8000/docs |
-| Temporal UI | http://localhost:8233 |
 | Frontend | http://localhost:3000 |
 
 ### Full stack via Docker Compose
@@ -181,7 +181,7 @@ Key endpoints:
 POST /auth/register          Register new tenant + admin user
 POST /auth/login             JWT login
 POST /listings               Create listing
-POST /listings/{id}/assets   Upload photos → triggers Temporal pipeline
+POST /listings/{id}/assets   Upload photos → triggers the pipeline job
 POST /listings/{id}/review   Claim for review (IN_REVIEW)
 POST /listings/{id}/approve  Approve → triggers Phase 2 pipeline
 GET  /listings/{id}/export   Download MLS or Marketing ZIP bundle
@@ -209,8 +209,7 @@ src/listingjet/
   config.py            Settings (pydantic-settings, .env)
   database.py          SQLAlchemy engine, sessions, RLS helper
   agents/              15 AI processing agents (BaseAgent pattern)
-  activities/          Temporal activity wrappers
-  workflows/           Temporal workflow definitions + worker
+  pipeline/            Job-table definition, runner, and standalone worker entrypoint
   api/                 FastAPI routers (auth, listings, billing, admin)
   models/              SQLAlchemy ORM models
   providers/           AI provider abstractions (Vision, LLM, Template)

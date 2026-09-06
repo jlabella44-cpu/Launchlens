@@ -42,8 +42,8 @@ async def test_vision_tier1_uses_run_tier1():
 
 
 @pytest.mark.asyncio
-async def test_admin_session_sets_is_admin_flag():
-    async with admin_session() as session:
+async def test_admin_session_sets_is_admin_flag(test_session_factory):
+    async with admin_session(session_factory=test_session_factory) as session:
         result = await session.execute(select(text("current_setting('app.is_admin', true)")))
         value = result.scalar_one()
     assert value == "true"

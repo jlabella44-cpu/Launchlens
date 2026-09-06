@@ -233,8 +233,8 @@ async def retry_pipeline(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    # Includes post-approval states so a Temporal workflow that died after
-    # the user approved (e.g. an LLM activity blew up before MLS export
+    # Includes post-approval states so a pipeline job that died after
+    # the user approved (e.g. an LLM step blew up before MLS export
     # could run) can still be restarted without a manual DB poke.
     retryable = {
         ListingState.FAILED,

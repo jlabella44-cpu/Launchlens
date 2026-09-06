@@ -1,9 +1,8 @@
 """Periodic maintenance tasks run in-process by `pipeline.runner.periodic_loop`.
 
-These were previously Temporal cron workflows/activities; Task 9 removes
-Temporal, so they run as plain coroutines on the pipeline worker's own
-schedule instead. Both open an `admin_session()` (not `AsyncSessionLocal`)
-because they are system actors that read/write across tenants.
+These run as plain coroutines on the pipeline worker's own schedule. Both
+open an `admin_session()` (not `AsyncSessionLocal`) because they are system
+actors that read/write across tenants.
 """
 
 
@@ -17,10 +16,7 @@ async def run_demo_cleanup() -> dict:
 
 
 async def run_baseline_aggregation() -> dict:
-    """Average LearningWeight across tenants per room_label into GlobalBaselineWeight.
-
-    Ported from `workflows/baseline_aggregation.py`'s Temporal activity body.
-    """
+    """Average LearningWeight across tenants per room_label into GlobalBaselineWeight."""
     from sqlalchemy import func, select
 
     from listingjet.database import admin_session
