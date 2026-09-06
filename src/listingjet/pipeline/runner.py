@@ -87,44 +87,63 @@ async def _siblings(session: AsyncSession, listing_id) -> dict[str, PipelineJob]
     return {j.step: j for j in rows}
 
 
+CLAIM_CANDIDATE_LIMIT = 500
+
+
 async def claim_next(session: AsyncSession, worker_id: str, *, steps: list[Step] = PIPELINE) -> PipelineJob | None:
-    """Claim the oldest runnable job. Marks it RUNNING and commits before returning."""
+    """Claim the oldest runnable job. Marks it RUNNING and commits before returning.
+
+    Candidates are read WITHOUT row locks. `enqueue_pipeline` inserts every
+    post-approval step as QUEUED up front, so each listing parked at the review
+    gate contributes ~12 rows that can never run until a human approves it;
+    locking a fixed window of the oldest queued rows (the old FOR UPDATE SKIP
+    LOCKED design) let a handful of in-review listings hold the whole window and
+    deadlock the queue. Instead we scan unlocked, filter dependencies in Python,
+    and take the first runnable row with a compare-and-set UPDATE that only wins
+    if the row is still QUEUED — so two workers racing the same row cannot both
+    claim it, and no row is ever held by a lock we don't intend to use.
+    """
     index = {s.name: s for s in steps}
-    try:
-        candidates = (await session.execute(
-            select(PipelineJob)
-            .where(PipelineJob.status == JobStatus.QUEUED, PipelineJob.run_after <= _now())
-            .order_by(PipelineJob.run_after, PipelineJob.created_at)
-            .limit(50)
-            .with_for_update(skip_locked=True)
-        )).scalars().all()
-    except Exception:
-        # FOR UPDATE SKIP LOCKED may fail inside a savepoint (e.g. tests);
-        # fall back but still lock rows to prevent duplicate delivery.
-        candidates = (await session.execute(
-            select(PipelineJob)
-            .where(PipelineJob.status == JobStatus.QUEUED, PipelineJob.run_after <= _now())
-            .order_by(PipelineJob.run_after, PipelineJob.created_at)
-            .limit(50)
-            .with_for_update()
-        )).scalars().all()
-    sibling_cache: dict = {}
+    candidates = (await session.execute(
+        select(PipelineJob)
+        .where(PipelineJob.status == JobStatus.QUEUED, PipelineJob.run_after <= _now())
+        .order_by(PipelineJob.run_after, PipelineJob.created_at)
+        .limit(CLAIM_CANDIDATE_LIMIT)
+    )).scalars().all()
+    if not candidates:
+        await session.commit()
+        return None
+
+    # One query for every candidate listing's siblings, not one per candidate.
+    siblings: dict = {}
+    rows = (await session.execute(
+        select(PipelineJob).where(PipelineJob.listing_id.in_({j.listing_id for j in candidates}))
+    )).scalars().all()
+    for row in rows:
+        siblings.setdefault(row.listing_id, {})[row.step] = row
+
     for job in candidates:
         step = index.get(job.step)
         if step is None:
             continue
-        if job.listing_id not in sibling_cache:
-            sibling_cache[job.listing_id] = await _siblings(session, job.listing_id)
-        sibs = sibling_cache[job.listing_id]
-        if all(is_satisfied(sibs.get(dep), index[dep]) for dep in step.requires):
-            job.status = JobStatus.RUNNING
-            job.locked_by = worker_id
-            job.locked_at = _now()
-            job.started_at = _now()
-            job.attempts += 1
-            await session.commit()
-            return job
-    await session.commit()  # release the row locks
+        sibs = siblings.get(job.listing_id, {})
+        if not all(is_satisfied(sibs.get(dep), index[dep]) for dep in step.requires):
+            continue
+        now = _now()
+        claimed = (await session.execute(
+            update(PipelineJob)
+            .where(PipelineJob.id == job.id, PipelineJob.status == JobStatus.QUEUED)
+            .values(status=JobStatus.RUNNING, locked_by=worker_id, locked_at=now,
+                    started_at=now, attempts=PipelineJob.attempts + 1)
+            .returning(PipelineJob.id)
+            .execution_options(synchronize_session=False)
+        )).first()
+        if claimed is None:
+            continue  # another worker won this row — try the next candidate
+        await session.commit()
+        await session.refresh(job)
+        return job
+    await session.commit()
     return None
 
 
