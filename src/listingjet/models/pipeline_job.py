@@ -1,5 +1,11 @@
 """One row per (listing, pipeline step). The worker loop claims rows with
-SELECT ... FOR UPDATE SKIP LOCKED; see listingjet.pipeline.runner."""
+SELECT ... FOR UPDATE SKIP LOCKED; see listingjet.pipeline.runner.
+
+This table has row-level security (tenant_isolation policy, migration 053).
+The worker is a system actor that claims jobs across all tenants, so any
+session it uses to read/write PipelineJob rows must run in an admin context
+(SET LOCAL app.is_admin = 'true'); a plain tenant-scoped session will only
+see/affect rows for its own tenant_id."""
 import enum
 import uuid
 from datetime import datetime

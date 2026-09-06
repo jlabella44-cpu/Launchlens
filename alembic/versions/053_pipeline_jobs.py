@@ -46,8 +46,17 @@ def upgrade() -> None:
     # The worker's claim query: queued rows ordered by run_after.
     op.create_index("ix_pipeline_jobs_claim", "pipeline_jobs", ["status", "run_after"])
 
+    op.execute("ALTER TABLE pipeline_jobs ENABLE ROW LEVEL SECURITY")
+    op.execute("ALTER TABLE pipeline_jobs FORCE ROW LEVEL SECURITY")
+    op.execute(
+        "CREATE POLICY tenant_isolation ON pipeline_jobs USING ("
+        "current_setting('app.is_admin', true) = 'true' "
+        "OR tenant_id = current_setting('app.current_tenant', true)::uuid)"
+    )
+
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS tenant_isolation ON pipeline_jobs")
     op.drop_index("ix_pipeline_jobs_claim", table_name="pipeline_jobs")
     op.drop_index("ix_pipeline_jobs_status", table_name="pipeline_jobs")
     op.drop_index("ix_pipeline_jobs_listing_id", table_name="pipeline_jobs")
