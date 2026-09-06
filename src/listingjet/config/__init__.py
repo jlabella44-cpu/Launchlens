@@ -128,11 +128,7 @@ class Settings(BaseSettings):
     # OpenTelemetry
     otel_exporter_endpoint: str = ""  # Empty = disabled
 
-    # RESO MLS
-    reso_api_url: str = ""
-    reso_api_key: str = ""
-
-    # Field-level encryption (Fernet key for IDX API keys, etc.)
+    # Field-level encryption (Fernet key for tenant secrets, etc.)
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     field_encryption_key: str = ""
 
@@ -202,13 +198,6 @@ class Settings(BaseSettings):
     property_lookup_cache_ttl: int = 86400  # 24h
     property_verification_enabled: bool = True
     scraper_rate_limit_seconds: int = 5
-
-    # Repliers (MLS data aggregator — https://docs.repliers.io)
-    # Used for real CMA comparables; falls back to synthetic data when unset.
-    repliers_api_key: str = ""
-    repliers_api_base: str = "https://api.repliers.io"
-    repliers_cma_enabled: bool = False
-    repliers_timeout_seconds: int = 10
 
 
 settings = Settings()

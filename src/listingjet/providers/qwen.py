@@ -4,7 +4,7 @@ Alibaba Qwen provider — used for long-context LLM and multimodal tasks.
 
 Qwen 3.6-Plus features a 1M-token context window and strong agentic coding
 capabilities, making it well-suited for long-context agents (FloorplanAgent,
-CMAReportAgent, LearningAgent, MicrositeAgent).
+LearningAgent, MicrositeAgent).
 
 Uses the DashScope OpenAI-compatible endpoint so we can reuse the same
 request shape as OpenAI-based providers.

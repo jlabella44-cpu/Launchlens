@@ -795,15 +795,6 @@ class ApiClient {
     });
   }
 
-  // CMA Reports
-  async generateCMAReport(listingId: string): Promise<{ listing_id: string; status: string; comparables_count: number; s3_key: string }> {
-    return this.request(`/listings/${listingId}/cma-report`, { method: "POST" });
-  }
-
-  async getCMAReport(listingId: string): Promise<{ listing_id: string; generated_at: string; download_url: string; comparables_count: number; analysis_summary: string | null }> {
-    return this.request(`/listings/${listingId}/cma-report`);
-  }
-
   // Property Microsites
   async generateMicrosite(listingId: string): Promise<{ listing_id: string; status: string; s3_key: string; microsite_url: string; qr_code_s3_key: string | null }> {
     return this.request(`/listings/${listingId}/microsite`, { method: "POST" });

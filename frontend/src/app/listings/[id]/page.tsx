@@ -12,7 +12,6 @@ import { PipelineStatus } from "@/components/listings/pipeline-status";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
 import apiClient from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
-import { useAuth } from "@/contexts/auth-context";
 import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
 import { VideoPlayer } from "@/components/listings/video-player";
 import { SocialPreview } from "@/components/listings/social-preview";
@@ -27,11 +26,6 @@ function ListingDetail() {
   const params = useParams();
   const id = params.id as string;
   const { toast } = useToast();
-  const { user } = useAuth();
-  // CMA uses a paid external data source (Repliers, ~$200/mo minimum). While
-  // the feature runs on the synthetic fallback, we gate it to superadmins so
-  // staff can still demo/QA without exposing unverified comps to paying users.
-  const isSuperadmin = user?.role === "superadmin";
   const healthScoreEnabled = useFeature("health_score");
   const listingPermissionsEnabled = useFeature("listing_permissions");
 
@@ -44,9 +38,7 @@ function ListingDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
   const [assetView, setAssetView] = useState<"grid" | "list">("grid");
-  const [cmaReport, setCmaReport] = useState<{ download_url: string; comparables_count: number; generated_at: string; analysis_summary: string | null } | null>(null);
   const [microsite, setMicrosite] = useState<{ microsite_url: string; qr_code_url: string | null; status: string } | null>(null);
-  const [cmaLoading, setCmaLoading] = useState(false);
   const [micrositeLoading, setMicrositeLoading] = useState(false);
   const [complianceFixing, setComplianceFixing] = useState(false);
 
@@ -66,11 +58,8 @@ function ListingDetail() {
         const pkg = await apiClient.getPackage(id);
         setSelections(pkg);
       }
-      // Load CMA (superadmin-gated) and microsite if listing is far enough along
+      // Load microsite if listing is far enough along
       if (["approved", "exporting", "delivered"].includes(l.state)) {
-        if (isSuperadmin) {
-          apiClient.getCMAReport(id).then(setCmaReport).catch(() => {});
-        }
         apiClient.getMicrosite(id).then(setMicrosite).catch(() => {});
       }
     } catch (err: unknown) {
@@ -79,7 +68,7 @@ function ListingDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id, isSuperadmin]);
+  }, [id]);
 
   useEffect(() => {
     const street = listing?.address?.street;
@@ -534,55 +523,6 @@ function ListingDetail() {
                 {complianceFixing ? "Scanning..." : "Auto-Fix Compliance"}
               </button>
             </div>
-
-            {/* CMA Report — superadmin-only until we're off the synthetic fallback */}
-            {isSuperadmin && (
-              <div className="bg-white rounded-2xl border border-slate-100 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-[var(--color-text)]" style={{ fontFamily: "var(--font-heading)" }}>
-                    CMA Report
-                  </h3>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-800">
-                    Staff preview
-                  </span>
-                </div>
-                <p className="text-[11px] text-[var(--color-text-secondary)] mb-3">
-                  Using synthetic comparables — real MLS data unlocks once we activate Repliers.
-                </p>
-                {cmaReport ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-[var(--color-text-secondary)]">
-                      {cmaReport.comparables_count} comparables &middot; Generated {new Date(cmaReport.generated_at).toLocaleDateString()}
-                    </p>
-                    <a
-                      href={cmaReport.download_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block w-full text-center px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold transition-colors"
-                    >
-                      Download Report
-                    </a>
-                  </div>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      setCmaLoading(true);
-                      try {
-                        await apiClient.generateCMAReport(id);
-                        const report = await apiClient.getCMAReport(id);
-                        setCmaReport(report);
-                        toast("CMA report generated", "success");
-                      } catch { toast("CMA generation failed", "error"); }
-                      finally { setCmaLoading(false); }
-                    }}
-                    disabled={cmaLoading}
-                    className="w-full px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold transition-colors disabled:opacity-50"
-                  >
-                    {cmaLoading ? "Generating..." : "Generate CMA Report"}
-                  </button>
-                )}
-              </div>
-            )}
 
             {/* Property Microsite */}
             <div className="bg-white rounded-2xl border border-slate-100 p-5">

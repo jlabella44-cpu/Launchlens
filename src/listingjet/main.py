@@ -10,7 +10,6 @@ from listingjet.api import (
     addons,
     admin_dashboard,
     admin_listings,
-    admin_providers,
     admin_tenants,
     admin_users,
     analytics,
@@ -19,13 +18,11 @@ from listingjet.api import (
     brand_kit,
     bulk,
     canva_oauth,
-    cma,
     credits,
     demo,
     health,
     help_agent,
     image_edit,
-    launch,
     listing_events,
     listing_health,
     listing_permissions,
@@ -57,8 +54,6 @@ from listingjet.middleware.request_id import RequestIDMiddleware
 from listingjet.middleware.security_headers import SecurityHeadersMiddleware
 from listingjet.middleware.tenant import TenantMiddleware
 from listingjet.monitoring import init_monitoring
-from listingjet.services.idx_feed_poller import IdxFeedPoller
-from listingjet.services.market_tracker import MarketTracker
 from listingjet.services.outbox_poller import OutboxPoller
 
 setup_logging(app_env=settings.app_env, log_level=settings.log_level)
@@ -83,28 +78,12 @@ async def lifespan(app: FastAPI):
         app.state.redis = None
 
     outbox_task = None
-    idx_task = None
-    market_task = None
     outbox_poller = None
-    idx_poller = None
-    market_tracker = None
     try:
         outbox_poller = OutboxPoller(session_factory=AsyncSessionLocal)
         outbox_task = asyncio.create_task(outbox_poller.run())
     except Exception:
         logging.getLogger(__name__).warning("Outbox poller failed to start — running without it")
-
-    try:
-        idx_poller = IdxFeedPoller(session_factory=AsyncSessionLocal)
-        idx_task = asyncio.create_task(idx_poller.run())
-    except Exception:
-        logging.getLogger(__name__).warning("IDX feed poller failed to start — running without it")
-
-    try:
-        market_tracker = MarketTracker(session_factory=AsyncSessionLocal)
-        market_task = asyncio.create_task(market_tracker.run())
-    except Exception:
-        logging.getLogger(__name__).warning("Market tracker failed to start — running without it")
 
     worker_stop = asyncio.Event()
     worker_tasks: list[asyncio.Task] = []
@@ -119,19 +98,14 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    for poller_obj, task_obj in [
-        (outbox_poller, outbox_task),
-        (idx_poller, idx_task),
-        (market_tracker, market_task),
-    ]:
-        if task_obj:
-            try:
-                if poller_obj:
-                    poller_obj.stop()
-                task_obj.cancel()
-                await task_obj
-            except (asyncio.CancelledError, Exception):
-                pass
+    if outbox_task:
+        try:
+            if outbox_poller:
+                outbox_poller.stop()
+            outbox_task.cancel()
+            await outbox_task
+        except (asyncio.CancelledError, Exception):
+            pass
 
     worker_stop.set()
     for t in worker_tasks:
@@ -217,7 +191,6 @@ def create_app() -> FastAPI:
     app.include_router(admin_tenants.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_users.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_listings.router, prefix="/admin", tags=["admin"])
-    app.include_router(admin_providers.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
     app.include_router(settings_features.router, prefix="/settings", tags=["settings"])
@@ -227,7 +200,6 @@ def create_app() -> FastAPI:
     app.include_router(credits.router, prefix="/credits", tags=["credits"])
     app.include_router(addons.router, prefix="/addons", tags=["addons"])
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
-    app.include_router(cma.router, prefix="/listings", tags=["listings"])
     if features.enabled("microsite"):
         app.include_router(microsite.router, prefix="/listings", tags=["listings"])
     app.include_router(image_edit.router, prefix="/listings", tags=["image-editing"])
@@ -239,7 +211,6 @@ def create_app() -> FastAPI:
     app.include_router(listing_events.router, prefix="/listings", tags=["listing-events"])
     app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
     app.include_router(social_accounts.router, prefix="/social-accounts", tags=["social-accounts"])
-    app.include_router(launch.router, tags=["launch"])
     if features.enabled("health_score"):
         app.include_router(listing_health.router, tags=["listing-health"])
     if features.enabled("performance_intelligence"):
