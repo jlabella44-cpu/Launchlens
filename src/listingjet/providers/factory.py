@@ -32,17 +32,9 @@ def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
     return ClaudeProvider(client=get_claude(agent=agent, tenant_id=tenant_id))
 
 
-def get_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
-    """Return the Tier 1 vision provider (Google Vision), or a mock when USE_MOCK_PROVIDERS is set."""
-    if settings.use_mock_providers:
-        from .mock import MockVisionProvider
-        return MockVisionProvider()
-    from .google_vision import GoogleVisionProvider
-    return GoogleVisionProvider()
-
-
 def get_tier2_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
-    """Return the Tier 2 vision provider (OpenAI Vision), or a mock when USE_MOCK_PROVIDERS is set."""
+    """Return the prompted vision provider (OpenAI Vision) used by the floorplan
+    agent, or a mock when USE_MOCK_PROVIDERS is set."""
     if settings.use_mock_providers:
         from .mock import MockVisionProvider
         return MockVisionProvider()

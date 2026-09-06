@@ -3,12 +3,12 @@
 Token bucket rate limiter backed by Redis.
 
 Uses WATCH/MULTI/EXEC pipeline for atomic check-and-decrement.
-Each provider key (e.g. "google_vision", "gpt4v") has its own bucket.
+Each provider key (e.g. "claude", "gpt4v") has its own bucket.
 
 Usage:
     limiter = RateLimiter(redis_client=redis.from_url(settings.redis_url))
-    if not limiter.acquire(key="google_vision", cost=1):
-        raise RateLimitExceeded("google_vision")
+    if not limiter.acquire(key="claude", cost=1):
+        raise RateLimitExceeded("claude")
 """
 import time
 

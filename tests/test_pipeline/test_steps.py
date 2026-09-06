@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select, text
 
+from listingjet.agents.photo_analysis import PhotoAnalysisAgent
 from listingjet.database import admin_session
 from listingjet.pipeline.definition import PIPELINE
 from listingjet.pipeline.steps import STEP_FUNCTIONS, StepContext
@@ -32,13 +33,15 @@ async def test_mls_export_step_passes_content_and_flyer_from_results():
 
 
 @pytest.mark.asyncio
-async def test_vision_tier1_uses_run_tier1():
+async def test_photo_analysis_step_runs_the_agent():
     ctx = StepContext(listing_id=str(uuid.uuid4()), tenant_id=str(uuid.uuid4()), results={})
-    with patch("listingjet.pipeline.steps.VisionAgent") as agent_cls:
-        agent_cls.return_value.run_tier1 = AsyncMock(return_value=7)
-        out = await STEP_FUNCTIONS["vision_tier1"](ctx)
-    assert out == {"count": 7}
-    agent_cls.assert_called_once_with(session_factory=admin_session)
+    counts = {"analyzed": 7, "failed": 0, "flagged": 0}
+    with patch.object(
+        PhotoAnalysisAgent, "instrumented_execute", AsyncMock(return_value=counts)
+    ) as run:
+        out = await STEP_FUNCTIONS["photo_analysis"](ctx)
+    assert out == counts
+    assert run.await_args.args[0].listing_id == ctx.listing_id
 
 
 @pytest.mark.asyncio

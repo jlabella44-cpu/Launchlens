@@ -15,9 +15,8 @@ logger = logging.getLogger(__name__)
 _warned_unknown_model_ids: set[str] = set()
 
 # Estimated cost per provider call in USD (flat per-call heuristic)
-# Legacy mapping for old provider labels; these are flat-rate calls like google_vision
+# Legacy mapping for old provider labels; these are flat per-call rates
 _LEGACY_PROVIDER_COSTS: dict[str, float] = {
-    "google_vision": 0.02,
     "claude": 0.05,
     "openai_gpt4v": 0.03,
 }
@@ -103,7 +102,7 @@ def record_token_usage(
 def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> None:
     """Record estimated cost for provider usage within an agent.
 
-    provider_name can be either an old provider label (google_vision, openai_gpt4v, etc.)
+    provider_name can be either an old provider label (claude, openai_gpt4v, etc.)
     or a model id (gpt-image-1.5, kling, etc.).
     """
     # Try new model id keys first, then fall back to legacy provider labels

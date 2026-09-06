@@ -22,13 +22,12 @@ from listingjet.agents.microsite_generator import MicrositeGeneratorAgent
 from listingjet.agents.mls_export import MLSExportAgent
 from listingjet.agents.packaging import PackagingAgent
 from listingjet.agents.performance_intelligence import PerformanceIntelligenceAgent
-from listingjet.agents.photo_compliance import PhotoComplianceAgent
+from listingjet.agents.photo_analysis import PhotoAnalysisAgent
 from listingjet.agents.property_verification import PropertyVerificationAgent
 from listingjet.agents.social_content import SocialContentAgent
 from listingjet.agents.social_cuts import SocialCutAgent
 from listingjet.agents.video import VideoAgent
 from listingjet.agents.virtual_staging import VirtualStagingAgent
-from listingjet.agents.vision import VisionAgent
 from listingjet.database import admin_session
 
 logger = logging.getLogger(__name__)
@@ -54,14 +53,6 @@ def _agent_step(agent_cls) -> StepFn:
         return result if isinstance(result, dict) else {"result": result}
     run.__name__ = f"run_{agent_cls.agent_name}"
     return run
-
-
-async def run_vision_tier1(ctx: StepContext) -> dict:
-    return {"count": await VisionAgent(session_factory=admin_session).run_tier1(ctx.agent_context())}
-
-
-async def run_vision_tier2(ctx: StepContext) -> dict:
-    return {"count": await VisionAgent(session_factory=admin_session).run_tier2(ctx.agent_context())}
 
 
 async def run_mls_export(ctx: StepContext) -> dict:
@@ -143,15 +134,13 @@ async def run_social_event(ctx: StepContext) -> dict:
 
 STEP_FUNCTIONS: dict[str, StepFn] = {
     "ingestion": _agent_step(IngestionAgent),
-    "vision_tier1": run_vision_tier1,
+    "photo_analysis": _agent_step(PhotoAnalysisAgent),
     "property_verification": _agent_step(PropertyVerificationAgent),
-    "vision_tier2": run_vision_tier2,
     "coverage": _agent_step(CoverageAgent),
     "virtual_staging": _agent_step(VirtualStagingAgent),
     "floorplan": _agent_step(FloorplanAgent),
     "dollhouse_render": _agent_step(DollhouseRenderAgent),
     "packaging": _agent_step(PackagingAgent),
-    "photo_compliance": _agent_step(PhotoComplianceAgent),
     "video": _agent_step(VideoAgent),
     "content": _agent_step(ContentAgent),
     "brand": _agent_step(BrandAgent),

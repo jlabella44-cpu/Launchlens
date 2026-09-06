@@ -351,7 +351,7 @@ async def get_pipeline_status(
         events = result.scalars().all()
 
         pipeline_steps = [
-            "ingestion", "vision_tier1", "vision_tier2", "coverage",
+            "ingestion", "photo_analysis", "coverage",
             "floorplan", "packaging", "compliance", "review",
             "content", "brand", "social_content",
             "social_cuts", "mls_export", "watermark", "distribution",
@@ -404,7 +404,7 @@ async def run_compliance_scan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Run photo compliance scan on a listing's packaged photos. Returns per-photo report."""
+    """Return the per-photo MLS compliance report for a listing's packaged photos."""
     listing = (await db.execute(
         select(Listing).where(
             Listing.id == listing_id,
@@ -424,11 +424,6 @@ async def run_compliance_scan(
             detail=f"Compliance scan requires packaged photos. Current state: {listing.state.value}",
         )
 
-    from listingjet.agents.base import AgentContext
-    from listingjet.agents.photo_compliance import PhotoComplianceAgent
-    from listingjet.database import admin_session
+    from listingjet.services.compliance import compliance_report
 
-    agent = PhotoComplianceAgent(session_factory=admin_session)
-    ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
-    report = await agent.execute(ctx)
-    return report
+    return await compliance_report(db, listing_id)

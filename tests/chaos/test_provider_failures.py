@@ -7,14 +7,13 @@ according to its design contract.
 """
 import uuid
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from listingjet.agents.base import AgentContext
 from listingjet.agents.content import ContentAgent
 from listingjet.agents.ingestion import IngestionAgent
-from listingjet.agents.photo_compliance import PhotoComplianceAgent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -112,98 +111,12 @@ class TestIngestionAgentDBFailure:
 
 
 # ---------------------------------------------------------------------------
-# 2. PhotoComplianceAgent — vision provider failure -> graceful degradation
+# 2. Photo analysis — vision failure is NO LONGER graceful
 # ---------------------------------------------------------------------------
-
-class TestPhotoComplianceVisionFailure:
-    """PhotoComplianceAgent catches vision errors and treats photos as
-    compliant so that export is never blocked by an infrastructure outage."""
-
-    @pytest.mark.asyncio
-    async def test_vision_failure_returns_all_compliant(self):
-        """When the vision provider raises on every call the agent should
-        return all_compliant=True (graceful degradation)."""
-        failing_vision = AsyncMock()
-        failing_vision.analyze_with_prompt.side_effect = RuntimeError(
-            "OpenAI API 500 Internal Server Error"
-        )
-
-        mock_storage = MagicMock()
-        mock_storage.presigned_url.return_value = "https://s3.example.com/photo.jpg"
-
-        listing_id = uuid.uuid4()
-
-        mock_asset_a = MagicMock()
-        mock_asset_a.id = uuid.uuid4()
-        mock_asset_a.file_path = "s3://bucket/photo_0.jpg"
-
-        mock_asset_b = MagicMock()
-        mock_asset_b.id = uuid.uuid4()
-        mock_asset_b.file_path = "s3://bucket/photo_1.jpg"
-
-        query_result = MagicMock()
-        query_result.all.return_value = [
-            (MagicMock(), mock_asset_a),
-            (MagicMock(), mock_asset_b),
-        ]
-
-        session = _make_mock_session()
-        session.get.return_value = MagicMock(id=listing_id)
-        session.execute.return_value = query_result
-
-        factory = _make_session_factory(session)
-        ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(uuid.uuid4()))
-
-        agent = PhotoComplianceAgent(
-            vision_provider=failing_vision,
-            storage_service=mock_storage,
-            session_factory=factory,
-        )
-        with patch("listingjet.services.events.emit_event", new_callable=AsyncMock):
-            result = await agent.execute(ctx)
-
-        assert result["all_compliant"] is True
-        assert result["flagged_count"] == 0
-        assert result["total_photos"] == 2
-        assert failing_vision.analyze_with_prompt.call_count == 2
-
-    @pytest.mark.asyncio
-    async def test_vision_timeout_returns_compliant(self):
-        """A timeout from the vision provider is treated as compliant."""
-        failing_vision = AsyncMock()
-        failing_vision.analyze_with_prompt.side_effect = TimeoutError(
-            "Request timed out after 30s"
-        )
-
-        mock_storage = MagicMock()
-        mock_storage.presigned_url.return_value = "https://s3.example.com/photo.jpg"
-
-        listing_id = uuid.uuid4()
-        mock_asset = MagicMock()
-        mock_asset.id = uuid.uuid4()
-        mock_asset.file_path = "s3://bucket/photo_0.jpg"
-
-        query_result = MagicMock()
-        query_result.all.return_value = [(MagicMock(), mock_asset)]
-
-        session = _make_mock_session()
-        session.get.return_value = MagicMock(id=listing_id)
-        session.execute.return_value = query_result
-
-        factory = _make_session_factory(session)
-        ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(uuid.uuid4()))
-
-        agent = PhotoComplianceAgent(
-            vision_provider=failing_vision,
-            storage_service=mock_storage,
-            session_factory=factory,
-        )
-        with patch("listingjet.services.events.emit_event", new_callable=AsyncMock):
-            result = await agent.execute(ctx)
-
-        assert result["all_compliant"] is True
-        assert result["compliant_count"] == 1
-
+# The compliance sweep is now part of PhotoAnalysisAgent, which deliberately
+# raises when more than half the photos fail instead of degrading to
+# "all compliant". That behaviour is covered against a real database in
+# tests/test_agents/test_photo_analysis.py.
 
 # ---------------------------------------------------------------------------
 # 3. ContentAgent — LLM provider failure should raise cleanly

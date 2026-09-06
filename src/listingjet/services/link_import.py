@@ -332,10 +332,10 @@ def _require_google_api_key() -> str:
     """Return the configured Google API key or raise."""
     from listingjet.config import settings  # deferred to avoid circular imports
 
-    key = settings.google_vision_api_key
+    key = settings.google_api_key
     if not key:
         raise RuntimeError(
-            "Google API key is not configured (settings.google_vision_api_key)"
+            "Google API key is not configured (settings.google_api_key)"
         )
     return key
 

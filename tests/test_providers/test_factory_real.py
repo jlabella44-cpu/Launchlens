@@ -6,17 +6,21 @@ from unittest.mock import patch
 
 from listingjet.providers.base import LLMProvider, VisionProvider
 from listingjet.providers.claude import ClaudeProvider
-from listingjet.providers.factory import get_llm_provider, get_template_provider, get_vision_provider
-from listingjet.providers.google_vision import GoogleVisionProvider
+from listingjet.providers.factory import (
+    get_llm_provider,
+    get_template_provider,
+    get_tier2_vision_provider,
+)
 from listingjet.providers.mock import MockTemplateProvider
 
 
-def test_factory_returns_google_vision_when_mock_disabled():
+def test_factory_returns_openai_vision_when_mock_disabled():
     with patch("listingjet.providers.factory.settings") as mock_settings:
         mock_settings.use_mock_providers = False
-        mock_settings.google_vision_api_key = "test"
-        provider = get_vision_provider()
-        assert isinstance(provider, GoogleVisionProvider)
+        mock_settings.openai_api_key = "test"
+        from listingjet.providers.openai_vision import OpenAIVisionProvider
+        provider = get_tier2_vision_provider()
+        assert isinstance(provider, OpenAIVisionProvider)
 
 
 def test_factory_returns_claude_when_mock_disabled():
@@ -35,11 +39,11 @@ def test_factory_returns_mock_template_always():
         assert isinstance(provider, MockTemplateProvider)
 
 
-def test_factory_returns_vision_provider_interface_for_google():
+def test_factory_returns_vision_provider_interface_for_openai():
     with patch("listingjet.providers.factory.settings") as mock_settings:
         mock_settings.use_mock_providers = False
-        mock_settings.google_vision_api_key = "test"
-        provider = get_vision_provider()
+        mock_settings.openai_api_key = "test"
+        provider = get_tier2_vision_provider()
         assert isinstance(provider, VisionProvider)
 
 
