@@ -1,7 +1,7 @@
 """
 Health Score Agent — calculates composite listing health score after pipeline completion.
 
-Runs as the final Temporal activity. Non-blocking: pipeline completes even if this fails.
+Runs as the final pipeline step. Non-blocking: pipeline completes even if this fails.
 Emits health.score.updated event and health.score.alert if below threshold.
 """
 import logging

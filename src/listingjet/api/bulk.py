@@ -16,9 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from listingjet.api.deps import get_current_user, get_db
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.user import User
+from listingjet.pipeline.runner import complete_review
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.storage import get_storage
-from listingjet.temporal_client import get_temporal_client
 
 logger = logging.getLogger(__name__)
 
@@ -72,18 +72,20 @@ async def bulk_approve(
             continue
 
         listing.state = ListingState.APPROVED
+        try:
+            if not await complete_review(db, listing.id):
+                logger.warning("pipeline.review_gate_missing listing=%s", lid)
+        except Exception:
+            logger.exception("Review gate completion failed for listing %s", lid)
+            await db.rollback()
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to complete review gate — no listings approved",
+            )
         results.append({"listing_id": str(lid), "status": "approved"})
         approved_ids.append(str(lid))
 
     await db.commit()
-
-    # Signal Temporal workflows after commit
-    for lid_str in approved_ids:
-        try:
-            client = get_temporal_client()
-            await client.signal_review_completed(listing_id=lid_str)
-        except Exception:
-            logger.exception("Review signal failed for listing %s", lid_str)
 
     approved_count = sum(1 for r in results if r["status"] == "approved")
     return {

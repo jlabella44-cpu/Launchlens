@@ -7,7 +7,7 @@
 #
 # What it checks:
 #   1. /health — returns 200 (API + DB liveness)
-#   2. /health/deep — returns 200 (DB + Redis + Temporal reachable)
+#   2. /health/deep — returns 200 (DB + Redis reachable, worker ticking)
 #   3. Anonymous POST /demo/upload — happy path, no auth, creates a demo
 #      listing with a single sample asset. Validates the ingestion path
 #      end-to-end.

@@ -41,8 +41,8 @@ async def _run_link_import_background(
     platform: str,
     import_job_id: str,
 ) -> None:
-    """Background task that runs the link import activity."""
-    from listingjet.activities.pipeline import LinkImportParams, run_link_import
+    """Background task that runs the link import job."""
+    from listingjet.services.link_import_job import LinkImportParams, run_link_import
 
     params = LinkImportParams(
         listing_id=listing_id,

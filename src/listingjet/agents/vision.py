@@ -5,7 +5,6 @@ import uuid
 
 from sqlalchemy import select
 
-from listingjet.agents.base import _safe_heartbeat
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.vision_result import VisionResult
@@ -192,7 +191,6 @@ class VisionAgent(BaseAgent):
                 storage = get_storage()
                 count = 0
                 for vr in candidates:
-                    _safe_heartbeat(f"tier2 {count + 1}/{len(candidates)}")
                     asset = await session.get(Asset, vr.asset_id)
                     image_url = self._resolve_image_url(asset, storage)
                     logger.info(

@@ -1,27 +1,29 @@
+"""Periodic maintenance tasks run in-process by `pipeline.runner.periodic_loop`.
+
+These run as plain coroutines on the pipeline worker's own schedule. Both
+open an `admin_session()` (not `AsyncSessionLocal`) because they are system
+actors that read/write across tenants.
 """
-Temporal cron workflow for global baseline weight aggregation.
-
-Schedule: runs weekly via Temporal cron.
-Aggregates LearningWeight across all tenants per room_label and updates
-GlobalBaselineWeight. This ensures that industry-wide trends (e.g., drone
-shots becoming more popular) are reflected in the default scoring for
-new tenants.
-"""
-from datetime import timedelta
-
-from temporalio import activity, workflow
-from temporalio.common import RetryPolicy
 
 
-@activity.defn
+async def run_demo_cleanup() -> dict:
+    from listingjet.database import admin_session
+    from listingjet.services.demo_cleanup import cleanup_expired_demos
+    from listingjet.services.storage import get_storage
+
+    async with admin_session() as session:
+        return await cleanup_expired_demos(session, storage=get_storage())
+
+
 async def run_baseline_aggregation() -> dict:
+    """Average LearningWeight across tenants per room_label into GlobalBaselineWeight."""
     from sqlalchemy import func, select
 
-    from listingjet.database import AsyncSessionLocal
+    from listingjet.database import admin_session
     from listingjet.models.global_baseline_weight import GlobalBaselineWeight
     from listingjet.models.learning_weight import LearningWeight
 
-    async with AsyncSessionLocal() as session:
+    async with admin_session() as session:
         async with session.begin():
             # Average weight per room_label across all tenants
             result = await session.execute(
@@ -54,16 +56,3 @@ async def run_baseline_aggregation() -> dict:
                 updated += 1
 
     return {"updated": updated, "room_labels": len(rows)}
-
-
-@workflow.defn
-class BaselineAggregationWorkflow:
-    """Cron workflow — Temporal schedules this weekly."""
-
-    @workflow.run
-    async def run(self) -> dict:
-        return await workflow.execute_activity(
-            run_baseline_aggregation,
-            start_to_close_timeout=timedelta(minutes=5),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-        )

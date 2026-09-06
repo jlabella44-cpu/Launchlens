@@ -1,4 +1,3 @@
-import asyncio
 import json
 import re
 import uuid
@@ -9,40 +8,6 @@ from typing import Any
 
 from listingjet.services.metrics import StepTimer
 from listingjet.telemetry import agent_span
-
-
-def _safe_heartbeat(detail: object) -> None:
-    """Send a Temporal activity heartbeat, silently no-op outside an activity context."""
-    try:
-        from temporalio import activity
-        activity.heartbeat(detail)
-    except RuntimeError:
-        pass  # Not running inside a Temporal activity (e.g. unit tests)
-
-
-@asynccontextmanager
-async def heartbeat_during(interval: float = 60.0, detail: object = "alive"):
-    """Send Temporal heartbeats every `interval` seconds while the wrapped block runs.
-
-    Use to keep long-running activities (LLM polling, video generation, S3
-    uploads) alive against the activity's heartbeat_timeout. Outside a
-    Temporal activity context, _safe_heartbeat no-ops, so this is safe to
-    use in unit tests without mocking Temporal.
-    """
-    async def _loop():
-        while True:
-            _safe_heartbeat(detail)
-            await asyncio.sleep(interval)
-
-    task = asyncio.create_task(_loop())
-    try:
-        yield
-    finally:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
 
 
 def strip_markdown_fences(text: str) -> str:
@@ -125,7 +90,7 @@ class BaseAgent(ABC):
 
     async def handle_failure(self, error: Exception, context: "AgentContext", session=None) -> None:
         """
-        Emit a failure event and re-raise so Temporal retries the activity.
+        Emit a failure event and re-raise so the job runner retries the step.
         session is optional — if None, failure is logged but not persisted.
         """
         if session is not None:
@@ -151,7 +116,7 @@ class BaseAgent(ABC):
                 except Exception:
                     pass  # Don't let notification failure mask the original error
 
-        raise error  # Temporal sees the failure and applies retry policy
+        raise error  # the job runner sees the failure and applies retry policy
 
     @staticmethod
     def parse_ids(context: "AgentContext") -> tuple["uuid.UUID", "uuid.UUID"]:
