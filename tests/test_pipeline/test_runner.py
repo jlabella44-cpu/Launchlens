@@ -52,6 +52,15 @@ async def test_enqueue_creates_one_row_per_step_with_gates_applied(db_session):
 
 
 @pytest.mark.asyncio
+async def test_enqueue_raises_on_unknown_gate(db_session):
+    listing = await _listing(db_session)
+    bad_steps = [Step("a"), Step("z", requires=("a",), gate="bogus")]
+    with pytest.raises(ValueError, match="unknown gate"):
+        await runner.enqueue_pipeline(
+            db_session, listing, billing_model="legacy", enabled_addons=[], steps=bad_steps)
+
+
+@pytest.mark.asyncio
 async def test_claim_respects_dependencies_and_marks_running(db_session):
     listing = await _listing(db_session)
     await runner.enqueue_pipeline(db_session, listing, billing_model="legacy", enabled_addons=[], steps=STEPS)
