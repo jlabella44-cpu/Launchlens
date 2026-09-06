@@ -73,7 +73,7 @@ class VirtualStagingAgent(BaseAgent):
         staged_count = 0
         for asset, vr in candidates[:_MAX_CANDIDATES]:
             try:
-                source_url = self._storage.presigned_url(asset.file_path)
+                source_url = self._storage.presigned_url(asset.file_path, expires_in=300)
                 staged_bytes = await self._provider.stage_image(
                     image_url=source_url,
                     room_type=vr.room_label,
