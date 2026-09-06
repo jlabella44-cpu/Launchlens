@@ -25,5 +25,5 @@ class VisionResult(Base):
     hero_score: Mapped[int | None]
     is_photo: Mapped[bool | None]
     is_empty_room: Mapped[bool | None]
-    features: Mapped[dict | None] = mapped_column(JSONB)
+    features: Mapped[list | None] = mapped_column(JSONB)
     compliance: Mapped[dict | None] = mapped_column(JSONB)

@@ -207,11 +207,14 @@ class PhotoAnalysisAgent(BaseAgent):
         counts = {"analyzed": len(successes), "failed": failed, "flagged": flagged}
 
         async with self.session_scope(context) as (session, lid, _tid):
-            for asset_id, analysis in successes:
-                await session.execute(
-                    delete(VisionResult).where(VisionResult.asset_id == asset_id)
+            # One analysis per asset replaces whatever was there before,
+            # including stale tier-2 rows from the old two-tier pass.
+            await session.execute(
+                delete(VisionResult).where(
+                    VisionResult.asset_id.in_([aid for aid, _ in successes])
                 )
-                session.add(self._to_row(asset_id, analysis))
+            )
+            session.add_all([self._to_row(aid, a) for aid, a in successes])
             await session.flush()
 
             if successes:
