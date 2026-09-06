@@ -10,7 +10,7 @@ occupied the window and nothing was ever claimable.
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.pipeline_job import JobStatus, PipelineJob
@@ -122,6 +122,40 @@ async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_
     job = await runner.claim_next(db_session, "w1")
     assert job is not None, "queue deadlocked behind 45 listings parked at the review gate"
     assert (job.listing_id, job.step) == (fresh.id, "ingestion")
+
+
+@pytest.mark.asyncio
+async def test_pre_review_steps_remain_claimable_for_a_parked_listing(db_session):
+    """`post_review_steps` must only capture steps that transitively require
+    `await_review`. `photo_compliance` and `video` hang directly off
+    `packaging` (not `await_review`), so they must stay claimable even while
+    the listing's `await_review` row sits WAITING right alongside them —
+    the exclusion in `claim_next` must not sweep them in too."""
+    listing = await _listing(db_session, "1 Pending Ave")
+    # Mark every step through packaging DONE directly (skip actually running
+    # them), leaving photo_compliance and video exactly as enqueue_pipeline
+    # created them — QUEUED — alongside await_review, which enqueue_pipeline
+    # always creates as WAITING for a gate="review" step.
+    await db_session.execute(
+        update(PipelineJob)
+        .where(PipelineJob.listing_id == listing.id,
+               PipelineJob.step.in_(["ingestion", "vision_tier1", "property_verification",
+                                      "vision_tier2", "coverage", "virtual_staging",
+                                      "floorplan", "dollhouse_render", "packaging"]))
+        .values(status=JobStatus.DONE)
+    )
+    await db_session.commit()
+    assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
+    assert await _status(db_session, listing.id, "photo_compliance") == JobStatus.QUEUED
+    assert await _status(db_session, listing.id, "video") == JobStatus.QUEUED
+
+    claimed_steps = set()
+    for _ in range(2):
+        job = await runner.claim_next(db_session, "w1")
+        assert job is not None, "photo_compliance/video wrongly excluded for a parked listing"
+        assert job.listing_id == listing.id
+        claimed_steps.add(job.step)
+    assert claimed_steps == {"photo_compliance", "video"}
 
 
 @pytest.mark.asyncio
