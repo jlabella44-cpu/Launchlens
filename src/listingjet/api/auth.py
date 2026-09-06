@@ -149,7 +149,7 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
     except HTTPException:
         raise
     except Exception:
-        pass  # Redis down — fail open, don't block logins
+        logger.error("auth.lockout_backend_error stage=check", exc_info=True)
 
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     # Constant-time comparison: always run bcrypt even if user not found
@@ -165,7 +165,7 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
             pipe.expire(lockout_key, _LOGIN_LOCKOUT_WINDOW)
             pipe.execute()
         except Exception:
-            pass  # Redis down — fail open
+            logger.error("auth.lockout_backend_error stage=increment", exc_info=True)
         logger.warning("auth.login_failed email_hash=%s", email_hash)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
@@ -174,7 +174,7 @@ async def login(body: LoginRequest, request: Request, _rl=Depends(rate_limit(10,
         r = _get_lockout_redis(request)
         r.delete(lockout_key)
     except Exception:
-        pass
+        logger.error("auth.lockout_backend_error stage=clear", exc_info=True)
 
     ip = request.client.host if request.client else "unknown"
     await emit_event(
@@ -371,9 +371,12 @@ async def refresh_token(request: Request, db: AsyncSession = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=401, detail="Missing refresh token")
 
-    payload = decode_token(token)
-    if payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Not a refresh token")
+    try:
+        payload = decode_token(token, expected_type="refresh")
+    except HTTPException as exc:
+        if exc.detail == "Wrong token type":
+            raise HTTPException(status_code=401, detail="Not a refresh token")
+        raise
 
     user_id = payload.get("sub")
     if not user_id:

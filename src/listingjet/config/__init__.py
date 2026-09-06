@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"  # comma-separated allowed origins
+    # Reverse proxies in front of the app. Defaults to 0 (fail closed: ignores
+    # X-Forwarded-For). Render needs 1; render.yaml sets TRUSTED_PROXY_COUNT=1.
+    trusted_proxy_count: int = 0
 
     # Database — auto-converts postgresql:// to postgresql+asyncpg:// if needed
     database_url: str
@@ -125,10 +128,6 @@ class Settings(BaseSettings):
 
     # Google OAuth
     google_oauth_client_id: str = ""
-
-    # ClamAV
-    clamav_host: str = "localhost"
-    clamav_port: int = 3310
 
     # OpenTelemetry
     otel_exporter_endpoint: str = ""  # Empty = disabled

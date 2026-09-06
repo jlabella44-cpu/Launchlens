@@ -8,6 +8,10 @@ from listingjet.config import settings
 def _get_fernet() -> Fernet | None:
     key = settings.field_encryption_key
     if not key:
+        if settings.app_env == "production":
+            raise RuntimeError(
+                "FIELD_ENCRYPTION_KEY is required in production; refusing to store secrets in plaintext"
+            )
         return None
     return Fernet(key.encode())
 

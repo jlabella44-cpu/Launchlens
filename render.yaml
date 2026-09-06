@@ -65,6 +65,9 @@ envVarGroups:
         sync: false
       - key: DB_USE_PGBOUNCER
         value: "true"
+      # --- Networking ---
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
       # --- Cache (Upstash, rediss://) ---
       - key: REDIS_URL
         sync: false
