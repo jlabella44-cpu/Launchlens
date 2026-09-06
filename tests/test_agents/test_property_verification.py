@@ -33,7 +33,7 @@ async def test_verification_agent_uses_api_data_only(db_session, listing):
     assert property_data.verified_at is not None
     assert property_data.scraped_data == {}
     assert property_data.field_confidence == {
-        "beds": 1.0, "baths": 1.0, "sqft": 1.0,
+        "beds": 0.5, "baths": 0.5, "sqft": 0.5,
     }
 
 

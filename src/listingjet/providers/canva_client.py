@@ -29,6 +29,7 @@ class CanvaClient:
         timeout: float = 60.0,
     ):
         self._token = token
+        self._timeout = timeout
         self._client = httpx.AsyncClient(
             base_url=base_url,
             headers={"Authorization": f"Bearer {token}"},
@@ -105,6 +106,12 @@ class CanvaClient:
         }
 
     async def download(self, url: str) -> bytes:
-        resp = await self._client.get(url)
-        resp.raise_for_status()
-        return resp.content
+        # Export URLs are typically presigned S3/CDN links, not Canva API
+        # endpoints — reusing self._client would leak our Canva bearer token
+        # to that host (and presigned URLs often reject extra auth headers).
+        # Use a bare, unauthenticated client for this one call.
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            resp = await client.get(url)
+            if resp.is_error:
+                raise CanvaError(resp.status_code, resp.content)
+            return resp.content

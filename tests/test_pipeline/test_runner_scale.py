@@ -120,7 +120,7 @@ async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_
 
     fresh = await _listing(db_session, "fresh listing")
     job = await runner.claim_next(db_session, "w1")
-    assert job is not None, "queue deadlocked behind 45 listings parked at the review gate"
+    assert job is not None, "queue deadlocked behind 50 listings parked at the review gate"
     assert (job.listing_id, job.step) == (fresh.id, "ingestion")
 
 

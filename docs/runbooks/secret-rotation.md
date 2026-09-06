@@ -176,7 +176,7 @@ The DATABASE_URL in `listingjet/app` is a legacy override. The primary path is `
 
 **Do not rotate without a migration script.**
 
-This Fernet key encrypts `idx_feed_config.api_key_encrypted` at rest. Rotating without re-encrypting existing rows means every IDX feed breaks instantly — the old ciphertext can't be decrypted with the new key.
+Rotating without re-encrypting existing rows means any data encrypted with this key becomes unreadable — the old ciphertext can't be decrypted with the new key.
 
 **Correct rotation procedure (if ever needed):**
 1. Add `FIELD_ENCRYPTION_KEY_OLD` as a second secret

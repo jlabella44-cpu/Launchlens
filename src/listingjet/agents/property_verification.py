@@ -49,7 +49,11 @@ class PropertyVerificationAgent(BaseAgent):
 
                 # Verification from API data only (site scrapers were removed in Phase 3).
                 property_data.verification_status = "api_only" if api_data else "unverified"
-                property_data.field_confidence = {k: 1.0 for k in api_data}
+                # ATTOM is a single, uncorroborated data source with no
+                # cross-check against a second provider or scraper, so we
+                # can't claim full confidence — 0.5 reflects "unverified but
+                # plausible" rather than confirmed accuracy.
+                property_data.field_confidence = {k: 0.5 for k in api_data}
                 property_data.mismatches = []
                 property_data.scraped_data = {}
                 property_data.sources_checked = ["attom"] if api_data else []

@@ -79,6 +79,8 @@ envVarGroups:
         value: https://listingjet.ai
       - key: CORS_ORIGINS
         value: https://listingjet.ai
+      - key: FEATURES
+        value: ""
       # --- Payments ---
       - key: STRIPE_SECRET_KEY
         sync: false

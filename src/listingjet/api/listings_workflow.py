@@ -353,7 +353,7 @@ async def get_pipeline_status(
         pipeline_steps = [
             "ingestion", "vision_tier1", "vision_tier2", "coverage",
             "floorplan", "packaging", "compliance", "review",
-            "content", "brand", "social_content", "chapters",
+            "content", "brand", "social_content",
             "social_cuts", "mls_export", "watermark", "distribution",
         ]
 

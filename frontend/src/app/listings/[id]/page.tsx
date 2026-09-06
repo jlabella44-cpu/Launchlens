@@ -28,6 +28,7 @@ function ListingDetail() {
   const { toast } = useToast();
   const healthScoreEnabled = useFeature("health_score");
   const listingPermissionsEnabled = useFeature("listing_permissions");
+  const micrositeEnabled = useFeature("microsite");
 
   const [listing, setListing] = useState<ListingResponse | null>(null);
   const [assets, setAssets] = useState<AssetResponse[]>([]);
@@ -59,7 +60,7 @@ function ListingDetail() {
         setSelections(pkg);
       }
       // Load microsite if listing is far enough along
-      if (["approved", "exporting", "delivered"].includes(l.state)) {
+      if (micrositeEnabled && ["approved", "exporting", "delivered"].includes(l.state)) {
         apiClient.getMicrosite(id).then(setMicrosite).catch(() => {});
       }
     } catch (err: unknown) {
@@ -68,7 +69,7 @@ function ListingDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, micrositeEnabled]);
 
   useEffect(() => {
     const street = listing?.address?.street;
@@ -525,6 +526,7 @@ function ListingDetail() {
             </div>
 
             {/* Property Microsite */}
+            {micrositeEnabled && (
             <div className="bg-white rounded-2xl border border-slate-100 p-5">
               <h3 className="text-sm font-semibold text-[var(--color-text)] mb-2" style={{ fontFamily: "var(--font-heading)" }}>
                 Property Microsite
@@ -590,6 +592,7 @@ function ListingDetail() {
                 </button>
               )}
             </div>
+            )}
           </div>
         )}
 

@@ -106,6 +106,24 @@ async def test_download_returns_bytes(httpx_mock):
 
 
 @pytest.mark.asyncio
+async def test_download_does_not_leak_bearer_token_to_export_host(httpx_mock):
+    httpx_mock.add_response(url="https://export-cdn.example.com/file.pdf", content=b"file-bytes")
+    async with CanvaClient(token="tok") as c:
+        assert await c.download("https://export-cdn.example.com/file.pdf") == b"file-bytes"
+    req = httpx_mock.get_requests()[0]
+    assert "authorization" not in {k.lower() for k in req.headers.keys()}
+
+
+@pytest.mark.asyncio
+async def test_download_error_raises_canva_error(httpx_mock):
+    httpx_mock.add_response(url="https://export-cdn.example.com/file.pdf", status_code=403, content=b"forbidden")
+    async with CanvaClient(token="tok") as c:
+        with pytest.raises(CanvaError) as exc:
+            await c.download("https://export-cdn.example.com/file.pdf")
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_error_status_without_body_raises(httpx_mock):
     httpx_mock.add_response(url="https://api.canva.com/rest/v1/autofills/af_1", status_code=500, json={})
     async with CanvaClient(token="tok") as c:
