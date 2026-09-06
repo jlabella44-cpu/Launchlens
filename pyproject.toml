@@ -16,8 +16,7 @@ dependencies = [
     "pydantic-settings>=2.3",
     "PyJWT>=2.8",
     "cryptography>=42",
-    "passlib[bcrypt]>=1.7",
-    "playwright>=1.40",
+    "bcrypt>=4.0",
     "redis[hiredis]>=5.0",
     "boto3>=1.34",
     "httpx>=0.27",
@@ -26,14 +25,7 @@ dependencies = [
     "stripe>=8.0",
     "Pillow>=12.2.0",
     "sentry-sdk>=1.40",
-    "imagehash>=4.3",
     "qrcode[pil]>=7.4",
-    "opentelemetry-api>=1.20",
-    "opentelemetry-sdk>=1.20",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
-    "opentelemetry-instrumentation-fastapi>=0.41b0",
-    "opentelemetry-instrumentation-sqlalchemy>=0.41b0",
-    "opentelemetry-instrumentation-redis>=0.41b0",
 ]
 
 [project.optional-dependencies]
@@ -68,7 +60,6 @@ show_missing = true
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-exclude = ["src/listingjet/providers/canva_generated"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]

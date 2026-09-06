@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 
 from listingjet.agents.base import AgentContext
 from listingjet.agents.brand import BrandAgent
-from listingjet.agents.chapter import ChapterAgent
 from listingjet.agents.content import ContentAgent
 from listingjet.agents.coverage import CoverageAgent
 from listingjet.agents.distribution import DistributionAgent
@@ -157,7 +156,6 @@ STEP_FUNCTIONS: dict[str, StepFn] = {
     "content": _agent_step(ContentAgent),
     "brand": _agent_step(BrandAgent),
     "social_content": _agent_step(SocialContentAgent),
-    "chapters": _agent_step(ChapterAgent),
     "social_cuts": _agent_step(SocialCutAgent),
     "mls_export": run_mls_export,
     "distribution": _agent_step(DistributionAgent),

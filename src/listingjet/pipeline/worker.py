@@ -5,9 +5,11 @@ import logging
 import signal
 from pathlib import Path
 
+from listingjet import features
 from listingjet.config import settings
 from listingjet.database import admin_session
 from listingjet.logging_config import setup_logging
+from listingjet.monitoring.sentry import init_sentry
 from listingjet.pipeline.runner import periodic_loop, worker_loop
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,9 @@ async def main() -> None:
     # Same structured/JSON logging setup the API applies at import time —
     # without it this process logs with the bare root handler.
     setup_logging(app_env=settings.app_env, log_level=settings.log_level)
+    init_sentry(dsn=settings.sentry_dsn, environment=settings.app_env, release=settings.git_sha)
+    # Fail fast on a typo'd FEATURES value, same as the API does at startup.
+    features.enabled_set()
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

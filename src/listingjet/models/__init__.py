@@ -13,7 +13,6 @@ from .user import User                                        # noqa
 from .social_content import SocialContent                     # noqa
 from .video_asset import VideoAsset                          # noqa
 from .dollhouse_scene import DollhouseScene                  # noqa
-from .api_key import APIKey                                  # noqa
 from .notification_preference import NotificationPreference  # noqa
 from .credit_account import CreditAccount                    # noqa
 from .credit_transaction import CreditTransaction            # noqa
@@ -27,7 +26,6 @@ from .social_account import SocialAccount                    # noqa
 from .notification import Notification                       # noqa
 from .listing_health_score import ListingHealthScore         # noqa
 from .health_score_history import HealthScoreHistory          # noqa
-from .idx_feed_config import IdxFeedConfig                   # noqa
 from .listing_outcome import ListingOutcome                  # noqa
 from .photo_outcome_correlation import PhotoOutcomeCorrelation  # noqa
 from .performance_insight import PerformanceInsight          # noqa

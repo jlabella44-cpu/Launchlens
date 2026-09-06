@@ -27,7 +27,7 @@ _PIPELINE_EVENTS = {
     "ingestion.completed", "vision_tier1.completed", "vision_tier2.completed",
     "coverage.completed", "packaging.completed", "content.completed",
     "brand.completed", "social_content.completed", "mls_export.completed",
-    "pipeline.completed", "video.completed", "chapters.completed",
+    "pipeline.completed", "video.completed",
     "social_cuts.completed",
 }
 

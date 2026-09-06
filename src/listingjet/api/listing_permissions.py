@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet import features
 from listingjet.api.deps import get_current_user
 from listingjet.api.schemas.listing_permission import (
     AuditLogEntryResponse,
@@ -22,7 +23,7 @@ from listingjet.services.email import get_email_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(features.require_feature("listing_permissions"))])
 
 VALID_PERMISSIONS = {"read", "write", "publish", "billing"}
 

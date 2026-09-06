@@ -67,15 +67,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Jaeger (OpenTelemetry traces) ────────────────────────────
-  jaeger:
-    image: jaegertracing/all-in-one:1.53
-    ports:
-      - "16686:16686"   # UI
-      - "4317:4317"     # OTLP gRPC
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-
   # ── ListingJet API ───────────────────────────────────────────
   api:
     build: .
@@ -87,7 +78,6 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - APP_ENV=development
       - USE_MOCK_PROVIDERS=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     ports:
       - "8000:8000"
     volumes:
@@ -110,7 +100,6 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - APP_ENV=development
       - USE_MOCK_PROVIDERS=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     volumes:
       - ./src:/app/src
     healthcheck:

@@ -1,5 +1,3 @@
-from unittest.mock import AsyncMock, patch
-
 import pytest
 
 from listingjet.agents.base import AgentContext
@@ -9,8 +7,8 @@ from tests.test_agents.conftest import make_session_factory
 
 
 @pytest.mark.asyncio
-async def test_verification_agent_runs_scrapers_and_stores_result(db_session, listing):
-    """Agent calls scrapers, cross-references, and writes verification_status='verified'."""
+async def test_verification_agent_uses_api_data_only(db_session, listing):
+    """Agent verifies from API-sourced PropertyData fields only (no scrapers)."""
     property_data = PropertyData(
         listing_id=listing.id,
         address_hash="abc123",
@@ -22,32 +20,26 @@ async def test_verification_agent_runs_scrapers_and_stores_result(db_session, li
     db_session.add(property_data)
     await db_session.flush()
 
-    scraped_result = {
-        "zillow": {"beds": 3, "baths": 2, "sqft": 1800},
-        "redfin": {"beds": 3, "baths": 2, "sqft": 1800},
-    }
+    agent = PropertyVerificationAgent(session_factory=make_session_factory(db_session))
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
 
-    with patch(
-        "listingjet.agents.property_verification.run_all_scrapers",
-        new=AsyncMock(return_value=scraped_result),
-    ):
-        agent = PropertyVerificationAgent(session_factory=make_session_factory(db_session))
-        ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
-        result = await agent.execute(ctx)
-
-    assert result["verification_status"] == "verified"
+    assert result["verification_status"] == "api_only"
     assert result["mismatches"] == []
-    assert set(result["sources_checked"]) == {"zillow", "redfin"}
+    assert result["sources_checked"] == ["attom"]
 
     await db_session.refresh(property_data)
-    assert property_data.verification_status == "verified"
+    assert property_data.verification_status == "api_only"
     assert property_data.verified_at is not None
-    assert property_data.scraped_data == scraped_result
+    assert property_data.scraped_data == {}
+    assert property_data.field_confidence == {
+        "beds": 0.5, "baths": 0.5, "sqft": 0.5,
+    }
 
 
 @pytest.mark.asyncio
 async def test_verification_skips_never_listed(db_session, listing):
-    """Agent returns skipped immediately without calling scrapers for never_listed properties."""
+    """Agent returns skipped immediately for never_listed properties."""
     property_data = PropertyData(
         listing_id=listing.id,
         address_hash="abc123",
@@ -58,13 +50,27 @@ async def test_verification_skips_never_listed(db_session, listing):
     db_session.add(property_data)
     await db_session.flush()
 
-    with patch(
-        "listingjet.agents.property_verification.run_all_scrapers",
-        new=AsyncMock(return_value={}),
-    ) as mock_scrapers:
-        agent = PropertyVerificationAgent(session_factory=make_session_factory(db_session))
-        ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
-        result = await agent.execute(ctx)
+    agent = PropertyVerificationAgent(session_factory=make_session_factory(db_session))
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
 
     assert result == {"verification_status": "skipped"}
-    mock_scrapers.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_verification_unverified_when_no_api_data(db_session, listing):
+    """Agent marks unverified when there is no API-sourced data to check."""
+    property_data = PropertyData(
+        listing_id=listing.id,
+        address_hash="abc123",
+        property_status="normal",
+    )
+    db_session.add(property_data)
+    await db_session.flush()
+
+    agent = PropertyVerificationAgent(session_factory=make_session_factory(db_session))
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["verification_status"] == "unverified"
+    assert result["sources_checked"] == []

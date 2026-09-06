@@ -1,4 +1,4 @@
-"""Extended tests for tenant settings API — usage and api-keys endpoints."""
+"""Extended tests for tenant settings API — usage endpoints."""
 import uuid
 
 import jwt as pyjwt
@@ -77,65 +77,3 @@ async def test_usage_new_tenant_zero(_mock_rate_limiter, async_client):
     data = resp.json()
     assert data["listings"]["used"] == 0
     assert "period" in data
-
-
-# --- API Keys ---
-
-@pytest.mark.asyncio
-async def test_api_key_full_lifecycle(_mock_rate_limiter, async_client):
-    """Create, list, and revoke an API key through the settings endpoints."""
-    token, _ = await _register(async_client)
-
-    # Create
-    create_resp = await async_client.post(
-        "/settings/api-keys",
-        json={"name": "CI/CD Key"},
-        headers=_auth(token),
-    )
-    assert create_resp.status_code == 201
-    key_data = create_resp.json()
-    assert key_data["name"] == "CI/CD Key"
-    assert key_data["key"].startswith("ll_")
-    key_id = key_data["id"]
-
-    # List
-    list_resp = await async_client.get("/settings/api-keys", headers=_auth(token))
-    assert list_resp.status_code == 200
-    keys = list_resp.json()
-    assert any(k["id"] == key_id for k in keys)
-    # Plaintext key should NOT appear in list
-    for k in keys:
-        assert "key" not in k
-
-    # Revoke
-    revoke_resp = await async_client.delete(
-        f"/settings/api-keys/{key_id}", headers=_auth(token)
-    )
-    assert revoke_resp.status_code == 200
-    assert revoke_resp.json()["revoked"] is True
-
-    # Confirm revoked in list
-    list_resp2 = await async_client.get("/settings/api-keys", headers=_auth(token))
-    revoked = [k for k in list_resp2.json() if k["id"] == key_id]
-    assert revoked[0]["is_active"] is False
-
-
-@pytest.mark.asyncio
-async def test_revoke_other_tenants_key_404(_mock_rate_limiter, async_client):
-    """Revoking a key that belongs to another tenant should return 404."""
-    token_a, _ = await _register(async_client)
-    token_b, _ = await _register(async_client)
-
-    # Create key under tenant A
-    create_resp = await async_client.post(
-        "/settings/api-keys",
-        json={"name": "A's Key"},
-        headers=_auth(token_a),
-    )
-    key_id = create_resp.json()["id"]
-
-    # Tenant B tries to revoke it
-    resp = await async_client.delete(
-        f"/settings/api-keys/{key_id}", headers=_auth(token_b)
-    )
-    assert resp.status_code == 404

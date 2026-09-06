@@ -8,12 +8,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.pipeline_job import JobStatus, PipelineJob
-from listingjet.pipeline.definition import PIPELINE, Step
+from listingjet.pipeline.definition import PIPELINE, Step, post_review_steps
 from listingjet.pipeline.steps import STEP_FUNCTIONS, StepContext
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,9 @@ def _gated_off(step: Step, billing_model: str, enabled_addons: list[str]) -> boo
         return step.gate.removeprefix("addon:") not in enabled_addons
     if step.gate == "video":
         return billing_model == "credit" and "ai_video_tour" not in enabled_addons
+    if step.gate.startswith("feature:"):
+        from listingjet import features
+        return not features.enabled(step.gate.removeprefix("feature:"))
     raise ValueError(f"unknown gate {step.gate!r} on step {step.name}")
 
 
@@ -104,9 +108,22 @@ async def claim_next(session: AsyncSession, worker_id: str, *, steps: list[Step]
     claim it, and no row is ever held by a lock we don't intend to use.
     """
     index = {s.name: s for s in steps}
+    post_review = post_review_steps(steps)
+    waiting_review = aliased(PipelineJob)
     candidates = (await session.execute(
         select(PipelineJob)
-        .where(PipelineJob.status == JobStatus.QUEUED, PipelineJob.run_after <= _now())
+        .where(
+            PipelineJob.status == JobStatus.QUEUED,
+            PipelineJob.run_after <= _now(),
+            ~(
+                PipelineJob.step.in_(post_review)
+                & exists().where(
+                    waiting_review.listing_id == PipelineJob.listing_id,
+                    waiting_review.step == "await_review",
+                    waiting_review.status == JobStatus.WAITING,
+                )
+            ),
+        )
         .order_by(PipelineJob.run_after, PipelineJob.created_at)
         .limit(CLAIM_CANDIDATE_LIMIT)
     )).scalars().all()
@@ -305,7 +322,8 @@ async def requeue_owned(session: AsyncSession, worker_id: str) -> int:
     res = await session.execute(
         update(PipelineJob)
         .where(PipelineJob.status == JobStatus.RUNNING, PipelineJob.locked_by == worker_id)
-        .values(status=JobStatus.QUEUED, locked_by=None, run_after=_now())
+        .values(status=JobStatus.QUEUED, locked_by=None, run_after=_now(),
+                attempts=func.greatest(PipelineJob.attempts - 1, 0))
     )
     await session.flush()
     return res.rowcount
@@ -427,6 +445,7 @@ async def worker_loop(session_factory, *, stop: asyncio.Event, concurrency: int,
                 job.status = JobStatus.QUEUED
                 job.locked_by = None
                 job.run_after = _now()
+                job.attempts = max(job.attempts - 1, 0)
                 await session.commit()
 
     async def _run(job_id):

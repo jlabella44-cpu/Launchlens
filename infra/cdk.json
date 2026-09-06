@@ -1,7 +1,0 @@
-{
-  "app": "python app.py",
-  "context": {
-    "@aws-cdk/aws-ecs:enableCircuitBreaker": true,
-    "@aws-cdk/core:stackRelativeExports": true
-  }
-}

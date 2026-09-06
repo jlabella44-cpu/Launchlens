@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
+from listingjet import features
 from listingjet.api.deps import get_current_user, require_admin
 from listingjet.api.schemas.help_agent import (
     AdminHelpAgentStatsResponse,
@@ -30,7 +31,7 @@ from listingjet.services.help_agent import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(features.require_feature("help_agent"))])
 
 
 @router.post("/chat")

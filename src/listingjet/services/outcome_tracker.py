@@ -1,9 +1,9 @@
 """
-Outcome Tracker — links photo selections to listing sale outcomes via IDX data.
+Outcome Tracker — links photo selections to listing sale outcomes via MLS-status data.
 
 Responsibilities:
-  1. ingest_outcome(): Called by IDX feed poller when a listing status changes
-     to Pending or Closed. Creates/updates ListingOutcome with sale data.
+  1. ingest_outcome(): Called when a listing status changes to Pending or
+     Closed. Creates/updates ListingOutcome with sale data.
   2. compute_correlations(): Aggregates across all closed listings for a tenant
      to find which photo attributes (room type, quality, position) correlate
      with better outcomes.  Results stored in PhotoOutcomeCorrelation.
@@ -110,9 +110,9 @@ async def ingest_outcome(
     idx_data: dict,
     source: str = "idx",
 ) -> ListingOutcome:
-    """Create or update a ListingOutcome from IDX feed data.
+    """Create or update a ListingOutcome from MLS-status data.
 
-    Called by IdxFeedPoller when a listing status changes.
+    Called when a listing status changes.
     """
     mls_status = idx_data.get("StandardStatus", "")
     status_map = {"Active": "active", "Pending": "pending", "Closed": "closed"}

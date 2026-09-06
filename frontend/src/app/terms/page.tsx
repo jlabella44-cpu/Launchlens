@@ -27,8 +27,8 @@ export default function TermsOfServicePage() {
             <p>
               ListingJet is an automated, AI-driven real estate marketing platform. We provide tools for processing
               real estate visual assets, generating property descriptions, creating 3D floorplans, rendering video
-              tours, virtual staging, AI image editing, CMA (Comparative Market Analysis) reports,
-              single-property microsites, and delivering final marketing and MLS-compliant bundles.
+              tours, virtual staging, AI image editing, single-property microsites, and delivering final
+              marketing and MLS-compliant bundles.
               The Service is provided on a subscription and/or per-credit basis as described on our
               Pricing page.
             </p>

@@ -21,12 +21,11 @@ export default function ChangelogPage() {
               <time className="text-xs text-slate-400">April 4, 2026</time>
             </div>
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
-              Virtual Staging, Image Editing, CMA Reports &amp; More
+              Virtual Staging, Image Editing &amp; More
             </h2>
             <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--color-text-secondary)]">
               <li>Virtual Staging — AI-furnished photos in 6 design styles (modern, coastal, luxury, and more)</li>
               <li>AI Photo Editing — remove yard signs, fix lighting, declutter, auto-fix MLS compliance</li>
-              <li>CMA Reports — on-demand Comparative Market Analysis with branded comparables</li>
               <li>Property Microsites — auto-generated landing pages with QR codes for yard signs</li>
               <li>Multi-Language Descriptions — 10 languages including Spanish, French, Chinese, and Arabic</li>
               <li>Pipeline integration — virtual staging runs automatically when addon is active</li>

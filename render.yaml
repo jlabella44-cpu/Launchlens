@@ -70,9 +70,6 @@ envVarGroups:
         sync: false
       - key: AWS_REGION
         value: auto
-      # CloudWatch is AWS-only — keep it off here.
-      - key: CLOUDWATCH_ENABLED
-        value: "false"
       # --- Auth / app ---
       - key: JWT_SECRET
         sync: false
@@ -82,6 +79,8 @@ envVarGroups:
         value: https://listingjet.ai
       - key: CORS_ORIGINS
         value: https://listingjet.ai
+      - key: FEATURES
+        value: ""
       # --- Payments ---
       - key: STRIPE_SECRET_KEY
         sync: false
@@ -101,8 +100,6 @@ envVarGroups:
       - key: KLING_ACCESS_KEY
         sync: false
       - key: KLING_SECRET_KEY
-        sync: false
-      - key: ELEVENLABS_API_KEY
         sync: false
       # --- Email (Resend) ---
       - key: EMAIL_ENABLED

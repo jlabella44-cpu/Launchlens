@@ -67,8 +67,8 @@ export default function PrivacyPolicyPage() {
               <li>
                 <strong>OpenAI (GPT-4V / DALL-E 3)</strong> &mdash; Deep image analysis, automated 3D floorplan JSON generation,
                 chapter marker extraction, compliance detection (identifying MLS violations such as visible yard
-                signs or people), virtual staging of empty rooms, AI image editing (object removal, lighting
-                enhancement), and CMA report narrative generation.
+                signs or people), virtual staging of empty rooms, and AI image editing (object removal, lighting
+                enhancement).
               </li>
               <li>
                 <strong>Anthropic (Claude 3)</strong> &mdash; Dual-tone property descriptions (MLS-compliant and

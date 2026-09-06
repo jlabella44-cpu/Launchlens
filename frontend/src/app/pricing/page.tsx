@@ -100,7 +100,6 @@ const SERVICE_COSTS = [
   { name: "Virtual Staging", credits: 15, description: "AI furniture rendering, up to 4 rooms" },
   { name: "3D Floorplan", credits: 8, description: "GPT-4V analysis + 3D dollhouse view" },
   { name: "AI Image Editing", credits: 6, description: "Object removal, enhancement, compliance fixes" },
-  { name: "CMA Report", credits: 5, description: "Comparative market analysis report" },
   { name: "Photo Compliance", credits: 3, description: "Automated FHA + MLS compliance checks" },
   { name: "Social Media Cuts", credits: 3, description: "Platform-sized video clips (IG, TikTok, FB, YT)" },
   { name: "Microsite", credits: 2, description: "Single-property landing page" },

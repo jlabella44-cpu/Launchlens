@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet import features
 from listingjet.api.deps import get_current_user, get_db
 from listingjet.models.listing import Listing
 from listingjet.models.listing_microsite import ListingMicrosite
@@ -16,7 +17,7 @@ from listingjet.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(features.require_feature("microsite"))])
 
 
 class MicrositeResponse(BaseModel):
