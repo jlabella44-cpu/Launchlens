@@ -98,6 +98,26 @@ def record_token_usage(
     emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
 
 
+def record_image_call(model_id: str, label: str) -> None:
+    """Record one image-generation call and its estimated cost from IMAGE_CALL_RATES.
+
+    model_id is the model identifier (e.g. "gpt-image-1.5"). label identifies
+    the calling provider/use-case (e.g. "openai_staging", "openai_dollhouse")
+    for dimensioning, same as record_provider_call's provider_name. If
+    model_id is unknown, logs a warning once per id and records cost 0.
+    """
+    cost = IMAGE_CALL_RATES.get(model_id)
+    if cost is None:
+        if model_id not in _warned_unknown_model_ids:
+            logger.warning("Unknown model_id in record_image_call: %s", model_id)
+            _warned_unknown_model_ids.add(model_id)
+        cost = 0.0
+
+    dims = {"model": model_id, "label": label}
+    emit_metric("ImageCallCount", 1, unit="Count", dimensions=dims)
+    emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
+
+
 def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> None:
     """Record estimated cost for provider usage within an agent.
 
