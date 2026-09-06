@@ -71,13 +71,23 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
     assert (job.listing_id, job.step) == (sixth.id, "ingestion")
 
     # Approving the fourth listing releases its post-approval work, which is
-    # older than the sixth listing's rows and so is claimed next.
+    # older than the sixth listing's rows and so is claimed next. Approval
+    # unblocks content, chapters and social_cuts at once and they share a
+    # run_after/created_at (clock resolution), so claim until content appears
+    # rather than assuming a tie-break order.
     assert await runner.complete_review(db_session, listings[3].id) is True
     await db_session.commit()
-    nxt = await runner.claim_next(db_session, "w1")
-    assert nxt is not None
-    assert (nxt.listing_id, nxt.step) == (listings[3].id, "content")
-    assert nxt.status == JobStatus.RUNNING and nxt.locked_by == "w1"
+    claims = []
+    for _ in range(3):
+        nxt = await runner.claim_next(db_session, "w1")
+        if nxt is None:
+            break
+        assert nxt.status == JobStatus.RUNNING and nxt.locked_by == "w1"
+        claims.append((nxt.listing_id, nxt.step))
+        if nxt.step == "content":
+            break
+    assert all(lid == listings[3].id for lid, _ in claims), claims
+    assert (listings[3].id, "content") in claims, claims
 
     # The other three are still parked, untouched.
     for listing in listings[:3]:

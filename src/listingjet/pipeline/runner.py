@@ -515,7 +515,11 @@ async def periodic_loop(session_factory, *, stop: asyncio.Event) -> None:
 
     schedule = [("demo_cleanup", run_demo_cleanup, timedelta(hours=1)),
                 ("baseline_aggregation", run_baseline_aggregation, timedelta(days=7))]
-    last: dict[str, datetime] = {}
+    # Last-run times are in-memory only, so a restart re-runs anything unseeded.
+    # Demo cleanup at boot is cheap and idempotent; the weekly baseline
+    # aggregation scans every tenant's learning weights, so seed it as if it had
+    # just run — a process that restarts often must not re-run it every time.
+    last: dict[str, datetime] = {"baseline_aggregation": _now()}
     while not stop.is_set():
         for name, fn, every in schedule:
             if name not in last or _now() - last[name] >= every:

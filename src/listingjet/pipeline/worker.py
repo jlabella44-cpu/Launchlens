@@ -7,6 +7,7 @@ from pathlib import Path
 
 from listingjet.config import settings
 from listingjet.database import admin_session
+from listingjet.logging_config import setup_logging
 from listingjet.pipeline.runner import periodic_loop, worker_loop
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,9 @@ async def _heartbeat(stop: asyncio.Event) -> None:
 
 
 async def main() -> None:
+    # Same structured/JSON logging setup the API applies at import time —
+    # without it this process logs with the bare root handler.
+    setup_logging(app_env=settings.app_env, log_level=settings.log_level)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

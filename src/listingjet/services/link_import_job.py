@@ -24,7 +24,7 @@ class LinkImportParams:
 async def run_link_import(params: LinkImportParams) -> dict:
     """Download photos from a third-party link and create Asset records."""
 
-    from listingjet.database import AsyncSessionLocal
+    from listingjet.database import admin_session
     from listingjet.models.asset import Asset
     from listingjet.models.import_job import ImportJob
     from listingjet.services.events import emit_event
@@ -33,7 +33,7 @@ async def run_link_import(params: LinkImportParams) -> dict:
 
     storage = StorageService()
 
-    async with AsyncSessionLocal() as db:
+    async with admin_session() as db:
         # Mark job as running
         job = await db.get(ImportJob, params.import_job_id)
         if job:
