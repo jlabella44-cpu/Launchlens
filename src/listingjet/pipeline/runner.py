@@ -383,12 +383,7 @@ async def worker_loop(session_factory, *, stop: asyncio.Event, concurrency: int,
             logger.exception("pipeline.worker_loop tick failed")
         if max_ticks is not None and ticks >= max_ticks:
             break
-        if claimed == 0 or free_slots == 0:
-            # Nothing claimed: no point retrying instantly. At capacity: give the
-            # in-flight task(s) a beat before the next reclaim/claim round — this
-            # also keeps back-to-back session_factory() calls from overlapping a
-            # just-launched task's own DB use when session_factory shares a single
-            # connection (as tests do; production opens an independent one each call).
+        if claimed == 0:
             try:
                 await asyncio.wait_for(stop.wait(), timeout=poll_interval_s)
             except asyncio.TimeoutError:

@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from contextlib import asynccontextmanager
 from datetime import timedelta
 
 import pytest
@@ -13,6 +14,30 @@ from listingjet.pipeline.definition import Step
 from tests.test_agents.conftest import make_session_factory
 
 STEPS = [Step("a"), Step("b", requires=("a",)), Step("c", requires=("a",))]
+
+
+def make_concurrent_session_factory(session):
+    """Like `make_session_factory`, but safe when the returned factory is called
+    from more than one in-flight coroutine at once (as `worker_loop` does: its own
+    tick loop and each spawned job task all call `session_factory()`).
+
+    A real `AsyncSessionLocal`/`admin_session` opens an independent DB connection
+    per call, so concurrent use is never a problem in production. This test shares
+    a single real `AsyncSession` (one DB connection) for every "worker", which
+    SQLAlchemy's `AsyncSession` does not allow two coroutines to touch at once
+    (`InvalidRequestError: ... concurrent operations are not permitted`). A lock
+    around each checkout serializes the brief moments any caller actually holds
+    the session, without serializing the surrounding work (e.g. a step function's
+    own sleep/IO, which never touches the session).
+    """
+    lock = asyncio.Lock()
+
+    @asynccontextmanager
+    async def _factory():
+        async with lock:
+            yield session
+
+    return _factory
 
 
 def test_worker_settings_defaults():
@@ -42,7 +67,7 @@ async def test_worker_loop_drains_pipeline_with_bounded_concurrency(db_session):
         return {}
 
     stop = asyncio.Event()
-    await runner.worker_loop(make_session_factory(db_session), stop=stop, concurrency=1,
+    await runner.worker_loop(make_concurrent_session_factory(db_session), stop=stop, concurrency=1,
                              poll_interval_s=0.01, steps=STEPS,
                              functions={"a": fn, "b": fn, "c": fn}, max_ticks=20)
     statuses = {j.step: j.status for j in (await db_session.execute(
