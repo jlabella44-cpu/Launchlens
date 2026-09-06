@@ -1,6 +1,7 @@
 """Health check endpoints."""
 
 import logging
+from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
 import sqlalchemy
@@ -55,15 +56,14 @@ async def deep_health():
         logger.warning("Health check: redis failed: %s", e)
         components["redis"] = f"error: {e}"
 
-    # Temporal
-    try:
-        from listingjet.temporal_client import connect_temporal
-        client = await connect_temporal()
-        await client.service_client.check_health()
-        components["temporal"] = "ok"
-    except Exception as e:
-        logger.warning("Health check: temporal failed: %s", e)
-        components["temporal"] = f"error: {e}"
+    # Worker
+    from listingjet.pipeline.runner import WORKER_STATE
+    if settings.worker_enabled:
+        tick = WORKER_STATE.get("last_tick")
+        fresh = tick is not None and (datetime.now(timezone.utc) - tick).total_seconds() < 60
+        components["worker"] = "ok" if fresh else "error: no tick in 60s"
+    else:
+        components["worker"] = "external"
 
     all_ok = all(v == "ok" for v in components.values())
     status_code = 200 if all_ok else 503

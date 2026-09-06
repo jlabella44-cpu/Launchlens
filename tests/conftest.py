@@ -1,7 +1,7 @@
 import asyncio
 import os
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("WORKER_ENABLED", "false")  # before any listingjet import: keep the worker loops off in tests
 
@@ -52,23 +52,12 @@ def _mock_external_services():
         __exit__=MagicMock(return_value=False),
     )
 
-    # Mock Temporal client so it never tries to connect to localhost:7233
-    mock_temporal = MagicMock()
-    mock_temporal.start_pipeline = AsyncMock(return_value="mock-workflow-id")
-    mock_temporal.signal_review_completed = AsyncMock()
-
     with (
         patch("listingjet.services.rate_limiter.RateLimiter", return_value=mock_redis),
         patch("listingjet.api.auth._get_lockout_redis", return_value=mock_redis),
         patch("listingjet.services.auth.get_redis", return_value=mock_redis),
         patch("listingjet.services.credits._get_redis", return_value=mock_redis),
         patch("listingjet.services.tenant_bypass._get_redis", return_value=mock_redis),
-        patch("listingjet.temporal_client.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_draft.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_media.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_workflow.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_draft.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.bulk.get_temporal_client", return_value=mock_temporal),
     ):
         yield
 

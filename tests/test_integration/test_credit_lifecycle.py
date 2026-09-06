@@ -4,7 +4,7 @@ End-to-end integration tests — full listing lifecycle with credits, addons, pi
 Tests cross module boundaries: auth → credits → listings → addons → billing webhooks.
 """
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -305,20 +305,15 @@ async def test_retry_does_not_rededuct(async_client: AsyncClient, db_session):
         await db_session.commit()
 
     # Retry
-    with patch("listingjet.api.listings_workflow.get_temporal_client") as mock_temporal:
-        mock_client = MagicMock()
-        mock_client.start_pipeline = AsyncMock()
-        mock_temporal.return_value = mock_client
-
-        retry_resp = await async_client.post(
-            f"/listings/{listing_id}/retry",
-            headers=_auth(token),
-        )
-        if retry_resp.status_code == 200:
-            # Balance should be the same as after creation (no re-deduction)
-            bal_after_retry = await async_client.get("/credits/balance", headers=_auth(token))
-            if bal_after_create.status_code == 200 and bal_after_retry.status_code == 200:
-                assert bal_after_retry.json().get("balance") == bal_after_create.json().get("balance")
+    retry_resp = await async_client.post(
+        f"/listings/{listing_id}/retry",
+        headers=_auth(token),
+    )
+    if retry_resp.status_code == 200:
+        # Balance should be the same as after creation (no re-deduction)
+        bal_after_retry = await async_client.get("/credits/balance", headers=_auth(token))
+        if bal_after_create.status_code == 200 and bal_after_retry.status_code == 200:
+            assert bal_after_retry.json().get("balance") == bal_after_create.json().get("balance")
 
 
 # ── Test: API Contract Validation ────────────────────────────────────

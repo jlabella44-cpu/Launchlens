@@ -20,10 +20,11 @@ from listingjet.models.listing import Listing, ListingState
 from listingjet.models.scoring_event import ScoringEvent
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
+from listingjet.pipeline.runner import cancel_listing_jobs, complete_review, listing_progress, retry_listing
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
 from listingjet.services.metrics import record_review_turnaround
-from listingjet.temporal_client import get_temporal_client
+from listingjet.services.pipeline_start import enabled_addon_slugs
 
 logger = logging.getLogger(__name__)
 
@@ -106,15 +107,15 @@ async def approve_listing(
         .values(outcome="approval", outcome_at=datetime.now(timezone.utc))
     )
 
+    # Complete the review gate so the worker can pick up post-approval steps —
+    # in the same transaction as the state change.
+    try:
+        await complete_review(db, listing.id)
+    except Exception:
+        logger.exception("Review gate completion failed for listing %s", listing.id)
+
     await db.commit()
     await db.refresh(listing)
-
-    # Signal the waiting workflow to continue post-approval pipeline
-    try:
-        client = get_temporal_client()
-        await client.signal_review_completed(listing_id=str(listing.id))
-    except Exception:
-        logger.exception("Review signal failed for listing %s", listing.id)
 
     # Send REVIEW_APPROVED email (fire-and-forget)
     try:
@@ -251,22 +252,19 @@ async def retry_pipeline(
             detail=f"Can only retry stuck or failed listings, current state: {listing.state.value}",
         )
 
-    listing.state = ListingState.UPLOADING
     tenant = await db.get(Tenant, current_user.tenant_id)
-    await db.commit()
-
+    slugs = await enabled_addon_slugs(db, listing.id)
     try:
-        client = get_temporal_client()
-        await client.start_pipeline(
-            listing_id=str(listing.id),
-            tenant_id=str(current_user.tenant_id),
-            plan=tenant.plan if tenant else "starter",
-            terminate_existing=True,
+        await retry_listing(
+            db, listing,
+            billing_model=tenant.billing_model if tenant else "legacy",
+            enabled_addons=slugs,
         )
     except Exception:
         logger.exception("Pipeline retry trigger failed for listing %s", listing.id)
+    await db.commit()
 
-    return {"listing_id": str(listing.id), "state": "uploading"}
+    return {"listing_id": str(listing.id), "state": listing.state.value}
 
 
 @router.post(
@@ -289,7 +287,11 @@ async def cancel_listing(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    cancellable = {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.FAILED, ListingState.PIPELINE_TIMEOUT}
+    cancellable = {
+        ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING,
+        ListingState.FAILED, ListingState.PIPELINE_TIMEOUT,
+        ListingState.ANALYZING, ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW,
+    }
     if listing.state not in cancellable:
         raise HTTPException(409, f"Cannot cancel: listing is {listing.state.value}")
 
@@ -302,6 +304,7 @@ async def cancel_listing(
         if txn:
             credits_refunded = txn.amount
 
+    await cancel_listing_jobs(db, listing.id)
     listing.state = ListingState.CANCELLED
     await db.commit()
 
@@ -324,55 +327,60 @@ async def get_pipeline_status(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    from listingjet.models.event import Event
-
-    result = await db.execute(
-        select(Event)
-        .where(Event.listing_id == listing_id)
-        .order_by(Event.created_at)
-        .limit(500)
-    )
-    events = result.scalars().all()
-
-    # Build step list from known pipeline stages
-    pipeline_steps = [
-        "ingestion", "vision_tier1", "vision_tier2", "coverage",
-        "floorplan", "packaging", "compliance", "review",
-        "content", "brand", "social_content", "chapters",
-        "social_cuts", "mls_export", "watermark", "distribution",
-    ]
-
-    completed_steps = set()
-    step_times = {}
-    for evt in events:
-        et = evt.event_type
-        if et.endswith(".completed") or et.endswith(".done"):
-            step_name = et.rsplit(".", 1)[0]
-            completed_steps.add(step_name)
-            step_times[step_name] = evt.created_at.isoformat()
-
     state_val = listing.state.value if hasattr(listing.state, "value") else listing.state
-    steps = []
-    for step in pipeline_steps:
-        if step in completed_steps:
-            status = "completed"
-        elif state_val in ("delivered", "failed"):
-            status = "skipped"
-        else:
-            status = "pending"
-        steps.append({
-            "name": step,
-            "status": status,
-            "completed_at": step_times.get(step),
-            "progress": None,
-        })
 
-    # Mark current active step
-    for s in steps:
-        if s["status"] == "pending":
-            if state_val not in ("new", "awaiting_review", "in_review", "delivered", "failed"):
-                s["status"] = "in_progress"
-            break
+    steps = await listing_progress(db, listing.id)
+    if not steps:
+        # Listing predates the job-table pipeline (no PipelineJob rows) — fall
+        # back to the old event-derived step list.
+        from listingjet.models.event import Event
+
+        result = await db.execute(
+            select(Event)
+            .where(Event.listing_id == listing_id)
+            .order_by(Event.created_at)
+            .limit(500)
+        )
+        events = result.scalars().all()
+
+        pipeline_steps = [
+            "ingestion", "vision_tier1", "vision_tier2", "coverage",
+            "floorplan", "packaging", "compliance", "review",
+            "content", "brand", "social_content", "chapters",
+            "social_cuts", "mls_export", "watermark", "distribution",
+        ]
+
+        completed_steps = set()
+        step_times = {}
+        for evt in events:
+            et = evt.event_type
+            if et.endswith(".completed") or et.endswith(".done"):
+                step_name = et.rsplit(".", 1)[0]
+                completed_steps.add(step_name)
+                step_times[step_name] = evt.created_at.isoformat()
+
+        for step in pipeline_steps:
+            if step in completed_steps:
+                status = "completed"
+            elif state_val in ("delivered", "failed"):
+                status = "skipped"
+            else:
+                status = "pending"
+            steps.append({
+                "name": step,
+                "status": status,
+                "completed_at": step_times.get(step),
+                "progress": None,
+                "error": None,
+                "attempts": 0,
+            })
+
+        # Mark current active step
+        for s in steps:
+            if s["status"] == "pending":
+                if state_val not in ("new", "awaiting_review", "in_review", "delivered", "failed"):
+                    s["status"] = "in_progress"
+                break
 
     # Engagement prediction + features — cached to avoid recomputation on every poll
     engagement_score = None

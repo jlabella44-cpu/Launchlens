@@ -31,9 +31,9 @@ from listingjet.models.user import User
 from listingjet.models.vision_result import VisionResult
 from listingjet.services.endpoint_rate_limit import rate_limit
 from listingjet.services.events import emit_event
+from listingjet.services.pipeline_start import start_listing_pipeline
 from listingjet.services.plan_limits import check_asset_quota, get_limits
 from listingjet.services.storage import get_storage
-from listingjet.temporal_client import get_temporal_client
 
 logger = logging.getLogger(__name__)
 
@@ -154,12 +154,8 @@ async def register_assets(
     # Trigger the pipeline if listing just entered UPLOADING
     if listing.state == ListingState.UPLOADING:
         try:
-            client = get_temporal_client()
-            await client.start_pipeline(
-                listing_id=str(listing.id),
-                tenant_id=str(current_user.tenant_id),
-                plan=tenant.plan,
-            )
+            await start_listing_pipeline(db, listing, tenant)
+            await db.commit()
         except Exception:
             logger.exception("Pipeline trigger failed for listing %s", listing.id)
             listing.state = ListingState.FAILED

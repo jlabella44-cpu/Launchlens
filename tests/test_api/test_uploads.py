@@ -1,6 +1,6 @@
 """Upload edge-case tests — file limits, extensions, and asset registration."""
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import jwt as pyjwt
 import pytest
@@ -131,12 +131,8 @@ async def test_upload_urls_valid_extensions_accepted(MockStorage, async_client: 
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings_media.get_temporal_client")
-async def test_register_assets_creates_records(mock_get_client, async_client: AsyncClient, db_session):
+async def test_register_assets_creates_records(async_client: AsyncClient, db_session):
     """Register 3 assets → 3 Asset records in DB with correct listing_id."""
-    mock_client = AsyncMock()
-    mock_get_client.return_value = mock_client
-
     token, tenant_id = await _register(async_client)
     listing_id = await _create_listing(async_client, token)
 

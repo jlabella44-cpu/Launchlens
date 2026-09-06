@@ -23,7 +23,7 @@ from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
 from listingjet.services.credits import CreditService, InsufficientCreditsError
 from listingjet.services.endpoint_rate_limit import rate_limit
-from listingjet.temporal_client import get_temporal_client
+from listingjet.services.pipeline_start import start_listing_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -188,17 +188,10 @@ async def start_pipeline(
     listing.state = ListingState.UPLOADING
     await db.commit()
 
-    # Start Temporal workflow
     workflow_id = ""
     try:
-        client = get_temporal_client()
-        workflow_id = await client.start_pipeline(
-            listing_id=str(listing_id),
-            tenant_id=str(tenant.id),
-            plan=tenant.plan,
-            billing_model=tenant.billing_model,
-            enabled_addons=enabled_addon_slugs,
-        )
+        await start_listing_pipeline(db, listing, tenant)
+        await db.commit()
     except Exception:
         logger.exception("Pipeline start failed for listing %s", listing_id)
         listing.state = ListingState.FAILED
