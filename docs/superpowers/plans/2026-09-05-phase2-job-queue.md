@@ -1938,7 +1938,7 @@ git commit -m "chore: remove Temporal (workflows, activities, client, config, co
 - Create: `scripts/seed_sample_listing.py`
 - Modify: `docs/superpowers/plans/2026-09-05-phase2-job-queue.md` (tick boxes only)
 
-- [ ] **Step 1: Seed script**
+- [x] **Step 1: Seed script**
 
 ```python
 #!/usr/bin/env python3
@@ -2003,17 +2003,17 @@ if __name__ == "__main__":
 
 Check the `Tenant`/`User` constructor fields against `models/tenant.py` and `models/user.py` and the storage factory name (`get_storage` in `services/storage.py`); with `USE_MOCK_PROVIDERS=true` and no S3 credentials, `storage.upload_bytes` needs a mock — if `StorageService` has no mock mode, set `S3_ENDPOINT_URL` to a moto server or wrap the upload in `try/except` and print a warning; the mock ingestion agent does not read the bytes.
 
-- [ ] **Step 2: Run the pipeline locally end to end with mock providers**
+- [x] **Step 2: Run the pipeline locally end to end with mock providers**
 
 In one terminal (Bash, `run_in_background: true`, timeout 600000): `USE_MOCK_PROVIDERS=true .venv/Scripts/python.exe -m listingjet.pipeline.worker > .superpowers/worker.log 2>&1`.
 Then: `.venv/Scripts/python.exe scripts/seed_sample_listing.py` (timeout 120000). Poll with `C:/Users/label/tools/pgsql/bin/psql.exe -h localhost -p 5432 -U listingjet -d listingjet -c "select step,status,attempts,left(error,60) from pipeline_jobs where listing_id='<id>' order by created_at"` (env `PGPASSWORD=password`) until `await_review` is the only non-terminal row and `listings.state = 'awaiting_review'`. Then `update pipeline_jobs set status='done' where listing_id='<id>' and step='await_review'` (or call `/approve` through the API) and watch it reach `distribution = done` and `listings.state = 'delivered'`. Record the timings in the PR body.
 
-- [ ] **Step 3: Crash and failure drills**
+- [x] **Step 3: Crash and failure drills**
 
 - Kill the worker (`taskkill` on its PID) while a step is `running`; set that row's `locked_at` back 1 hour with psql; restart the worker; confirm the row is reclaimed and finishes.
 - Seed again, then `update pipeline_jobs set payload = payload || '{"force_error": true}'` is not wired, so instead patch: temporarily set `USE_MOCK_PROVIDERS=false` with no API keys so `ingestion` succeeds but `vision_tier1` raises; confirm `listings.state='failed'`, the `pipeline.failed` event exists, downstream rows are `cancelled`; call `/retry` through the API and confirm rows requeue. Restore env.
 
-- [ ] **Step 4: Full suite, lint, PR**
+- [x] **Step 4: Full suite, lint, PR**
 
 Run: `.venv/Scripts/python.exe -m pytest --tb=short -q -p no:cacheprovider` (timeout 600000) and `ruff check src tests alembic`.
 
