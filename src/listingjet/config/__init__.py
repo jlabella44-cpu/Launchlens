@@ -100,6 +100,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
     use_mock_providers: bool = False
+    claude_fast_model: str = "claude-haiku-4-5"
+    claude_quality_model: str = "claude-sonnet-5"
 
     # Google OAuth
     google_oauth_client_id: str = ""

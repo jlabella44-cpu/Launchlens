@@ -2,8 +2,44 @@
 """Mock provider implementations for tests and local development."""
 import hashlib
 import json
+import typing
+
+from pydantic import BaseModel
 
 from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider, VisionLabel, VisionProvider
+
+
+def _defaults_for(schema: type[BaseModel], seed: int = 0) -> dict:
+    """Build a dict of schema-shaped default values for a Pydantic model.
+
+    str -> "mock" (or the first enum literal), int -> 1, float -> 0.5,
+    bool -> False, list -> [], nested BaseModel -> recurse.
+    """
+    import enum
+
+    data: dict = {}
+    for name, field in schema.model_fields.items():
+        ann = field.annotation
+        origin = typing.get_origin(ann)
+        if isinstance(ann, type) and issubclass(ann, enum.Enum):
+            data[name] = list(ann)[0].value
+        elif isinstance(ann, type) and issubclass(ann, BaseModel):
+            data[name] = _defaults_for(ann, seed)
+        elif origin is list or ann is list:
+            data[name] = []
+        elif ann is str:
+            data[name] = "mock"
+        elif ann is bool:
+            data[name] = False
+        elif ann is int:
+            data[name] = 1
+        elif ann is float:
+            data[name] = 0.5
+        elif field.default is not None and field.default.__class__.__name__ != "PydanticUndefinedType":
+            data[name] = field.default
+        else:
+            data[name] = None
+    return data
 
 # Pools of realistic labels for deterministic variety based on image URL
 _ROOM_LABELS = [
@@ -155,3 +191,31 @@ class MockVirtualStagingProvider(VirtualStagingProvider):
 class MockTemplateProvider(TemplateProvider):
     async def render(self, template_id: str, data: dict) -> bytes:
         return b"%PDF-mock-content"
+
+
+class MockClaudeClient:
+    """Mock for ClaudeClient. Tests can queue exact responses per schema via
+    `responses: dict[type, list[BaseModel]]` — each call to complete_json/analyze_images
+    pops the next queued instance for that schema, falling back to schema-default generation."""
+
+    def __init__(self):
+        self.responses: dict[type, list[BaseModel]] = {}
+        self._seed = 0
+
+    async def complete_text(self, prompt: str, *, system=None, model=None, max_tokens=4096, agent=None) -> str:
+        return "Stunning home with modern finishes and abundant natural light."
+
+    async def _next(self, schema: type[BaseModel]) -> BaseModel:
+        queue = self.responses.get(schema)
+        if queue:
+            return queue.pop(0)
+        self._seed += 1
+        return schema.model_validate(_defaults_for(schema, self._seed))
+
+    async def complete_json(self, prompt: str, schema: type[BaseModel], *, system=None, model=None, max_tokens=4096, agent=None) -> BaseModel:
+        return await self._next(schema)
+
+    async def analyze_images(self, image_urls: list[str], prompt: str, schema: type[BaseModel], *, system=None, model=None, max_tokens=4096, agent=None) -> BaseModel:
+        if not image_urls:
+            raise ValueError("image_urls must be non-empty")
+        return await self._next(schema)

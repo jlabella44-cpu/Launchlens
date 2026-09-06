@@ -14,13 +14,22 @@ from listingjet.config import settings
 from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider, VisionProvider
 
 
+def get_claude(agent: str | None = None, tenant_id=None):
+    """Return the raw Claude client, or a mock when USE_MOCK_PROVIDERS is set."""
+    if settings.use_mock_providers:
+        from .mock import MockClaudeClient
+        return MockClaudeClient()
+    from .claude import ClaudeClient
+    return ClaudeClient()
+
+
 def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
     """Return the LLM provider (Claude), or a mock when USE_MOCK_PROVIDERS is set."""
     if settings.use_mock_providers:
         from .mock import MockLLMProvider
         return MockLLMProvider()
     from .claude import ClaudeProvider
-    return ClaudeProvider()
+    return ClaudeProvider(client=get_claude(agent=agent, tenant_id=tenant_id))
 
 
 def get_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
