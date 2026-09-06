@@ -1,16 +1,19 @@
 import asyncio
+import os
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import jwt
-import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+os.environ.setdefault("WORKER_ENABLED", "false")  # before any listingjet import: keep the worker loops off in tests
 
-from listingjet.api.deps import get_db_admin
-from listingjet.config import settings
-from listingjet.database import Base, get_db
-from listingjet.main import app
+import jwt  # noqa: E402
+import pytest  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+
+from listingjet.api.deps import get_db_admin  # noqa: E402
+from listingjet.config import settings  # noqa: E402
+from listingjet.database import Base, get_db  # noqa: E402
+from listingjet.main import app  # noqa: E402
 
 TEST_DB_URL = "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
 

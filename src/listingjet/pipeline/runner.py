@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -19,6 +21,8 @@ logger = logging.getLogger(__name__)
 _NON_RETRYABLE = (ValueError, KeyError, TypeError, PermissionError, NotImplementedError)
 
 SATISFIED = {JobStatus.DONE, JobStatus.SKIPPED}
+
+WORKER_STATE: dict = {"last_tick": None, "worker_id": None}
 
 
 def _now() -> datetime:
@@ -129,6 +133,7 @@ async def run_job(session_factory, job_id, *, steps: list[Step] = PIPELINE, func
     async with session_factory() as session:
         job = await session.get(PipelineJob, job_id)
         step = index[job.step]
+        started_at = job.started_at
         sibs = await _siblings(session, job.listing_id)
         results = {name: j.result for name, j in sibs.items() if j.status == JobStatus.DONE and j.result is not None}
         ctx = StepContext(listing_id=str(job.listing_id), tenant_id=str(job.tenant_id), results=results)
@@ -136,10 +141,13 @@ async def run_job(session_factory, job_id, *, steps: list[Step] = PIPELINE, func
     try:
         result = await asyncio.wait_for(fn(ctx), timeout=step.timeout_s)
     except Exception as exc:  # noqa: BLE001 — every failure is classified in _handle_failure (Task 5)
-        return await _handle_failure(session_factory, job_id, step, exc)
+        return await _handle_failure(session_factory, job_id, step, exc, started_at=started_at)
     async with session_factory() as session:
         job = await session.get(PipelineJob, job_id)
-        if job.status != JobStatus.RUNNING:
+        # A job reclaimed by reclaim_stale and re-claimed by another worker is RUNNING
+        # again with a *new* started_at — the status check alone can't tell this zombie
+        # completion apart from the real owner, so also require started_at to match.
+        if job.status != JobStatus.RUNNING or job.started_at != started_at:
             logger.warning("pipeline.step.stale_completion step=%s job=%s status=%s",
                            job.step, job_id, job.status)
             return job.status
@@ -202,13 +210,14 @@ async def fail_listing(session: AsyncSession, listing_id, *, step: str, error: s
                      tenant_id=str(listing.tenant_id), listing_id=str(listing_id))
 
 
-async def _handle_failure(session_factory, job_id, step: Step, exc: BaseException) -> JobStatus:
+async def _handle_failure(session_factory, job_id, step: Step, exc: BaseException, *,
+                          started_at: datetime | None = None) -> JobStatus:
     error = _describe(exc)
     logger.warning("pipeline.step.failed step=%s job=%s error=%s", step.name, job_id, error,
                    exc_info=not isinstance(exc, asyncio.TimeoutError))
     async with session_factory() as session:
         job = await session.get(PipelineJob, job_id)
-        if job.status != JobStatus.RUNNING:
+        if job.status != JobStatus.RUNNING or (started_at is not None and job.started_at != started_at):
             logger.warning("pipeline.step.stale_completion step=%s job=%s status=%s",
                            step.name, job_id, job.status)
             return job.status
@@ -325,3 +334,91 @@ async def listing_progress(session: AsyncSession, listing_id, *, steps: list[Ste
             "attempts": j.attempts,
         })
     return rows
+
+
+async def worker_loop(session_factory, *, stop: asyncio.Event, concurrency: int, poll_interval_s: float,
+                      steps: list[Step] = PIPELINE, functions=STEP_FUNCTIONS,
+                      max_ticks: int | None = None) -> None:
+    """Drain claimable pipeline jobs with bounded concurrency until `stop` is set.
+
+    Each tick: reclaim jobs abandoned by dead workers, then claim up to
+    `concurrency` jobs and run each in its own task. Sleeps `poll_interval_s`
+    when a tick claims nothing so idle workers don't hammer the DB.
+    """
+    worker_id = f"{socket.gethostname()}:{uuid.uuid4().hex[:8]}"
+    WORKER_STATE["worker_id"] = worker_id
+    tasks: set[asyncio.Task] = set()
+    free_slots = concurrency
+    ticks = 0
+
+    async def _run(job_id):
+        nonlocal free_slots
+        try:
+            await run_job(session_factory, job_id, steps=steps, functions=functions)
+        except Exception:  # noqa: BLE001 — never let one job crash the loop
+            logger.exception("pipeline.run_job crashed job=%s", job_id)
+        finally:
+            free_slots += 1
+
+    while not stop.is_set():
+        ticks += 1
+        WORKER_STATE["last_tick"] = _now()
+        claimed = 0
+        try:
+            async with session_factory() as session:
+                await reclaim_stale(session, steps=steps)
+                await session.commit()
+            while free_slots > 0 and not stop.is_set():
+                async with session_factory() as session:
+                    job = await claim_next(session, worker_id, steps=steps)
+                if job is None:
+                    break
+                claimed += 1
+                free_slots -= 1
+                t = asyncio.create_task(_run(job.id))
+                tasks.add(t)
+                t.add_done_callback(tasks.discard)
+                await asyncio.sleep(0)  # let the task start
+        except Exception:  # noqa: BLE001
+            logger.exception("pipeline.worker_loop tick failed")
+        if max_ticks is not None and ticks >= max_ticks:
+            break
+        if claimed == 0 or free_slots == 0:
+            # Nothing claimed: no point retrying instantly. At capacity: give the
+            # in-flight task(s) a beat before the next reclaim/claim round — this
+            # also keeps back-to-back session_factory() calls from overlapping a
+            # just-launched task's own DB use when session_factory shares a single
+            # connection (as tests do; production opens an independent one each call).
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=poll_interval_s)
+            except asyncio.TimeoutError:
+                pass
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def periodic_loop(session_factory, *, stop: asyncio.Event) -> None:
+    """Runs demo cleanup hourly and baseline aggregation weekly, in-process.
+
+    `session_factory` is accepted for interface symmetry with `worker_loop`
+    (and so a future task can pass it through); the periodic tasks currently
+    open their own admin sessions internally. Each task's last-run time is
+    kept in memory only — a restart simply re-runs it, which is harmless.
+    """
+    from listingjet.pipeline.periodic import run_baseline_aggregation, run_demo_cleanup
+
+    schedule = [("demo_cleanup", run_demo_cleanup, timedelta(hours=1)),
+                ("baseline_aggregation", run_baseline_aggregation, timedelta(days=7))]
+    last: dict[str, datetime] = {}
+    while not stop.is_set():
+        for name, fn, every in schedule:
+            if name not in last or _now() - last[name] >= every:
+                try:
+                    await fn()
+                except Exception:  # noqa: BLE001
+                    logger.exception("periodic task failed name=%s", name)
+                last[name] = _now()
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=60)
+        except asyncio.TimeoutError:
+            pass

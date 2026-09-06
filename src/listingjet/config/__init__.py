@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     temporal_api_key: str = ""
     temporal_tls: bool = False
 
+    # Pipeline worker (runs inside the API process unless worker_enabled=false)
+    worker_enabled: bool = True
+    worker_concurrency: int = 2
+    worker_poll_interval_s: float = 2.0
+
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
