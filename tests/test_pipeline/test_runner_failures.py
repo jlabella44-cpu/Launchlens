@@ -127,3 +127,68 @@ async def test_reclaim_stale_running_jobs(db_session):
     assert await runner.reclaim_stale(db_session, steps=STEPS) == 1
     j = await _job(db_session, listing.id, "a")
     assert j.status == JobStatus.QUEUED and j.locked_by is None
+
+
+@pytest.mark.asyncio
+async def test_reclaim_stale_fails_job_that_is_out_of_attempts(db_session):
+    """A job whose worker died on its last attempt must not go back to the
+    queue forever — it fails, and (being non-optional) fails the listing."""
+    listing, _ = await _setup(db_session)
+    job = await runner.claim_next(db_session, "w", steps=STEPS)
+    job.attempts = job.max_attempts  # "a" is max_attempts=2
+    job.error = "earlier boom"
+    job.locked_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    await db_session.flush()
+
+    assert await runner.reclaim_stale(db_session, steps=STEPS) == 1
+    j = await _job(db_session, listing.id, "a")
+    assert j.status == JobStatus.FAILED
+    assert j.locked_by is None and j.finished_at is not None
+    assert "max attempts reached" in j.error and "earlier boom" in j.error
+    assert (await db_session.get(Listing, listing.id)).state == ListingState.FAILED
+    assert (await _job(db_session, listing.id, "b")).status == JobStatus.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_reclaim_stale_optional_step_out_of_attempts_spares_the_listing(db_session):
+    listing, _ = await _setup(db_session)
+    j = await _job(db_session, listing.id, "opt")  # optional, max_attempts=1
+    j.status = JobStatus.RUNNING
+    j.attempts = 1
+    j.locked_by = "dead-worker"
+    j.locked_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    await db_session.flush()
+
+    assert await runner.reclaim_stale(db_session, steps=STEPS) == 1
+    j = await _job(db_session, listing.id, "opt")
+    assert j.status == JobStatus.FAILED and "max attempts reached" in j.error
+    assert (await db_session.get(Listing, listing.id)).state == ListingState.ANALYZING
+
+
+@pytest.mark.asyncio
+async def test_reclaim_stale_requeues_and_appends_to_the_existing_error(db_session):
+    listing, _ = await _setup(db_session)
+    job = await runner.claim_next(db_session, "w", steps=STEPS)  # attempts=1 < 2
+    job.error = "earlier boom"
+    job.locked_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    await db_session.flush()
+
+    assert await runner.reclaim_stale(db_session, steps=STEPS) == 1
+    j = await _job(db_session, listing.id, "a")
+    assert j.status == JobStatus.QUEUED and j.locked_by is None
+    assert j.error == "earlier boom\nreclaimed after worker died"
+
+
+@pytest.mark.asyncio
+async def test_reclaim_stale_respects_each_step_timeout(db_session):
+    """SQL narrows on the smallest step timeout (2 x 1s here); Python still
+    applies each job's own limit, so "b" (600s) is left alone."""
+    listing, _ = await _setup(db_session)
+    j = await _job(db_session, listing.id, "b")
+    j.status = JobStatus.RUNNING
+    j.attempts = 1
+    j.locked_by = "w"
+    j.locked_at = datetime.now(timezone.utc) - timedelta(seconds=30)
+    await db_session.flush()
+    assert await runner.reclaim_stale(db_session, steps=STEPS) == 0
+    assert (await _job(db_session, listing.id, "b")).status == JobStatus.RUNNING

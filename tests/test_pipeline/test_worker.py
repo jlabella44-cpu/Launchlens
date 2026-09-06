@@ -154,3 +154,81 @@ async def test_run_job_zombie_guard_ignores_reclaimed_and_reclaimed_job(db_sessi
     assert fresh.status == JobStatus.RUNNING
     assert fresh.locked_by == "w2"
     assert fresh.result is None
+
+
+@pytest.mark.asyncio
+async def test_worker_loop_runs_two_jobs_in_parallel(db_session):
+    """concurrency=2 with three independent steps must actually overlap two."""
+    par_steps = [Step("a"), Step("b"), Step("c")]
+    listing = Listing(tenant_id=uuid.uuid4(), address={"street": "2 Loop St"}, metadata_={},
+                      state=ListingState.UPLOADING)
+    db_session.add(listing)
+    await db_session.flush()
+    await runner.enqueue_pipeline(db_session, listing, billing_model="legacy", enabled_addons=[],
+                                  steps=par_steps)
+
+    in_flight = 0
+    peak = 0
+    both_running = asyncio.Event()
+
+    async def fn(ctx):
+        # Each step parks until a second step joins it (or 2s passes), so the
+        # assertion below can't pass or fail on step-duration luck.
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        if in_flight >= 2:
+            both_running.set()
+        try:
+            await asyncio.wait_for(both_running.wait(), timeout=2)
+        except asyncio.TimeoutError:
+            pass
+        in_flight -= 1
+        return {}
+
+    stop = asyncio.Event()
+    await runner.worker_loop(make_concurrent_session_factory(db_session), stop=stop, concurrency=2,
+                             poll_interval_s=0.01, steps=par_steps,
+                             functions={"a": fn, "b": fn, "c": fn}, max_ticks=30)
+    statuses = {j.step: j.status for j in (await db_session.execute(
+        select(PipelineJob).where(PipelineJob.listing_id == listing.id))).scalars().all()}
+    assert statuses == {"a": JobStatus.DONE, "b": JobStatus.DONE, "c": JobStatus.DONE}
+    assert peak == 2
+
+
+@pytest.mark.asyncio
+async def test_worker_loop_requeues_in_flight_jobs_on_shutdown(db_session):
+    """A cancelled shutdown must not strand a job RUNNING until reclaim_stale
+    notices it (which can be 2x the step timeout — up to 40 minutes)."""
+    listing = Listing(tenant_id=uuid.uuid4(), address={"street": "3 Loop St"}, metadata_={},
+                      state=ListingState.UPLOADING)
+    db_session.add(listing)
+    await db_session.flush()
+    await runner.enqueue_pipeline(db_session, listing, billing_model="legacy", enabled_addons=[], steps=STEPS)
+
+    running = asyncio.Event()
+
+    async def slow(ctx):
+        running.set()
+        await asyncio.sleep(5)
+        return {}
+
+    stop = asyncio.Event()
+    loop_task = asyncio.create_task(runner.worker_loop(
+        make_concurrent_session_factory(db_session), stop=stop, concurrency=1,
+        poll_interval_s=0.01, steps=STEPS, functions={"a": slow, "b": slow, "c": slow}))
+    # The loop shares db_session with this test, so don't touch the session
+    # until the loop has finished — wait on the step function instead.
+    await asyncio.wait_for(running.wait(), timeout=10)
+
+    stop.set()
+    await asyncio.sleep(0.05)  # loop leaves its tick and starts draining
+    loop_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(loop_task, timeout=10)
+
+    job = (await db_session.execute(select(PipelineJob).where(
+        PipelineJob.listing_id == listing.id, PipelineJob.step == "a"))).scalar_one()
+    await db_session.refresh(job)
+    assert job.status == JobStatus.QUEUED
+    assert job.locked_by is None

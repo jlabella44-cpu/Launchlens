@@ -124,3 +124,39 @@ async def _ret(v):
 
 async def _raise(exc):
     raise exc
+
+
+@pytest.mark.asyncio
+async def test_retry_listing_resets_running_jobs(db_session):
+    """Retry is an explicit user action on a stuck listing: a RUNNING row whose
+    worker vanished must be requeued too, not left for reclaim_stale."""
+    listing, _ = await _setup(db_session)
+    job = await runner.claim_next(db_session, "w", steps=STEPS)
+    assert job.step == "ingestion" and job.status == JobStatus.RUNNING
+    n = await runner.retry_listing(db_session, listing, steps=STEPS)
+    assert n == 1
+    fresh = (await db_session.execute(select(PipelineJob).where(
+        PipelineJob.listing_id == listing.id, PipelineJob.step == "ingestion"))).scalar_one()
+    assert fresh.status == JobStatus.QUEUED
+    assert fresh.locked_by is None and fresh.attempts == 0 and fresh.error is None
+
+
+@pytest.mark.asyncio
+async def test_retry_after_reject_reopens_the_review_gate(db_session):
+    """Rejection cancels the live rows; retrying an analysed listing puts it
+    back in front of the reviewer instead of leaving it FAILED."""
+    listing, factory = await _setup(db_session)
+    fns = {"ingestion": lambda ctx: _ret({}), "packaging": lambda ctx: _ret({"auto_approved": False})}
+    for _ in range(2):
+        job = await runner.claim_next(db_session, "w", steps=STEPS)
+        await runner.run_job(factory, job.id, steps=STEPS, functions=fns)
+    # Reject: cancel everything live, then fail the listing.
+    assert await runner.cancel_listing_jobs(db_session, listing.id) == 2  # gate + content
+    listing.state = ListingState.FAILED
+    await db_session.flush()
+
+    n = await runner.retry_listing(db_session, listing, steps=STEPS)
+    assert n == 1  # content requeued; the gate is reopened but not counted
+    assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
+    assert await _status(db_session, listing.id, "content") == JobStatus.QUEUED
+    assert (await db_session.get(Listing, listing.id)).state == ListingState.AWAITING_REVIEW

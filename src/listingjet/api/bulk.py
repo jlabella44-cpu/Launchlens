@@ -73,9 +73,15 @@ async def bulk_approve(
 
         listing.state = ListingState.APPROVED
         try:
-            await complete_review(db, listing.id)
+            if not await complete_review(db, listing.id):
+                logger.warning("pipeline.review_gate_missing listing=%s", lid)
         except Exception:
             logger.exception("Review gate completion failed for listing %s", lid)
+            await db.rollback()
+            raise HTTPException(
+                status_code=502,
+                detail="Failed to complete review gate — no listings approved",
+            )
         results.append({"listing_id": str(lid), "status": "approved"})
         approved_ids.append(str(lid))
 

@@ -255,23 +255,60 @@ async def _handle_failure(session_factory, job_id, step: Step, exc: BaseExceptio
         return JobStatus.FAILED
 
 
+def _append_error(job: PipelineJob, msg: str) -> str:
+    """Keep the failure that came before — reclaiming is extra context, not a replacement."""
+    return f"{job.error}\n{msg}" if job.error else msg
+
+
 async def reclaim_stale(session: AsyncSession, *, steps: list[Step] = PIPELINE) -> int:
+    """Requeue (or fail) RUNNING jobs whose worker died.
+
+    The staleness cut-off is per step (2x its own timeout), so SQL narrows the
+    scan with the *smallest* step timeout and Python applies each job's real
+    limit — a job past the cheapest cut-off may still be well inside its own.
+    """
     index = {s.name: s for s in steps}
+    now = _now()
+    min_timeout = min([s.timeout_s for s in steps], default=600)
     rows = (await session.execute(
-        select(PipelineJob).where(PipelineJob.status == JobStatus.RUNNING).with_for_update(skip_locked=True)
+        select(PipelineJob)
+        .where(PipelineJob.status == JobStatus.RUNNING,
+               PipelineJob.locked_at.is_not(None),
+               PipelineJob.locked_at < now - timedelta(seconds=2 * min_timeout))
+        .with_for_update(skip_locked=True)
     )).scalars().all()
     reclaimed = 0
-    now = _now()
     for job in rows:
         step = index.get(job.step)
         limit = timedelta(seconds=2 * (step.timeout_s if step else 600))
-        if job.locked_at and job.locked_at < now - limit:
+        if job.locked_at >= now - limit:
+            continue
+        job.locked_by = None
+        if job.attempts >= job.max_attempts:
+            # Out of attempts: don't hand a dead job back to the queue forever.
+            msg = "reclaimed after worker died; max attempts reached"
+            job.status = JobStatus.FAILED
+            job.error = _append_error(job, msg)
+            job.finished_at = now
+            if step is None or not step.optional:
+                await fail_listing(session, job.listing_id, step=job.step, error=msg)
+        else:
             job.status = JobStatus.QUEUED
-            job.locked_by = None
-            job.error = "reclaimed after worker died"
-            reclaimed += 1
+            job.error = _append_error(job, "reclaimed after worker died")
+        reclaimed += 1
     await session.flush()
     return reclaimed
+
+
+async def requeue_owned(session: AsyncSession, worker_id: str) -> int:
+    """Hand every job this worker still holds back to the queue (shutdown path)."""
+    res = await session.execute(
+        update(PipelineJob)
+        .where(PipelineJob.status == JobStatus.RUNNING, PipelineJob.locked_by == worker_id)
+        .values(status=JobStatus.QUEUED, locked_by=None, run_after=_now())
+    )
+    await session.flush()
+    return res.rowcount
 
 
 _STATUS_LABEL = {
@@ -302,9 +339,15 @@ async def retry_listing(session: AsyncSession, listing: Listing, *, steps: list[
         listing.state = ListingState.UPLOADING
         # Review-gate steps are created (as WAITING) but not counted, matching the existing-jobs branch below.
         return sum(1 for j in created if index.get(j.step) is None or index[j.step].gate != "review")
+    was_failed = listing.state == ListingState.FAILED
+    gate_reopened = False
     n = 0
+    # RUNNING is included: retry is an explicit user action on a listing they
+    # believe is stuck, so a job whose worker vanished (and which reclaim_stale
+    # will not touch until 2x its timeout) is reset too.
+    resettable = (JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.RUNNING)
     for job in sibs.values():
-        if job.status in (JobStatus.FAILED, JobStatus.CANCELLED):
+        if job.status in resettable:
             step = index.get(job.step)
             is_gate = step is not None and step.gate == "review"
             # The gate is reset to WAITING (reopened) but not counted, since it isn't a requeued work item.
@@ -313,7 +356,9 @@ async def retry_listing(session: AsyncSession, listing: Listing, *, steps: list[
             job.error = None
             job.locked_by = None
             job.run_after = _now()
-            if not is_gate:
+            if is_gate:
+                gate_reopened = True
+            else:
                 n += 1
     def _done(name: str) -> bool:
         j = sibs.get(name)
@@ -322,6 +367,11 @@ async def retry_listing(session: AsyncSession, listing: Listing, *, steps: list[
         listing.state = ListingState.UPLOADING
     elif not _done("packaging"):
         listing.state = ListingState.ANALYZING
+    elif was_failed and gate_reopened:
+        # Analysis is done and the review gate was cancelled (a rejected
+        # listing): retrying puts it back in front of the reviewer rather than
+        # leaving it FAILED with a reopened gate nobody can reach.
+        listing.state = ListingState.AWAITING_REVIEW
     await session.flush()
     return n
 
@@ -370,45 +420,87 @@ async def worker_loop(session_factory, *, stop: asyncio.Event, concurrency: int,
     free_slots = concurrency
     ticks = 0
 
+    async def _requeue(job_id) -> None:
+        async with session_factory() as session:
+            job = await session.get(PipelineJob, job_id)
+            if job is not None and job.status == JobStatus.RUNNING and job.locked_by == worker_id:
+                job.status = JobStatus.QUEUED
+                job.locked_by = None
+                job.run_after = _now()
+                await session.commit()
+
     async def _run(job_id):
         nonlocal free_slots
         try:
             await run_job(session_factory, job_id, steps=steps, functions=functions)
+        except asyncio.CancelledError:
+            # Shutdown: hand the job straight back so it isn't stranded RUNNING
+            # until reclaim_stale notices (up to 2x the step timeout later).
+            try:
+                await _requeue(job_id)
+            except Exception:  # noqa: BLE001
+                logger.exception("pipeline.run_job requeue-on-cancel failed job=%s", job_id)
+            raise
         except Exception:  # noqa: BLE001 — never let one job crash the loop
             logger.exception("pipeline.run_job crashed job=%s", job_id)
         finally:
             free_slots += 1
 
-    while not stop.is_set():
-        ticks += 1
-        WORKER_STATE["last_tick"] = _now()
-        claimed = 0
+    cancelled = False
+    try:
+        while not stop.is_set():
+            ticks += 1
+            WORKER_STATE["last_tick"] = _now()
+            claimed = 0
+            tick_failed = False
+            try:
+                async with session_factory() as session:
+                    await reclaim_stale(session, steps=steps)
+                    await session.commit()
+                while free_slots > 0 and not stop.is_set():
+                    async with session_factory() as session:
+                        job = await claim_next(session, worker_id, steps=steps)
+                    if job is None:
+                        break
+                    claimed += 1
+                    free_slots -= 1
+                    t = asyncio.create_task(_run(job.id))
+                    tasks.add(t)
+                    t.add_done_callback(tasks.discard)
+                    await asyncio.sleep(0)  # let the task start
+            except Exception:  # noqa: BLE001
+                tick_failed = True
+                logger.exception("pipeline.worker_loop tick failed")
+            if max_ticks is not None and ticks >= max_ticks:
+                break
+            # Always back off after a failed tick — a tick that dies before it
+            # claims anything (e.g. the DB is down) must not hot-loop.
+            if claimed == 0 or tick_failed:
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=poll_interval_s)
+                except asyncio.TimeoutError:
+                    pass
+        # Clean exit: let in-flight jobs finish before shutting down.
+        if tasks:
+            await asyncio.gather(*list(tasks), return_exceptions=True)
+    except asyncio.CancelledError:
+        cancelled = True
+    finally:
+        pending = [t for t in tasks if not t.done()]
+        for t in pending:
+            t.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        # Belt and braces with _run's cancel handler: anything still marked
+        # RUNNING under this worker id goes back to the queue. Idempotent.
         try:
             async with session_factory() as session:
-                await reclaim_stale(session, steps=steps)
+                await requeue_owned(session, worker_id)
                 await session.commit()
-            while free_slots > 0 and not stop.is_set():
-                async with session_factory() as session:
-                    job = await claim_next(session, worker_id, steps=steps)
-                if job is None:
-                    break
-                claimed += 1
-                free_slots -= 1
-                t = asyncio.create_task(_run(job.id))
-                tasks.add(t)
-                t.add_done_callback(tasks.discard)
-                await asyncio.sleep(0)  # let the task start
         except Exception:  # noqa: BLE001
-            logger.exception("pipeline.worker_loop tick failed")
-        if max_ticks is not None and ticks >= max_ticks:
-            break
-        if claimed == 0:
-            try:
-                await asyncio.wait_for(stop.wait(), timeout=poll_interval_s)
-            except asyncio.TimeoutError:
-                pass
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+            logger.exception("pipeline.worker_loop requeue_owned failed worker=%s", worker_id)
+    if cancelled:
+        raise asyncio.CancelledError()
 
 
 async def periodic_loop(session_factory, *, stop: asyncio.Event) -> None:

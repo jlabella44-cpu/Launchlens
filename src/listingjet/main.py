@@ -135,8 +135,13 @@ async def lifespan(app: FastAPI):
     for t in worker_tasks:
         try:
             await asyncio.wait_for(t, timeout=30)
-        except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+        except asyncio.TimeoutError:
+            # Cancelling is only a request — await the task so its shutdown
+            # path (which requeues whatever it still holds) actually runs.
             t.cancel()
+            await asyncio.gather(t, return_exceptions=True)
+        except Exception:
+            logging.getLogger(__name__).exception("Pipeline worker task failed during shutdown")
 
     if app.state.redis:
         app.state.redis.close()

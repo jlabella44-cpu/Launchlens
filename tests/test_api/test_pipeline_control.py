@@ -122,3 +122,37 @@ async def test_deep_health_reports_worker(async_client):
     resp = await async_client.get("/health/deep")
     data = resp.json()
     assert "worker" in data
+
+
+@pytest.mark.asyncio
+async def test_reject_cancels_jobs_and_retry_reopens_review(async_client, db_session):
+    """Rejecting must not leave live pipeline rows behind, and retrying an
+    already-analysed listing must send it back to review rather than
+    re-running the whole pipeline."""
+    token, tenant_id = await _register(async_client)
+    listing = Listing(tenant_id=uuid.UUID(tenant_id), address={"street": "6 Q St"}, metadata_={},
+                      state=ListingState.IN_REVIEW)
+    db_session.add(listing)
+    await db_session.flush()
+    for step, status in [("ingestion", JobStatus.DONE), ("packaging", JobStatus.DONE),
+                         ("await_review", JobStatus.WAITING), ("content", JobStatus.QUEUED)]:
+        db_session.add(PipelineJob(tenant_id=listing.tenant_id, listing_id=listing.id,
+                                   step=step, status=status))
+    await db_session.commit()
+
+    resp = await async_client.post(f"/listings/{listing.id}/reject",
+                                   json={"reason": "quality"}, headers=_auth(token))
+    assert resp.status_code == 200, resp.text
+    jobs = {j.step: j.status for j in (await db_session.execute(
+        select(PipelineJob).where(PipelineJob.listing_id == listing.id))).scalars().all()}
+    assert jobs["await_review"] == JobStatus.CANCELLED
+    assert jobs["content"] == JobStatus.CANCELLED
+    assert jobs["ingestion"] == JobStatus.DONE
+
+    resp = await async_client.post(f"/listings/{listing.id}/retry", headers=_auth(token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["state"] == "awaiting_review"
+    jobs = {j.step: j.status for j in (await db_session.execute(
+        select(PipelineJob).where(PipelineJob.listing_id == listing.id))).scalars().all()}
+    assert jobs["await_review"] == JobStatus.WAITING
+    assert jobs["content"] == JobStatus.QUEUED

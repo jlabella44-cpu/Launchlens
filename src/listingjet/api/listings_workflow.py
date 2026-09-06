@@ -110,7 +110,8 @@ async def approve_listing(
     # Complete the review gate so the worker can pick up post-approval steps —
     # in the same transaction as the state change.
     try:
-        await complete_review(db, listing.id)
+        if not await complete_review(db, listing.id):
+            logger.warning("pipeline.review_gate_missing listing=%s", listing.id)
     except Exception:
         logger.exception("Review gate completion failed for listing %s", listing.id)
 
@@ -167,6 +168,10 @@ async def reject_listing(
     if body.reason not in valid_reasons:
         raise HTTPException(status_code=400, detail=f"Invalid reason. Must be one of: {valid_reasons}")
 
+    # Stop the pipeline before failing the listing: without this the queued /
+    # waiting rows stay live, so a worker keeps running steps for a rejected
+    # listing and its review gate is still reachable.
+    await cancel_listing_jobs(db, listing.id)
     listing.state = ListingState.FAILED
 
     # Backfill "rejection" outcome on all un-labeled ScoringEvent rows for this listing
@@ -262,7 +267,13 @@ async def retry_pipeline(
         )
     except Exception:
         logger.exception("Pipeline retry trigger failed for listing %s", listing.id)
+        await db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to start pipeline — listing state unchanged",
+        )
     await db.commit()
+    await db.refresh(listing)
 
     return {"listing_id": str(listing.id), "state": listing.state.value}
 
