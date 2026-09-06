@@ -1,16 +1,16 @@
 import logging
 import uuid
 
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from listingjet.agents.base import parse_llm_json
+from listingjet.config import settings
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.dollhouse_scene import DollhouseScene
 from listingjet.models.listing import Listing
 from listingjet.models.vision_result import VisionResult
-from listingjet.providers import get_tier2_vision_provider
-from listingjet.services.metrics import record_cost
+from listingjet.providers import get_claude
 from listingjet.services.storage import get_storage
 
 from .base import AgentContext, BaseAgent
@@ -38,7 +38,10 @@ ROOM_COLORS = {
     "attic": "#E7E5E4",
 }
 
+# Legacy tier-1 room_label values that mean "this asset is the floorplan".
 FLOORPLAN_VISION_LABELS = ("floorplan", "blueprint", "diagram", "site_plan")
+
+_MAX_ROOM_PHOTOS = 5  # 1 floorplan + up to 5 room photos = 6 images per call
 
 FLOORPLAN_DOLLHOUSE_PROMPT = """\
 You are analyzing a real estate floorplan to produce a 3D "dollhouse" scene.
@@ -102,12 +105,52 @@ Return ONLY valid JSON. No markdown, no commentary.
 """
 
 
+class FloorplanDoor(BaseModel):
+    wall: str = "south"
+    position: float = 0.5
+
+
+class FloorplanWindow(BaseModel):
+    wall: str = "north"
+    position: float = 0.5
+
+
+class FloorplanFurniture(BaseModel):
+    type: str = "sofa"
+    x: float = 0.5
+    y: float = 0.5
+    rotation_degrees: int = 0
+
+
+class FloorplanRoom(BaseModel):
+    label: str = "living_room"
+    polygon: list[list[float]] = Field(default_factory=list)
+    width_meters: float = 0.0
+    height_meters: float = 0.0
+    doors: list[FloorplanDoor] = Field(default_factory=list)
+    windows: list[FloorplanWindow] = Field(default_factory=list)
+    wall_color: str | None = None
+    flooring: str | None = None
+    decor_tags: list[str] = Field(default_factory=list)
+    furniture: list[FloorplanFurniture] = Field(default_factory=list)
+
+
+class FloorplanScene(BaseModel):
+    floor_label: str = "Floor 1"
+    level: int = 1
+    structure: str = "main_house"
+    overall_width_meters: float = 10.0
+    overall_height_meters: float = 8.0
+    wall_height_meters: float = 2.7
+    rooms: list[FloorplanRoom] = Field(default_factory=list)
+
+
 class FloorplanAgent(BaseAgent):
     agent_name = "floorplan"
     requires_ai_consent = True
 
-    def __init__(self, vision_provider=None, session_factory=None, storage=None):
-        self._vision_provider = vision_provider or get_tier2_vision_provider()
+    def __init__(self, claude=None, session_factory=None, storage=None):
+        self._claude = claude or get_claude()
         self._session_factory = session_factory or AsyncSessionLocal
         self._storage = storage
 
@@ -117,9 +160,13 @@ class FloorplanAgent(BaseAgent):
     async def _find_floorplan_assets(
         self, session, all_assets: list[Asset]
     ) -> list[Asset]:
-        """Return all assets Vision T1 tagged as floorplan-like.
+        """Return all assets tagged as floorplan-like.
 
-        Falls back to filename heuristics for assets with no VisionResult.
+        An asset is a floorplan if its tier-1 VisionResult says
+        is_photo is False, or its raw_labels["room"] (from the Claude
+        PhotoAnalysisAgent) is "floorplan", or the legacy room_label set
+        already used by earlier vision providers matches. Falls back to
+        filename heuristics for assets with no VisionResult at all.
         """
         asset_by_id = {a.id: a for a in all_assets}
         if not asset_by_id:
@@ -134,11 +181,16 @@ class FloorplanAgent(BaseAgent):
             )
         ).scalars().all()
         tiered_ids: set[uuid.UUID] = {vr.asset_id for vr in tier1_vrs}
-        found: set[uuid.UUID] = {
-            vr.asset_id
-            for vr in tier1_vrs
-            if vr.room_label in FLOORPLAN_VISION_LABELS
-        }
+
+        def _is_floorplan(vr: VisionResult) -> bool:
+            if vr.is_photo is False:
+                return True
+            raw_labels = vr.raw_labels or {}
+            if raw_labels.get("room") == "floorplan":
+                return True
+            return vr.room_label in FLOORPLAN_VISION_LABELS
+
+        found: set[uuid.UUID] = {vr.asset_id for vr in tier1_vrs if _is_floorplan(vr)}
 
         for a in all_assets:
             if a.id in found or a.id in tiered_ids:
@@ -168,6 +220,8 @@ class FloorplanAgent(BaseAgent):
 
         best: dict[str, tuple[uuid.UUID, float]] = {}
         for vr in vision_results:
+            if vr.is_photo is False:
+                continue
             if vr.room_label and vr.room_label not in best:
                 best[vr.room_label] = (vr.asset_id, vr.quality_score)
         return best
@@ -179,7 +233,7 @@ class FloorplanAgent(BaseAgent):
         best_photo_by_room: dict[str, tuple[uuid.UUID, float]],
         storage,
     ) -> dict | None:
-        floorplan_url = storage.presigned_url(floorplan_asset.file_path)
+        floorplan_url = storage.presigned_url(floorplan_asset.file_path, expires_in=300)
 
         photo_refs: list[tuple[str, str]] = []
         asset_by_id = {a.id: a for a in all_assets}
@@ -188,7 +242,10 @@ class FloorplanAgent(BaseAgent):
                 continue
             asset = asset_by_id.get(asset_id)
             if asset:
-                photo_refs.append((room_label, storage.presigned_url(asset.file_path)))
+                photo_refs.append(
+                    (room_label, storage.presigned_url(asset.file_path, expires_in=300))
+                )
+        photo_refs = photo_refs[:_MAX_ROOM_PHOTOS]
 
         image_urls = [floorplan_url] + [u for _, u in photo_refs]
         photo_legend = "\n".join(
@@ -200,8 +257,13 @@ class FloorplanAgent(BaseAgent):
         )
 
         try:
-            raw = await self._vision_provider.analyze_with_prompt_multi(
-                image_urls=image_urls, prompt=prompt
+            result = await self._claude.analyze_images(
+                image_urls,
+                prompt,
+                FloorplanScene,
+                model=settings.claude_quality_model,
+                max_tokens=8000,
+                agent="floorplan",
             )
         except Exception:
             logger.exception(
@@ -209,27 +271,22 @@ class FloorplanAgent(BaseAgent):
             )
             return None
 
-        parsed = parse_llm_json(raw)
-        if not isinstance(parsed, dict):
-            logger.warning("floorplan parse failed asset=%s", floorplan_asset.id)
-            return None
-
         rooms_out = []
-        for room in parsed.get("rooms", []):
-            label = room.get("label", "unknown")
+        for room in result.rooms:
+            label = room.label
             photo_info = best_photo_by_room.get(label)
             rooms_out.append(
                 {
                     "label": label,
-                    "polygon": room.get("polygon", []),
-                    "width_meters": room.get("width_meters", 0),
-                    "height_meters": room.get("height_meters", 0),
-                    "doors": room.get("doors", []),
-                    "windows": room.get("windows", []),
-                    "wall_color": room.get("wall_color"),
-                    "flooring": room.get("flooring"),
-                    "decor_tags": room.get("decor_tags", []),
-                    "furniture": room.get("furniture", []),
+                    "polygon": room.polygon,
+                    "width_meters": room.width_meters,
+                    "height_meters": room.height_meters,
+                    "doors": [d.model_dump() for d in room.doors],
+                    "windows": [w.model_dump() for w in room.windows],
+                    "wall_color": room.wall_color,
+                    "flooring": room.flooring,
+                    "decor_tags": room.decor_tags,
+                    "furniture": [f.model_dump() for f in room.furniture],
                     "color": ROOM_COLORS.get(label, "#F3F4F6"),
                     "best_photo_asset_id": str(photo_info[0]) if photo_info else None,
                     "photo_score": photo_info[1] if photo_info else None,
@@ -237,14 +294,14 @@ class FloorplanAgent(BaseAgent):
             )
 
         return {
-            "floor_label": parsed.get("floor_label", "Floor 1"),
-            "level": parsed.get("level", 1),
-            "structure": parsed.get("structure", "main_house"),
+            "floor_label": result.floor_label,
+            "level": result.level,
+            "structure": result.structure,
             "dimensions": {
-                "width_meters": parsed.get("overall_width_meters", 10),
-                "height_meters": parsed.get("overall_height_meters", 8),
+                "width_meters": result.overall_width_meters,
+                "height_meters": result.overall_height_meters,
             },
-            "wall_height_meters": parsed.get("wall_height_meters", 2.7),
+            "wall_height_meters": result.wall_height_meters,
             "source_floorplan_asset_id": str(floorplan_asset.id),
             "rooms": rooms_out,
         }
@@ -253,7 +310,6 @@ class FloorplanAgent(BaseAgent):
         floors: list[dict] = []
         scene_id: str | None = None
         total_rooms = 0
-        floorplan_count = 0
 
         async with self.session_scope(context) as (session, listing_id, _tenant_id):
             listing = await session.get(Listing, listing_id)
@@ -293,7 +349,6 @@ class FloorplanAgent(BaseAgent):
 
             floors.sort(key=lambda f: f.get("level", 1))
             total_rooms = sum(len(f.get("rooms", [])) for f in floors)
-            floorplan_count = len(floorplan_assets)
 
             scene_json = {
                 "version": 2,
@@ -323,7 +378,6 @@ class FloorplanAgent(BaseAgent):
                 },
             )
 
-        record_cost(self.agent_name, "openai_gpt4v", floorplan_count)
         return {
             "room_count": total_rooms,
             "floor_count": len(floors),

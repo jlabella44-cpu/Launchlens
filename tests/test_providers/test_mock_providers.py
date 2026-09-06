@@ -1,19 +1,7 @@
 import pytest
 
-from listingjet.providers.base import LLMProvider, TemplateProvider, VisionLabel, VisionProvider
-from listingjet.providers.mock import MockLLMProvider, MockTemplateProvider, MockVisionProvider
-
-
-def test_vision_label_dataclass():
-    label = VisionLabel(name="kitchen", confidence=0.95, category="room")
-    assert label.name == "kitchen"
-    assert label.confidence == 0.95
-    assert label.category == "room"
-
-
-def test_mock_vision_provider_is_vision_provider():
-    provider = MockVisionProvider()
-    assert isinstance(provider, VisionProvider)
+from listingjet.providers.base import LLMProvider, TemplateProvider
+from listingjet.providers.mock import MockLLMProvider, MockTemplateProvider
 
 
 def test_mock_llm_provider_is_llm_provider():
@@ -24,15 +12,6 @@ def test_mock_llm_provider_is_llm_provider():
 def test_mock_template_provider_is_template_provider():
     provider = MockTemplateProvider()
     assert isinstance(provider, TemplateProvider)
-
-
-@pytest.mark.asyncio
-async def test_mock_vision_provider_analyze_returns_labels():
-    provider = MockVisionProvider()
-    labels = await provider.analyze(image_url="https://example.com/photo.jpg")
-    assert isinstance(labels, list)
-    assert len(labels) > 0
-    assert all(isinstance(lbl, VisionLabel) for lbl in labels)
 
 
 @pytest.mark.asyncio

@@ -2,42 +2,10 @@
 """
 Provider ABCs for external service integrations.
 
-VisionProvider  — photo analysis (Google Vision, GPT-4V)
 LLMProvider     — text generation (Claude, GPT-4)
 TemplateProvider — flyer/social asset rendering (Canva, HTML/Chromium)
 """
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-
-
-@dataclass
-class VisionLabel:
-    name: str
-    confidence: float
-    category: str  # e.g. "room", "feature", "quality"
-
-
-class VisionProvider(ABC):
-    @abstractmethod
-    async def analyze(self, image_url: str) -> list[VisionLabel]:
-        """Return labels for the given image URL."""
-        ...
-
-    async def analyze_with_prompt(self, image_url: str, prompt: str) -> str:
-        """Send an image with a custom prompt. Returns raw text response."""
-        raise NotImplementedError
-
-    async def analyze_with_prompt_multi(
-        self, image_urls: list[str], prompt: str
-    ) -> str:
-        """Send multiple images with a single prompt. Returns raw text response.
-
-        Default implementation falls back to the first image only; providers
-        that natively support multi-image input should override.
-        """
-        if not image_urls:
-            raise ValueError("image_urls must be non-empty")
-        return await self.analyze_with_prompt(image_urls[0], prompt)
 
 
 class LLMProvider(ABC):

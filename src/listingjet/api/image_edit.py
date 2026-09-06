@@ -175,14 +175,12 @@ async def auto_fix_compliance(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Auto-fix compliance issues detected by the photo compliance agent.
+    """Auto-fix compliance issues found during photo analysis.
 
     Removes yard signs, people, branding, and text overlays from flagged photos.
     Returns a list of edited assets created.
     """
-    from listingjet.agents.base import AgentContext
-    from listingjet.agents.photo_compliance import PhotoComplianceAgent
-    from listingjet.database import admin_session
+    from listingjet.services.compliance import compliance_report
 
     listing = (await db.execute(
         select(Listing).where(Listing.id == listing_id, Listing.tenant_id == current_user.tenant_id)
@@ -190,10 +188,8 @@ async def auto_fix_compliance(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    # Run compliance check first
-    compliance_agent = PhotoComplianceAgent(session_factory=admin_session)
-    ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
-    report = await compliance_agent.execute(ctx)
+    # Read the compliance verdicts recorded by the photo_analysis step.
+    report = await compliance_report(db, listing_id)
 
     if report.get("all_compliant", True):
         return {"fixed_count": 0, "message": "All photos are already compliant", "edits": []}
