@@ -17,19 +17,11 @@ PROVIDER_COSTS: dict[str, float] = {
     "claude": 0.05,
     "openai_gpt4v": 0.03,
     "kling": 0.50,
-    "qwen": 0.01,
-    "qwen_vision": 0.005,
-    "gemma": 0.003,
-    "gemma_vision": 0.003,
 }
 
 # Per-1M-token cost in USD: (input_rate, output_rate)
 TOKEN_COSTS: dict[str, tuple[float, float]] = {
     "claude": (3.00, 15.00),
-    "qwen": (0.26, 1.56),      # estimated from Qwen3.5-Plus rates
-    "qwen_vision": (0.26, 1.56),
-    "gemma": (0.14, 0.40),     # Gemma 4 31B via Gemini API
-    "gemma_vision": (0.14, 0.40),
     "openai_gpt4v": (2.50, 10.00),
 }
 

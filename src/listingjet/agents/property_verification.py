@@ -7,8 +7,6 @@ from listingjet.config import settings
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.property_data import PropertyData
-from listingjet.services.property_scraper import run_all_scrapers
-from listingjet.services.property_scraper.cross_reference import cross_reference
 
 
 class PropertyVerificationAgent(BaseAgent):
@@ -33,19 +31,10 @@ class PropertyVerificationAgent(BaseAgent):
                 if not settings.property_verification_enabled:
                     return {"verification_status": "skipped"}
 
-                # 4. Get the Listing to extract address string
+                # 4. Confirm the Listing exists
                 listing = await session.get(Listing, listing_id)
                 if listing is None:
                     return {"verification_status": "skipped"}
-
-                addr = listing.address or {}
-                parts = [
-                    addr.get("street", ""),
-                    addr.get("city", ""),
-                    addr.get("state", ""),
-                    addr.get("zip", ""),
-                ]
-                address_str = ", ".join(p for p in parts if p).strip(", ")
 
                 # 5. Build api_data dict from PropertyData fields
                 api_data = {
@@ -58,19 +47,16 @@ class PropertyVerificationAgent(BaseAgent):
                     }.items() if v is not None
                 }
 
-                # 6. Run all scrapers
-                scraped = await run_all_scrapers(address_str)
-
-                # 7. Cross-reference
-                xref = cross_reference(api_data, scraped)
-
-                # 8. Update PropertyData
-                property_data.verification_status = xref["status"]
-                property_data.field_confidence = xref["field_confidence"]
-                property_data.mismatches = xref["mismatches"]
-                property_data.scraped_data = scraped
-                property_data.sources_checked = xref["sources_checked"]
+                # Verification from API data only (site scrapers were removed in Phase 3).
+                property_data.verification_status = "api_only" if api_data else "unverified"
+                property_data.field_confidence = {k: 1.0 for k in api_data}
+                property_data.mismatches = []
+                property_data.scraped_data = {}
+                property_data.sources_checked = ["attom"] if api_data else []
                 property_data.verified_at = datetime.now(timezone.utc)
+                xref = {"status": property_data.verification_status,
+                        "field_confidence": property_data.field_confidence,
+                        "mismatches": [], "sources_checked": property_data.sources_checked}
 
         # 9. Return result
         return {

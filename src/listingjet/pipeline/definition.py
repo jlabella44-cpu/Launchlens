@@ -38,10 +38,9 @@ PIPELINE: list[Step] = [
     Step("content", requires=("await_review",)),
     Step("brand", requires=("content",), optional=True),
     Step("social_content", requires=("content",), optional=True),
-    Step("chapters", requires=("video", "await_review"), optional=True),
     Step("social_cuts", requires=("video", "await_review"), optional=True),
     Step("mls_export", requires=("content", "brand"), timeout_s=15 * _MIN),
-    Step("distribution", requires=("mls_export", "social_content", "chapters", "social_cuts", "photo_compliance")),
+    Step("distribution", requires=("mls_export", "social_content", "social_cuts", "photo_compliance")),
     # Phase 3: after delivery, all best-effort
     Step("microsite", requires=("distribution",), timeout_s=5 * _MIN, optional=True, gate="feature:microsite"),
     Step("learning", requires=("distribution",), optional=True, gate="feature:learning"),

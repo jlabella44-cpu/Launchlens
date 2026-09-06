@@ -102,25 +102,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
-    qwen_api_key: str = ""
-    gemini_api_key: str = ""
     use_mock_providers: bool = False
-
-    # LLM / Vision provider routing (values: "claude", "qwen", "gemma")
-    llm_provider: str = "claude"
-    vision_provider_tier1: str = "google"  # "google" | "gemma" | "qwen"
-    vision_provider_tier2: str = "openai"  # "openai" | "qwen" | "gemma"
-    # Per-agent overrides, JSON: {"llm": {"floorplan": "qwen"}, "vision": {"photo_compliance": "gemma"}}
-    agent_model_routing: str = ""
-    # Per-tenant overrides, JSON: {"<tenant_uuid>": {"llm": "claude"}}
-    tenant_model_routing: str = ""
-    # Enable fallback chain: try primary provider, fall back to Claude on failure
-    llm_fallback_enabled: bool = False
-    # Self-host / alt endpoint for Gemma (e.g. http://localhost:11434/v1 for Ollama)
-    gemma_base_url: str = ""
-    gemma_model: str = "gemma-4-31b-it"
-    # Qwen DashScope context caching (discounts repeated system prompts)
-    qwen_enable_cache: bool = False
 
     # Google OAuth
     google_oauth_client_id: str = ""
@@ -172,10 +154,6 @@ class Settings(BaseSettings):
     canva_redirect_uri: str = "https://api.listingjet.ai/auth/canva/callback"
     canva_frontend_redirect: str = "https://listingjet.ai/settings/brand-kit"
 
-    # ElevenLabs (voiceover)
-    elevenlabs_api_key: str = ""
-    elevenlabs_voice_id: str = ""
-
     # Email / Notifications
     smtp_host: str = ""
     smtp_port: int = 587
@@ -197,7 +175,6 @@ class Settings(BaseSettings):
     walk_score_api_key: str = ""
     property_lookup_cache_ttl: int = 86400  # 24h
     property_verification_enabled: bool = True
-    scraper_rate_limit_seconds: int = 5
 
 
 settings = Settings()
