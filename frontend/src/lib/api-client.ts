@@ -59,8 +59,6 @@ import type {
   SupportTicketStats,
   ListingHealthResponse,
   HealthSummaryResponse,
-  IdxFeedConfig,
-  IdxFeedConfigCreate,
   HealthWeights,
   PerformanceOverview,
   ListingPerformance,
@@ -990,21 +988,9 @@ class ApiClient {
     return this.request("/listings/health/summary");
   }
 
-  // IDX Feed Config
-  async listIdxFeeds(): Promise<IdxFeedConfig[]> {
-    return this.request("/settings/idx-feed");
-  }
-
-  async createIdxFeed(data: IdxFeedConfigCreate): Promise<IdxFeedConfig> {
-    return this.request("/settings/idx-feed", { method: "POST", body: JSON.stringify(data) });
-  }
-
-  async updateIdxFeed(id: string, data: Partial<IdxFeedConfigCreate & { status: string }>): Promise<IdxFeedConfig> {
-    return this.request(`/settings/idx-feed/${id}`, { method: "PATCH", body: JSON.stringify(data) });
-  }
-
-  async deleteIdxFeed(id: string): Promise<void> {
-    return this.request(`/settings/idx-feed/${id}`, { method: "DELETE" });
+  // Feature Flags
+  async getFeatures(): Promise<{ features: string[] }> {
+    return this.request("/settings/features");
   }
 
   // Health Weights

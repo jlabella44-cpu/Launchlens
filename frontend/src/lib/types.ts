@@ -604,25 +604,6 @@ export interface HealthSummaryResponse {
   bottom_listings: HealthSummaryListing[];
 }
 
-export interface IdxFeedConfig {
-  id: string;
-  name: string;
-  base_url: string;
-  board_id: string | null;
-  poll_interval_minutes: number;
-  last_polled_at: string | null;
-  status: string;
-  created_at: string;
-}
-
-export interface IdxFeedConfigCreate {
-  name: string;
-  base_url: string;
-  api_key: string;
-  board_id?: string;
-  poll_interval_minutes?: number;
-}
-
 // -- Performance Intelligence --
 
 export interface PerformanceInsight {

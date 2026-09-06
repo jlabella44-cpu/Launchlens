@@ -15,13 +15,13 @@ import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/contexts/auth-context";
 import type { ListingResponse, AssetResponse, PackageSelection } from "@/lib/types";
 import { VideoPlayer } from "@/components/listings/video-player";
-import { VideoUpload } from "@/components/listings/video-upload";
 import { SocialPreview } from "@/components/listings/social-preview";
 import { SharePanel } from "@/components/listings/share-panel";
 import { ActivityLog } from "@/components/listings/activity-log";
 import { HealthPanel } from "@/components/listings/health-panel";
 import { DollhouseCard } from "@/components/listings/dollhouse-card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { useFeature } from "@/hooks/use-features";
 
 function ListingDetail() {
   const params = useParams();
@@ -32,6 +32,8 @@ function ListingDetail() {
   // the feature runs on the synthetic fallback, we gate it to superadmins so
   // staff can still demo/QA without exposing unverified comps to paying users.
   const isSuperadmin = user?.role === "superadmin";
+  const healthScoreEnabled = useFeature("health_score");
+  const listingPermissionsEnabled = useFeature("listing_permissions");
 
   const [listing, setListing] = useState<ListingResponse | null>(null);
   const [assets, setAssets] = useState<AssetResponse[]>([]);
@@ -41,7 +43,6 @@ function ListingDetail() {
   const [shareOpen, setShareOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDone, setActionDone] = useState("");
-  const [showVideoUpload, setShowVideoUpload] = useState(false);
   const [assetView, setAssetView] = useState<"grid" | "list">("grid");
   const [cmaReport, setCmaReport] = useState<{ download_url: string; comparables_count: number; generated_at: string; analysis_summary: string | null } | null>(null);
   const [microsite, setMicrosite] = useState<{ microsite_url: string; qr_code_url: string | null; status: string } | null>(null);
@@ -204,22 +205,26 @@ function ListingDetail() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShareOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--color-border)] text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[#F97316] hover:text-[#F97316] transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-                </svg>
-                Share
-              </button>
+              {listingPermissionsEnabled && (
+                <button
+                  onClick={() => setShareOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--color-border)] text-xs font-semibold text-[var(--color-text-secondary)] hover:border-[#F97316] hover:text-[#F97316] transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                  </svg>
+                  Share
+                </button>
+              )}
               <Badge state={listing.state} />
             </div>
           </div>
         </div>
 
         {/* Share Panel */}
-        <SharePanel listingId={id} isOpen={shareOpen} onClose={() => setShareOpen(false)} />
+        {listingPermissionsEnabled && (
+          <SharePanel listingId={id} isOpen={shareOpen} onClose={() => setShareOpen(false)} />
+        )}
 
         {/* Pipeline Status */}
         <div className="mb-8">
@@ -463,21 +468,7 @@ function ListingDetail() {
                 >
                   Video Assets
                 </h3>
-                <VideoPlayer
-                  listingId={id}
-                  onNoVideo={() => setShowVideoUpload(true)}
-                />
-                {showVideoUpload && (
-                  <div className="mt-4">
-                    <VideoUpload
-                      listingId={id}
-                      onUploaded={() => {
-                        setShowVideoUpload(false);
-                        fetchData();
-                      }}
-                    />
-                  </div>
-                )}
+                <VideoPlayer listingId={id} />
               </div>
             )}
 
@@ -663,9 +654,11 @@ function ListingDetail() {
         )}
 
         {/* Listing Health Score */}
-        <div className="mt-10">
-          <HealthPanel listingId={id} />
-        </div>
+        {healthScoreEnabled && (
+          <div className="mt-10">
+            <HealthPanel listingId={id} />
+          </div>
+        )}
 
         {/* Activity Log */}
         <div className="mt-10">
