@@ -4,6 +4,10 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("WORKER_ENABLED", "false")  # before any listingjet import: keep the worker loops off in tests
+os.environ.setdefault(
+    "FEATURES",
+    "learning,health_score,performance_intelligence,help_agent,microsite,webhooks,listing_permissions",
+)  # before any listingjet import: routers are chosen at app-build time in main.py
 
 import jwt  # noqa: E402
 import pytest  # noqa: E402

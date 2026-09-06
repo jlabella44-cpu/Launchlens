@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet import features
 from listingjet.api.deps import get_current_user, get_db, require_admin
 from listingjet.api.schemas.health import (
     HealthBreakdown,
@@ -42,7 +43,7 @@ from listingjet.models.user import User
 from listingjet.services import field_encryption
 from listingjet.services import health_score as hs
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(features.require_feature("health_score"))])
 
 
 # ---- Health Score Endpoints ----

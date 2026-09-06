@@ -43,11 +43,12 @@ PIPELINE: list[Step] = [
     Step("mls_export", requires=("content", "brand"), timeout_s=15 * _MIN),
     Step("distribution", requires=("mls_export", "social_content", "chapters", "social_cuts", "photo_compliance")),
     # Phase 3: after delivery, all best-effort
-    Step("microsite", requires=("distribution",), timeout_s=5 * _MIN, optional=True),
-    Step("learning", requires=("distribution",), optional=True),
+    Step("microsite", requires=("distribution",), timeout_s=5 * _MIN, optional=True, gate="feature:microsite"),
+    Step("learning", requires=("distribution",), optional=True, gate="feature:learning"),
     Step("social_event", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
-    Step("health_score", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
-    Step("performance_intelligence", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
+    Step("health_score", requires=("distribution",), timeout_s=2 * _MIN, optional=True, gate="feature:health_score"),
+    Step("performance_intelligence", requires=("distribution",), timeout_s=2 * _MIN, optional=True,
+         gate="feature:performance_intelligence"),
 ]
 
 

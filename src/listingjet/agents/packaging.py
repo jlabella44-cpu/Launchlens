@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import delete, select
 
+from listingjet import features as feature_flags
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
 from listingjet.models.learning_weight import LearningWeight
@@ -165,23 +166,27 @@ class PackagingAgent(BaseAgent):
                     if vr.asset_id not in seen:
                         seen[vr.asset_id] = vr
 
-                # Load tenant learning weights
-                lw_result = await session.execute(
-                    select(LearningWeight).where(LearningWeight.tenant_id == tenant_id)
-                )
-                weight_map = {lw.room_label: lw for lw in lw_result.scalars().all()}
-
-                # Phase 5: Load outcome-based boosts per room
-                oc_result = await session.execute(
-                    select(PhotoOutcomeCorrelation).where(
-                        PhotoOutcomeCorrelation.tenant_id == tenant_id,
-                        PhotoOutcomeCorrelation.dimension == "room_label",
+                if feature_flags.enabled("learning"):
+                    # Load tenant learning weights
+                    lw_result = await session.execute(
+                        select(LearningWeight).where(LearningWeight.tenant_id == tenant_id)
                     )
-                )
-                outcome_boost_map = {
-                    oc.dimension_value: (oc.outcome_boost, oc.sample_count)
-                    for oc in oc_result.scalars().all()
-                }
+                    weight_map = {lw.room_label: lw for lw in lw_result.scalars().all()}
+
+                    # Phase 5: Load outcome-based boosts per room
+                    oc_result = await session.execute(
+                        select(PhotoOutcomeCorrelation).where(
+                            PhotoOutcomeCorrelation.tenant_id == tenant_id,
+                            PhotoOutcomeCorrelation.dimension == "room_label",
+                        )
+                    )
+                    outcome_boost_map = {
+                        oc.dimension_value: (oc.outcome_boost, oc.sample_count)
+                        for oc in oc_result.scalars().all()
+                    }
+                else:
+                    weight_map = {}
+                    outcome_boost_map = {}
 
                 # Score each asset
                 now = datetime.now(timezone.utc)

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet import features
 from listingjet.models.outbox import Outbox
 from listingjet.models.tenant import Tenant
 from listingjet.services.webhook_delivery import deliver_webhook
@@ -75,7 +76,7 @@ class OutboxPoller:
         for row in rows:
             # Attempt webhook delivery if tenant has a URL configured
             webhook_url = await self._get_webhook_url(session, row.tenant_id)
-            if webhook_url:
+            if webhook_url and features.enabled("webhooks"):
                 await deliver_webhook(
                     url=webhook_url,
                     event_type=row.event_type,

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from listingjet import features
 from listingjet.api import (
     addons,
     admin_dashboard,
@@ -40,6 +41,7 @@ from listingjet.api import (
     performance,
     performance_intelligence,
     properties,
+    settings_features,
     social_accounts,
     sse,
     support,
@@ -202,7 +204,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(canva_oauth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
-    app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
+    if features.enabled("listing_permissions"):
+        app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
     app.include_router(listings_core.router, prefix="/listings", tags=["listings"])
     app.include_router(listings_draft.router, prefix="/listings", tags=["listings-draft"])
     app.include_router(listings_workflow.router, prefix="/listings", tags=["listings"])
@@ -217,6 +220,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_providers.router, prefix="/admin", tags=["admin"])
     app.include_router(demo.router, prefix="/demo", tags=["demo"])
     app.include_router(tenant_settings.router, prefix="/settings", tags=["settings"])
+    app.include_router(settings_features.router, prefix="/settings", tags=["settings"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
     app.include_router(bulk.router, prefix="/bulk", tags=["bulk"])
     app.include_router(brand_kit.router, prefix="/brand-kit", tags=["brand-kit"])
@@ -224,19 +228,23 @@ def create_app() -> FastAPI:
     app.include_router(addons.router, prefix="/addons", tags=["addons"])
     app.include_router(properties.router, prefix="/properties", tags=["properties"])
     app.include_router(cma.router, prefix="/listings", tags=["listings"])
-    app.include_router(microsite.router, prefix="/listings", tags=["listings"])
+    if features.enabled("microsite"):
+        app.include_router(microsite.router, prefix="/listings", tags=["listings"])
     app.include_router(image_edit.router, prefix="/listings", tags=["image-editing"])
     app.include_router(team.router, prefix="/team", tags=["team"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
-    app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
+    if features.enabled("help_agent"):
+        app.include_router(help_agent.router, prefix="/help", tags=["help-agent"])
     app.include_router(support.router, prefix="/support", tags=["support"])
     app.include_router(listing_events.router, prefix="/listings", tags=["listing-events"])
     app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
     app.include_router(social_accounts.router, prefix="/social-accounts", tags=["social-accounts"])
     app.include_router(launch.router, tags=["launch"])
-    app.include_router(listing_health.router, tags=["listing-health"])
-    app.include_router(performance.router, tags=["performance"])
-    app.include_router(performance_intelligence.router, tags=["performance-intelligence"])
+    if features.enabled("health_score"):
+        app.include_router(listing_health.router, tags=["listing-health"])
+    if features.enabled("performance_intelligence"):
+        app.include_router(performance.router, tags=["performance"])
+        app.include_router(performance_intelligence.router, tags=["performance-intelligence"])
     app.include_router(white_label.router, tags=["white-label"])
     app.include_router(health.router)
 
