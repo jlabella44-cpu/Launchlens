@@ -18,7 +18,6 @@ _warned_unknown_model_ids: set[str] = set()
 # Legacy mapping for old provider labels; these are flat per-call rates
 _LEGACY_PROVIDER_COSTS: dict[str, float] = {
     "claude": 0.05,
-    "openai_gpt4v": 0.03,
 }
 
 # New mapping keyed by model id (images and legacy video)
@@ -102,7 +101,7 @@ def record_token_usage(
 def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> None:
     """Record estimated cost for provider usage within an agent.
 
-    provider_name can be either an old provider label (claude, openai_gpt4v, etc.)
+    provider_name can be either an old provider label (claude, etc.)
     or a model id (gpt-image-1.5, kling, etc.).
     """
     # Try new model id keys first, then fall back to legacy provider labels

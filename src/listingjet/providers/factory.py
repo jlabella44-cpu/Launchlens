@@ -11,7 +11,7 @@ need no changes.
 """
 from listingjet.config import settings
 
-from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider, VisionProvider
+from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider
 
 
 def get_claude(agent: str | None = None, tenant_id=None):
@@ -30,16 +30,6 @@ def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
         return MockLLMProvider()
     from .claude import ClaudeProvider
     return ClaudeProvider(client=get_claude(agent=agent, tenant_id=tenant_id))
-
-
-def get_tier2_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
-    """Return the prompted vision provider (OpenAI Vision) used by the floorplan
-    agent, or a mock when USE_MOCK_PROVIDERS is set."""
-    if settings.use_mock_providers:
-        from .mock import MockVisionProvider
-        return MockVisionProvider()
-    from .openai_vision import OpenAIVisionProvider
-    return OpenAIVisionProvider()
 
 
 def get_image_edit_provider() -> ImageEditProvider:
