@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Request
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -54,3 +56,21 @@ async def get_db(request: Request = None):
         finally:
             if listener is not None:
                 event.remove(session.sync_session, "after_begin", listener)
+
+
+@asynccontextmanager
+async def admin_session():
+    """Session with SET LOCAL app.is_admin = 'true' on every transaction.
+
+    For system actors (pipeline worker, periodic jobs) that legitimately read
+    across tenants. Mirrors api.deps.get_db_admin.
+    """
+    async with AsyncSessionLocal() as session:
+        @event.listens_for(session.sync_session, "after_begin")
+        def _set_admin_flag(_session, _transaction, connection):
+            connection.execute(text("SET LOCAL app.is_admin = 'true'"))
+
+        try:
+            yield session
+        finally:
+            event.remove(session.sync_session, "after_begin", _set_admin_flag)
