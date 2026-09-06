@@ -144,6 +144,8 @@ async def run_job(session_factory, job_id, *, steps: list[Step] = PIPELINE, func
         job.error = None
         job.finished_at = _now()
         job.locked_by = None
+        if job.step == "packaging" and isinstance(job.result, dict) and job.result.get("auto_approved") is True:
+            await complete_review(session, job.listing_id)
         await session.commit()
     logger.info("pipeline.step.done listing=%s step=%s", job.listing_id, job.step)
     return JobStatus.DONE
@@ -234,3 +236,82 @@ async def reclaim_stale(session: AsyncSession, *, steps: list[Step] = PIPELINE) 
             reclaimed += 1
     await session.flush()
     return reclaimed
+
+
+_STATUS_LABEL = {
+    JobStatus.QUEUED: "pending", JobStatus.WAITING: "pending", JobStatus.RUNNING: "in_progress",
+    JobStatus.DONE: "completed", JobStatus.FAILED: "failed",
+    JobStatus.SKIPPED: "skipped", JobStatus.CANCELLED: "skipped",
+}
+
+
+async def complete_review(session: AsyncSession, listing_id) -> bool:
+    res = await session.execute(
+        update(PipelineJob)
+        .where(PipelineJob.listing_id == listing_id, PipelineJob.step == "await_review",
+               PipelineJob.status == JobStatus.WAITING)
+        .values(status=JobStatus.DONE, finished_at=_now(), result={"approved": True})
+    )
+    await session.flush()
+    return res.rowcount == 1
+
+
+async def retry_listing(session: AsyncSession, listing: Listing, *, steps: list[Step] = PIPELINE,
+                        billing_model: str = "legacy", enabled_addons: list[str] | None = None) -> int:
+    sibs = await _siblings(session, listing.id)
+    if not sibs:
+        created = await enqueue_pipeline(session, listing, billing_model=billing_model,
+                                         enabled_addons=enabled_addons or [], steps=steps)
+        listing.state = ListingState.UPLOADING
+        return len(created)
+    index = {s.name: s for s in steps}
+    n = 0
+    for job in sibs.values():
+        if job.status in (JobStatus.FAILED, JobStatus.CANCELLED):
+            step = index.get(job.step)
+            is_gate = step is not None and step.gate == "review"
+            job.status = JobStatus.WAITING if is_gate else JobStatus.QUEUED
+            job.attempts = 0
+            job.error = None
+            job.locked_by = None
+            job.run_after = _now()
+            if not is_gate:
+                n += 1
+    def _done(name: str) -> bool:
+        j = sibs.get(name)
+        return j is not None and j.status in SATISFIED
+    if not _done("ingestion"):
+        listing.state = ListingState.UPLOADING
+    elif not _done("packaging"):
+        listing.state = ListingState.ANALYZING
+    await session.flush()
+    return n
+
+
+async def cancel_listing_jobs(session: AsyncSession, listing_id) -> int:
+    res = await session.execute(
+        update(PipelineJob)
+        .where(PipelineJob.listing_id == listing_id,
+               PipelineJob.status.in_([JobStatus.QUEUED, JobStatus.WAITING, JobStatus.RUNNING]))
+        .values(status=JobStatus.CANCELLED, locked_by=None)
+    )
+    await session.flush()
+    return res.rowcount
+
+
+async def listing_progress(session: AsyncSession, listing_id, *, steps: list[Step] = PIPELINE) -> list[dict]:
+    sibs = await _siblings(session, listing_id)
+    rows = []
+    for step in steps:
+        j = sibs.get(step.name)
+        if j is None:
+            continue
+        rows.append({
+            "name": step.name,
+            "status": _STATUS_LABEL[j.status],
+            "completed_at": j.finished_at.isoformat() if j.finished_at and j.status == JobStatus.DONE else None,
+            "progress": None,
+            "error": j.error if j.status == JobStatus.FAILED else None,
+            "attempts": j.attempts,
+        })
+    return rows
