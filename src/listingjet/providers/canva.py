@@ -3,45 +3,15 @@
 
 Capabilities:
 - Autofill brand templates with listing data, brand kit, and hero photo
-- Poll async jobs (autofill, export, asset upload) via generated client
+- Poll async jobs (autofill, export, asset upload) via a thin httpx client
 - Export designs as PDF
 - Upload hero photos as Canva assets for template placement
 """
 import asyncio
 import logging
-from http import HTTPStatus
-
-import httpx
 
 from .base import TemplateProvider
-from .canva_generated.canva_connect_api_client.api.asset import (
-    create_url_asset_upload_job,
-    get_url_asset_upload_job,
-)
-from .canva_generated.canva_connect_api_client.api.autofill import (
-    create_design_autofill_job,
-    get_design_autofill_job,
-)
-from .canva_generated.canva_connect_api_client.api.export import (
-    create_design_export_job,
-    get_design_export_job,
-)
-from .canva_generated.canva_connect_api_client.client import AuthenticatedClient
-from .canva_generated.canva_connect_api_client.models.create_design_autofill_job_request import (
-    CreateDesignAutofillJobRequest,
-)
-from .canva_generated.canva_connect_api_client.models.create_design_autofill_job_request_data import (
-    CreateDesignAutofillJobRequestData,
-)
-from .canva_generated.canva_connect_api_client.models.create_design_export_job_request import (
-    CreateDesignExportJobRequest,
-)
-from .canva_generated.canva_connect_api_client.models.create_url_asset_upload_job_request import (
-    CreateUrlAssetUploadJobRequest,
-)
-from .canva_generated.canva_connect_api_client.models.error import Error
-from .canva_generated.canva_connect_api_client.models.pdf_export_format import PdfExportFormat
-from .canva_generated.canva_connect_api_client.models.pdf_export_format_type import PdfExportFormatType
+from .canva_client import CanvaClient
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +42,7 @@ class CanvaTemplateProvider(TemplateProvider):
         4. Create export job for PDF
         5. Poll until export completes, download PDF bytes
         """
-        client = AuthenticatedClient(
-            base_url=_CANVA_API_BASE,
-            token=self._effective_token,
-            timeout=httpx.Timeout(60.0),
-        )
-
-        async with client:
+        async with CanvaClient(token=self._effective_token, base_url=_CANVA_API_BASE) as client:
             # 1. Upload hero photo as Canva asset if URL provided
             hero_asset_id = None
             if data.get("hero_image_url"):
@@ -88,53 +52,26 @@ class CanvaTemplateProvider(TemplateProvider):
 
             # 2. Start autofill
             autofill_data = _build_autofill_data(data, hero_asset_id)
-            autofill_body = CreateDesignAutofillJobRequest(
-                brand_template_id=template_id,
-                data=autofill_data,
-            )
-            autofill_resp = await create_design_autofill_job.asyncio_detailed(
-                client=client, body=autofill_body,
-            )
-            if autofill_resp.status_code != HTTPStatus.OK or isinstance(autofill_resp.parsed, Error):
-                raise RuntimeError(f"Canva autofill request failed: {autofill_resp.status_code}")
-            job_id = autofill_resp.parsed.job.id
+            job_id = await client.create_autofill(template_id, autofill_data)
 
             # 3. Poll autofill until done
             design_id = await _poll_autofill(client, job_id)
 
             # 4. Export as PDF
-            export_body = CreateDesignExportJobRequest(
-                design_id=design_id,
-                format_=PdfExportFormat(type_=PdfExportFormatType.PDF),
-            )
-            export_resp = await create_design_export_job.asyncio_detailed(
-                client=client, body=export_body,
-            )
-            if export_resp.status_code != HTTPStatus.OK or isinstance(export_resp.parsed, Error):
-                raise RuntimeError(f"Canva export request failed: {export_resp.status_code}")
-            export_job_id = export_resp.parsed.job.id
+            export_job_id = await client.create_export(design_id, {"type": "pdf"})
 
             # 5. Poll export until done
             pdf_url = await _poll_export(client, export_job_id)
 
-            # 6. Download the rendered PDF (raw httpx — no generated endpoint)
-            async with httpx.AsyncClient(timeout=60) as http_client:
-                pdf_resp = await http_client.get(pdf_url)
-                pdf_resp.raise_for_status()
-                return pdf_resp.content
+            # 6. Download the rendered PDF
+            return await client.download(pdf_url)
 
     async def _upload_hero_asset(
-        self, client: AuthenticatedClient, image_url: str
+        self, client: CanvaClient, image_url: str
     ) -> str | None:
         """Upload a hero photo URL as a Canva asset. Returns asset ID or None on failure."""
         try:
-            body = CreateUrlAssetUploadJobRequest(name="hero_image", url=image_url)
-            resp = await create_url_asset_upload_job.asyncio_detailed(
-                client=client, body=body,
-            )
-            if resp.status_code != HTTPStatus.OK or isinstance(resp.parsed, Error):
-                raise RuntimeError(f"Upload request failed: {resp.status_code}")
-            job_id = resp.parsed.job.id
+            job_id = await client.create_url_asset_upload("hero_image", image_url)
             return await _poll_upload(client, job_id)
         except Exception:
             logger.warning("canva.hero_upload_failed url=%s", image_url, exc_info=True)
@@ -142,74 +79,63 @@ class CanvaTemplateProvider(TemplateProvider):
 
 
 async def _poll_autofill(
-    client: AuthenticatedClient,
+    client: CanvaClient,
     job_id: str,
     max_attempts: int = 20,
     delay_s: float = 2.0,
 ) -> str:
     """Poll autofill job until success; return the design ID."""
     for _ in range(max_attempts):
-        resp = await get_design_autofill_job.asyncio_detailed(job_id, client=client)
-        if isinstance(resp.parsed, Error):
-            raise RuntimeError(f"Canva autofill poll error: {resp.parsed}")
-        job = resp.parsed.job
-        if job.status.value == "success":
-            return job.result.design.id
-        if job.status.value == "failed":
-            raise RuntimeError(f"Canva autofill job failed: {job}")
+        result = await client.get_autofill(job_id)
+        if result["status"] == "success":
+            return result["design_id"]
+        if result["status"] == "failed":
+            raise RuntimeError(f"Canva autofill job failed: {result}")
         await asyncio.sleep(delay_s)
     raise TimeoutError(f"Canva autofill job {job_id} did not complete in time")
 
 
 async def _poll_export(
-    client: AuthenticatedClient,
+    client: CanvaClient,
     export_id: str,
     max_attempts: int = 20,
     delay_s: float = 2.0,
 ) -> str:
     """Poll export job until success; return the first download URL."""
     for _ in range(max_attempts):
-        resp = await get_design_export_job.asyncio_detailed(export_id, client=client)
-        if isinstance(resp.parsed, Error):
-            raise RuntimeError(f"Canva export poll error: {resp.parsed}")
-        job = resp.parsed.job
-        if job.status.value == "success":
-            return job.urls[0]
-        if job.status.value == "failed":
-            raise RuntimeError(f"Canva export job failed: {job}")
+        result = await client.get_export(export_id)
+        if result["status"] == "success":
+            return result["urls"][0]
+        if result["status"] == "failed":
+            raise RuntimeError(f"Canva export job failed: {result}")
         await asyncio.sleep(delay_s)
     raise TimeoutError(f"Canva export job {export_id} did not complete in time")
 
 
 async def _poll_upload(
-    client: AuthenticatedClient,
+    client: CanvaClient,
     job_id: str,
     max_attempts: int = 10,
     delay_s: float = 1.5,
 ) -> str:
     """Poll URL asset upload job until success; return the asset ID."""
     for _ in range(max_attempts):
-        resp = await get_url_asset_upload_job.asyncio_detailed(job_id, client=client)
-        if isinstance(resp.parsed, Error):
-            raise RuntimeError(f"Canva upload poll error: {resp.parsed}")
-        job = resp.parsed.job
-        if job.status.value == "success":
-            return job.asset.id
-        if job.status.value == "failed":
-            raise RuntimeError(f"Canva upload job failed: {job}")
+        result = await client.get_url_asset_upload(job_id)
+        if result["status"] == "success":
+            return result["asset_id"]
+        if result["status"] == "failed":
+            raise RuntimeError(f"Canva upload job failed: {result}")
         await asyncio.sleep(delay_s)
     raise TimeoutError(f"Canva upload job {job_id} did not complete in time")
 
 
 def _build_autofill_data(
     data: dict, hero_asset_id: str | None = None
-) -> CreateDesignAutofillJobRequestData:
+) -> dict:
     """Convert listing + brand data into Canva autofill request data.
 
-    The CreateDesignAutofillJobRequestData model uses additional_properties
-    as a dict of field_name -> DatasetTextValue|DatasetImageValue|DatasetChartValue.
-    Since our data shape uses simple dicts matching the Canva API JSON format,
-    we build the dict and use from_dict() to let the generated model parse it.
+    Returns a plain dict of field_name -> {"type": "text"|"image", ...}
+    matching the Canva autofill API's JSON shape directly.
     """
     fields: dict[str, dict] = {}
 
@@ -236,7 +162,7 @@ def _build_autofill_data(
     if data.get("logo_url"):
         _add_text(fields, "logo_url", data["logo_url"])
 
-    return CreateDesignAutofillJobRequestData.from_dict(fields)
+    return fields
 
 
 def _add_text(fields: dict, name: str, value: str) -> None:
