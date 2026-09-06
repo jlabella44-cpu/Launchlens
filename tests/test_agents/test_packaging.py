@@ -32,7 +32,7 @@ async def _add_vr(db_session, asset_id, quality=80, commercial=60, hero=True, ti
     return vr
 
 
-def _make_scored(room_label, quality=80, commercial=60, hero=False, asset_id=None):
+def _make_scored(room_label, quality=80, commercial=60, hero=False, asset_id=None, is_photo=True):
     """Create a (score, asset_id, vr) tuple for unit-testing _select_diverse / _reorder_mls."""
     import uuid as _uuid
     aid = asset_id or _uuid.uuid4()
@@ -44,6 +44,7 @@ def _make_scored(room_label, quality=80, commercial=60, hero=False, asset_id=Non
         quality_score=quality,
         commercial_score=commercial,
         hero_candidate=hero,
+        is_photo=is_photo,
         raw_labels={},
         model_used="google-vision-v1",
     )
@@ -209,3 +210,27 @@ def test_reorder_mls_follows_room_priority():
     # living_room before kitchen before bathroom in MLS order
     assert labels.index("living_room") < labels.index("kitchen")
     assert labels.index("kitchen") < labels.index("bathroom")
+
+
+def test_select_diverse_excludes_non_photos_and_orders_primary_bedroom_first():
+    """Documents/floorplans (is_photo=False) never make it in, and
+    primary_bedroom sorts ahead of plain bedroom per MLS_POSITION_ORDER."""
+    scored = [
+        _make_scored("document", quality=95, is_photo=False),  # excluded: not a photo
+        _make_scored("floorplan", quality=95, is_photo=False),  # excluded: max_slots=0
+        _make_scored("exterior", quality=80),
+        _make_scored("primary_bedroom", quality=70),
+        _make_scored("bedroom", quality=75),
+        _make_scored("kitchen", quality=60),
+        _make_scored("living_room", quality=55),
+        _make_scored("bathroom", quality=50),
+    ]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = PackagingAgent._select_diverse(scored)
+    rooms = [item[2].room_label for item in top]
+    assert "document" not in rooms
+    assert "floorplan" not in rooms
+
+    reordered = PackagingAgent._reorder_mls(top)
+    labels = [item[2].room_label for item in reordered]
+    assert labels.index("primary_bedroom") < labels.index("bedroom")

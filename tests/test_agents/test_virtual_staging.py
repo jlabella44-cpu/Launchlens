@@ -160,3 +160,46 @@ async def test_provider_failure_on_one_candidate_does_not_block_others(
 
     assert result["staged_count"] == 1
     assert provider.stage_image.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_storage_upload_failure_on_one_candidate_does_not_block_others(
+    db_session, listing, assets, fake_provider
+):
+    """A storage.upload() failure for one asset should be caught like a
+    provider failure: logged and skipped, while the other candidate still
+    completes and the completion event still fires."""
+    empty_living, empty_bedroom, empty_bathroom = assets
+    await _add_vision_result(
+        db_session, empty_living, room_label="living_room", is_empty_room=True
+    )
+    await _add_vision_result(
+        db_session, empty_bedroom, room_label="bedroom", is_empty_room=True
+    )
+
+    storage = _fake_storage()
+    storage.upload = MagicMock(side_effect=[RuntimeError("s3 blew up"), None])
+
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    agent = VirtualStagingAgent(
+        staging_provider=fake_provider,
+        storage_service=storage,
+        session_factory=make_session_factory(db_session),
+    )
+
+    result = await agent.execute(ctx)
+
+    assert result["staged_count"] == 1
+    assert fake_provider.stage_image.await_count == 2
+    assert storage.upload.call_count == 2
+
+    staged_assets = (
+        await db_session.execute(select(Asset).where(Asset.state == "staged"))
+    ).scalars().all()
+    assert len(staged_assets) == 1
+
+    events = (await db_session.execute(
+        select(Event).where(Event.event_type == "virtual_staging.completed")
+    )).scalars().all()
+    assert len(events) == 1
+    assert events[0].payload["staged_count"] == 1

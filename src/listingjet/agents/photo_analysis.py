@@ -155,7 +155,9 @@ class PhotoAnalysisAgent(BaseAgent):
         async def run(asset_id: uuid.UUID, key: str):
             async with semaphore:
                 try:
-                    return asset_id, await self._analyze_one(storage.presigned_url(key))
+                    return asset_id, await self._analyze_one(
+                        storage.presigned_url(key, expires_in=300)
+                    )
                 except asyncio.TimeoutError:
                     logger.warning(
                         "photo_analysis timeout asset=%s after %ss",
@@ -206,6 +208,8 @@ class PhotoAnalysisAgent(BaseAgent):
         )
         counts = {"analyzed": len(successes), "failed": failed, "flagged": flagged}
 
+        will_fail = bool(failed) and (failed == len(results) or failed * 2 > len(results))
+
         async with self.session_scope(context) as (session, lid, _tid):
             # One analysis per asset replaces whatever was there before,
             # including stale tier-2 rows from the old two-tier pass.
@@ -217,16 +221,16 @@ class PhotoAnalysisAgent(BaseAgent):
             session.add_all([self._to_row(aid, a) for aid, a in successes])
             await session.flush()
 
-            if successes:
-                # Kept for backwards compatibility: the SSE stream and the
-                # legacy event-derived progress list still key off this name.
-                await self.emit(session, context, "vision.tier1.completed",
-                                {"asset_count": len(successes)})
-            await self.emit(session, context, "photo_analysis.completed", counts)
-            report = await compliance_report(session, lid)
-            await self.emit(session, context, "photo_compliance.completed", report)
+            # Persist the successful VisionResult rows regardless of outcome,
+            # but only announce completion when the step actually succeeded —
+            # a majority-failure raise below means downstream consumers must
+            # not think this step finished.
+            if not will_fail:
+                await self.emit(session, context, "photo_analysis.completed", counts)
+                report = await compliance_report(session, lid)
+                await self.emit(session, context, "photo_compliance.completed", report)
 
-        if failed and (failed == len(results) or failed * 2 > len(results)):
+        if will_fail:
             raise RuntimeError(
                 f"photo_analysis: {failed} of {len(results)} photos failed"
             )

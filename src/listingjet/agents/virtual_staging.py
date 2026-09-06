@@ -79,15 +79,14 @@ class VirtualStagingAgent(BaseAgent):
                     room_type=vr.room_label,
                     style=_DEFAULT_STYLE,
                 )
+                s3_key = f"listings/{listing_id}/staged/{uuid.uuid4()}.png"
+                self._storage.upload(s3_key, staged_bytes, content_type="image/png")
             except Exception:
                 logger.warning(
                     "virtual_staging.failed room=%s asset=%s",
                     vr.room_label, asset.id, exc_info=True,
                 )
                 continue
-
-            s3_key = f"listings/{listing_id}/staged/{uuid.uuid4()}.png"
-            self._storage.upload(s3_key, staged_bytes, content_type="image/png")
 
             async with self.session_scope(context) as (session, _lid, _tid):
                 staged_asset = Asset(

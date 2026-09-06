@@ -57,10 +57,12 @@ async def test_analyze_images_puts_image_blocks_before_text():
 async def test_none_parsed_output_raises_provider_output_error():
     c = ClaudeClient(api_key="k")
     c._client.messages.parse = AsyncMock(return_value=_resp(parsed=None, stop_reason="refusal"))
-    with patch("listingjet.providers.claude.settings") as s:
+    with patch("listingjet.providers.claude.record_provider_call") as rec, \
+         patch("listingjet.providers.claude.settings") as s:
         s.claude_quality_model = "claude-sonnet-5"
         with pytest.raises(ProviderOutputError):
             await c.complete_json("x", Out)
+    rec.assert_called_once_with("claude", False)
 
 
 @pytest.mark.asyncio

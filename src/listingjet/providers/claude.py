@@ -44,12 +44,13 @@ class ClaudeClient:
         except Exception:
             record_provider_call("claude", False)
             raise
-        record_provider_call("claude", True)
         usage = getattr(resp, "usage", None)
         if usage is not None:
             record_token_usage(model, usage.input_tokens, usage.output_tokens, agent)
         if getattr(resp, "parsed_output", None) is None:
+            record_provider_call("claude", False)
             raise ProviderOutputError(f"no structured output (stop_reason={getattr(resp, 'stop_reason', None)!r})")
+        record_provider_call("claude", True)
         return resp.parsed_output
 
     async def complete_json(
@@ -113,12 +114,13 @@ class ClaudeClient:
         except Exception:
             record_provider_call("claude", False)
             raise
-        record_provider_call("claude", True)
         usage = getattr(resp, "usage", None)
         if usage is not None:
             record_token_usage(model, usage.input_tokens, usage.output_tokens, agent)
         if getattr(resp, "stop_reason", None) == "refusal":
+            record_provider_call("claude", False)
             raise ProviderOutputError("model refused")
+        record_provider_call("claude", True)
         return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
 
 

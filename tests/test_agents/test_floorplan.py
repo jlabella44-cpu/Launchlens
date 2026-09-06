@@ -396,6 +396,37 @@ async def test_floorplan_agent_handles_multiple_floors(db_session):
     assert floors[1]["floor_label"] == "First Floor"
 
 
+@pytest.mark.asyncio
+async def test_build_best_photo_map_skips_non_photo_vision_results(db_session, listing_with_floorplan):
+    """A document/screenshot (is_photo=False) tier-1 row must never win a
+    room's best-photo slot, even with a higher quality_score than the real
+    photo for that room (e.g. an inspection PDF page mislabeled 'kitchen')."""
+    listing, floorplan, photos = listing_with_floorplan
+
+    doc_asset = Asset(
+        tenant_id=listing.tenant_id, listing_id=listing.id,
+        file_path=f"listings/{listing.id}/inspection_doc.jpg",
+        file_hash="doc001", state="ingested",
+    )
+    db_session.add(doc_asset)
+    await db_session.flush()
+    db_session.add(VisionResult(
+        asset_id=doc_asset.id,
+        tier=1, room_label="kitchen", is_photo=False,
+        raw_labels={"room": "document"},
+        quality_score=99, commercial_score=0, hero_candidate=False,
+    ))
+    await db_session.flush()
+
+    all_assets = [*photos, floorplan, doc_asset]
+    agent = _make_agent(db_session, _mock_claude())
+    best = await agent._build_best_photo_map(db_session, all_assets)
+
+    kitchen_asset_id, kitchen_quality = best["kitchen"]
+    assert kitchen_asset_id != doc_asset.id
+    assert kitchen_quality != 99
+
+
 def test_dollhouse_prompt_exists():
     assert "floor_label" in FLOORPLAN_DOLLHOUSE_PROMPT
     assert "furniture" in FLOORPLAN_DOLLHOUSE_PROMPT

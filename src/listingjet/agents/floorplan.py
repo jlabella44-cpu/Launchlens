@@ -220,6 +220,8 @@ class FloorplanAgent(BaseAgent):
 
         best: dict[str, tuple[uuid.UUID, float]] = {}
         for vr in vision_results:
+            if vr.is_photo is False:
+                continue
             if vr.room_label and vr.room_label not in best:
                 best[vr.room_label] = (vr.asset_id, vr.quality_score)
         return best
@@ -231,7 +233,7 @@ class FloorplanAgent(BaseAgent):
         best_photo_by_room: dict[str, tuple[uuid.UUID, float]],
         storage,
     ) -> dict | None:
-        floorplan_url = storage.presigned_url(floorplan_asset.file_path)
+        floorplan_url = storage.presigned_url(floorplan_asset.file_path, expires_in=300)
 
         photo_refs: list[tuple[str, str]] = []
         asset_by_id = {a.id: a for a in all_assets}
@@ -240,7 +242,9 @@ class FloorplanAgent(BaseAgent):
                 continue
             asset = asset_by_id.get(asset_id)
             if asset:
-                photo_refs.append((room_label, storage.presigned_url(asset.file_path)))
+                photo_refs.append(
+                    (room_label, storage.presigned_url(asset.file_path, expires_in=300))
+                )
         photo_refs = photo_refs[:_MAX_ROOM_PHOTOS]
 
         image_urls = [floorplan_url] + [u for _, u in photo_refs]

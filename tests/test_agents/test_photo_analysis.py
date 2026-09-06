@@ -155,7 +155,6 @@ async def test_emits_backward_compatible_events(db_session, listing, assets):
     )).scalars().all()
     by_type = {e.event_type: e.payload for e in events}
 
-    assert by_type["vision.tier1.completed"] == {"asset_count": 3}
     assert by_type["photo_analysis.completed"] == {"analyzed": 3, "failed": 0, "flagged": 1}
     report = by_type["photo_compliance.completed"]
     assert report["total_photos"] == 3
@@ -231,6 +230,13 @@ async def test_majority_failing_raises_but_keeps_successes(db_session, listing, 
     assert len(rows) == 1
     assert rows[0].asset_id == assets[0].id
 
+    events = (await db_session.execute(
+        select(Event).where(Event.listing_id == listing.id)
+    )).scalars().all()
+    by_type = {e.event_type: e.payload for e in events}
+    assert "photo_analysis.completed" not in by_type
+    assert "photo_compliance.completed" not in by_type
+
 
 @pytest.mark.asyncio
 async def test_no_ingested_assets_is_a_no_op(db_session, listing, assets):
@@ -264,3 +270,18 @@ async def test_prefers_the_proxy_image_when_present(db_session, listing, assets)
     await agent.execute(AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id)))
 
     assert "https://mock/proxies/hero.jpg" in seen
+
+
+@pytest.mark.asyncio
+async def test_requests_a_short_lived_presigned_url(db_session, listing, assets, patch_storage):
+    """Vision analysis URLs should be short-lived (300s), not the storage
+    default, since they're only ever used for one immediate provider call."""
+    await _ingested(db_session, assets)
+    agent = PhotoAnalysisAgent(
+        claude=_client_for(assets, _three_analyses()),
+        session_factory=make_session_factory(db_session),
+    )
+    await agent.execute(AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id)))
+
+    for call in patch_storage.presigned_url.call_args_list:
+        assert call.kwargs.get("expires_in") == 300
