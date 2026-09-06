@@ -3,17 +3,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+import httpx
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from listingjet.models.listing import Listing
+from listingjet.models.listing import Listing, ListingState
 from listingjet.models.pipeline_job import JobStatus, PipelineJob
 from listingjet.pipeline.definition import PIPELINE, Step
 from listingjet.pipeline.steps import STEP_FUNCTIONS, StepContext
 
 logger = logging.getLogger(__name__)
+
+_NON_RETRYABLE = (ValueError, KeyError, TypeError, PermissionError, NotImplementedError)
 
 SATISFIED = {JobStatus.DONE, JobStatus.SKIPPED}
 
@@ -146,5 +149,88 @@ async def run_job(session_factory, job_id, *, steps: list[Step] = PIPELINE, func
     return JobStatus.DONE
 
 
+def is_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, asyncio.TimeoutError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code
+        return code == 429 or code >= 500
+    try:
+        import anthropic
+        if isinstance(exc, anthropic.BadRequestError):
+            return False
+        if isinstance(exc, (anthropic.RateLimitError, anthropic.APIConnectionError)):
+            return True
+    except ImportError:
+        pass
+    if isinstance(exc, _NON_RETRYABLE):
+        return False
+    return True
+
+
+def backoff_seconds(attempt: int) -> int:
+    return min(600, 30 * (2 ** (attempt - 1)))
+
+
+def _describe(exc: BaseException) -> str:
+    if isinstance(exc, asyncio.TimeoutError):
+        return "step timed out"
+    return f"{type(exc).__name__}: {exc}"[:2000]
+
+
+async def fail_listing(session: AsyncSession, listing_id, *, step: str, error: str) -> None:
+    from listingjet.services.events import emit_event
+
+    listing = await session.get(Listing, listing_id)
+    if listing is None:
+        return
+    listing.state = ListingState.FAILED
+    await session.execute(
+        update(PipelineJob)
+        .where(PipelineJob.listing_id == listing_id,
+               PipelineJob.status.in_([JobStatus.QUEUED, JobStatus.WAITING]))
+        .values(status=JobStatus.CANCELLED)
+    )
+    await emit_event(session=session, event_type="pipeline.failed",
+                     payload={"step": step, "error": error},
+                     tenant_id=str(listing.tenant_id), listing_id=str(listing_id))
+
+
 async def _handle_failure(session_factory, job_id, step: Step, exc: BaseException) -> JobStatus:
-    raise NotImplementedError  # Task 5
+    error = _describe(exc)
+    logger.warning("pipeline.step.failed step=%s job=%s error=%s", step.name, job_id, error,
+                   exc_info=not isinstance(exc, asyncio.TimeoutError))
+    async with session_factory() as session:
+        job = await session.get(PipelineJob, job_id)
+        job.error = error
+        job.locked_by = None
+        if is_retryable(exc) and job.attempts < job.max_attempts:
+            job.status = JobStatus.QUEUED
+            job.run_after = _now() + timedelta(seconds=backoff_seconds(job.attempts))
+            await session.commit()
+            return JobStatus.QUEUED
+        job.status = JobStatus.FAILED
+        job.finished_at = _now()
+        if not step.optional:
+            await fail_listing(session, job.listing_id, step=step.name, error=error)
+        await session.commit()
+        return JobStatus.FAILED
+
+
+async def reclaim_stale(session: AsyncSession, *, steps: list[Step] = PIPELINE) -> int:
+    index = {s.name: s for s in steps}
+    rows = (await session.execute(
+        select(PipelineJob).where(PipelineJob.status == JobStatus.RUNNING).with_for_update(skip_locked=True)
+    )).scalars().all()
+    reclaimed = 0
+    now = _now()
+    for job in rows:
+        step = index.get(job.step)
+        limit = timedelta(seconds=2 * (step.timeout_s if step else 600))
+        if job.locked_at and job.locked_at < now - limit:
+            job.status = JobStatus.QUEUED
+            job.locked_by = None
+            job.error = "reclaimed after worker died"
+            reclaimed += 1
+    await session.flush()
+    return reclaimed
