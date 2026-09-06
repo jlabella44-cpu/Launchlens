@@ -73,6 +73,40 @@ async def test_cancel_listing_jobs(db_session):
 
 
 @pytest.mark.asyncio
+async def test_run_job_ignores_stale_success_after_cancel(db_session):
+    listing, factory = await _setup(db_session)
+    job = await runner.claim_next(db_session, "w", steps=STEPS)
+    assert await runner.cancel_listing_jobs(db_session, listing.id) == 4  # all queued/waiting/running jobs
+    status = await runner.run_job(factory, job.id, steps=STEPS, functions={"ingestion": lambda ctx: _ret({})})
+    assert status == JobStatus.CANCELLED
+    assert await _status(db_session, listing.id, "ingestion") == JobStatus.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_run_job_ignores_stale_failure_after_cancel(db_session):
+    listing, factory = await _setup(db_session)
+    job = await runner.claim_next(db_session, "w", steps=STEPS)
+    assert await runner.cancel_listing_jobs(db_session, listing.id) == 4
+    status = await runner.run_job(factory, job.id, steps=STEPS,
+                                  functions={"ingestion": lambda ctx: _raise(RuntimeError("boom"))})
+    assert status == JobStatus.CANCELLED
+    assert await _status(db_session, listing.id, "ingestion") == JobStatus.CANCELLED
+    assert (await db_session.get(Listing, listing.id)).state == ListingState.UPLOADING
+
+
+@pytest.mark.asyncio
+async def test_retry_listing_with_no_jobs_enqueues_fresh_pipeline(db_session):
+    listing = Listing(tenant_id=uuid.uuid4(), address={"street": "1 Gate St"}, metadata_={},
+                      state=ListingState.UPLOADING)
+    db_session.add(listing)
+    await db_session.flush()
+    n = await runner.retry_listing(db_session, listing, steps=STEPS)
+    assert n == 3  # ingestion + packaging + content; the gate is created WAITING but not counted
+    assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
+    assert (await db_session.get(Listing, listing.id)).state == ListingState.UPLOADING
+
+
+@pytest.mark.asyncio
 async def test_listing_progress_shape(db_session):
     listing, factory = await _setup(db_session)
     job = await runner.claim_next(db_session, "w", steps=STEPS)

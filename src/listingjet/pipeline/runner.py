@@ -139,6 +139,10 @@ async def run_job(session_factory, job_id, *, steps: list[Step] = PIPELINE, func
         return await _handle_failure(session_factory, job_id, step, exc)
     async with session_factory() as session:
         job = await session.get(PipelineJob, job_id)
+        if job.status != JobStatus.RUNNING:
+            logger.warning("pipeline.step.stale_completion step=%s job=%s status=%s",
+                           job.step, job_id, job.status)
+            return job.status
         job.status = JobStatus.DONE
         job.result = result if isinstance(result, dict) else {"result": result}
         job.error = None
@@ -204,6 +208,10 @@ async def _handle_failure(session_factory, job_id, step: Step, exc: BaseExceptio
                    exc_info=not isinstance(exc, asyncio.TimeoutError))
     async with session_factory() as session:
         job = await session.get(PipelineJob, job_id)
+        if job.status != JobStatus.RUNNING:
+            logger.warning("pipeline.step.stale_completion step=%s job=%s status=%s",
+                           step.name, job_id, job.status)
+            return job.status
         job.error = error
         job.locked_by = None
         if is_retryable(exc) and job.attempts < job.max_attempts:
@@ -258,18 +266,20 @@ async def complete_review(session: AsyncSession, listing_id) -> bool:
 
 async def retry_listing(session: AsyncSession, listing: Listing, *, steps: list[Step] = PIPELINE,
                         billing_model: str = "legacy", enabled_addons: list[str] | None = None) -> int:
+    index = {s.name: s for s in steps}
     sibs = await _siblings(session, listing.id)
     if not sibs:
         created = await enqueue_pipeline(session, listing, billing_model=billing_model,
                                          enabled_addons=enabled_addons or [], steps=steps)
         listing.state = ListingState.UPLOADING
-        return len(created)
-    index = {s.name: s for s in steps}
+        # Review-gate steps are created (as WAITING) but not counted, matching the existing-jobs branch below.
+        return sum(1 for j in created if index.get(j.step) is None or index[j.step].gate != "review")
     n = 0
     for job in sibs.values():
         if job.status in (JobStatus.FAILED, JobStatus.CANCELLED):
             step = index.get(job.step)
             is_gate = step is not None and step.gate == "review"
+            # The gate is reset to WAITING (reopened) but not counted, since it isn't a requeued work item.
             job.status = JobStatus.WAITING if is_gate else JobStatus.QUEUED
             job.attempts = 0
             job.error = None
