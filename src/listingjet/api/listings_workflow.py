@@ -426,8 +426,9 @@ async def run_compliance_scan(
 
     from listingjet.agents.base import AgentContext
     from listingjet.agents.photo_compliance import PhotoComplianceAgent
+    from listingjet.database import admin_session
 
-    agent = PhotoComplianceAgent()
+    agent = PhotoComplianceAgent(session_factory=admin_session)
     ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
     report = await agent.execute(ctx)
     return report

@@ -108,19 +108,23 @@ async def lifespan(app: FastAPI):
             pass
 
     worker_stop.set()
-    for t in worker_tasks:
-        try:
-            await asyncio.wait_for(t, timeout=30)
-        except asyncio.TimeoutError:
-            # Cancelling is only a request — await the task so its shutdown
-            # path (which requeues whatever it still holds) actually runs.
-            t.cancel()
-            await asyncio.gather(t, return_exceptions=True)
-        except Exception:
-            logging.getLogger(__name__).exception("Pipeline worker task failed during shutdown")
-
-    if app.state.redis:
-        app.state.redis.close()
+    try:
+        for t in worker_tasks:
+            try:
+                await asyncio.wait_for(t, timeout=30)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                # Cancelling is only a request — await the task so its shutdown
+                # path (which requeues whatever it still holds) actually runs.
+                # A CancelledError here means *this* await was cancelled (e.g.
+                # the surrounding shutdown itself is being torn down), not that
+                # the worker task is done, so it still needs cancel + await.
+                t.cancel()
+                await asyncio.gather(t, return_exceptions=True)
+            except Exception:
+                logging.getLogger(__name__).exception("Pipeline worker task failed during shutdown")
+    finally:
+        if app.state.redis:
+            app.state.redis.close()
 
 
 _TAG_METADATA = [

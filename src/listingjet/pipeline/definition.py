@@ -78,5 +78,24 @@ def topological_order(steps: list[Step]) -> list[str]:
     return order
 
 
+def transitive_requires(name: str, steps: list[Step] = PIPELINE) -> set[str]:
+    """Every step name reachable from `name` by following `requires` edges."""
+    index = {s.name: s for s in steps}
+    seen: set[str] = set()
+    stack = list(index[name].requires)
+    while stack:
+        dep = stack.pop()
+        if dep in seen:
+            continue
+        seen.add(dep)
+        stack.extend(index[dep].requires)
+    return seen
+
+
+def post_review_steps(steps: list[Step] = PIPELINE) -> frozenset[str]:
+    """Names whose transitive requires include the `await_review` gate."""
+    return frozenset(s.name for s in steps if "await_review" in transitive_requires(s.name, steps))
+
+
 validate_pipeline(PIPELINE)
 STEP_INDEX: dict[str, Step] = {s.name: s for s in PIPELINE}

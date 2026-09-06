@@ -95,6 +95,36 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
 
 
 @pytest.mark.asyncio
+async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_claim(db_session):
+    """Regression at scale: with CLAIM_CANDIDATE_LIMIT=500 and 11 unsatisfiable
+    post-approval rows per parked listing (content, brand, social_content,
+    social_cuts, mls_export, distribution, microsite, learning, social_event,
+    health_score, performance_intelligence — all QUEUED with every test
+    feature flag on), 50 parked listings alone fill the whole candidate window
+    (550 rows) with rows that can never run until a human approves them. A
+    fresh listing's `ingestion` row must still be claimable on the very first
+    `claim_next` call, not merely "eventually"."""
+    factory = make_session_factory(db_session)
+    listings = [await _listing(db_session, f"{i} Parked Ave") for i in range(50)]
+
+    # Drain everything runnable: every listing walks up to its review gate,
+    # leaving ~12 unsatisfiable post-approval rows per listing at the head of
+    # the candidate scan.
+    drained = 0
+    while (job := await runner.claim_next(db_session, "w1")) is not None:
+        await runner.run_job(factory, job.id, functions=FUNCTIONS)
+        drained += 1
+        assert drained < 2000, "drain did not terminate"
+    for listing in listings:
+        assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
+
+    fresh = await _listing(db_session, "fresh listing")
+    job = await runner.claim_next(db_session, "w1")
+    assert job is not None, "queue deadlocked behind 45 listings parked at the review gate"
+    assert (job.listing_id, job.step) == (fresh.id, "ingestion")
+
+
+@pytest.mark.asyncio
 async def test_two_workers_cannot_claim_the_same_job(db_session):
     """The compare-and-set claim means only one worker can win a given row."""
     steps = [Step("a"), Step("b", requires=("a",))]
