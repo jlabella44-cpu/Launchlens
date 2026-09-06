@@ -7,7 +7,7 @@ Rework tracker. Spec: `docs/superpowers/specs/2026-09-05-free-tier-rework-design
 | 1 Security fixes | `fix/security-week1` / #306 | done, awaiting merge |
 | 2 Job queue replaces Temporal | `feat/job-queue` / #307 | done, awaiting merge |
 | 3 Delete and flag | `chore/delete-and-flag` / #308 | done, awaiting merge |
-| 4 Claude providers + photo analysis | `feat/claude-providers` / TBD | done, awaiting merge |
+| 4 Claude providers + photo analysis | `feat/claude-providers` / #309 | done, awaiting merge |
 | 5 Content + social | — | |
 | 6 Video two-tier (ffmpeg + Runway) | — | |
 | 7 Frontend, CI, hosting config | — | |
