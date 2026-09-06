@@ -91,9 +91,6 @@ class Settings(BaseSettings):
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
 
-    # CloudWatch metrics — opt-in. Set true on AWS deploys; off everywhere else.
-    cloudwatch_enabled: bool = False
-
     # Monitoring
     sentry_dsn: str = ""
     git_sha: str = ""
@@ -106,9 +103,6 @@ class Settings(BaseSettings):
 
     # Google OAuth
     google_oauth_client_id: str = ""
-
-    # OpenTelemetry
-    otel_exporter_endpoint: str = ""  # Empty = disabled
 
     # Field-level encryption (Fernet key for tenant secrets, etc.)
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

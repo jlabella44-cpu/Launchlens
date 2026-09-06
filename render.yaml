@@ -70,9 +70,6 @@ envVarGroups:
         sync: false
       - key: AWS_REGION
         value: auto
-      # CloudWatch is AWS-only — keep it off here.
-      - key: CLOUDWATCH_ENABLED
-        value: "false"
       # --- Auth / app ---
       - key: JWT_SECRET
         sync: false

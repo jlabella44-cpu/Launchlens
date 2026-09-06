@@ -1,15 +1,24 @@
 """
 Pipeline-level metrics — tracks agent step durations, failures, provider calls, and costs.
 
-All functions are no-ops in development to avoid CloudWatch calls during local work.
+Metrics are logged via the standard logger (no external metrics backend).
 """
 
 import logging
 import time
 
-from listingjet.monitoring.metrics import emit_metric
-
 logger = logging.getLogger(__name__)
+
+
+def emit_metric(
+    name: str,
+    value: float,
+    unit: str = "Count",
+    dimensions: dict[str, str] | None = None,
+) -> None:
+    """Log a metric line. Replaces the old CloudWatch emitter — metrics are
+    now just structured log lines for external log aggregation."""
+    logger.info("metric name=%s value=%s unit=%s dims=%s", name, value, unit, dimensions or {})
 
 # Estimated cost per provider call in USD (flat per-call heuristic)
 PROVIDER_COSTS: dict[str, float] = {
