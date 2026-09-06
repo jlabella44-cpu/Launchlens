@@ -134,7 +134,10 @@ class ClaudeProvider(LLMProvider):
         context: dict,
         temperature: float | None = None,
         system_prompt: str | None = None,
+        agent: str | None = None,
     ) -> str:
         context_str = json.dumps(context, indent=2, default=str) if context else ""
         user = f"{prompt}\n\nContext:\n{context_str}" if context_str else prompt
-        return await self._client.complete_text(user, system=system_prompt or DEFAULT_SYSTEM_PROMPT)
+        return await self._client.complete_text(
+            user, system=system_prompt or DEFAULT_SYSTEM_PROMPT, agent=agent
+        )
