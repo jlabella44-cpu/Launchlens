@@ -200,6 +200,10 @@ class MockClaudeClient:
 
     def __init__(self):
         self.responses: dict[type, list[BaseModel]] = {}
+        # analyze_images only: map the first image URL to an exact response.
+        # Use this instead of `responses` when calls run concurrently and the
+        # queue order is not guaranteed to match the caller's submit order.
+        self.by_url: dict[str, BaseModel] = {}
         self._seed = 0
 
     async def complete_text(self, prompt: str, *, system=None, model=None, max_tokens=4096, agent=None) -> str:
@@ -218,4 +222,6 @@ class MockClaudeClient:
     async def analyze_images(self, image_urls: list[str], prompt: str, schema: type[BaseModel], *, system=None, model=None, max_tokens=4096, agent=None) -> BaseModel:
         if not image_urls:
             raise ValueError("image_urls must be non-empty")
+        if image_urls[0] in self.by_url:
+            return self.by_url[image_urls[0]]
         return await self._next(schema)
