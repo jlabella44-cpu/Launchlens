@@ -102,7 +102,7 @@ async def edit_single_image(
         input_tokens = int(usage.get("input_tokens", 0))
         output_tokens = int(usage.get("output_tokens", 0))
         if input_tokens or output_tokens:
-            record_token_usage(provider_label, input_tokens, output_tokens)
+            record_token_usage("gpt-image-1.5", input_tokens, output_tokens)
 
     record_provider_call(provider_label, True)
     png_bytes = base64.b64decode(b64)

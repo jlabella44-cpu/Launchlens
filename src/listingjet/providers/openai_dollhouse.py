@@ -157,7 +157,7 @@ class OpenAIDollhouseProvider:
             input_tokens = int(usage.get("input_tokens", 0))
             output_tokens = int(usage.get("output_tokens", 0))
             if input_tokens or output_tokens:
-                record_token_usage("openai_dollhouse", input_tokens, output_tokens)
+                record_token_usage("gpt-image-1.5", input_tokens, output_tokens)
 
         record_provider_call("openai_dollhouse", True)
         png_bytes = base64.b64decode(b64)
