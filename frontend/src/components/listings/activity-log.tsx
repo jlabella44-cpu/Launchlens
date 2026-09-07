@@ -68,7 +68,6 @@ function SkeletonRow() {
 export function ActivityLog({ listingId }: ActivityLogProps) {
   const [entries, setEntries] = useState<AuditLogEntryResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -104,17 +103,13 @@ export function ActivityLog({ listingId }: ActivityLogProps) {
         </div>
       )}
 
-      {!loading && error && (
-        <p className="text-sm text-red-500 py-4 text-center">{error}</p>
-      )}
-
-      {!loading && !error && entries.length === 0 && (
+      {!loading && entries.length === 0 && (
         <p className="text-sm text-slate-400 py-6 text-center">
           No activity recorded yet.
         </p>
       )}
 
-      {!loading && !error && entries.length > 0 && (
+      {!loading && entries.length > 0 && (
         <div className="relative">
           {/* Timeline line */}
           <div className="absolute left-[15px] top-4 bottom-4 w-px bg-[var(--color-card-border)]" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
@@ -772,15 +772,15 @@ function SupportTab() {
     apiClient.adminSupportStats().then(setStats).catch(() => {});
   }, []);
 
-  useEffect(() => { fetchTickets(); }, [statusFilter]);
-
-  async function fetchTickets() {
+  const fetchTickets = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiClient.adminSupportTickets({ status: statusFilter === "all" ? undefined : statusFilter, limit: 50 });
       setTickets(res.items);
     } catch { /* silently handle */ } finally { setLoading(false); }
-  }
+  }, [statusFilter]);
+
+  useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
   async function selectTicket(id: string) {
     setSelectedId(id);

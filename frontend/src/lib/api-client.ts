@@ -26,8 +26,6 @@ import type {
   Addon,
   VideoResponse,
   SocialCut,
-  VideoUploadRequest,
-  VideoUploadResponse,
   DemoCreateResponse,
   DemoUploadRequest,
   DemoUploadResponse,
@@ -38,7 +36,6 @@ import type {
   BrandKitResponse,
   BrandKitUpsertRequest,
   PipelineStatusResponse,
-  ReviewQueueItem,
   RejectRequest,
   TeamMemberResponse,
   InviteTeamMemberRequest,
@@ -114,7 +111,6 @@ class ApiClient {
       this._authMiddleware = {
         async onRequest({ request }) {
           request.headers.set("Authorization", `Bearer ${token}`);
-          request.headers.set("ngrok-skip-browser-warning", "true");
           return request;
         },
       };
@@ -144,7 +140,6 @@ class ApiClient {
   ): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
       ...(options.headers as Record<string, string>),
     };
 
@@ -321,12 +316,6 @@ class ApiClient {
     return this.request<SocialCut[]>(`/listings/${listingId}/video/social-cuts`);
   }
 
-  async uploadVideo(listingId: string, data: VideoUploadRequest): Promise<VideoUploadResponse> {
-    return this.request<VideoUploadResponse>(`/listings/${listingId}/video/upload`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
 
   // Retry failed listing
   async retryListing(listingId: string): Promise<{ listing_id: string; state: string }> {
@@ -767,7 +756,6 @@ class ApiClient {
   async sendHelpMessage(message: string, sessionId?: string): Promise<Response> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
     };
     if (this.token) {
       headers["Authorization"] = `Bearer ${this.token}`;

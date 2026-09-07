@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  backend:
     runs-on: ubuntu-latest
 
     services:
@@ -24,20 +24,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      postgres-dev:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: listingjet
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: listingjet
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U listingjet"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
       redis:
         image: redis:7-alpine
         ports:
@@ -48,9 +34,11 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    # Tests only ever talk to the test DB on 5433 (see TEST_DB_URL in
+    # tests/conftest.py) — there is no separate dev database in CI.
     env:
-      DATABASE_URL: postgresql+asyncpg://listingjet:password@localhost:5432/listingjet
-      DATABASE_URL_SYNC: postgresql://listingjet:password@localhost:5432/listingjet
+      DATABASE_URL: postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test
+      DATABASE_URL_SYNC: postgresql://listingjet:password@localhost:5433/listingjet_test
       JWT_SECRET: ci-test-secret-minimum-32-characters-long
       REDIS_URL: redis://localhost:6379/0
       USE_MOCK_PROVIDERS: "true"
@@ -73,9 +61,6 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
-      - name: Run Alembic migrations (dev DB)
-        run: alembic upgrade head
-
       - name: Run Alembic migrations (test DB)
         env:
           DATABASE_URL_SYNC: postgresql://listingjet:password@localhost:5433/listingjet_test
@@ -85,5 +70,44 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
+      - name: Ruff
+        run: ruff check src tests alembic scripts
+
+      - name: Env example drift
+        run: python scripts/gen_env_example.py --check
+
       - name: Run tests
         run: pytest --tb=short -q --timeout=30
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_PUBLIC_MEDIA_HOST: media.example.com
+      NEXT_PUBLIC_API_URL: /api
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build

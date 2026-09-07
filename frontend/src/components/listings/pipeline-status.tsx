@@ -3,19 +3,24 @@
 /**
  * Simplified 5-stage horizontal pipeline tracker.
  *
- * Upload → Analyze → Review → Create → Delivered
+ * Ingest → Analyze → Review → Create → Delivered
  */
 
-const STAGES = [
+// Only real listing states appear here, and between STAGES and ERROR_STATES
+// every member of `ListingState` (src/listingjet/models/listing.py) is
+// covered — otherwise getStageIndex returns -1 and the tracker renders with
+// no stage marked at all.
+export const STAGES = [
   {
-    key: "upload",
-    label: "Upload",
-    states: ["new", "uploading"],
+    key: "ingest",
+    label: "Ingest",
+    // `draft` and `demo` are pre-pipeline states: both sit at Ingest.
+    states: ["draft", "demo", "new", "uploading"],
   },
   {
     key: "analyze",
     label: "Analyze",
-    states: ["analyzing", "coverage", "floorplan", "packaging", "compliance"],
+    states: ["analyzing"],
   },
   {
     key: "review",
@@ -25,7 +30,7 @@ const STAGES = [
   {
     key: "create",
     label: "Create",
-    states: ["content", "brand_social", "chapters", "social_cuts", "mls_export", "exporting"],
+    states: ["exporting"],
   },
   {
     key: "delivered",
@@ -34,9 +39,9 @@ const STAGES = [
   },
 ];
 
-const ERROR_STATES = new Set(["failed", "pipeline_timeout", "cancelled"]);
+export const ERROR_STATES = new Set(["failed", "pipeline_timeout", "cancelled"]);
 
-function getStageIndex(state: string): number {
+export function getStageIndex(state: string): number {
   for (let i = 0; i < STAGES.length; i++) {
     if (STAGES[i].states.includes(state)) return i;
   }

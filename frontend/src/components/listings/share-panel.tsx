@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Select } from "@/components/ui/select";
 import apiClient from "@/lib/api-client";
@@ -62,13 +62,7 @@ export function SharePanel({ listingId, isOpen, onClose }: SharePanelProps) {
     return () => dialog.removeEventListener("keydown", handleTab);
   }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadPermissions();
-    }
-  }, [isOpen, listingId]);
-
-  async function loadPermissions() {
+  const loadPermissions = useCallback(async () => {
     setLoading(true);
     try {
       const perms = await apiClient.getListingPermissions(listingId);
@@ -78,7 +72,13 @@ export function SharePanel({ listingId, isOpen, onClose }: SharePanelProps) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [listingId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPermissions();
+    }
+  }, [isOpen, loadPermissions]);
 
   async function handleShare(e: React.FormEvent) {
     e.preventDefault();

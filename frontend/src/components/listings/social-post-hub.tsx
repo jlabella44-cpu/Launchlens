@@ -171,7 +171,7 @@ export function SocialPostHub({ listingId }: SocialPostHubProps) {
             No listing events yet
           </p>
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            Events like "Just Listed" or "Open House" will appear here once created.
+            Events like &ldquo;Just Listed&rdquo; or &ldquo;Open House&rdquo; will appear here once created.
           </p>
         </div>
       )}

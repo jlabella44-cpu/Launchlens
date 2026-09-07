@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Badge } from "@/components/ui/badge";
 import type { PackageSelection } from "@/lib/types";
 
 interface PackageViewerProps {

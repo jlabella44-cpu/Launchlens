@@ -58,7 +58,6 @@ const PLATFORM_CONFIG = {
 export function PlatformPostCard({
   platform,
   listingId,
-  eventId,
   socialCut,
   captions,
   hashtags = [],

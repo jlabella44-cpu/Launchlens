@@ -238,6 +238,27 @@ function ReviewQueue() {
     return () => clearInterval(interval);
   }, [fetchQueue]);
 
+  const handleApprove = useCallback(async (id: string) => {
+    setActionLoading(id);
+    try {
+      // startReview is a best-effort transition: if the listing is already
+      // IN_REVIEW (e.g. user opened the detail page first), the endpoint
+      // returns 409 — that's fine, we still want to approve.
+      try {
+        await apiClient.startReview(id);
+      } catch (err: unknown) {
+        const status = (err as { status?: number })?.status;
+        if (status !== 409) throw err;
+      }
+      await apiClient.approveListing(id);
+      setListings((prev) => prev.filter((l) => l.id !== id));
+      toast("Listing approved", "success");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : "Failed to approve", "error");
+    } finally {
+      setActionLoading(null);
+    }
+  }, [toast]);
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -257,7 +278,7 @@ function ReviewQueue() {
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [listings, expandedId]);
+  }, [listings, expandedId, handleApprove]);
 
   async function toggleExpand(id: string) {
     if (expandedId === id) {
@@ -311,27 +332,6 @@ function ReviewQueue() {
     }
   }
 
-  async function handleApprove(id: string) {
-    setActionLoading(id);
-    try {
-      // startReview is a best-effort transition: if the listing is already
-      // IN_REVIEW (e.g. user opened the detail page first), the endpoint
-      // returns 409 — that's fine, we still want to approve.
-      try {
-        await apiClient.startReview(id);
-      } catch (err: unknown) {
-        const status = (err as { status?: number })?.status;
-        if (status !== 409) throw err;
-      }
-      await apiClient.approveListing(id);
-      setListings((prev) => prev.filter((l) => l.id !== id));
-      toast("Listing approved", "success");
-    } catch (err: unknown) {
-      toast(err instanceof Error ? err.message : "Failed to approve", "error");
-    } finally {
-      setActionLoading(null);
-    }
-  }
 
   async function handleReject(id: string) {
     setActionLoading(id);

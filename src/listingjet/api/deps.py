@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,20 +13,9 @@ from listingjet.services.auth import decode_token
 _bearer = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    # Prefer explicit Authorization header, fall back to httpOnly cookie.
-    # This ordering is critical: httpx and browsers may persist cookies
-    # across requests, so an explicit Bearer header must take priority
-    # to avoid using a stale cookie from a different user/session.
-    token: str | None = None
-    if credentials:
-        token = credentials.credentials
-    if not token:
-        token = request.cookies.get("access_token")
+async def _user_from_token(token: str | None, db: AsyncSession) -> User:
+    """Shared validation path: decode (type + revocation checked in
+    `decode_token`), look up the user, and enforce the tenant soft-delete gate."""
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -50,6 +39,43 @@ async def get_current_user(
     if tenant is None or tenant.deactivated_at is not None:
         raise HTTPException(status_code=401, detail="Tenant deactivated")
     return user
+
+
+async def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    # Prefer explicit Authorization header, fall back to httpOnly cookie.
+    # This ordering is critical: httpx and browsers may persist cookies
+    # across requests, so an explicit Bearer header must take priority
+    # to avoid using a stale cookie from a different user/session.
+    token: str | None = None
+    if credentials:
+        token = credentials.credentials
+    if not token:
+        token = request.cookies.get("access_token")
+    return await _user_from_token(token, db)
+
+
+async def get_current_user_or_query_token(
+    request: Request,
+    token: str | None = Query(None, alias="token"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Same validation as `get_current_user`, but also accepts a `?token=`
+    query parameter as a last-resort fallback. Browsers' `EventSource` cannot
+    send an Authorization header, so the SSE route uses this instead of
+    `get_current_user` — nothing else should."""
+    resolved: str | None = None
+    if credentials:
+        resolved = credentials.credentials
+    if not resolved:
+        resolved = request.cookies.get("access_token")
+    if not resolved:
+        resolved = token
+    return await _user_from_token(resolved, db)
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:

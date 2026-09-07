@@ -34,7 +34,6 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
 
 import httpx
 
@@ -93,7 +92,8 @@ def step_1_register(client: httpx.Client, state: State) -> None:
     payload = resp.json()
     state.token = payload["access_token"]
     # Decode tenant_id from the token without verifying — sub/tenant_id are non-secret
-    import base64, json as _json
+    import base64
+    import json as _json
     parts = state.token.split(".")
     body = _json.loads(base64.urlsafe_b64decode(parts[1] + "=="))
     state.tenant_id = body["tenant_id"]

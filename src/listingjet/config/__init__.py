@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     worker_enabled: bool = True
     worker_concurrency: int = 2
     worker_poll_interval_s: float = 2.0
+    # A listing with no RUNNING job whose newest pipeline_jobs row hasn't been
+    # touched in this many hours is considered stuck and failed by
+    # `pipeline.periodic.fail_stuck_listings`.
+    pipeline_timeout_hours: int = 6
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

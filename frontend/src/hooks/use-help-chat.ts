@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 
 export interface ChatMessage {
@@ -27,7 +27,6 @@ export function useHelpChat() {
     }
     return null;
   });
-  const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
     async (text: string) => {

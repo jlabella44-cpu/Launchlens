@@ -3,7 +3,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.api.deps import get_current_user
@@ -12,7 +12,9 @@ from listingjet.database import get_db
 from listingjet.models.addon_catalog import AddonCatalog
 from listingjet.models.addon_purchase import AddonPurchase
 from listingjet.models.listing import Listing, ListingState
+from listingjet.models.pipeline_job import PipelineJob
 from listingjet.models.user import User
+from listingjet.pipeline.runner import enqueue_addon_steps
 from listingjet.services.credits import CreditService, InsufficientCreditsError
 from listingjet.services.endpoint_rate_limit import rate_limit
 
@@ -40,8 +42,10 @@ async def activate_addon(
 ):
     """Activate an add-on for a listing, deducting the required credits.
 
-    Can only be applied before the pipeline starts (states: NEW, UPLOADING,
-    AWAITING_REVIEW, IN_REVIEW). Returns 402 if credits are insufficient.
+    Can be applied any time before delivery, and even after: adding one to a
+    listing whose pipeline already ran (APPROVED/EXPORTING/DELIVERED) queues
+    the gated step (and everything downstream of it) to re-run via
+    `enqueue_addon_steps`. Returns 402 if credits are insufficient.
     """
     # Verify listing ownership
     listing = (await db.execute(
@@ -53,8 +57,11 @@ async def activate_addon(
     if not listing:
         raise HTTPException(404, "Listing not found")
 
-    # Can only add add-ons before pipeline starts generating
-    allowed_states = {ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING, ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW}
+    allowed_states = {
+        ListingState.DRAFT, ListingState.NEW, ListingState.UPLOADING,
+        ListingState.AWAITING_REVIEW, ListingState.IN_REVIEW,
+        ListingState.APPROVED, ListingState.EXPORTING, ListingState.DELIVERED,
+    }
     if listing.state not in allowed_states:
         raise HTTPException(409, f"Cannot add add-ons in state: {listing.state.value}")
 
@@ -87,12 +94,17 @@ async def activate_addon(
         except InsufficientCreditsError:
             raise HTTPException(status_code=402, detail="Insufficient credits for bundle")
 
+        already_purchased = set((await db.execute(
+            select(AddonPurchase.addon_id).where(AddonPurchase.listing_id == listing_id)
+        )).scalars().all())
+
         purchases = []
+        new_slugs = []
         for slug in bundle["includes"]:
             catalog_entry = (await db.execute(
                 select(AddonCatalog).where(AddonCatalog.slug == slug)
             )).scalar_one_or_none()
-            if catalog_entry:
+            if catalog_entry and catalog_entry.id not in already_purchased:
                 purchase = AddonPurchase(
                     tenant_id=current_user.tenant_id,
                     listing_id=listing_id,
@@ -103,6 +115,13 @@ async def activate_addon(
                 )
                 db.add(purchase)
                 purchases.append(purchase)
+                new_slugs.append(slug)
+
+        if new_slugs and await db.scalar(
+            select(exists().where(PipelineJob.listing_id == listing_id))
+        ):
+            for slug in new_slugs:
+                await enqueue_addon_steps(db, listing, slug)
 
         await db.commit()
         return {
@@ -151,6 +170,10 @@ async def activate_addon(
         credit_transaction_id=txn.id,
     )
     db.add(purchase)
+
+    if await db.scalar(select(exists().where(PipelineJob.listing_id == listing_id))):
+        await enqueue_addon_steps(db, listing, addon.slug)
+
     await db.commit()
 
     return AddonPurchaseResponse(

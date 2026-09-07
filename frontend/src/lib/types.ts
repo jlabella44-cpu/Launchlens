@@ -111,18 +111,6 @@ export interface SocialCut {
   max_duration: number;
 }
 
-export interface VideoUploadRequest {
-  s3_key: string;
-  video_type: "user_raw" | "professional";
-  duration_seconds?: number;
-}
-
-export interface VideoUploadResponse {
-  id: string;
-  s3_key: string;
-  video_type: string;
-  status: string;
-}
 
 export interface DemoUploadRequest {
   file_paths: string[];
@@ -256,6 +244,10 @@ export interface PipelineStep {
   status: "pending" | "in_progress" | "completed" | "failed" | "skipped";
   completed_at: string | null;
   progress: string | null;
+  /** Failure detail from the job row; null unless status is "failed". */
+  error: string | null;
+  /** How many times the step has run. Older responses may omit it. */
+  attempts?: number;
 }
 
 export interface PipelineStatusResponse {

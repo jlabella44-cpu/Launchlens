@@ -23,7 +23,7 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     dockerCommand: ./entrypoint.sh api
-    plan: starter
+    plan: free
     region: oregon
     healthCheckPath: /health
     autoDeploy: false
@@ -36,11 +36,15 @@ services:
       - fromGroup: listingjet-shared
       - key: APP_ENV
         value: production
+      - key: WORKER_ENABLED
+        value: "true"
+      - key: WORKER_CONCURRENCY
+        value: "2"
       # Render injects PORT automatically; entrypoint.sh honors it.
 
 # Shared secrets / config. Set the real values once in the Render dashboard
 # (Environment Groups -> listingjet-shared). Keep this list in sync with
-# .env.production.example — anything there that prod needs can be added here.
+# .env.example — anything there that prod needs can be added here.
 envVarGroups:
   - name: listingjet-shared
     envVars:

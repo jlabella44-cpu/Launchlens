@@ -14,18 +14,43 @@ const STATUS_ICON: Record<string, { icon: string; color: string; bg: string }> =
   skipped: { icon: "–", color: "text-slate-400", bg: "bg-slate-50" },
 };
 
-const POLLING_STATES = ["uploading", "analyzing", "generating", "exporting"];
+// Real `ListingState` values only — see src/listingjet/models/listing.py.
+const POLLING_STATES = ["uploading", "analyzing", "exporting"];
 const POLL_INTERVAL = 10_000;
+const ERROR_MAX_CHARS = 200;
 
 interface PipelineProgressProps {
   listingId: string;
   listingState: string;
+  /** Bump to force a refetch — the page increments this on every SSE event. */
+  refreshKey: number;
+  /** True while the SSE stream is connected; suppresses the fallback poll. */
+  live: boolean;
+  /** Lets the page render step errors (e.g. in the failure banner). */
+  onSteps?: (steps: PipelineStep[]) => void;
 }
 
-export function PipelineProgress({ listingId, listingState }: PipelineProgressProps) {
+function truncate(text: string): string {
+  return text.length > ERROR_MAX_CHARS
+    ? `${text.slice(0, ERROR_MAX_CHARS - 1)}…`
+    : text;
+}
+
+export function PipelineProgress({
+  listingId,
+  listingState,
+  refreshKey,
+  live,
+  onSteps,
+}: PipelineProgressProps) {
   const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onStepsRef = useRef(onSteps);
+
+  useEffect(() => {
+    onStepsRef.current = onSteps;
+  }, [onSteps]);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +58,9 @@ export function PipelineProgress({ listingId, listingState }: PipelineProgressPr
     async function fetchStatus() {
       try {
         const res = await apiClient.getPipelineStatus(listingId);
-        if (!cancelled) setSteps(res.steps);
+        if (cancelled) return;
+        setSteps(res.steps);
+        onStepsRef.current?.(res.steps);
       } catch {
         // Endpoint may not exist yet — silently ignore
       } finally {
@@ -43,15 +70,19 @@ export function PipelineProgress({ listingId, listingState }: PipelineProgressPr
 
     fetchStatus();
 
-    if (POLLING_STATES.includes(listingState)) {
+    // SSE pushes updates when connected; poll only as a fallback.
+    if (!live && POLLING_STATES.includes(listingState)) {
       intervalRef.current = setInterval(fetchStatus, POLL_INTERVAL);
     }
 
     return () => {
       cancelled = true;
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
-  }, [listingId, listingState]);
+  }, [listingId, listingState, refreshKey, live]);
 
   if (loading || steps.length === 0) return null;
 
@@ -72,35 +103,53 @@ export function PipelineProgress({ listingId, listingState }: PipelineProgressPr
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.03 }}
-              className="flex items-center gap-3 py-1.5"
+              className="py-1.5"
             >
-              <span
-                className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${meta.bg} ${meta.color} ${
-                  step.status === "in_progress" ? "animate-spin" : ""
-                }`}
-              >
-                {meta.icon}
-              </span>
-              <span
-                className={`text-sm flex-1 ${
-                  step.status === "completed"
-                    ? "text-[var(--color-text)]"
-                    : step.status === "in_progress"
-                      ? "text-[var(--color-primary)] font-medium"
-                      : "text-[var(--color-text-secondary)]"
-                }`}
-              >
-                {step.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-              </span>
-              {step.progress && step.status === "in_progress" && (
-                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                  {step.progress}
+              <div className="flex items-center gap-3">
+                <span
+                  className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${meta.bg} ${meta.color} ${
+                    step.status === "in_progress" ? "animate-spin" : ""
+                  }`}
+                >
+                  {meta.icon}
                 </span>
-              )}
-              {step.completed_at && step.status === "completed" && (
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  {new Date(step.completed_at).toLocaleTimeString()}
+                <span
+                  className={`text-sm flex-1 ${
+                    step.status === "completed"
+                      ? "text-[var(--color-text)]"
+                      : step.status === "in_progress"
+                        ? "text-[var(--color-primary)] font-medium"
+                        : step.status === "failed"
+                          ? "text-red-700 font-medium"
+                          : "text-[var(--color-text-secondary)]"
+                  }`}
+                >
+                  {step.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                 </span>
+                {typeof step.attempts === "number" && step.attempts > 1 && (
+                  <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                    attempt {step.attempts}
+                  </span>
+                )}
+                {step.progress && step.status === "in_progress" && (
+                  <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                    {step.progress}
+                  </span>
+                )}
+                {step.completed_at && step.status === "completed" && (
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    {new Date(step.completed_at).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              {step.status === "failed" && step.error && (
+                <p
+                  data-testid={`step-error-${step.name}`}
+                  title={step.error}
+                  className="ml-9 mt-1 text-xs font-mono text-red-700 bg-red-50 border border-red-100 rounded-lg px-2 py-1 break-words"
+                >
+                  {truncate(step.error)}
+                </p>
               )}
             </motion.div>
           );

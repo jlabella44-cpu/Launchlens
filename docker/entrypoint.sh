@@ -24,7 +24,7 @@ until python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('
 done
 echo "PostgreSQL check complete"
 
-# Use PORT env var if set (Railway sets this), otherwise 8000
+# Use PORT env var if set (Render sets this), otherwise 8000
 PORT=${PORT:-8000}
 
 case "${1:-api}" in

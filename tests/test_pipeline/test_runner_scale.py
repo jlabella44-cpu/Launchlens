@@ -94,6 +94,10 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
         assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
 
 
+# 55 listings x ~10 rows: fast locally, but slower than CI's global
+# `--timeout=30` on a shared GitHub runner, where it was killed mid-commit.
+# pytest-timeout honours this per-test marker over the CLI default.
+@pytest.mark.timeout(180)
 @pytest.mark.asyncio
 async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_claim(db_session):
     """Regression at scale: with CLAIM_CANDIDATE_LIMIT=500 and 10 unsatisfiable

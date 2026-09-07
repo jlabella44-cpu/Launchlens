@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/layout/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { PackageViewer } from "@/components/listings/package-viewer";
 import { PipelineStatus } from "@/components/listings/pipeline-status";
+import { PipelineProgress } from "@/components/listings/pipeline-progress";
 import { AssetUploadForm } from "@/components/listings/asset-upload-form";
 import apiClient from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
@@ -21,6 +22,18 @@ import { HealthPanel } from "@/components/listings/health-panel";
 import { DollhouseCard } from "@/components/listings/dollhouse-card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { useFeature } from "@/hooks/use-features";
+import { useListingEvents } from "@/lib/use-listing-events";
+import type { PipelineStep } from "@/lib/types";
+
+const ERROR_MAX_CHARS = 200;
+/** Collapse a burst of SSE events into a single refetch. */
+const SSE_REFETCH_DEBOUNCE_MS = 300;
+
+function truncateError(text: string): string {
+  return text.length > ERROR_MAX_CHARS
+    ? `${text.slice(0, ERROR_MAX_CHARS - 1)}…`
+    : text;
+}
 
 function ListingDetail() {
   const params = useParams();
@@ -42,6 +55,14 @@ function ListingDetail() {
   const [microsite, setMicrosite] = useState<{ microsite_url: string; qr_code_url: string | null; status: string } | null>(null);
   const [micrositeLoading, setMicrositeLoading] = useState(false);
   const [complianceFixing, setComplianceFixing] = useState(false);
+  const [pipelineSteps, setPipelineSteps] = useState<PipelineStep[]>([]);
+
+  // Live pipeline updates. Polling below is only the fallback when the
+  // SSE stream is not connected.
+  const { connected, lastEvent, events, gaveUp } = useListingEvents(id);
+  /** Trailing debounce for the SSE-driven refetch (a pipeline step can emit
+   *  several events in a burst; one refetch is enough). */
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -81,11 +102,26 @@ function ListingDetail() {
   }, [fetchData]);
 
   useEffect(() => {
+    if (!lastEvent) return;
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => {
+      refetchTimer.current = null;
+      fetchData();
+    }, SSE_REFETCH_DEBOUNCE_MS);
+  }, [lastEvent, fetchData]);
+
+  useEffect(() => () => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+  }, []);
+
+  const listingState = listing?.state;
+  useEffect(() => {
     const PROCESSING_STATES = ["uploading", "analyzing", "exporting"];
-    if (!listing || !PROCESSING_STATES.includes(listing.state)) return;
+    if (connected) return;
+    if (!listingState || !PROCESSING_STATES.includes(listingState)) return;
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
-  }, [listing?.state, fetchData]);
+  }, [listingState, connected, fetchData]);
 
   async function handleStartReview() {
     setActionLoading(true);
@@ -164,7 +200,9 @@ function ListingDetail() {
   }
 
   const addr = listing.address;
-  const meta = listing.metadata;
+  const firstStepError = pipelineSteps.find(
+    (step) => step.status === "failed" && step.error,
+  );
   const showActions = ["awaiting_review", "in_review", "approved", "exporting", "delivered"].includes(listing.state);
   const showVideo = ["approved", "exporting", "delivered"].includes(listing.state);
 
@@ -217,8 +255,24 @@ function ListingDetail() {
         )}
 
         {/* Pipeline Status */}
-        <div className="mb-8">
+        <div className="mb-8 space-y-4">
+          {gaveUp && (
+            <p
+              data-testid="live-updates-unavailable"
+              role="status"
+              className="text-xs text-[var(--color-text-secondary)]"
+            >
+              Live updates unavailable — refresh to see the latest.
+            </p>
+          )}
           <PipelineStatus state={listing.state} />
+          <PipelineProgress
+            listingId={id}
+            listingState={listing.state}
+            refreshKey={events.length}
+            live={connected}
+            onSteps={setPipelineSteps}
+          />
         </div>
 
         {/* Two-column layout */}
@@ -400,6 +454,17 @@ function ListingDetail() {
                     ? "Approved but the post-approval workflow didn't finish. Click retry to restart from scratch (you'll need to re-review)."
                     : "Turbulence detected. Something went wrong during processing."}
                 </p>
+                {firstStepError && (
+                  <p
+                    title={firstStepError.error ?? ""}
+                    className="text-xs font-mono text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4 break-words"
+                  >
+                    <span className="font-sans font-semibold">
+                      {firstStepError.name.replace(/_/g, " ")}:{" "}
+                    </span>
+                    {truncateError(firstStepError.error ?? "")}
+                  </p>
+                )}
                 <div className="flex gap-3">
                   <button
                     onClick={handleRetryPipeline}

@@ -8,8 +8,33 @@ In development, uses standard human-readable format.
 """
 import json
 import logging
+import re
 import sys
 from datetime import datetime, timezone
+
+# `?token=<jwt>` is accepted by the SSE endpoint (EventSource cannot send
+# custom headers), and uvicorn's access log records the whole request line —
+# so the raw JWT would otherwise land in the logs.
+_TOKEN_RE = re.compile(r"(token=)[^&\s\"'#]+", re.IGNORECASE)
+
+
+def redact_tokens(value):
+    """Replace any `token=<value>` inside a string with `token=REDACTED`."""
+    if isinstance(value, str) and "token=" in value.lower():
+        return _TOKEN_RE.sub(r"\1REDACTED", value)
+    return value
+
+
+class RedactTokenFilter(logging.Filter):
+    """Strips query-string tokens from log records. Never drops a record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg = redact_tokens(record.msg)
+        if isinstance(record.args, tuple):
+            record.args = tuple(redact_tokens(a) for a in record.args)
+        elif isinstance(record.args, dict):
+            record.args = {k: redact_tokens(v) for k, v in record.args.items()}
+        return True
 
 
 class JSONFormatter(logging.Formatter):
@@ -51,6 +76,9 @@ def setup_logging(app_env: str = "development", log_level: str = "INFO"):
     root.addHandler(handler)
 
     # Quiet noisy libraries
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.setLevel(logging.WARNING)
+    if not any(isinstance(f, RedactTokenFilter) for f in access_logger.filters):
+        access_logger.addFilter(RedactTokenFilter())
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)

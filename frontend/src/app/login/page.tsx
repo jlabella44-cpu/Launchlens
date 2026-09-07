@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/auth-context";
-import { Button } from "@/components/ui/button";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -266,7 +265,8 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleGoogleClick}
-                className="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 transition-colors"
+                disabled={googleLoading}
+                className="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-50 transition-colors disabled:opacity-50"
                 aria-label="Sign in with Google"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
