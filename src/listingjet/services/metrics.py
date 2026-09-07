@@ -7,7 +7,12 @@ Metrics are logged via the standard logger (no external metrics backend).
 import logging
 import time
 
-from listingjet.config.ai_rates import IMAGE_CALL_RATES, LEGACY_CALL_RATES, TOKEN_RATES
+from listingjet.config.ai_rates import (
+    IMAGE_CALL_RATES,
+    LEGACY_CALL_RATES,
+    TOKEN_RATES,
+    VIDEO_SECOND_RATES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +121,28 @@ def record_image_call(model_id: str, label: str) -> None:
     dims = {"model": model_id, "label": label}
     emit_metric("ImageCallCount", 1, unit="Count", dimensions=dims)
     emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
+
+
+def record_video_seconds(model_id: str, seconds: float, agent: str) -> float:
+    """Record generated video seconds and compute estimated cost from VIDEO_SECOND_RATES.
+
+    model_id is the Runway model identifier (e.g. "gen4_turbo", "veo3.1_fast").
+    Returns the estimated cost in USD. If model_id is unknown, logs a warning
+    once per id and records (and returns) cost 0.
+    """
+    rate = VIDEO_SECOND_RATES.get(model_id)
+    if rate is None:
+        if model_id not in _warned_unknown_model_ids:
+            logger.warning("Unknown model_id in record_video_seconds: %s", model_id)
+            _warned_unknown_model_ids.add(model_id)
+        cost = 0.0
+    else:
+        cost = rate * seconds
+
+    dims = {"model": model_id, "agent": agent}
+    emit_metric("VideoSecondsGenerated", seconds, unit="Seconds", dimensions=dims)
+    emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
+    return cost
 
 
 def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> None:
