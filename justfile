@@ -10,7 +10,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 # Fast local gate: lint + the non-DB, non-ffmpeg test subset.
 check:
-    ruff check src tests alembic
+    ruff check src tests alembic scripts
     pytest -m "not db and not ffmpeg" -q
 
 # Full test suite (needs Postgres on 5433 and ffmpeg on PATH for full green).

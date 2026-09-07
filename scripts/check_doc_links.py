@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {"node_modules", ".venv", ".next", ".superpowers", ".git"}
-LINK_RE = re.compile(r"\[[^\]]*\]\(([^)#\s]+)(?:#[^)]*)?\)")
+LINK_RE = re.compile(r'\[[^\]]*\]\(([^)#\s]+)(?:#[^)]*)?(?:\s+"[^"]*")?\)')
 CODE_RE = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
 EXTERNAL = ("http://", "https://", "mailto:", "tel:", "//")
 

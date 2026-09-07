@@ -112,13 +112,15 @@ cp .env.example .env
 At a minimum set:
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://listingjet:password@localhost:5432/launchlens
-DATABASE_URL_SYNC=postgresql://listingjet:password@localhost:5432/launchlens
+DATABASE_URL=postgresql+asyncpg://listingjet:password@localhost:5432/listingjet
+DATABASE_URL_SYNC=postgresql://listingjet:password@localhost:5432/listingjet
 JWT_SECRET=<32 or more random characters>
 REDIS_URL=redis://localhost:6379/0
 USE_MOCK_PROVIDERS=true
 FFMPEG_BIN=ffmpeg
 ```
+
+`docker-compose up postgres` creates a `listingjet` database under that name; a hand-made local cluster may use a different database name, so adjust both URLs to match it.
 
 `USE_MOCK_PROVIDERS=true` swaps every AI provider for `src/listingjet/providers/mock.py`, so the pipeline runs end to end with no API keys and no spend. Redis is optional for a first run: the app logs a warning at startup and degrades rate limiting if it cannot connect.
 
@@ -192,8 +194,9 @@ Interactive docs are at http://localhost:8000/docs whenever the server runs outs
 POST /auth/register            Register a tenant and admin user
 POST /auth/login               JWT login
 POST /listings                 Create a listing
+POST /listings/{id}/upload-urls   Presigned upload URLs for the browser
 POST /listings/{id}/assets     Upload photos, enqueue the pipeline
-POST /listings/{id}/approve    Approve, releasing the post-review steps
+POST /listings/{id}/review     Approve or reject, releasing the post-review steps
 GET  /listings/{id}/export     Download the MLS or marketing ZIP bundle
 GET  /sse/listings/{id}/events Server-sent pipeline events (?token=<jwt>)
 POST /billing/checkout         Create a Stripe checkout session
