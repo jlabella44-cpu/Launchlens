@@ -1,6 +1,8 @@
 # src/listingjet/providers/mock.py
 """Mock provider implementations for tests and local development."""
+import tempfile
 import typing
+from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -93,3 +95,79 @@ class MockClaudeClient:
         if image_urls[0] in self.by_url:
             return self.by_url[image_urls[0]]
         return await self._next(schema)
+
+
+class MockRunwayClient:
+    """Mock for RunwayClient. Tasks resolve SUCCEEDED unless their model is
+    listed in `fail_models`, in which case they resolve FAILED.
+
+    `download` returns real mp4 bytes — a 2s 320x180 solid-colour clip built
+    with ffmpeg via `video_stitcher.build_still_clip` — so pipeline code that
+    stitches/probes the downloaded clip works end-to-end against the mock.
+    The clip is generated once and cached on the instance.
+    """
+
+    provider_name = "runway"
+
+    def __init__(self):
+        self.submitted: list[dict] = []
+        self.fail_models: set[str] = set()
+        self._task_models: dict[str, str] = {}
+        self._n = 0
+        self._clip_bytes: bytes | None = None
+
+    async def image_to_video(
+        self,
+        image_url: str,
+        prompt: str,
+        *,
+        model: str,
+        duration: int,
+        ratio: str = "1280:720",
+        audio: bool | None = None,
+    ) -> str:
+        self._n += 1
+        task_id = f"mock-task-{self._n}"
+        self.submitted.append({
+            "image_url": image_url,
+            "prompt": prompt,
+            "model": model,
+            "duration": duration,
+            "ratio": ratio,
+            "audio": audio,
+        })
+        self._task_models[task_id] = model
+        return task_id
+
+    async def get_task(self, task_id: str) -> dict:
+        model = self._task_models.get(task_id)
+        if model in self.fail_models:
+            return {"status": "FAILED", "failure": "mock failure", "failureCode": "MOCK"}
+        return {"status": "SUCCEEDED", "output": [f"mock://clip/{task_id}"]}
+
+    async def wait(self, task_id: str, *, timeout_s: float = 900.0, poll_s: float = 5.0) -> list[str]:
+        from .runway import RunwayTaskFailed
+
+        task = await self.get_task(task_id)
+        if task["status"] == "FAILED":
+            raise RunwayTaskFailed(
+                task["failure"], task_id=task_id, failure_code=task.get("failureCode"),
+            )
+        return task["output"]
+
+    async def download(self, url: str) -> bytes:
+        if self._clip_bytes is None:
+            from PIL import Image
+
+            from listingjet.services.video_stitcher import build_still_clip
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                png_path = str(Path(tmpdir) / "mock.png")
+                mp4_path = str(Path(tmpdir) / "mock.mp4")
+                Image.new("RGB", (320, 180), color=(30, 144, 255)).save(png_path)
+                build_still_clip(png_path, mp4_path, duration_s=2.0, width=320, height=180)
+                self._clip_bytes = Path(mp4_path).read_bytes()
+        return self._clip_bytes
+
+    async def aclose(self) -> None:
+        pass
