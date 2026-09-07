@@ -40,6 +40,7 @@ from listingjet.api import (
     properties,
     settings_features,
     social_accounts,
+    social_content,
     sse,
     support,
     team,
@@ -185,6 +186,7 @@ def create_app() -> FastAPI:
     if features.enabled("listing_permissions"):
         app.include_router(listing_permissions.router, prefix="/listings", tags=["listing-permissions"])
     app.include_router(listings_core.router, prefix="/listings", tags=["listings"])
+    app.include_router(social_content.router, prefix="/listings", tags=["listings"])
     app.include_router(listings_draft.router, prefix="/listings", tags=["listings-draft"])
     app.include_router(listings_workflow.router, prefix="/listings", tags=["listings"])
     app.include_router(listings_media.router, prefix="/listings", tags=["listings"])

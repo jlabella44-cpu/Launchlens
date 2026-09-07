@@ -28,6 +28,7 @@ interface SocialContent {
   captions?: Partial<Record<CaptionStyle, string>>;
   instagram_captions?: Partial<Record<CaptionStyle, string>>;
   facebook_captions?: Partial<Record<CaptionStyle, string>>;
+  tiktok_caption?: string | null;
   hashtags?: string[];
 }
 
@@ -107,8 +108,11 @@ export function SocialPostHub({ listingId }: SocialPostHubProps) {
     if (platform === "facebook" && socialContent.facebook_captions) {
       return socialContent.facebook_captions;
     }
-    // TikTok reuses Instagram captions
+    // TikTok: use its own caption when present, otherwise fall back to Instagram captions
     if (platform === "tiktok") {
+      if (socialContent.tiktok_caption) {
+        return { storyteller: socialContent.tiktok_caption };
+      }
       return socialContent.instagram_captions ?? socialContent.captions ?? {};
     }
     return socialContent.captions ?? {};

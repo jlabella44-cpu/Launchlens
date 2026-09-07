@@ -4,7 +4,7 @@
 Mocks are applied to `CanvaClient` (the thin httpx client) rather than
 raw HTTP calls or a generated SDK.
 """
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -131,12 +131,3 @@ async def test_render_hero_upload_failure_still_renders():
 
     assert result == b"%PDF-ok"
     mock_client.create_url_asset_upload.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_constructor_stores_api_key_and_llm():
-    """Constructor accepts api_key and optional llm_provider."""
-    mock_llm = MagicMock()
-    provider = CanvaProvider(api_key="my_key", llm_provider=mock_llm)
-    assert provider._api_key == "my_key"
-    assert provider._llm is mock_llm

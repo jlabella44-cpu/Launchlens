@@ -21,7 +21,7 @@ def test_pipeline_is_valid_and_has_expected_steps():
     assert STEP_INDEX["virtual_staging"].gate == "addon:virtual_staging"
     assert "chapters" not in STEP_INDEX
     assert STEP_INDEX["social_cuts"].requires == ("video", "await_review")
-    assert len(names) == 21
+    assert len(names) == 20
 
 
 def test_photo_analysis_is_the_only_photo_analysis_step():
@@ -30,19 +30,22 @@ def test_photo_analysis_is_the_only_photo_analysis_step():
     assert [n for n in STEP_INDEX if "vision" in n or "complian" in n] == []
     assert STEP_INDEX["photo_analysis"].requires == ("ingestion",)
     assert STEP_INDEX["coverage"].requires == ("photo_analysis",)
-    assert STEP_INDEX["distribution"].requires == ("mls_export", "social_content", "social_cuts")
+    assert STEP_INDEX["content_social"].requires == ("await_review",)
+    assert STEP_INDEX["brand"].requires == ("content_social",)
+    assert STEP_INDEX["mls_export"].requires == ("content_social", "brand")
+    assert STEP_INDEX["distribution"].requires == ("mls_export", "social_cuts")
 
 
 def test_required_steps_are_not_optional():
     for name in ("ingestion", "photo_analysis", "coverage", "floorplan",
-                 "packaging", "content", "mls_export", "distribution"):
+                 "packaging", "content_social", "mls_export", "distribution"):
         assert STEP_INDEX[name].optional is False, name
 
 
 def test_post_approval_steps_depend_on_review_gate():
     order = topological_order(PIPELINE)
-    assert order.index("await_review") < order.index("content")
-    assert order.index("content") < order.index("mls_export")
+    assert order.index("await_review") < order.index("content_social")
+    assert order.index("content_social") < order.index("mls_export")
     assert order.index("mls_export") < order.index("distribution")
 
 

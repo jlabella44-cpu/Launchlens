@@ -11,7 +11,13 @@ from sqlalchemy import select
 
 from listingjet.agents.base import AgentContext
 from listingjet.agents.brand import BrandAgent
-from listingjet.agents.content import ContentAgent
+from listingjet.agents.content_social import (
+    ContentSocial,
+    ContentSocialAgent,
+    FacebookCopy,
+    Hook,
+    InstagramCopy,
+)
 from listingjet.agents.coverage import CoverageAgent
 from listingjet.agents.distribution import DistributionAgent
 from listingjet.agents.ingestion import IngestionAgent
@@ -98,9 +104,6 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
     sf = make_session_factory(db_session)
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
-    mock_llm = MagicMock()
-    mock_llm.complete = AsyncMock(return_value='{"mls_safe": "Spacious 4BR/3BA home with modern finishes.", "marketing": "Stunning 4BR/3BA home with modern finishes and natural light."}')
-
     mock_template = MagicMock()
     mock_template.render = AsyncMock(return_value=b"%PDF-content")
 
@@ -152,8 +155,18 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
     await db_session.refresh(listing)
     assert listing.state == ListingState.AWAITING_REVIEW
 
-    # Step 5: Content
-    r = await ContentAgent(llm_provider=mock_llm, session_factory=sf).execute(ctx)
+    # Step 5: Content + social
+    hooks = [Hook(style=s, caption=f"{s} hook") for s in
+             ("storyteller", "data_driven", "luxury_minimalist", "urgency", "lifestyle")]
+    mock_claude = MockClaudeClient()
+    mock_claude.responses[ContentSocial] = [ContentSocial(
+        mls_safe="Spacious 4BR/3BA home with modern finishes.",
+        marketing="Stunning 4BR/3BA home with modern finishes and natural light.",
+        instagram=InstagramCopy(hooks=hooks, hashtags=["#justlisted"] * 20, cta="Link in bio"),
+        facebook=FacebookCopy(hooks=hooks, cta="Book a showing"),
+        tiktok_caption="Tour this one before it's gone.",
+    )]
+    r = await ContentSocialAgent(claude=mock_claude, session_factory=sf).execute(ctx)
     assert r["fha_passed"] is True
     assert len(r["mls_safe"]) > 0
     assert len(r["marketing"]) > 0

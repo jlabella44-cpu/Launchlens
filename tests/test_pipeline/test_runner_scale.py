@@ -2,7 +2,7 @@
 starve the queue.
 
 `enqueue_pipeline` inserts every post-approval step as QUEUED up front, so each
-listing sitting at `await_review` contributes ~12 rows that cannot run until a
+listing sitting at `await_review` contributes ~10 rows that cannot run until a
 human approves. The original `claim_next` locked the 50 oldest queued rows and
 only then filtered dependencies, so a handful of in-review listings permanently
 occupied the window and nothing was ever claimable.
@@ -60,9 +60,9 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
     for listing in listings:
         assert await _status(db_session, listing.id, "packaging") == JobStatus.DONE
         assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
-        assert await _status(db_session, listing.id, "content") == JobStatus.QUEUED
+        assert await _status(db_session, listing.id, "content_social") == JobStatus.QUEUED
 
-    # 5 listings x ~12 unsatisfiable post-approval rows sit at the head of the
+    # 5 listings x ~10 unsatisfiable post-approval rows sit at the head of the
     # queue. A brand-new listing's ingestion is the ONLY runnable row and must
     # still be claimable.
     sixth = await _listing(db_session, "6 Scale St")
@@ -72,9 +72,9 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
 
     # Approving the fourth listing releases its post-approval work, which is
     # older than the sixth listing's rows and so is claimed next. Approval
-    # unblocks content, chapters and social_cuts at once and they share a
-    # run_after/created_at (clock resolution), so claim until content appears
-    # rather than assuming a tie-break order.
+    # unblocks content_social and social_cuts at once and they share a
+    # run_after/created_at (clock resolution), so claim until content_social
+    # appears rather than assuming a tie-break order.
     assert await runner.complete_review(db_session, listings[3].id) is True
     await db_session.commit()
     claims = []
@@ -84,10 +84,10 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
             break
         assert nxt.status == JobStatus.RUNNING and nxt.locked_by == "w1"
         claims.append((nxt.listing_id, nxt.step))
-        if nxt.step == "content":
+        if nxt.step == "content_social":
             break
     assert all(lid == listings[3].id for lid, _ in claims), claims
-    assert (listings[3].id, "content") in claims, claims
+    assert (listings[3].id, "content_social") in claims, claims
 
     # The other three are still parked, untouched.
     for listing in listings[:3]:
@@ -96,20 +96,21 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
 
 @pytest.mark.asyncio
 async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_claim(db_session):
-    """Regression at scale: with CLAIM_CANDIDATE_LIMIT=500 and 11 unsatisfiable
-    post-approval rows per parked listing (content, brand, social_content,
-    social_cuts, mls_export, distribution, microsite, learning, social_event,
-    health_score, performance_intelligence — all QUEUED with every test
-    feature flag on), 50 parked listings alone fill the whole candidate window
-    (550 rows) with rows that can never run until a human approves them. A
-    fresh listing's `ingestion` row must still be claimable on the very first
-    `claim_next` call, not merely "eventually"."""
+    """Regression at scale: with CLAIM_CANDIDATE_LIMIT=500 and 10 unsatisfiable
+    post-approval rows per parked listing (content_social, brand, social_cuts,
+    mls_export, distribution, microsite, learning, social_event, health_score,
+    performance_intelligence — all QUEUED with every test feature flag on), 55
+    parked listings alone fill the whole candidate window (550 rows) with rows
+    that can never run until a human approves them. A fresh listing's
+    `ingestion` row must still be claimable on the very first `claim_next`
+    call, not merely "eventually"."""
     factory = make_session_factory(db_session)
-    listings = [await _listing(db_session, f"{i} Parked Ave") for i in range(50)]
+    listings = [await _listing(db_session, f"{i} Parked Ave") for i in range(55)]
 
     # Drain everything runnable: every listing walks up to its review gate,
-    # leaving ~12 unsatisfiable post-approval rows per listing at the head of
-    # the candidate scan.
+    # leaving ~10 unsatisfiable post-approval rows per listing (55 listings x
+    # 10 rows = 550 > the 500-row CLAIM_CANDIDATE_LIMIT) at the head of the
+    # candidate scan.
     drained = 0
     while (job := await runner.claim_next(db_session, "w1")) is not None:
         await runner.run_job(factory, job.id, functions=FUNCTIONS)
@@ -120,7 +121,7 @@ async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_
 
     fresh = await _listing(db_session, "fresh listing")
     job = await runner.claim_next(db_session, "w1")
-    assert job is not None, "queue deadlocked behind 50 listings parked at the review gate"
+    assert job is not None, "queue deadlocked behind 55 listings parked at the review gate"
     assert (job.listing_id, job.step) == (fresh.id, "ingestion")
 
 
