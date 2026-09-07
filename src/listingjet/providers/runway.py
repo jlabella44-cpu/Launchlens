@@ -10,7 +10,8 @@ Request/response facts verified against the official Runway Python SDK:
 - `POST /v1/image_to_video` JSON body:
     {"model", "promptImage", "promptText", "duration", "ratio"}
   plus `"audio": <bool>` only when the caller passes `audio` (veo3.1_fast
-  supports it; gen4_turbo does not) -> `{"id": "..."}`
+  supports it; gen4_turbo does not) -> `{"id": "..."}`.
+  `promptText` is capped at 1000 characters by the API.
 - `GET /v1/tasks/{id}` ->
     {"status": "PENDING"|"THROTTLED"|"RUNNING"|"SUCCEEDED"|"FAILED"|"CANCELLED",
      "output": [url, ...], "failure": str?, "failureCode": str?, "progress": float?}
@@ -37,6 +38,9 @@ _MAX_POLL_INTERVAL_S = 20.0
 _POLL_GROWTH = 1.5
 
 _TERMINAL_FAILURE_STATUSES = {"FAILED", "CANCELLED"}
+
+# Runway rejects promptText longer than this.
+_MAX_PROMPT_CHARS = 1000
 
 
 class RunwayError(Exception):
@@ -91,7 +95,7 @@ class RunwayClient:
         body: dict = {
             "model": model,
             "promptImage": image_url,
-            "promptText": prompt,
+            "promptText": prompt[:_MAX_PROMPT_CHARS],
             "duration": duration,
             "ratio": ratio,
         }

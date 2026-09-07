@@ -13,10 +13,6 @@ IMAGE_CALL_RATES: dict[str, float] = {
     "gpt-image-1.5": 0.05,   # 1536x1024 medium
 }
 
-LEGACY_CALL_RATES: dict[str, float] = {  # until Task 4 removes Kling entirely
-    "kling": 0.50,
-}
-
 VIDEO_SECOND_RATES: dict[str, float] = {  # USD per generated second, Runway two-tier
     "gen4_turbo": 0.05,
     "veo3.1_fast": 0.10,

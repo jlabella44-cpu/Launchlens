@@ -24,15 +24,23 @@ def test_settings_ffmpeg_bin_overridable(monkeypatch):
     assert s.ffmpeg_bin == "x"
 
 
-def test_settings_kling_key_fields_removed(monkeypatch):
-    # kling_api_base_url stays for now: KlingProvider.__init__ reads it
-    # unconditionally when base_url= is omitted (tests/test_providers/test_kling.py
-    # does), so it isn't safe to drop until Task 4 removes providers/kling.py.
+def test_settings_video_fields_are_runway_only(monkeypatch):
+    """The pre-Runway video provider is gone — no settings of its own survive.
+
+    Asserted as an exhaustive set rather than name-by-name so any resurrected
+    legacy field (access keys, base urls, score floors) fails here.
+    """
     monkeypatch.setenv("JWT_SECRET", "test-secret-32-chars-minimum-required!")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://x:x@localhost/x")
     s = Settings()
-    assert not hasattr(s, "kling_access_key")
-    assert not hasattr(s, "kling_secret_key")
+    video_fields = {f for f in type(s).model_fields if "video" in f or "runway" in f}
+    assert video_fields == {
+        "runway_api_key",
+        "runway_interior_model",
+        "runway_exterior_model",
+        "video_music_enabled",
+        "video_music_path",
+    }
 
 
 def test_settings_video_two_tier_defaults(monkeypatch):

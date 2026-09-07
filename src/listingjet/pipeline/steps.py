@@ -25,7 +25,7 @@ from listingjet.agents.performance_intelligence import PerformanceIntelligenceAg
 from listingjet.agents.photo_analysis import PhotoAnalysisAgent
 from listingjet.agents.property_verification import PropertyVerificationAgent
 from listingjet.agents.social_cuts import SocialCutAgent
-from listingjet.agents.video import VideoAgent
+from listingjet.agents.video_ai import VideoAIAgent
 from listingjet.agents.virtual_staging import VirtualStagingAgent
 from listingjet.database import admin_session
 
@@ -140,7 +140,8 @@ STEP_FUNCTIONS: dict[str, StepFn] = {
     "floorplan": _agent_step(FloorplanAgent),
     "dollhouse_render": _agent_step(DollhouseRenderAgent),
     "packaging": _agent_step(PackagingAgent),
-    "video": _agent_step(VideoAgent),
+    # Temporary bridge: Task 5 renames the video steps properly.
+    "video": _agent_step(VideoAIAgent),
     "content_social": _agent_step(ContentSocialAgent),
     "brand": _agent_step(BrandAgent),
     "social_cuts": _agent_step(SocialCutAgent),

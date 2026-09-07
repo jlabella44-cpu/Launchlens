@@ -163,14 +163,6 @@ class Settings(BaseSettings):
     ses_enabled: bool = False
     resend_api_key: str = ""
 
-    # Video (legacy Kling, kept until Task 4 removes agents/video.py + providers/kling.py.
-    # kling_api_base_url is read unconditionally in KlingProvider.__init__ whenever the
-    # caller omits base_url= (tests/test_providers/test_kling.py does), so it isn't the
-    # lazy access it looked like — removing it breaks that suite. video_score_floor is
-    # read in VideoAgent.__init__ likewise.)
-    kling_api_base_url: str = "https://api.klingai.com"
-    video_score_floor: float = 0.65
-
     # Video (Runway two-tier generation + ffmpeg stitching)
     ffmpeg_bin: str = "ffmpeg"
     runway_api_key: str = ""

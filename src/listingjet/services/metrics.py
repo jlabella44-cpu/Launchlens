@@ -7,12 +7,7 @@ Metrics are logged via the standard logger (no external metrics backend).
 import logging
 import time
 
-from listingjet.config.ai_rates import (
-    IMAGE_CALL_RATES,
-    LEGACY_CALL_RATES,
-    TOKEN_RATES,
-    VIDEO_SECOND_RATES,
-)
+from listingjet.config.ai_rates import IMAGE_CALL_RATES, TOKEN_RATES, VIDEO_SECOND_RATES
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +20,8 @@ _LEGACY_PROVIDER_COSTS: dict[str, float] = {
     "claude": 0.05,
 }
 
-# New mapping keyed by model id (images and legacy video)
-PROVIDER_COSTS: dict[str, float] = {**IMAGE_CALL_RATES, **LEGACY_CALL_RATES}
+# Per-call cost keyed by model id (images; video is billed per second instead)
+PROVIDER_COSTS: dict[str, float] = dict(IMAGE_CALL_RATES)
 
 
 def emit_metric(
@@ -149,7 +144,7 @@ def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> Non
     """Record estimated cost for provider usage within an agent.
 
     provider_name can be either an old provider label (claude, etc.)
-    or a model id (gpt-image-1.5, kling, etc.).
+    or a model id (gpt-image-1.5, etc.).
     """
     # Try new model id keys first, then fall back to legacy provider labels
     cost_per_call = PROVIDER_COSTS.get(provider_name) or _LEGACY_PROVIDER_COSTS.get(provider_name, 0)

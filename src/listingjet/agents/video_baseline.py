@@ -1,13 +1,13 @@
 """VideoBaselineAgent — the free ffmpeg Ken Burns tour every listing gets.
 
-Unlike VideoAgent (AI-generated Kling clips, `requires_ai_consent = True`),
+Unlike `VideoAIAgent` (Runway-generated clips, `requires_ai_consent = True`),
 this agent builds a "baseline" tour entirely with local ffmpeg: a pan/zoom
 (Ken Burns) clip per packaged photo, crossfaded together, with a branded
 (or neutral default) end-card always appended. No third-party AI provider
 is involved, so `requires_ai_consent = False` and it can run for every
 listing regardless of AI consent.
 
-`upsert_tour_asset` is shared with Task 4 (the AI-upgrade path): both write
+`upsert_tour_asset` is shared with `VideoAIAgent` (the AI-upgrade path): both write
 to the same `VideoAsset` row, keyed by `video_type in ("tour", "ai_generated")`.
 """
 from __future__ import annotations
@@ -137,7 +137,7 @@ async def upsert_tour_asset(
 ) -> VideoAsset:
     """Create or update the listing's tour `VideoAsset` row.
 
-    Shared with Task 4 (the AI-upgrade path): both the free baseline tour
+    Shared with `VideoAIAgent` (the AI-upgrade path): both the free baseline tour
     and the AI-generated upgrade write to the same row, found by
     `video_type in ("tour", "ai_generated")`.
     """

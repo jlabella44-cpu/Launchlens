@@ -49,6 +49,29 @@ async def test_image_to_video_posts_expected_body_and_headers(httpx_mock: HTTPXM
 
 
 @pytest.mark.asyncio
+async def test_image_to_video_truncates_prompt_to_1000_chars(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api.dev.runwayml.com/v1/image_to_video",
+        json={"id": "t1"},
+    )
+
+    client = RunwayClient(api_key="k")
+    await client.image_to_video(
+        "https://s3.example.com/photo.jpg", "x" * 1500, model="gen4_turbo", duration=5,
+    )
+
+    import json
+
+    body = json.loads(httpx_mock.get_request(
+        url="https://api.dev.runwayml.com/v1/image_to_video"
+    ).content)
+    assert body["promptText"] == "x" * 1000
+
+    await client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_image_to_video_includes_audio_when_passed(httpx_mock: HTTPXMock):
     httpx_mock.add_response(
         method="POST",
