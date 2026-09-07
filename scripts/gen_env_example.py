@@ -7,7 +7,7 @@ Usage:
 Iterates `Settings.model_fields` in declaration order and emits one line per
 field: `KEY=<default>` for ordinary fields (booleans lowercased, list-like
 defaults comma-joined, `None` rendered as empty). Any field whose name
-contains "key", "secret", "password", "token", "dsn", or ends with "_url" is
+contains "key", "secret", "password", "token", "dsn", or "url" is
 treated as sensitive: it is always emitted blank (`KEY=`) with a trailing
 `# secret` comment, regardless of what real default it may have.
 
@@ -33,7 +33,7 @@ from listingjet.config import Settings  # noqa: E402
 
 ENV_EXAMPLE_PATH = REPO_ROOT / ".env.example"
 
-SECRET_SUBSTRINGS = ("key", "secret", "password", "token", "dsn")
+SECRET_SUBSTRINGS = ("key", "secret", "password", "token", "dsn", "url")
 
 HEADER = """# ─────────────────────────────────────────────
 # ListingJet — Environment Configuration
@@ -49,7 +49,7 @@ HEADER = """# ──────────────────────
 
 
 def is_secret(name: str) -> bool:
-    return any(s in name for s in SECRET_SUBSTRINGS) or name.endswith("_url")
+    return any(s in name for s in SECRET_SUBSTRINGS)
 
 
 def format_default(value: object) -> str:
