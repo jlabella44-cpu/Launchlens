@@ -1,25 +1,12 @@
 import pytest
 
-from listingjet.providers.base import LLMProvider, TemplateProvider
-from listingjet.providers.mock import MockLLMProvider, MockTemplateProvider
-
-
-def test_mock_llm_provider_is_llm_provider():
-    provider = MockLLMProvider()
-    assert isinstance(provider, LLMProvider)
+from listingjet.providers.base import TemplateProvider
+from listingjet.providers.mock import MockTemplateProvider
 
 
 def test_mock_template_provider_is_template_provider():
     provider = MockTemplateProvider()
     assert isinstance(provider, TemplateProvider)
-
-
-@pytest.mark.asyncio
-async def test_mock_llm_provider_complete_returns_string():
-    provider = MockLLMProvider()
-    result = await provider.complete(prompt="Describe this kitchen.", context={})
-    assert isinstance(result, str)
-    assert len(result) > 0
 
 
 @pytest.mark.asyncio

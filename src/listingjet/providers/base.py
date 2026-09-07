@@ -2,28 +2,9 @@
 """
 Provider ABCs for external service integrations.
 
-LLMProvider     — text generation (Claude, GPT-4)
 TemplateProvider — flyer/social asset rendering (Canva, HTML/Chromium)
 """
 from abc import ABC, abstractmethod
-
-
-class LLMProvider(ABC):
-    @abstractmethod
-    async def complete(
-        self,
-        prompt: str,
-        context: dict,
-        temperature: float | None = None,
-        system_prompt: str | None = None,
-    ) -> str:
-        """Return a text completion for the given prompt and context.
-
-        Args:
-            temperature: 0.0-1.0, controls creativity. None = provider default.
-            system_prompt: Override the default system prompt. None = provider default.
-        """
-        ...
 
 
 class ImageEditProvider(ABC):

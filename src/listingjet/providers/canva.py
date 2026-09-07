@@ -21,9 +21,8 @@ _CANVA_API_BASE = "https://api.canva.com/rest"
 class CanvaTemplateProvider(TemplateProvider):
     """Renders listing flyers via the Canva Connect API."""
 
-    def __init__(self, api_key: str, llm_provider=None, access_token: str | None = None):
+    def __init__(self, api_key: str, access_token: str | None = None):
         self._api_key = api_key
-        self._llm = llm_provider
         self._access_token = access_token
 
     @property

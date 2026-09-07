@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from listingjet.agents.base import AgentContext
 from listingjet.agents.brand import BrandAgent
-from listingjet.agents.content import ContentAgent
+from listingjet.agents.content_social import ContentSocialAgent
 from listingjet.agents.coverage import CoverageAgent
 from listingjet.agents.distribution import DistributionAgent
 from listingjet.agents.dollhouse_render import DollhouseRenderAgent
@@ -24,7 +24,6 @@ from listingjet.agents.packaging import PackagingAgent
 from listingjet.agents.performance_intelligence import PerformanceIntelligenceAgent
 from listingjet.agents.photo_analysis import PhotoAnalysisAgent
 from listingjet.agents.property_verification import PropertyVerificationAgent
-from listingjet.agents.social_content import SocialContentAgent
 from listingjet.agents.social_cuts import SocialCutAgent
 from listingjet.agents.video import VideoAgent
 from listingjet.agents.virtual_staging import VirtualStagingAgent
@@ -58,7 +57,7 @@ def _agent_step(agent_cls) -> StepFn:
 async def run_mls_export(ctx: StepContext) -> dict:
     brand = ctx.results.get("brand") or {}
     agent = MLSExportAgent(
-        content_result=ctx.results.get("content") or {},
+        content_result=ctx.results.get("content_social") or {},
         flyer_s3_key=brand.get("flyer_s3_key"),
         session_factory=admin_session,
     )
@@ -142,9 +141,8 @@ STEP_FUNCTIONS: dict[str, StepFn] = {
     "dollhouse_render": _agent_step(DollhouseRenderAgent),
     "packaging": _agent_step(PackagingAgent),
     "video": _agent_step(VideoAgent),
-    "content": _agent_step(ContentAgent),
+    "content_social": _agent_step(ContentSocialAgent),
     "brand": _agent_step(BrandAgent),
-    "social_content": _agent_step(SocialContentAgent),
     "social_cuts": _agent_step(SocialCutAgent),
     "mls_export": run_mls_export,
     "distribution": _agent_step(DistributionAgent),

@@ -18,7 +18,7 @@ def test_every_runnable_step_has_a_function():
 @pytest.mark.asyncio
 async def test_mls_export_step_passes_content_and_flyer_from_results():
     ctx = StepContext(listing_id=str(uuid.uuid4()), tenant_id=str(uuid.uuid4()), results={
-        "content": {"mls_safe": "A", "marketing": "B"},
+        "content_social": {"mls_safe": "A", "marketing": "B"},
         "brand": {"flyer_s3_key": "flyers/x.pdf"},
     })
     with patch("listingjet.pipeline.steps.MLSExportAgent") as agent_cls:
