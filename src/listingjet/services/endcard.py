@@ -180,6 +180,32 @@ def generate_endcard(
         return b""
 
 
+def endcard_clip(
+    png_bytes: bytes,
+    out_path: str,
+    *,
+    duration_s: float = ENDCARD_DURATION,
+    width: int = 1920,
+    height: int = 1080,
+) -> str:
+    """Convert an end-card PNG into a static video clip via `build_still_clip`."""
+    import tempfile
+
+    from listingjet.services.video_stitcher import build_still_clip
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        f.write(png_bytes)
+        png_path = f.name
+    try:
+        return build_still_clip(png_path, out_path, duration_s=duration_s, width=width, height=height)
+    finally:
+        import os
+        try:
+            os.unlink(png_path)
+        except OSError:
+            pass
+
+
 def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     """Convert #RRGGBB to (R, G, B) tuple."""
     hex_color = hex_color.lstrip("#")
