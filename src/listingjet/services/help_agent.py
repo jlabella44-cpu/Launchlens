@@ -18,7 +18,6 @@ from listingjet.services.metrics import record_provider_call
 
 logger = logging.getLogger(__name__)
 
-_MODEL = "claude-sonnet-4-6"
 _MAX_TOOL_ROUNDS = 5
 _MAX_HISTORY_MESSAGES = 50
 _HISTORY_TTL = 7200  # 2 hours
@@ -370,7 +369,7 @@ class HelpAgentService:
         for round_num in range(_MAX_TOOL_ROUNDS):
             try:
                 response = await self._client.messages.create(
-                    model=_MODEL,
+                    model=settings.claude_quality_model,
                     max_tokens=_MAX_OUTPUT_TOKENS,
                     system=SYSTEM_PROMPT,
                     messages=api_messages,

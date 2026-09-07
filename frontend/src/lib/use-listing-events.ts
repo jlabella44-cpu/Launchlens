@@ -68,7 +68,7 @@ export function useListingEvents(
 
     // Listen for named pipeline events
     const pipelineEvents = [
-      "ingestion.completed", "vision_tier1.completed", "vision_tier2.completed",
+      "ingestion.completed", "photo_analysis.completed", "photo_compliance.completed",
       "coverage.completed", "packaging.completed", "content.completed",
       "brand.completed", "social_content.completed", "mls_export.completed",
       "pipeline.completed", "video.completed",

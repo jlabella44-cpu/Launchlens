@@ -32,26 +32,37 @@ REQUIRED_ROOMS = ["exterior", "kitchen", "living_room", "bathroom"]
 # Max slots per room type (prevents overrepresentation)
 ROOM_MAX_SLOTS: dict[str, int] = {
     "exterior": 4,
+    "drone": 1,
+    "entryway": 1,
     "living_room": 2,
     "kitchen": 2,
     "dining_room": 2,
     "bedroom": 3,
+    "primary_bedroom": 1,
     "bathroom": 3,
+    "primary_bathroom": 1,
     "office": 1,
     "backyard": 2,
     "pool": 2,
     "garage": 1,
     "basement": 1,
     "laundry": 0,  # exclude
+    "floorplan": 0,  # exclude — not a listing photo
+    "document": 0,  # exclude — not a listing photo
+    "screenshot": 0,  # exclude — not a listing photo
 }
 
 # MLS position ordering — exterior first, then interior flow
 MLS_POSITION_ORDER = [
     "exterior",
+    "drone",
+    "entryway",
     "living_room",
     "kitchen",
     "dining_room",
+    "primary_bedroom",
     "bedroom",
+    "primary_bathroom",
     "bathroom",
     "office",
     "backyard",
@@ -77,6 +88,12 @@ class PackagingAgent(BaseAgent):
         candidates = [
             (s, aid, vr) for s, aid, vr in scored
             if (vr.quality_score or 50) >= MIN_QUALITY_SCORE
+        ]
+
+        # Filter non-photos (floorplans, documents, screenshots)
+        candidates = [
+            (s, aid, vr) for s, aid, vr in candidates
+            if vr.is_photo is not False
         ]
 
         # Filter excluded rooms (max_slots == 0)
@@ -151,16 +168,16 @@ class PackagingAgent(BaseAgent):
 
     async def execute(self, context: AgentContext) -> dict:
         async with self.session_scope(context) as (session, listing_id, tenant_id):
-                # Load best VisionResult per asset (prefer Tier 2 over Tier 1)
+                # Load VisionResult rows (only tier 1 exists today)
                 result = await session.execute(
                     select(VisionResult)
                     .join(Asset, VisionResult.asset_id == Asset.id)
                     .where(Asset.listing_id == listing_id)
-                    .order_by(VisionResult.tier.desc(), VisionResult.quality_score.desc())
+                    .order_by(VisionResult.quality_score.desc())
                 )
                 all_vrs = result.scalars().all()
 
-                # Deduplicate: keep best tier result per asset
+                # Deduplicate: keep best result per asset
                 seen: dict[uuid.UUID, VisionResult] = {}
                 for vr in all_vrs:
                     if vr.asset_id not in seen:

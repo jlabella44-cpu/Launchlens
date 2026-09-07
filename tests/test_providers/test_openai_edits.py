@@ -1,118 +1,23 @@
-"""Tests for the shared OpenAI image-edits helper and the two providers
-that delegate to it (OpenAIVirtualStagingProvider, OpenAIImageEditProvider).
+"""Tests for OpenAIVirtualStagingProvider and OpenAIImageEditProvider.
 
-These tests verify the pieces that were previously broken: both providers
-used to call /v1/images/generations (text-only) so they never actually saw
-the input image. The fix switches them to /v1/images/edits with
-gpt-image-1.5 and passes the input image as multipart form data.
+Both are thin wrappers around OpenAIImagesClient (see test_openai_images.py
+for the shared HTTP-call behavior: multipart body, auth header, error
+handling). These tests verify the pieces that were previously broken: both
+providers used to call /v1/images/generations (text-only) so they never
+actually saw the input image. The fix switches them to /v1/images/edits
+with gpt-image-1.5 and passes the input image as multipart form data.
 """
 import base64
 
 import pytest
 from pytest_httpx import HTTPXMock
 
-from listingjet.providers._openai_edits import (
-    OpenAIEditError,
-    edit_single_image,
-    fetch_image_bytes,
-)
 from listingjet.providers.openai_image_edit import OpenAIImageEditProvider
+from listingjet.providers.openai_images import OpenAIEditError
 from listingjet.providers.openai_staging import OpenAIVirtualStagingProvider
 
 _FAKE_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 256
 _FAKE_B64 = base64.b64encode(_FAKE_PNG).decode()
-
-
-# ---------- helper: edit_single_image ----------
-
-
-@pytest.mark.asyncio
-async def test_edit_single_image_posts_multipart_with_input(httpx_mock: HTTPXMock):
-    httpx_mock.add_response(
-        method="POST",
-        url="https://api.openai.com/v1/images/edits",
-        json={"data": [{"b64_json": _FAKE_B64}]},
-    )
-
-    result = await edit_single_image(
-        api_key="test-key",
-        image_bytes=b"fake-input-image-bytes",
-        image_content_type="image/jpeg",
-        prompt="make it look nice",
-        provider_label="test_label",
-    )
-    assert result == _FAKE_PNG
-
-    req = httpx_mock.get_request(url="https://api.openai.com/v1/images/edits")
-    assert req is not None
-    assert req.headers["authorization"] == "Bearer test-key"
-    body = req.content.decode("utf-8", errors="replace")
-    # Multipart field names and values
-    assert 'name="image[]"' in body
-    assert 'name="prompt"' in body
-    assert "make it look nice" in body
-    assert "gpt-image-1.5" in body
-    # The actual input image bytes must be in the multipart body
-    assert "fake-input-image-bytes" in body
-
-
-@pytest.mark.asyncio
-async def test_edit_single_image_raises_on_missing_api_key():
-    with pytest.raises(OpenAIEditError):
-        await edit_single_image(
-            api_key="",
-            image_bytes=b"bytes",
-            image_content_type="image/png",
-            prompt="x",
-            provider_label="test",
-        )
-
-
-@pytest.mark.asyncio
-async def test_edit_single_image_raises_on_empty_bytes():
-    with pytest.raises(OpenAIEditError):
-        await edit_single_image(
-            api_key="test-key",
-            image_bytes=b"",
-            image_content_type="image/png",
-            prompt="x",
-            provider_label="test",
-        )
-
-
-@pytest.mark.asyncio
-async def test_edit_single_image_raises_on_api_error(httpx_mock: HTTPXMock):
-    httpx_mock.add_response(
-        method="POST",
-        url="https://api.openai.com/v1/images/edits",
-        status_code=429,
-        json={"error": {"message": "rate limit"}},
-    )
-    with pytest.raises(OpenAIEditError) as exc_info:
-        await edit_single_image(
-            api_key="test-key",
-            image_bytes=b"bytes",
-            image_content_type="image/png",
-            prompt="x",
-            provider_label="test",
-        )
-    assert "429" in str(exc_info.value)
-
-
-# ---------- helper: fetch_image_bytes ----------
-
-
-@pytest.mark.asyncio
-async def test_fetch_image_bytes_returns_content_and_type(httpx_mock: HTTPXMock):
-    httpx_mock.add_response(
-        method="GET",
-        url="https://s3.example.com/photo.jpg",
-        content=b"actual-jpeg-bytes",
-        headers={"content-type": "image/jpeg; charset=binary"},
-    )
-    data, ctype = await fetch_image_bytes("https://s3.example.com/photo.jpg")
-    assert data == b"actual-jpeg-bytes"
-    assert ctype == "image/jpeg"
 
 
 # ---------- OpenAIVirtualStagingProvider ----------

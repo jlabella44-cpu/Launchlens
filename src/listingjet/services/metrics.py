@@ -7,7 +7,21 @@ Metrics are logged via the standard logger (no external metrics backend).
 import logging
 import time
 
+from listingjet.config.ai_rates import IMAGE_CALL_RATES, LEGACY_CALL_RATES, TOKEN_RATES
+
 logger = logging.getLogger(__name__)
+
+# Track model IDs we've warned about (to warn once per unknown id)
+_warned_unknown_model_ids: set[str] = set()
+
+# Estimated cost per provider call in USD (flat per-call heuristic)
+# Legacy mapping for old provider labels; these are flat per-call rates
+_LEGACY_PROVIDER_COSTS: dict[str, float] = {
+    "claude": 0.05,
+}
+
+# New mapping keyed by model id (images and legacy video)
+PROVIDER_COSTS: dict[str, float] = {**IMAGE_CALL_RATES, **LEGACY_CALL_RATES}
 
 
 def emit_metric(
@@ -20,19 +34,9 @@ def emit_metric(
     now just structured log lines for external log aggregation."""
     logger.info("metric name=%s value=%s unit=%s dims=%s", name, value, unit, dimensions or {})
 
-# Estimated cost per provider call in USD (flat per-call heuristic)
-PROVIDER_COSTS: dict[str, float] = {
-    "google_vision": 0.02,
-    "claude": 0.05,
-    "openai_gpt4v": 0.03,
-    "kling": 0.50,
-}
 
 # Per-1M-token cost in USD: (input_rate, output_rate)
-TOKEN_COSTS: dict[str, tuple[float, float]] = {
-    "claude": (3.00, 15.00),
-    "openai_gpt4v": (2.50, 10.00),
-}
+TOKEN_COSTS: dict[str, tuple[float, float]] = TOKEN_RATES
 
 
 def track_step_duration(agent_name: str, duration_ms: float) -> None:
@@ -66,18 +70,27 @@ def record_provider_call(provider_name: str, success: bool) -> None:
 
 
 def record_token_usage(
-    provider_name: str,
+    model_id: str,
     input_tokens: int,
     output_tokens: int,
     agent_name: str | None = None,
 ) -> None:
-    """Record token counts and compute estimated cost from TOKEN_COSTS."""
-    rates = TOKEN_COSTS.get(provider_name)
+    """Record token counts and compute estimated cost from TOKEN_RATES.
+
+    model_id is the model identifier (e.g. "claude-haiku-4-5", "gpt-image-1.5").
+    If unknown, logs a warning once per id and records metrics with cost 0.
+    """
+    rates = TOKEN_RATES.get(model_id)
     if rates is None:
-        return
-    in_rate, out_rate = rates
-    cost = (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
-    dims = {"provider": provider_name}
+        if model_id not in _warned_unknown_model_ids:
+            logger.warning("Unknown model_id in record_token_usage: %s", model_id)
+            _warned_unknown_model_ids.add(model_id)
+        cost = 0.0
+    else:
+        in_rate, out_rate = rates
+        cost = (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
+
+    dims = {"model": model_id}
     if agent_name:
         dims["agent"] = agent_name
     emit_metric("TokensInput", input_tokens, unit="Count", dimensions=dims)
@@ -85,9 +98,34 @@ def record_token_usage(
     emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
 
 
+def record_image_call(model_id: str, label: str) -> None:
+    """Record one image-generation call and its estimated cost from IMAGE_CALL_RATES.
+
+    model_id is the model identifier (e.g. "gpt-image-1.5"). label identifies
+    the calling provider/use-case (e.g. "openai_staging", "openai_dollhouse")
+    for dimensioning, same as record_provider_call's provider_name. If
+    model_id is unknown, logs a warning once per id and records cost 0.
+    """
+    cost = IMAGE_CALL_RATES.get(model_id)
+    if cost is None:
+        if model_id not in _warned_unknown_model_ids:
+            logger.warning("Unknown model_id in record_image_call: %s", model_id)
+            _warned_unknown_model_ids.add(model_id)
+        cost = 0.0
+
+    dims = {"model": model_id, "label": label}
+    emit_metric("ImageCallCount", 1, unit="Count", dimensions=dims)
+    emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
+
+
 def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> None:
-    """Record estimated cost for provider usage within an agent."""
-    cost_per_call = PROVIDER_COSTS.get(provider_name, 0)
+    """Record estimated cost for provider usage within an agent.
+
+    provider_name can be either an old provider label (claude, etc.)
+    or a model id (gpt-image-1.5, kling, etc.).
+    """
+    # Try new model id keys first, then fall back to legacy provider labels
+    cost_per_call = PROVIDER_COSTS.get(provider_name) or _LEGACY_PROVIDER_COSTS.get(provider_name, 0)
     total = cost_per_call * call_count
     if total > 0:
         emit_metric(

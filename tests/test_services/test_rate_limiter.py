@@ -12,7 +12,7 @@ def limiter():
 
 def test_acquire_within_limit_returns_true(limiter):
     for _ in range(3):
-        assert limiter.acquire(key="google_vision", cost=1) is True
+        assert limiter.acquire(key="claude", cost=1) is True
 
 
 def test_acquire_exceeds_capacity_returns_false(limiter):
@@ -22,9 +22,9 @@ def test_acquire_exceeds_capacity_returns_false(limiter):
         capacity=2,
         refill_rate=0,
     )
-    assert small.acquire(key="google_vision", cost=1) is True
-    assert small.acquire(key="google_vision", cost=1) is True
-    assert small.acquire(key="google_vision", cost=1) is False
+    assert small.acquire(key="claude", cost=1) is True
+    assert small.acquire(key="claude", cost=1) is True
+    assert small.acquire(key="claude", cost=1) is False
 
 
 def test_acquire_cost_greater_than_one(limiter):
@@ -45,6 +45,6 @@ def test_different_keys_are_independent(limiter):
         capacity=1,
         refill_rate=0,
     )
-    assert small.acquire(key="google_vision", cost=1) is True
-    assert small.acquire(key="google_vision", cost=1) is False
+    assert small.acquire(key="claude", cost=1) is True
+    assert small.acquire(key="claude", cost=1) is False
     assert small.acquire(key="gpt4v", cost=1) is True

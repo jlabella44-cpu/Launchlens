@@ -1,4 +1,4 @@
-from pydantic import field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -54,8 +54,8 @@ class Settings(BaseSettings):
             missing = []
             if not self.anthropic_api_key:
                 missing.append("ANTHROPIC_API_KEY")
-            if not self.google_vision_api_key:
-                missing.append("GOOGLE_VISION_API_KEY")
+            if not self.openai_api_key:
+                missing.append("OPENAI_API_KEY")
             if missing:
                 raise ValueError(
                     f"USE_MOCK_PROVIDERS is false but required provider keys are missing: "
@@ -98,8 +98,13 @@ class Settings(BaseSettings):
     # Provider API keys
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    google_vision_api_key: str = ""
+    # Google API key used for Google Drive link-import (not vision).
+    google_api_key: str = Field(
+        default="", validation_alias=AliasChoices("GOOGLE_API_KEY", "GOOGLE_VISION_API_KEY")
+    )
     use_mock_providers: bool = False
+    claude_fast_model: str = "claude-haiku-4-5"
+    claude_quality_model: str = "claude-sonnet-5"
 
     # Google OAuth
     google_oauth_client_id: str = ""

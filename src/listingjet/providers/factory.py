@@ -11,7 +11,16 @@ need no changes.
 """
 from listingjet.config import settings
 
-from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider, VisionProvider
+from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider
+
+
+def get_claude(agent: str | None = None, tenant_id=None):
+    """Return the raw Claude client, or a mock when USE_MOCK_PROVIDERS is set."""
+    if settings.use_mock_providers:
+        from .mock import MockClaudeClient
+        return MockClaudeClient()
+    from .claude import ClaudeClient
+    return ClaudeClient()
 
 
 def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
@@ -20,25 +29,7 @@ def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
         from .mock import MockLLMProvider
         return MockLLMProvider()
     from .claude import ClaudeProvider
-    return ClaudeProvider()
-
-
-def get_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
-    """Return the Tier 1 vision provider (Google Vision), or a mock when USE_MOCK_PROVIDERS is set."""
-    if settings.use_mock_providers:
-        from .mock import MockVisionProvider
-        return MockVisionProvider()
-    from .google_vision import GoogleVisionProvider
-    return GoogleVisionProvider()
-
-
-def get_tier2_vision_provider(agent: str | None = None, tenant_id=None) -> VisionProvider:
-    """Return the Tier 2 vision provider (OpenAI Vision), or a mock when USE_MOCK_PROVIDERS is set."""
-    if settings.use_mock_providers:
-        from .mock import MockVisionProvider
-        return MockVisionProvider()
-    from .openai_vision import OpenAIVisionProvider
-    return OpenAIVisionProvider()
+    return ClaudeProvider(client=get_claude(agent=agent, tenant_id=tenant_id))
 
 
 def get_image_edit_provider() -> ImageEditProvider:

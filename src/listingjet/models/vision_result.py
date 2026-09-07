@@ -22,3 +22,8 @@ class VisionResult(Base):
     raw_labels: Mapped[dict | None] = mapped_column(JSONB)
     model_used: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    hero_score: Mapped[int | None]
+    is_photo: Mapped[bool | None]
+    is_empty_room: Mapped[bool | None]
+    features: Mapped[list | None] = mapped_column(JSONB)
+    compliance: Mapped[dict | None] = mapped_column(JSONB)

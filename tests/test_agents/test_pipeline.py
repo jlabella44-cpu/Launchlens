@@ -16,10 +16,15 @@ from listingjet.agents.coverage import CoverageAgent
 from listingjet.agents.distribution import DistributionAgent
 from listingjet.agents.ingestion import IngestionAgent
 from listingjet.agents.packaging import PackagingAgent
-from listingjet.agents.vision import VisionAgent
+from listingjet.agents.photo_analysis import (
+    Compliance,
+    PhotoAnalysis,
+    PhotoAnalysisAgent,
+    RoomLabel,
+)
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.vision_result import VisionResult
-from listingjet.providers.base import VisionLabel
+from listingjet.providers.mock import MockClaudeClient
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -48,7 +53,7 @@ def _tiny_jpeg() -> bytes:
 def patch_storage_everywhere():
     mock = _mock_storage_service()
     with patch("listingjet.agents.ingestion.get_storage", return_value=mock), \
-         patch("listingjet.agents.vision.get_storage", return_value=mock):
+         patch("listingjet.agents.photo_analysis.get_storage", return_value=mock):
         yield mock
 
 
@@ -93,38 +98,6 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
     sf = make_session_factory(db_session)
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
-    # Map shot type keys to label names recognized by VisionAgent's ROOM_LABEL_MAP.
-    # The fallback .replace("_", " ") works for most room labels, but new shot types
-    # should be explicitly added here if they don't match ROOM_LABEL_MAP keys exactly.
-    SHOT_TO_LABEL_NAME = {
-        "exterior": "building exterior",
-        "living_room": "living room",
-        "kitchen": "kitchen",
-        "bedroom": "bedroom",
-        "bathroom": "bathroom",
-    }
-
-    # Build lookups: file_hash -> shot_type, and asset_id -> shot_type
-    hash_to_room_label = {h: shot_type for h, shot_type in shot_hashes}
-    asset_id_to_room_label = {
-        str(a.id): hash_to_room_label[a.file_hash] for a in assets
-    }
-
-    async def mock_analyze(image_url):
-        # URL is presigned: https://s3.example.com/listings/{id}/proxies/{asset_id}.jpg?signed=1
-        # or https://s3.example.com/listings/{id}/{hash}.jpg?signed=1
-        filename = image_url.split("/")[-1].split(".")[0]
-        shot_type = asset_id_to_room_label.get(filename) or hash_to_room_label.get(filename, "living_room")
-        label_name = SHOT_TO_LABEL_NAME.get(shot_type, shot_type.replace("_", " "))
-        return [
-            VisionLabel(name=label_name, confidence=0.95, category="room"),
-            VisionLabel(name="natural light", confidence=0.88, category="quality"),
-            VisionLabel(name="hardwood", confidence=0.82, category="feature"),
-        ]
-
-    mock_vision = MagicMock()
-    mock_vision.analyze = mock_analyze
-
     mock_llm = MagicMock()
     mock_llm.complete = AsyncMock(return_value='{"mls_safe": "Spacious 4BR/3BA home with modern finishes.", "marketing": "Stunning 4BR/3BA home with modern finishes and natural light."}')
 
@@ -140,9 +113,32 @@ async def test_full_pipeline(db_session, pipeline_listing, pipeline_assets):
     await db_session.refresh(listing)
     assert listing.state == ListingState.ANALYZING
 
-    # Step 2: Vision (Tier 1 only for smoke test)
-    r = await VisionAgent(vision_provider=mock_vision, session_factory=sf).run_tier1(ctx)
-    assert r == 5
+    # Step 2: Photo analysis (one Claude pass per photo). Ingestion has now
+    # written proxy_path on each asset, which is the image the agent presigns.
+    hash_to_room_label = {h: shot_type for h, shot_type in shot_hashes}
+
+    def _analysis(room: str) -> PhotoAnalysis:
+        return PhotoAnalysis(
+            room=RoomLabel(room),
+            is_interior=room != "exterior",
+            is_photo=True,
+            quality=90,
+            hero_score=85 if room == "exterior" else 75,
+            features=["hardwood floors", "natural light"],
+            is_empty_room=False,
+            compliance=Compliance(people=False, signage=False, branding=False, text_overlay=False),
+            notes=f"Clean {room} shot.",
+        )
+
+    claude = MockClaudeClient()
+    claude.by_url = {
+        f"https://s3.example.com/{a.proxy_path or a.file_path}?signed=1":
+            _analysis(hash_to_room_label[a.file_hash])
+        for a in assets
+    }
+
+    r = await PhotoAnalysisAgent(claude=claude, session_factory=sf).execute(ctx)
+    assert r == {"analyzed": 5, "failed": 0, "flagged": 0}
     vrs = (await db_session.execute(select(VisionResult))).scalars().all()
     assert len(vrs) == 5
 

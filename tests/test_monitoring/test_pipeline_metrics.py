@@ -38,12 +38,12 @@ def test_record_step_failure_emits_metric():
 
 def test_record_provider_call_emits_metric():
     with patch("listingjet.services.metrics.emit_metric") as mock:
-        record_provider_call("google_vision", True)
+        record_provider_call("claude", True)
         mock.assert_called_once_with(
             "ProviderCallCount",
             1,
             unit="Count",
-            dimensions={"provider": "google_vision", "success": "True"},
+            dimensions={"provider": "claude", "success": "True"},
         )
 
 
@@ -60,12 +60,12 @@ def test_record_provider_call_failure():
 
 def test_record_cost_emits_metric():
     with patch("listingjet.services.metrics.emit_metric") as mock:
-        record_cost("vision", "google_vision", 10)
+        record_cost("photo_analysis", "claude", 10)
         mock.assert_called_once_with(
             "EstimatedCost",
-            0.2,  # 10 * 0.02
+            0.5,  # 10 * 0.05
             unit="None",
-            dimensions={"agent": "vision", "provider": "google_vision"},
+            dimensions={"agent": "photo_analysis", "provider": "claude"},
         )
 
 

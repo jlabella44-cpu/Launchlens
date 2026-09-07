@@ -1,17 +1,25 @@
 # tests/test_agents/test_floorplan.py
-import json
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import select
 
 from listingjet.agents.base import AgentContext
-from listingjet.agents.floorplan import FLOORPLAN_DOLLHOUSE_PROMPT, FloorplanAgent
+from listingjet.agents.floorplan import (
+    FLOORPLAN_DOLLHOUSE_PROMPT,
+    FloorplanAgent,
+    FloorplanDoor,
+    FloorplanFurniture,
+    FloorplanRoom,
+    FloorplanScene,
+    FloorplanWindow,
+)
 from listingjet.models.asset import Asset
 from listingjet.models.dollhouse_scene import DollhouseScene
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.vision_result import VisionResult
+from listingjet.providers.mock import MockClaudeClient
 from tests.test_agents.conftest import make_session_factory
 
 
@@ -41,59 +49,68 @@ def test_dollhouse_scene_model_exists():
     assert hasattr(DollhouseScene, "room_count")
 
 
-def _floor_response(floor_label="First Floor", level=1):
-    return json.dumps({
-        "floor_label": floor_label,
-        "level": level,
-        "structure": "main_house",
-        "overall_width_meters": 12.0,
-        "overall_height_meters": 9.0,
-        "wall_height_meters": 2.7,
-        "rooms": [
-            {
-                "label": "living_room",
-                "polygon": [[0.0, 0.0], [0.5, 0.0], [0.5, 0.4], [0.0, 0.4]],
-                "width_meters": 6.0, "height_meters": 4.5,
-                "doors": [{"wall": "south", "position": 0.5}],
-                "windows": [{"wall": "east", "position": 0.3}],
-                "wall_color": "#E8E2D0",
-                "flooring": "hardwood",
-                "decor_tags": ["beige walls"],
-                "furniture": [
-                    {"type": "sectional", "x": 0.3, "y": 0.5, "rotation_degrees": 0},
+def _floor_scene(floor_label="First Floor", level=1) -> FloorplanScene:
+    return FloorplanScene(
+        floor_label=floor_label,
+        level=level,
+        structure="main_house",
+        overall_width_meters=12.0,
+        overall_height_meters=9.0,
+        wall_height_meters=2.7,
+        rooms=[
+            FloorplanRoom(
+                label="living_room",
+                polygon=[[0.0, 0.0], [0.5, 0.0], [0.5, 0.4], [0.0, 0.4]],
+                width_meters=6.0,
+                height_meters=4.5,
+                doors=[FloorplanDoor(wall="south", position=0.5)],
+                windows=[FloorplanWindow(wall="east", position=0.3)],
+                wall_color="#E8E2D0",
+                flooring="hardwood",
+                decor_tags=["beige walls"],
+                furniture=[
+                    FloorplanFurniture(type="sectional", x=0.3, y=0.5, rotation_degrees=0),
                 ],
-            },
-            {
-                "label": "kitchen",
-                "polygon": [[0.5, 0.0], [1.0, 0.0], [1.0, 0.4], [0.5, 0.4]],
-                "width_meters": 5.0, "height_meters": 4.5,
-                "doors": [{"wall": "west", "position": 0.5}],
-                "windows": [],
-                "wall_color": "#FFFFFF",
-                "flooring": "tile",
-                "decor_tags": [],
-                "furniture": [
-                    {"type": "kitchen_island", "x": 0.5, "y": 0.5, "rotation_degrees": 0},
+            ),
+            FloorplanRoom(
+                label="kitchen",
+                polygon=[[0.5, 0.0], [1.0, 0.0], [1.0, 0.4], [0.5, 0.4]],
+                width_meters=5.0,
+                height_meters=4.5,
+                doors=[FloorplanDoor(wall="west", position=0.5)],
+                windows=[],
+                wall_color="#FFFFFF",
+                flooring="tile",
+                decor_tags=[],
+                furniture=[
+                    FloorplanFurniture(type="kitchen_island", x=0.5, y=0.5, rotation_degrees=0),
                 ],
-            },
-            {
-                "label": "bedroom",
-                "polygon": [[0.0, 0.4], [0.5, 0.4], [0.5, 1.0], [0.0, 1.0]],
-                "width_meters": 6.0, "height_meters": 5.0,
-                "doors": [{"wall": "north", "position": 0.3}],
-                "windows": [{"wall": "west", "position": 0.5}],
-                "wall_color": "#D6CFC4",
-                "flooring": "carpet",
-                "decor_tags": [],
-                "furniture": [
-                    {"type": "queen_bed", "x": 0.5, "y": 0.5, "rotation_degrees": 0},
+            ),
+            FloorplanRoom(
+                label="bedroom",
+                polygon=[[0.0, 0.4], [0.5, 0.4], [0.5, 1.0], [0.0, 1.0]],
+                width_meters=6.0,
+                height_meters=5.0,
+                doors=[FloorplanDoor(wall="north", position=0.3)],
+                windows=[FloorplanWindow(wall="west", position=0.5)],
+                wall_color="#D6CFC4",
+                flooring="carpet",
+                decor_tags=[],
+                furniture=[
+                    FloorplanFurniture(type="queen_bed", x=0.5, y=0.5, rotation_degrees=0),
                 ],
-            },
+            ),
         ],
-    })
+    )
 
 
-MOCK_FLOOR_RESPONSE = _floor_response()
+MOCK_FLOOR_SCENE = _floor_scene()
+
+
+def _mock_claude(*scenes: FloorplanScene) -> MockClaudeClient:
+    client = MockClaudeClient()
+    client.responses[FloorplanScene] = list(scenes) if scenes else [MOCK_FLOOR_SCENE]
+    return client
 
 
 @pytest.fixture
@@ -122,7 +139,7 @@ async def listing_with_floorplan(db_session):
     for i, (a, room) in enumerate(zip(photos, photo_rooms)):
         vr = VisionResult(
             asset_id=a.id,
-            tier=1, room_label=room,
+            tier=1, room_label=room, is_photo=True,
             quality_score=90 - i * 5, commercial_score=80, hero_candidate=(i == 0),
         )
         db_session.add(vr)
@@ -137,16 +154,17 @@ async def listing_with_floorplan(db_session):
     # Tag the floorplan asset so vision-based detection finds it.
     db_session.add(VisionResult(
         asset_id=floorplan.id,
-        tier=1, room_label="floorplan",
+        tier=1, room_label="floorplan", is_photo=False,
+        raw_labels={"room": "floorplan"},
         quality_score=50, commercial_score=0, hero_candidate=False,
     ))
     await db_session.flush()
     return listing, floorplan, photos
 
 
-def _make_agent(db_session, mock_vision):
+def _make_agent(db_session, mock_claude):
     return FloorplanAgent(
-        vision_provider=mock_vision,
+        claude=mock_claude,
         session_factory=make_session_factory(db_session),
         storage=_fake_storage(),
     )
@@ -157,10 +175,8 @@ async def test_floorplan_agent_creates_scene(db_session, listing_with_floorplan)
     listing, floorplan, photos = listing_with_floorplan
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
-    mock_vision = MagicMock()
-    mock_vision.analyze_with_prompt_multi = AsyncMock(return_value=MOCK_FLOOR_RESPONSE)
-
-    agent = _make_agent(db_session, mock_vision)
+    mock_claude = _mock_claude()
+    agent = _make_agent(db_session, mock_claude)
     result = await agent.execute(ctx)
 
     assert result["room_count"] == 3
@@ -188,14 +204,32 @@ async def test_floorplan_agent_creates_scene(db_session, listing_with_floorplan)
 
 
 @pytest.mark.asyncio
+async def test_floorplan_agent_calls_claude_with_expected_args(db_session, listing_with_floorplan):
+    listing, floorplan, photos = listing_with_floorplan
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+
+    mock_claude = _mock_claude()
+    mock_claude.analyze_images = AsyncMockRecorder(mock_claude)
+    agent = _make_agent(db_session, mock_claude)
+    await agent.execute(ctx)
+
+    assert mock_claude.analyze_images.calls, "analyze_images was never called"
+    call = mock_claude.analyze_images.calls[0]
+    assert call.kwargs["model"] == "claude-sonnet-5"
+    assert call.kwargs["max_tokens"] == 8000
+    assert call.kwargs["agent"] == "floorplan"
+    image_urls = call.args[0]
+    assert image_urls[0] == "https://fake.example/" + floorplan.file_path
+    assert len(image_urls) <= 6
+
+
+@pytest.mark.asyncio
 async def test_floorplan_agent_matches_photos_to_rooms(db_session, listing_with_floorplan):
     listing, floorplan, photos = listing_with_floorplan
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
-    mock_vision = MagicMock()
-    mock_vision.analyze_with_prompt_multi = AsyncMock(return_value=MOCK_FLOOR_RESPONSE)
-
-    agent = _make_agent(db_session, mock_vision)
+    mock_claude = _mock_claude()
+    agent = _make_agent(db_session, mock_claude)
     await agent.execute(ctx)
 
     scenes = (await db_session.execute(select(DollhouseScene))).scalars().all()
@@ -209,10 +243,8 @@ async def test_floorplan_agent_emits_event(db_session, listing_with_floorplan):
     listing, floorplan, photos = listing_with_floorplan
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
-    mock_vision = MagicMock()
-    mock_vision.analyze_with_prompt_multi = AsyncMock(return_value=MOCK_FLOOR_RESPONSE)
-
-    agent = _make_agent(db_session, mock_vision)
+    mock_claude = _mock_claude()
+    agent = _make_agent(db_session, mock_claude)
     await agent.execute(ctx)
 
     from listingjet.models.event import Event
@@ -232,8 +264,8 @@ async def test_floorplan_agent_no_floorplan_skips(db_session):
     db_session.add(listing)
     await db_session.flush()
 
-    mock_vision = MagicMock()
-    agent = _make_agent(db_session, mock_vision)
+    mock_claude = _mock_claude()
+    agent = _make_agent(db_session, mock_claude)
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
     result = await agent.execute(ctx)
 
@@ -244,7 +276,7 @@ async def test_floorplan_agent_no_floorplan_skips(db_session):
 @pytest.mark.asyncio
 async def test_floorplan_agent_detects_via_vision(db_session):
     """Asset with a UUID-like filename (no 'floorplan' in path) is still detected
-    when VisionResult tags it with room_label='floorplan'."""
+    when VisionResult tags it is_photo=False / raw_labels room=floorplan."""
     tenant_id = uuid.uuid4()
     listing = Listing(
         tenant_id=tenant_id,
@@ -265,15 +297,14 @@ async def test_floorplan_agent_detects_via_vision(db_session):
 
     db_session.add(VisionResult(
         asset_id=floorplan.id, tier=1, room_label="floorplan",
+        is_photo=False, raw_labels={"room": "floorplan"},
         quality_score=50, commercial_score=0, hero_candidate=False,
     ))
     await db_session.flush()
 
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
-    mock_vision = MagicMock()
-    mock_vision.analyze_with_prompt_multi = AsyncMock(return_value=MOCK_FLOOR_RESPONSE)
-
-    agent = _make_agent(db_session, mock_vision)
+    mock_claude = _mock_claude()
+    agent = _make_agent(db_session, mock_claude)
     result = await agent.execute(ctx)
 
     assert result["room_count"] == 3
@@ -302,10 +333,8 @@ async def test_floorplan_agent_filename_fallback(db_session):
     await db_session.flush()
 
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
-    mock_vision = MagicMock()
-    mock_vision.analyze_with_prompt_multi = AsyncMock(return_value=MOCK_FLOOR_RESPONSE)
-
-    agent = _make_agent(db_session, mock_vision)
+    mock_claude = _mock_claude()
+    agent = _make_agent(db_session, mock_claude)
     result = await agent.execute(ctx)
 
     assert result["room_count"] == 3
@@ -314,7 +343,7 @@ async def test_floorplan_agent_filename_fallback(db_session):
 @pytest.mark.asyncio
 async def test_floorplan_agent_handles_multiple_floors(db_session):
     """Two floorplan assets produce a scene with floors[] length 2,
-    and labels/levels come from the vision response for each call."""
+    and labels/levels come from the Claude response for each call."""
     tenant_id = uuid.uuid4()
     listing = Listing(
         tenant_id=tenant_id,
@@ -340,21 +369,18 @@ async def test_floorplan_agent_handles_multiple_floors(db_session):
     for a in (fp1, fp2):
         db_session.add(VisionResult(
             asset_id=a.id, tier=1, room_label="floorplan",
+            is_photo=False, raw_labels={"room": "floorplan"},
             quality_score=50, commercial_score=0, hero_candidate=False,
         ))
     await db_session.flush()
 
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
-    mock_vision = MagicMock()
-    responses = iter([
-        _floor_response("First Floor", 1),
-        _floor_response("Basement", -1),
-    ])
-    mock_vision.analyze_with_prompt_multi = AsyncMock(
-        side_effect=lambda **kwargs: next(responses)
+    mock_claude = _mock_claude(
+        _floor_scene("First Floor", 1),
+        _floor_scene("Basement", -1),
     )
 
-    agent = _make_agent(db_session, mock_vision)
+    agent = _make_agent(db_session, mock_claude)
     result = await agent.execute(ctx)
 
     assert result["floor_count"] == 2
@@ -370,8 +396,59 @@ async def test_floorplan_agent_handles_multiple_floors(db_session):
     assert floors[1]["floor_label"] == "First Floor"
 
 
+@pytest.mark.asyncio
+async def test_build_best_photo_map_skips_non_photo_vision_results(db_session, listing_with_floorplan):
+    """A document/screenshot (is_photo=False) tier-1 row must never win a
+    room's best-photo slot, even with a higher quality_score than the real
+    photo for that room (e.g. an inspection PDF page mislabeled 'kitchen')."""
+    listing, floorplan, photos = listing_with_floorplan
+
+    doc_asset = Asset(
+        tenant_id=listing.tenant_id, listing_id=listing.id,
+        file_path=f"listings/{listing.id}/inspection_doc.jpg",
+        file_hash="doc001", state="ingested",
+    )
+    db_session.add(doc_asset)
+    await db_session.flush()
+    db_session.add(VisionResult(
+        asset_id=doc_asset.id,
+        tier=1, room_label="kitchen", is_photo=False,
+        raw_labels={"room": "document"},
+        quality_score=99, commercial_score=0, hero_candidate=False,
+    ))
+    await db_session.flush()
+
+    all_assets = [*photos, floorplan, doc_asset]
+    agent = _make_agent(db_session, _mock_claude())
+    best = await agent._build_best_photo_map(db_session, all_assets)
+
+    kitchen_asset_id, kitchen_quality = best["kitchen"]
+    assert kitchen_asset_id != doc_asset.id
+    assert kitchen_quality != 99
+
+
 def test_dollhouse_prompt_exists():
     assert "floor_label" in FLOORPLAN_DOLLHOUSE_PROMPT
     assert "furniture" in FLOORPLAN_DOLLHOUSE_PROMPT
     assert "wall_color" in FLOORPLAN_DOLLHOUSE_PROMPT
     assert "JSON" in FLOORPLAN_DOLLHOUSE_PROMPT
+
+
+class _Call:
+    def __init__(self, args, kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+
+class AsyncMockRecorder:
+    """Wraps MockClaudeClient.analyze_images to record call args/kwargs
+    while still delegating to the real mock behavior."""
+
+    def __init__(self, mock_claude: MockClaudeClient):
+        self._mock_claude = mock_claude
+        self._orig = MockClaudeClient.analyze_images.__get__(mock_claude)
+        self.calls: list[_Call] = []
+
+    async def __call__(self, *args, **kwargs):
+        self.calls.append(_Call(args, kwargs))
+        return await self._orig(*args, **kwargs)

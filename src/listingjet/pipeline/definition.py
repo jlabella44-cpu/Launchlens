@@ -22,15 +22,13 @@ class Step:
 PIPELINE: list[Step] = [
     # Phase 1: analysis
     Step("ingestion"),
-    Step("vision_tier1", requires=("ingestion",)),
+    Step("photo_analysis", requires=("ingestion",), timeout_s=20 * _MIN),
     Step("property_verification", requires=("ingestion",), timeout_s=2 * _MIN, optional=True),
-    Step("vision_tier2", requires=("vision_tier1",), timeout_s=20 * _MIN),
-    Step("coverage", requires=("vision_tier2",)),
+    Step("coverage", requires=("photo_analysis",)),
     Step("virtual_staging", requires=("coverage",), timeout_s=15 * _MIN, optional=True, gate="addon:virtual_staging"),
     Step("floorplan", requires=("coverage", "virtual_staging"), timeout_s=20 * _MIN),
     Step("dollhouse_render", requires=("floorplan",), optional=True),
     Step("packaging", requires=("floorplan", "dollhouse_render", "property_verification")),
-    Step("photo_compliance", requires=("packaging",), optional=True),
     Step("video", requires=("packaging",), timeout_s=30 * _MIN, optional=True, gate="video"),
     # Human gate
     Step("await_review", requires=("packaging",), gate="review"),
@@ -40,7 +38,7 @@ PIPELINE: list[Step] = [
     Step("social_content", requires=("content",), optional=True),
     Step("social_cuts", requires=("video", "await_review"), optional=True),
     Step("mls_export", requires=("content", "brand"), timeout_s=15 * _MIN),
-    Step("distribution", requires=("mls_export", "social_content", "social_cuts", "photo_compliance")),
+    Step("distribution", requires=("mls_export", "social_content", "social_cuts")),
     # Phase 3: after delivery, all best-effort
     Step("microsite", requires=("distribution",), timeout_s=5 * _MIN, optional=True, gate="feature:microsite"),
     Step("learning", requires=("distribution",), optional=True, gate="feature:learning"),

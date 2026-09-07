@@ -21,10 +21,20 @@ def test_pipeline_is_valid_and_has_expected_steps():
     assert STEP_INDEX["virtual_staging"].gate == "addon:virtual_staging"
     assert "chapters" not in STEP_INDEX
     assert STEP_INDEX["social_cuts"].requires == ("video", "await_review")
+    assert len(names) == 21
+
+
+def test_photo_analysis_is_the_only_photo_analysis_step():
+    """The two vision tiers and the standalone compliance sweep collapsed into
+    a single `photo_analysis` step hanging straight off ingestion."""
+    assert [n for n in STEP_INDEX if "vision" in n or "complian" in n] == []
+    assert STEP_INDEX["photo_analysis"].requires == ("ingestion",)
+    assert STEP_INDEX["coverage"].requires == ("photo_analysis",)
+    assert STEP_INDEX["distribution"].requires == ("mls_export", "social_content", "social_cuts")
 
 
 def test_required_steps_are_not_optional():
-    for name in ("ingestion", "vision_tier1", "vision_tier2", "coverage", "floorplan",
+    for name in ("ingestion", "photo_analysis", "coverage", "floorplan",
                  "packaging", "content", "mls_export", "distribution"):
         assert STEP_INDEX[name].optional is False, name
 
