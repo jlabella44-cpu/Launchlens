@@ -60,7 +60,7 @@ describe("useListingEvents", () => {
   beforeEach(() => {
     StubEventSource.instances = [];
     vi.stubGlobal("EventSource", StubEventSource);
-    localStorage.setItem("token", "tok-123");
+    localStorage.setItem("listingjet_token", "tok-123");
   });
 
   afterEach(() => {
@@ -77,7 +77,7 @@ describe("useListingEvents", () => {
     render(<Probe id="listing-1" />);
     expect(StubEventSource.instances).toHaveLength(1);
     expect(source().url).toBe(
-      "http://localhost:8000/listings/listing-1/events?token=tok-123",
+      "http://localhost:8000/sse/listings/listing-1/events?token=tok-123",
     );
   });
 

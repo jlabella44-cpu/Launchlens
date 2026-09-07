@@ -61,11 +61,18 @@ export function useListingEvents(
       return;
     }
 
+    // Key must match `auth-context.tsx`'s storage key, or this always
+    // reads null and the stream silently falls back to unauthenticated
+    // (401) connection attempts.
     const token = typeof window !== "undefined"
-      ? localStorage.getItem("token")
+      ? localStorage.getItem("listingjet_token")
       : null;
 
-    const url = `${baseUrl}/listings/${listingId}/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+    // NOTE: the SSE router (`api/sse.py`) is mounted at `/sse` in
+    // `main.py` to avoid colliding with the pre-existing
+    // `GET /listings/{id}/events` route in `api/listing_events.py`
+    // (unrelated: social-reminder events, not the pipeline stream).
+    const url = `${baseUrl}/sse/listings/${listingId}/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
     const source = new EventSource(url);
     sourceRef.current = source;
 

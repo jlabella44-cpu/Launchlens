@@ -6,7 +6,7 @@
 
 - **Backend:** FastAPI + PostgreSQL (job table) + Redis, Python 3.12, Alembic migrations
 - **Frontend:** Next.js 16 (App Router), Tailwind CSS v4, TypeScript
-- **Infra:** Render (API + worker), Supabase Postgres, Upstash Redis, Cloudflare R2 (media) — see `render.yaml`.
+- **Infra:** Render (single free-tier web service; the worker runs in-process via `WORKER_ENABLED`, not a separate Render service), Supabase Postgres, Upstash Redis, Cloudflare R2 (media) — see `render.yaml`.
 - **Tests:** pytest + pytest-cov, vitest for frontend
 
 ---
@@ -42,8 +42,28 @@ runtime.
 
 ## Running the project
 
+A `justfile` at the repo root wraps the common commands. On Windows (no
+POSIX `just` runtime), call the `.venv/Scripts/*` binaries directly instead
+of `just <target>`:
+
 ```bash
-# Start all services (postgres, redis, api, worker)
+just check       # ruff check src tests alembic + pytest -m "not db and not ffmpeg" -q
+just test        # pytest -q (full suite)
+just dev          # uvicorn listingjet.main:app --reload --port 8000
+just worker       # python -m listingjet.pipeline.worker
+just env-check    # scripts/gen_env_example.py --check (fails if .env.example is stale)
+
+# Windows equivalents (no `just` runtime):
+.venv/Scripts/ruff.exe check src tests alembic
+.venv/Scripts/pytest.exe -m "not db and not ffmpeg" -q
+.venv/Scripts/python.exe -m uvicorn listingjet.main:app --reload --port 8000
+.venv/Scripts/python.exe -m listingjet.pipeline.worker
+.venv/Scripts/python.exe scripts/gen_env_example.py --check
+```
+
+```bash
+# Start all services (postgres, redis, api — worker runs in-process via
+# WORKER_ENABLED=true, already set for the api service in docker-compose.yml)
 docker-compose up
 
 # Run backend tests
@@ -56,6 +76,26 @@ cd frontend && npm ci && npm run dev
 # Run frontend tests
 cd frontend && npm run lint && npx vitest run
 ```
+
+`.env.example` is **generated** — `scripts/gen_env_example.py` derives it
+from `Settings.model_fields`; never hand-edit it. Regenerate with
+`scripts/gen_env_example.py` (no flag) after adding/removing a setting, and
+run `--check` to verify it's current (this is also a CI/gate check).
+
+---
+
+## CI
+
+One workflow, `.github/workflows/test.yml` ("Test"), runs on every PR and
+on push to `main`: a `backend` job (Postgres + Redis services, Alembic
+migrations, ffmpeg, `ruff check`, `pytest`) and a `frontend` job (`npm ci`,
+lint, `tsc --noEmit`, `vitest run`, `npm run build`). `deploy.yml` triggers
+the Render deploy hook only on push to `main` (API service only — the
+worker runs in-process inside that same service via `WORKER_ENABLED`, so
+there's no separate worker deploy). `docker.yml` builds the Docker image
+(no push) on every PR and on push to `main`, to catch Dockerfile breakage
+before merge. `lint.yml` was removed — Ruff now runs inside `test.yml`'s
+`backend` job.
 
 ---
 
@@ -89,7 +129,7 @@ cd frontend && npm run lint && npx vitest run
 
 | What | Where |
 |---|---|
-| Alembic migrations | `alembic/versions/` (001→055, linear) |
+| Alembic migrations | `alembic/versions/` (001→056, linear) |
 | Backend pytest suite | `tests/` |
 | Migration / seed / smoke scripts | `scripts/` |
 
@@ -133,5 +173,5 @@ cd frontend && npm run lint && npx vitest run
 - **Never amend published commits** — create new commits
 - **Migration head: 056** — next migration must chain off `056_video_asset_metadata`
 - **Feature flags** — `FEATURES=` is a comma-separated env list (see `src/listingjet/features.py`) of: `learning`, `health_score`, `performance_intelligence`, `help_agent`, `microsite`, `webhooks`, `listing_permissions`. All off by default. Routers are selected at app start based on this value, so changing `FEATURES` requires restarting the API and worker processes.
-- Routes are mounted at their router prefix directly (e.g. `/auth/...`, `/listings/...`, `/demo/...`) — there is no `/v1` prefix in the running app despite past plans. Health endpoints (`/health`, `/health/deep`) are at their literal paths; `/ready` is not implemented.
+- Routes are mounted at their router prefix directly (e.g. `/auth/...`, `/listings/...`, `/demo/...`) — there is no `/v1` prefix in the running app despite past plans. Health endpoints (`/health`, `/health/deep`) are at their literal paths; `/ready` is not implemented. **Exception:** the SSE pipeline-events stream in `api/sse.py` is mounted at `/sse` (`GET /sse/listings/{id}/events`), not under `/listings`, because `api/listing_events.py` already owns `GET /listings/{id}/events` for an unrelated feature (social-reminder events). Frontend code must build the SSE URL with the `/sse` prefix.
 - The stop hook in `~/.claude/settings.json` will block you from stopping if there are uncommitted changes or unpushed commits — commit and push before ending the session.
