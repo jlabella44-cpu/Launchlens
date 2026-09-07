@@ -94,12 +94,17 @@ async def activate_addon(
         except InsufficientCreditsError:
             raise HTTPException(status_code=402, detail="Insufficient credits for bundle")
 
+        already_purchased = set((await db.execute(
+            select(AddonPurchase.addon_id).where(AddonPurchase.listing_id == listing_id)
+        )).scalars().all())
+
         purchases = []
+        new_slugs = []
         for slug in bundle["includes"]:
             catalog_entry = (await db.execute(
                 select(AddonCatalog).where(AddonCatalog.slug == slug)
             )).scalar_one_or_none()
-            if catalog_entry:
+            if catalog_entry and catalog_entry.id not in already_purchased:
                 purchase = AddonPurchase(
                     tenant_id=current_user.tenant_id,
                     listing_id=listing_id,
@@ -110,11 +115,12 @@ async def activate_addon(
                 )
                 db.add(purchase)
                 purchases.append(purchase)
+                new_slugs.append(slug)
 
-        if purchases and await db.scalar(
+        if new_slugs and await db.scalar(
             select(exists().where(PipelineJob.listing_id == listing_id))
         ):
-            for slug in bundle["includes"]:
+            for slug in new_slugs:
                 await enqueue_addon_steps(db, listing, slug)
 
         await db.commit()

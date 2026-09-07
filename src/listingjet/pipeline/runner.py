@@ -403,12 +403,25 @@ async def enqueue_addon_steps(session: AsyncSession, listing: Listing, slug: str
 
     For every step gated on `addon:{slug}` (e.g. `video_ai`, `virtual_staging`):
     a missing job is inserted QUEUED, and a SKIPPED/FAILED/CANCELLED job is reset
-    to QUEUED (attempts=0, run_after=now). Every step that transitively depends
-    on one of those gated steps and is currently DONE/SKIPPED is reset the same
-    way, so the pipeline re-runs everything downstream. Returns the number of
-    rows touched. If the listing had already reached DELIVERED, it's moved back
-    to EXPORTING so the UI shows processing again; `distribution` restores
-    DELIVERED once the re-run completes.
+    to QUEUED (attempts=0, run_after=now, and `slug` appended to the row's
+    `enabled_addons` payload so later gate checks see it). If none of those
+    rows actually changed (e.g. the add-on was already active), returns 0
+    without touching anything downstream.
+
+    Otherwise, every OTHER step that transitively depends on one of those
+    gated steps is also reset: a DONE dependent always resets to QUEUED; a
+    SKIPPED dependent is re-checked against its own gate with this slug added
+    (`_gated_off`) and only reset if that lifts it — a step gated on a
+    different, still-unpurchased add-on or a disabled feature flag stays
+    SKIPPED. The review gate itself (`gate == "review"`, e.g. `await_review`)
+    is never touched even when it's technically an ancestor of a gated step
+    (e.g. `virtual_staging` is a dependency of `floorplan`, which
+    `await_review` transitively requires) — resetting a DONE/WAITING gate
+    that has no worker function would strand the job.
+
+    Returns the number of rows touched. If the listing had already reached
+    DELIVERED, it's moved back to EXPORTING so the UI shows processing again;
+    `distribution` restores DELIVERED once the re-run completes.
     """
     gate = f"addon:{slug}"
     gated_steps = [s for s in steps if s.gate == gate]
@@ -420,6 +433,16 @@ async def enqueue_addon_steps(session: AsyncSession, listing: Listing, slug: str
     now = _now()
     touched = 0
 
+    # Default payload for a step with no existing row: copy billing_model /
+    # enabled_addons from any sibling job rather than hardcoding "legacy".
+    default_billing_model = "legacy"
+    default_enabled_addons: list[str] = []
+    for j in sibs.values():
+        if j.payload:
+            default_billing_model = j.payload.get("billing_model", default_billing_model)
+            default_enabled_addons = list(j.payload.get("enabled_addons", default_enabled_addons))
+            break
+
     def _reset(job: PipelineJob) -> None:
         nonlocal touched
         job.status = JobStatus.QUEUED
@@ -427,30 +450,59 @@ async def enqueue_addon_steps(session: AsyncSession, listing: Listing, slug: str
         job.error = None
         job.locked_by = None
         job.run_after = now
+        # So later gate checks (including the SKIPPED re-check below, on a
+        # future purchase) see this slug as enabled.
+        payload = dict(job.payload or {})
+        enabled = list(payload.get("enabled_addons", default_enabled_addons))
+        if slug not in enabled:
+            enabled.append(slug)
+        payload["enabled_addons"] = enabled
+        job.payload = payload
         touched += 1
 
+    any_gated_changed = False
     for step in gated_steps:
         job = sibs.get(step.name)
         if job is None:
             job = PipelineJob(
                 tenant_id=listing.tenant_id, listing_id=listing.id, step=step.name,
                 status=JobStatus.QUEUED, max_attempts=step.max_attempts, run_after=now,
-                payload={"billing_model": "legacy", "enabled_addons": [slug]},
+                payload={"billing_model": default_billing_model,
+                         "enabled_addons": list({*default_enabled_addons, slug})},
             )
             session.add(job)
             sibs[step.name] = job
             touched += 1
+            any_gated_changed = True
         elif job.status in _ADDON_RESETTABLE:
             _reset(job)
+            any_gated_changed = True
+        # else: already active or already done — no-op, and its dependents
+        # are left alone too (nothing new to re-run).
+
+    if not any_gated_changed:
+        return 0
 
     for step in steps:
-        if step.name in gated_names:
+        if step.name in gated_names or step.gate == "review":
+            continue  # never touch the review gate itself
+        if not (transitive_requires(step.name, steps) & gated_names):
             continue
         job = sibs.get(step.name)
-        if job is None or job.status not in SATISFIED:
+        if job is None:
             continue
-        if transitive_requires(step.name, steps) & gated_names:
+        if job.status == JobStatus.DONE:
             _reset(job)
+        elif job.status == JobStatus.SKIPPED:
+            payload = job.payload or {}
+            billing_model = payload.get("billing_model", default_billing_model)
+            enabled_addons = list(payload.get("enabled_addons", default_enabled_addons))
+            if slug not in enabled_addons:
+                enabled_addons = [*enabled_addons, slug]
+            # Only un-skip if this purchase actually lifts *this* step's own
+            # gate (e.g. a feature-gated step stays SKIPPED regardless).
+            if not _gated_off(step, billing_model, enabled_addons):
+                _reset(job)
 
     if touched and listing.state == ListingState.DELIVERED:
         listing.state = ListingState.EXPORTING

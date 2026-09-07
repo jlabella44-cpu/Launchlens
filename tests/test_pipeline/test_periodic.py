@@ -91,6 +91,41 @@ async def test_fail_stuck_listings_ignores_recently_updated_listing(db_session):
 
 
 @pytest.mark.asyncio
+async def test_fail_stuck_listings_catches_listing_with_zero_jobs(db_session):
+    """A listing whose enqueue itself never ran has no pipeline_jobs rows at
+    all — an INNER JOIN against pipeline_jobs would silently never match it.
+    Falls back to the listing's own `updated_at`."""
+    listing = await _make_listing(db_session, state=ListingState.UPLOADING)
+    await db_session.execute(
+        update(Listing).where(Listing.id == listing.id)
+        .values(updated_at=runner._now() - _STALE)
+    )
+    await db_session.flush()
+
+    n = await periodic.fail_stuck_listings(make_session_factory(db_session), max_age_hours=MAX_AGE_HOURS)
+
+    assert n == 1
+    refreshed_state = (await db_session.execute(
+        select(Listing.state).where(Listing.id == listing.id)
+    )).scalar_one()
+    assert refreshed_state == ListingState.PIPELINE_TIMEOUT
+
+
+@pytest.mark.asyncio
+async def test_fail_stuck_listings_ignores_recently_created_zero_job_listing(db_session):
+    listing = await _make_listing(db_session, state=ListingState.UPLOADING)
+    # No backdating — `updated_at` defaults to "now".
+
+    n = await periodic.fail_stuck_listings(make_session_factory(db_session), max_age_hours=MAX_AGE_HOURS)
+
+    assert n == 0
+    refreshed_state = (await db_session.execute(
+        select(Listing.state).where(Listing.id == listing.id)
+    )).scalar_one()
+    assert refreshed_state == ListingState.UPLOADING
+
+
+@pytest.mark.asyncio
 async def test_fail_stuck_listings_sets_error_message_and_cancels_queued_jobs(db_session):
     listing = await _make_listing(db_session, state=ListingState.EXPORTING)
     await _add_job(db_session, listing, step="mls_export", status=JobStatus.DONE, age=_STALE)

@@ -65,8 +65,10 @@ async def fail_stuck_listings(session_factory=None, *, max_age_hours: int) -> in
     newest `pipeline_jobs.updated_at` is older than `max_age_hours` has no
     worker actively making progress on it and none queued to reclaim it (that's
     `reclaim_stale`'s job, and it only handles RUNNING rows) — most likely a bug
-    silently dropped every job for the listing without ever failing it. Moves
-    the listing to PIPELINE_TIMEOUT via `runner.fail_listing` (which also
+    silently dropped every job for the listing without ever failing it. A
+    listing with zero `pipeline_jobs` rows at all (enqueue itself never ran)
+    is caught the same way, falling back to the listing's own `updated_at`.
+    Moves the listing to PIPELINE_TIMEOUT via `runner.fail_listing` (which also
     cancels any still-QUEUED/WAITING rows) and returns the number failed.
     """
     from datetime import timedelta
@@ -93,11 +95,11 @@ async def fail_stuck_listings(session_factory=None, *, max_age_hours: int) -> in
         )
         listings = (await session.execute(
             select(Listing)
-            .join(stats, stats.c.listing_id == Listing.id)
+            .outerjoin(stats, stats.c.listing_id == Listing.id)
             .where(
                 Listing.state.in_(stuck_states),
-                stats.c.has_running.is_(False),
-                stats.c.newest < cutoff,
+                func.coalesce(stats.c.has_running, False).is_(False),
+                func.coalesce(stats.c.newest, Listing.updated_at) < cutoff,
             )
         )).scalars().all()
 
