@@ -28,6 +28,7 @@ export const test = base.extend<{ authedPage: typeof base extends { extend: (f: 
   page: async ({ page }, use) => {
     // No-op — the default page fixture is unmodified.
     // Protected-page tests should use the `authedPage` helper below.
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- Playwright fixture `use` callback, not React's `use` hook.
     await use(page);
   },
 });
@@ -50,15 +51,7 @@ export async function setupAuth(page: import("@playwright/test").Page) {
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({
-        id: "test-user-001",
-        email: "test@listingjet.com",
-        name: "Test User",
-        company_name: "Test Brokerage",
-        plan_tier: "active_agent",
-        onboarding_complete: true,
-        created_at: "2026-01-01T00:00:00Z",
-      }),
+      body: JSON.stringify(FAKE_USER),
     })
   );
 

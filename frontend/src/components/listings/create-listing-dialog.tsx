@@ -26,7 +26,7 @@ export function CreateListingDialog({
   onClose,
   onCreated,
 }: CreateListingDialogProps) {
-  const { billingModel, creditBalance, listingCreditCost, canAffordListing, refresh } = usePlan();
+  const { billingModel, creditBalance, listingCreditCost, refresh } = usePlan();
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Focus trap

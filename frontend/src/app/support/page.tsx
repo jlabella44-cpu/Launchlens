@@ -6,7 +6,7 @@ import { Nav } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/layout/protected-route";
 import { useToast } from "@/components/ui/toast";
 import apiClient from "@/lib/api-client";
-import type { SupportTicket, SupportTicketDetail, SupportMessage } from "@/lib/types";
+import type { SupportTicket, SupportTicketDetail } from "@/lib/types";
 
 const CATEGORIES = [
   { value: "billing", label: "Billing" },
