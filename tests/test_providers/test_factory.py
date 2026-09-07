@@ -1,14 +1,7 @@
 from unittest.mock import patch
 
-from listingjet.providers.factory import get_llm_provider, get_template_provider
-from listingjet.providers.mock import MockLLMProvider, MockTemplateProvider
-
-
-def test_get_llm_provider_returns_mock_when_flag_set():
-    with patch("listingjet.providers.factory.settings") as mock_settings:
-        mock_settings.use_mock_providers = True
-        provider = get_llm_provider()
-        assert isinstance(provider, MockLLMProvider)
+from listingjet.providers.factory import get_template_provider
+from listingjet.providers.mock import MockTemplateProvider
 
 
 def test_get_template_provider_returns_mock_when_flag_set():
@@ -16,10 +9,3 @@ def test_get_template_provider_returns_mock_when_flag_set():
         mock_settings.use_mock_providers = True
         provider = get_template_provider()
         assert isinstance(provider, MockTemplateProvider)
-
-
-def test_get_llm_provider_accepts_and_ignores_agent_and_tenant_kwargs():
-    with patch("listingjet.providers.factory.settings") as mock_settings:
-        mock_settings.use_mock_providers = True
-        provider = get_llm_provider(agent="content", tenant_id="some-tenant")
-        assert isinstance(provider, MockLLMProvider)

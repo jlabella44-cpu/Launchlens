@@ -6,7 +6,6 @@ sampling parameters, so temperature is never sent; tone lives in the system prom
 """
 from __future__ import annotations
 
-import json
 import logging
 
 import anthropic
@@ -14,8 +13,6 @@ from pydantic import BaseModel
 
 from listingjet.config import settings
 from listingjet.services.metrics import record_provider_call, record_token_usage
-
-from .base import LLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -122,24 +119,3 @@ class ClaudeClient:
             raise ProviderOutputError("model refused")
         record_provider_call("claude", True)
         return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
-
-
-class ClaudeProvider(LLMProvider):
-    """Legacy text interface used by content/social agents until Phase 5. `temperature` is ignored."""
-
-    def __init__(self, api_key: str | None = None, client: ClaudeClient | None = None):
-        self._client = client or ClaudeClient(api_key=api_key)
-
-    async def complete(
-        self,
-        prompt: str,
-        context: dict,
-        temperature: float | None = None,
-        system_prompt: str | None = None,
-        agent: str | None = None,
-    ) -> str:
-        context_str = json.dumps(context, indent=2, default=str) if context else ""
-        user = f"{prompt}\n\nContext:\n{context_str}" if context_str else prompt
-        return await self._client.complete_text(
-            user, system=system_prompt or DEFAULT_SYSTEM_PROMPT, agent=agent
-        )

@@ -11,7 +11,7 @@ need no changes.
 """
 from listingjet.config import settings
 
-from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider
+from .base import ImageEditProvider, TemplateProvider, VirtualStagingProvider
 
 
 def get_claude(agent: str | None = None, tenant_id=None):
@@ -21,15 +21,6 @@ def get_claude(agent: str | None = None, tenant_id=None):
         return MockClaudeClient()
     from .claude import ClaudeClient
     return ClaudeClient()
-
-
-def get_llm_provider(agent: str | None = None, tenant_id=None) -> LLMProvider:
-    """Return the LLM provider (Claude), or a mock when USE_MOCK_PROVIDERS is set."""
-    if settings.use_mock_providers:
-        from .mock import MockLLMProvider
-        return MockLLMProvider()
-    from .claude import ClaudeProvider
-    return ClaudeProvider(client=get_claude(agent=agent, tenant_id=tenant_id))
 
 
 def get_image_edit_provider() -> ImageEditProvider:
@@ -54,6 +45,6 @@ def get_template_provider() -> TemplateProvider:
         return MockTemplateProvider()
     if settings.canva_api_key:
         from .canva import CanvaTemplateProvider
-        return CanvaTemplateProvider(api_key=settings.canva_api_key, llm_provider=get_llm_provider())
+        return CanvaTemplateProvider(api_key=settings.canva_api_key)
     from .mock import MockTemplateProvider
     return MockTemplateProvider()

@@ -4,7 +4,7 @@ import typing
 
 from pydantic import BaseModel
 
-from .base import ImageEditProvider, LLMProvider, TemplateProvider, VirtualStagingProvider
+from .base import ImageEditProvider, TemplateProvider, VirtualStagingProvider
 
 
 def _defaults_for(schema: type[BaseModel], seed: int = 0) -> dict:
@@ -38,11 +38,6 @@ def _defaults_for(schema: type[BaseModel], seed: int = 0) -> dict:
         else:
             data[name] = None
     return data
-
-class MockLLMProvider(LLMProvider):
-    async def complete(self, prompt: str, context: dict, temperature: float | None = None, system_prompt: str | None = None) -> str:
-        return "Stunning home with modern finishes and abundant natural light."
-
 
 class MockImageEditProvider(ImageEditProvider):
     provider_name = "mock"

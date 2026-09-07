@@ -4,8 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import BaseModel
 
-from listingjet.providers.base import LLMProvider
-from listingjet.providers.claude import ClaudeClient, ClaudeProvider, ProviderOutputError
+from listingjet.providers.claude import ClaudeClient, ProviderOutputError
 
 
 class Out(BaseModel):
@@ -19,11 +18,6 @@ def _resp(parsed=None, text="hello", stop_reason="end_turn", in_tok=10, out_tok=
         content=[SimpleNamespace(type="text", text=text)],
         usage=SimpleNamespace(input_tokens=in_tok, output_tokens=out_tok),
     )
-
-
-def test_claude_provider_is_llm_provider():
-    provider = ClaudeProvider(api_key="test-key")
-    assert isinstance(provider, LLMProvider)
 
 
 @pytest.mark.asyncio
@@ -63,16 +57,6 @@ async def test_none_parsed_output_raises_provider_output_error():
         with pytest.raises(ProviderOutputError):
             await c.complete_json("x", Out)
     rec.assert_called_once_with("claude", False)
-
-
-@pytest.mark.asyncio
-async def test_shim_ignores_temperature_and_appends_context():
-    p = ClaudeProvider(api_key="k")
-    p._client.complete_text = AsyncMock(return_value="copy")
-    out = await p.complete("write", {"beds": 3}, temperature=0.9, system_prompt="sys")
-    assert out == "copy"
-    kw = p._client.complete_text.await_args
-    assert '"beds": 3' in kw.args[0] and kw.kwargs["system"] == "sys"
 
 
 @pytest.mark.asyncio
