@@ -125,3 +125,19 @@ async def test_complete_text_returns_nonempty_string():
     result = await client.complete_text("write copy")
     assert isinstance(result, str)
     assert len(result) > 0
+
+
+@pytest.mark.asyncio
+async def test_photo_analysis_defaults_pass_packaging_quality_floor():
+    """PhotoAnalysis's schema-shape defaults alone would produce is_photo=False
+    and quality=1 — real photos in mock-provider test fixtures would then be
+    silently dropped by the packaging quality floor. The schema-name override
+    in `_SCHEMA_DEFAULT_OVERRIDES` keeps mock output realistic."""
+    from listingjet.agents.packaging import MIN_QUALITY_SCORE
+    from listingjet.agents.photo_analysis import PhotoAnalysis
+
+    client = MockClaudeClient()
+    result = await client.analyze_images(["https://x/1.jpg"], "which room", PhotoAnalysis)
+
+    assert result.is_photo is True
+    assert result.quality >= MIN_QUALITY_SCORE

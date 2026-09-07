@@ -1,6 +1,8 @@
-"""Video template definitions + room-specific prompts and camera controls for Kling AI."""
+"""Room-specific cinematic prompts and shot ordering for the AI video tour.
 
-from dataclasses import dataclass
+Consumed by `agents/video_ai.py` (Runway image-to-video) and, for the
+exclusion list, by `agents/video_baseline.py`.
+"""
 
 ROOM_PROMPTS: dict[str, str] = {
     "drone": (
@@ -166,46 +168,6 @@ ROOM_PROMPTS: dict[str, str] = {
     ),
 }
 
-ROOM_CAMERA_CONTROLS: dict[str, dict[str, int]] = {
-    "drone": {"zoom": 2, "horizontal": 3},
-    "exterior": {"zoom": 4, "horizontal": 0},
-    "exterior_rear": {"zoom": 3, "horizontal": 2},
-    "entryway": {"zoom": 5, "horizontal": 0},
-    "foyer": {"zoom": 3, "horizontal": 0},
-    "living_room": {"zoom": 4, "horizontal": -2},
-    "family_room": {"zoom": 3, "horizontal": -3},
-    "kitchen": {"zoom": 5, "horizontal": 0},
-    "dining_room": {"zoom": 4, "horizontal": -2},
-    "breakfast_nook": {"zoom": 4, "horizontal": 0},
-    "primary_bedroom": {"zoom": 4, "horizontal": -2},
-    "bedroom": {"zoom": 3, "horizontal": -3},
-    "primary_bathroom": {"zoom": 3, "horizontal": 2},
-    "bathroom": {"zoom": 3, "horizontal": 0},
-    "office": {"zoom": 3, "horizontal": 3},
-    "laundry": {"zoom": 3, "horizontal": 0},
-    "mudroom": {"zoom": 3, "horizontal": 0},
-    "closet": {"zoom": 4, "horizontal": 0},
-    "staircase": {"zoom": 2, "horizontal": 0},
-    "hallway": {"zoom": 4, "horizontal": 0},
-    "garage": {"zoom": 3, "horizontal": 0},
-    "pool": {"zoom": 2, "horizontal": 3},
-    "patio": {"zoom": 3, "horizontal": -3},
-    "deck": {"zoom": 2, "horizontal": -3},
-    "backyard": {"zoom": 2, "horizontal": -3},
-    "basement": {"zoom": 4, "horizontal": 0},
-    "theater": {"zoom": 4, "horizontal": 0},
-    "gym": {"zoom": 3, "horizontal": 3},
-    "wine_cellar": {"zoom": 4, "horizontal": 0},
-    "bonus_room": {"zoom": 3, "horizontal": 0},
-}
-
-NEGATIVE_PROMPT = (
-    "static image, still photo, no movement, frozen, slideshow, ken burns, "
-    "shaky camera, fast cuts, blurry, distorted, excessive movement, "
-    "hallucinated objects, morphing walls, warping furniture, artifacts, "
-    "people appearing, phantom figures, text overlay, watermark"
-)
-
 # Room labels that should NEVER appear in video (non-photo content)
 VIDEO_EXCLUDED_LABELS: frozenset[str] = frozenset({
     "floorplan", "floor_plan", "diagram", "map", "site_plan",
@@ -246,27 +208,6 @@ DRONE_ROOMS: frozenset[str] = frozenset({"drone"})
 EXTERIOR_ROOMS: frozenset[str] = frozenset({"exterior", "exterior_rear"})
 
 
-@dataclass(frozen=True)
-class VideoTemplate:
-    """Defines the shape of a generated video: clip count, length, model, structure."""
-    name: str
-    clip_duration_s: int
-    clip_count: int
-    kling_model: str = "kling-v2-5-turbo"
-    kling_mode: str = "pro"
-    transition: str = "cut"  # "cut" = hard cut (no xfade)
-
-
-STANDARD_60S = VideoTemplate(
-    name="standard_60s",
-    clip_duration_s=5,
-    clip_count=12,
-    kling_model="kling-v2-5-turbo",
-    kling_mode="pro",
-    transition="cut",
-)
-
-
 def get_prompt_for_room(room_label: str, metadata: dict | None = None) -> str:
     """Get the cinematic prompt for a room, optionally enriched with feature tags."""
     base = ROOM_PROMPTS.get(room_label, ROOM_PROMPTS.get("living_room"))
@@ -275,8 +216,3 @@ def get_prompt_for_room(room_label: str, metadata: dict | None = None) -> str:
         if features:
             base += f", featuring {', '.join(features)}"
     return base
-
-
-def get_camera_control(room_label: str) -> dict[str, int]:
-    """Get camera control settings for a room."""
-    return ROOM_CAMERA_CONTROLS.get(room_label, {"zoom": 3, "horizontal": 0})

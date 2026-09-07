@@ -17,11 +17,14 @@ def test_pipeline_is_valid_and_has_expected_steps():
     assert "await_review" in names and "distribution" in names
     assert len(names) == len(set(names))
     assert STEP_INDEX["await_review"].gate == "review"
-    assert STEP_INDEX["video"].gate == "video"
+    assert STEP_INDEX["video_baseline"].gate is None
+    assert STEP_INDEX["video_baseline"].requires == ("packaging",)
+    assert STEP_INDEX["video_ai"].gate == "addon:ai_video_tour"
+    assert STEP_INDEX["video_ai"].requires == ("packaging", "await_review")
     assert STEP_INDEX["virtual_staging"].gate == "addon:virtual_staging"
     assert "chapters" not in STEP_INDEX
-    assert STEP_INDEX["social_cuts"].requires == ("video", "await_review")
-    assert len(names) == 20
+    assert STEP_INDEX["social_cuts"].requires == ("video_baseline", "video_ai", "await_review")
+    assert len(names) == 21
 
 
 def test_photo_analysis_is_the_only_photo_analysis_step():

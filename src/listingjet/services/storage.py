@@ -54,7 +54,7 @@ class StorageService:
             logger.exception("S3 upload failed key=%s", key)
             raise StorageError(f"Failed to upload {key}: {e}") from e
 
-    # Convenience alias used by VideoAgent
+    # Convenience alias used by the video agents
     def upload_bytes(self, data: bytes, key: str, content_type: str) -> str:
         return self.upload(key=key, data=data, content_type=content_type)
 

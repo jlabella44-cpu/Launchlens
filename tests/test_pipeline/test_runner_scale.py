@@ -128,13 +128,13 @@ async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_
 @pytest.mark.asyncio
 async def test_pre_review_steps_remain_claimable_for_a_parked_listing(db_session):
     """`post_review_steps` must only capture steps that transitively require
-    `await_review`. `video` hangs directly off `packaging` (not
+    `await_review`. `video_baseline` hangs directly off `packaging` (not
     `await_review`), so it must stay claimable even while the listing's
     `await_review` row sits WAITING right alongside it — the exclusion in
     `claim_next` must not sweep it in too."""
     listing = await _listing(db_session, "1 Pending Ave")
     # Mark every step through packaging DONE directly (skip actually running
-    # them), leaving video exactly as enqueue_pipeline created it — QUEUED —
+    # them), leaving video_baseline exactly as enqueue_pipeline created it — QUEUED —
     # alongside await_review, which enqueue_pipeline always creates as
     # WAITING for a gate="review" step.
     await db_session.execute(
@@ -147,11 +147,11 @@ async def test_pre_review_steps_remain_claimable_for_a_parked_listing(db_session
     )
     await db_session.commit()
     assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
-    assert await _status(db_session, listing.id, "video") == JobStatus.QUEUED
+    assert await _status(db_session, listing.id, "video_baseline") == JobStatus.QUEUED
 
     job = await runner.claim_next(db_session, "w1")
-    assert job is not None, "video wrongly excluded for a parked listing"
-    assert (job.listing_id, job.step) == (listing.id, "video")
+    assert job is not None, "video_baseline wrongly excluded for a parked listing"
+    assert (job.listing_id, job.step) == (listing.id, "video_baseline")
 
 
 @pytest.mark.asyncio

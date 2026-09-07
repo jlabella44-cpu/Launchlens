@@ -19,3 +19,4 @@ class VideoAsset(TenantScopedModel):
     branded_player_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # {logo_url, cta_text, accent_color}
     thumbnail_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     clip_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    metadata_: Mapped[dict | None] = mapped_column(JSONB, name="metadata", nullable=True)

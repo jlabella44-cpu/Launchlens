@@ -113,6 +113,35 @@ def test_is_satisfied_rules():
 
 
 @pytest.mark.asyncio
+async def test_ai_video_tour_addon_gate_applies_regardless_of_billing_model(db_session):
+    """`video_ai` is gated on the `ai_video_tour` add-on for every billing
+    model — credit and subscription tenants alike. `video_baseline` has no
+    gate at all and is always queued."""
+    from listingjet.pipeline.definition import PIPELINE
+
+    listing = await _listing(db_session)
+    await runner.enqueue_pipeline(
+        db_session, listing, billing_model="credit", enabled_addons=[], steps=PIPELINE)
+    jobs = await _jobs(db_session, listing.id)
+    assert jobs["video_ai"].status == JobStatus.SKIPPED
+    assert jobs["video_baseline"].status == JobStatus.QUEUED
+
+    listing2 = await _listing(db_session)
+    await runner.enqueue_pipeline(
+        db_session, listing2, billing_model="credit", enabled_addons=["ai_video_tour"], steps=PIPELINE)
+    jobs2 = await _jobs(db_session, listing2.id)
+    assert jobs2["video_ai"].status == JobStatus.QUEUED
+    assert jobs2["video_baseline"].status == JobStatus.QUEUED
+
+    listing3 = await _listing(db_session)
+    await runner.enqueue_pipeline(
+        db_session, listing3, billing_model="subscription", enabled_addons=[], steps=PIPELINE)
+    jobs3 = await _jobs(db_session, listing3.id)
+    assert jobs3["video_ai"].status == JobStatus.SKIPPED
+    assert jobs3["video_baseline"].status == JobStatus.QUEUED
+
+
+@pytest.mark.asyncio
 async def test_feature_gate_skips_step_when_flag_off(db_session):
     from unittest.mock import patch
 

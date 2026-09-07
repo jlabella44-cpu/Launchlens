@@ -45,6 +45,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["ffmpeg: shells out to ffmpeg"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/listingjet"]

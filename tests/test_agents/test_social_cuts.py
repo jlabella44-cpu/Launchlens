@@ -71,6 +71,52 @@ async def test_social_cut_agent_creates_cuts(db_session, listing_with_video):
 
 
 @pytest.mark.asyncio
+async def test_social_cut_agent_prefers_tour_video_over_other_ready_videos(db_session):
+    tenant_id = uuid.uuid4()
+    listing = Listing(
+        tenant_id=tenant_id,
+        address={"street": "601 Tour Preference Dr"}, metadata_={},
+        state=ListingState.APPROVED,
+    )
+    db_session.add(listing)
+    await db_session.flush()
+
+    older_tour = VideoAsset(
+        tenant_id=tenant_id, listing_id=listing.id,
+        s3_key=f"videos/{listing.id}/tour.mp4",
+        video_type="tour", duration_seconds=30, status="ready",
+    )
+    newer_professional = VideoAsset(
+        tenant_id=tenant_id, listing_id=listing.id,
+        s3_key=f"videos/{listing.id}/professional.mp4",
+        video_type="professional", duration_seconds=60, status="ready",
+    )
+    db_session.add(older_tour)
+    await db_session.flush()
+    db_session.add(newer_professional)
+    await db_session.flush()
+
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+
+    mock_storage = MagicMock()
+    mock_storage.download = MagicMock(return_value=b"fake-video-bytes")
+    mock_storage.upload = MagicMock(side_effect=lambda key="", data=b"", content_type="": key)
+
+    mock_cutter = MagicMock()
+    mock_cutter.create_cut = MagicMock(return_value=b"fake-cut-bytes")
+
+    agent = SocialCutAgent(
+        storage_service=mock_storage,
+        video_cutter=mock_cutter,
+        session_factory=make_session_factory(db_session),
+    )
+    result = await agent.execute(ctx)
+
+    assert result["video_asset_id"] == str(older_tour.id)
+    mock_storage.download.assert_called_once_with(older_tour.s3_key)
+
+
+@pytest.mark.asyncio
 async def test_social_cut_agent_skips_no_video(db_session):
     tenant_id = uuid.uuid4()
     listing = Listing(

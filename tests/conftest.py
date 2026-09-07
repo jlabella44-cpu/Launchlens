@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 import uuid
 from unittest.mock import MagicMock, patch
 
@@ -144,6 +145,13 @@ def make_jwt(tenant_id: str, user_id: str | None = None) -> str:
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
+
+
+@pytest.fixture
+def ffmpeg_available():
+    if shutil.which(settings.ffmpeg_bin) is None:
+        pytest.skip(f"ffmpeg not found at {settings.ffmpeg_bin!r}; set FFMPEG_BIN")
+    return settings.ffmpeg_bin
 
 
 @pytest.fixture

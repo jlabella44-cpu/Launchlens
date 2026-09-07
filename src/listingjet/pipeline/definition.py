@@ -29,13 +29,15 @@ PIPELINE: list[Step] = [
     Step("floorplan", requires=("coverage", "virtual_staging"), timeout_s=20 * _MIN),
     Step("dollhouse_render", requires=("floorplan",), optional=True),
     Step("packaging", requires=("floorplan", "dollhouse_render", "property_verification")),
-    Step("video", requires=("packaging",), timeout_s=30 * _MIN, optional=True, gate="video"),
+    Step("video_baseline", requires=("packaging",), timeout_s=15 * _MIN, optional=True),
+    Step("video_ai", requires=("packaging", "await_review"), timeout_s=30 * _MIN, optional=True,
+         gate="addon:ai_video_tour"),
     # Human gate
     Step("await_review", requires=("packaging",), gate="review"),
     # Phase 2: post-approval
     Step("content_social", requires=("await_review",)),
     Step("brand", requires=("content_social",), optional=True),
-    Step("social_cuts", requires=("video", "await_review"), optional=True),
+    Step("social_cuts", requires=("video_baseline", "video_ai", "await_review"), optional=True),
     Step("mls_export", requires=("content_social", "brand"), timeout_s=15 * _MIN),
     Step("distribution", requires=("mls_export", "social_cuts")),
     # Phase 3: after delivery, all best-effort

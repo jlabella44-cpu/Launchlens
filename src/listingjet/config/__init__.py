@@ -163,11 +163,13 @@ class Settings(BaseSettings):
     ses_enabled: bool = False
     resend_api_key: str = ""
 
-    # Video (Kling AI)
-    kling_access_key: str = ""
-    kling_secret_key: str = ""
-    kling_api_base_url: str = "https://api.klingai.com"
-    video_score_floor: float = 0.65
+    # Video (Runway two-tier generation + ffmpeg stitching)
+    ffmpeg_bin: str = "ffmpeg"
+    runway_api_key: str = ""
+    runway_interior_model: str = "gen4_turbo"
+    runway_exterior_model: str = "veo3.1_fast"
+    video_music_enabled: bool = False
+    video_music_path: str = ""
 
     # Property Lookup
     attom_api_key: str = ""

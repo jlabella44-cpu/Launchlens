@@ -71,7 +71,7 @@ export function useListingEvents(
       "ingestion.completed", "photo_analysis.completed", "photo_compliance.completed",
       "coverage.completed", "packaging.completed", "content_social.completed",
       "brand.completed", "mls_export.completed",
-      "pipeline.completed", "video.completed",
+      "pipeline.completed", "video_baseline.completed", "video_ai.completed",
     ];
 
     for (const eventType of pipelineEvents) {

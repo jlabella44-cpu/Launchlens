@@ -97,9 +97,7 @@ envVarGroups:
         sync: false
       - key: CANVA_DEFAULT_TEMPLATE_ID
         sync: false
-      - key: KLING_ACCESS_KEY
-        sync: false
-      - key: KLING_SECRET_KEY
+      - key: RUNWAY_API_KEY
         sync: false
       # --- Email (Resend) ---
       - key: EMAIL_ENABLED
