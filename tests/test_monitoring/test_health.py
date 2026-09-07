@@ -19,7 +19,7 @@ async def test_deep_health_returns_component_status(async_client: AsyncClient):
     data = resp.json()
     assert "database" in data
     assert "redis" in data
-    assert "temporal" in data
+    assert "worker" in data
     assert "status" in data
 
 

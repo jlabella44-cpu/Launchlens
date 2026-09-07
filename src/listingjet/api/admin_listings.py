@@ -12,7 +12,9 @@ from listingjet.api.schemas.admin import (
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.tenant import Tenant
 from listingjet.models.user import User
+from listingjet.pipeline.runner import retry_listing
 from listingjet.services.audit import audit_log
+from listingjet.services.pipeline_start import enabled_addon_slugs
 
 router = APIRouter()
 
@@ -143,15 +145,12 @@ async def admin_retry_listing(
     previous_state = listing.state.value
     tenant = await db.get(Tenant, listing.tenant_id)
 
-    # Start the workflow BEFORE committing the state change
     try:
-        from listingjet.temporal_client import get_temporal_client
-
-        client = get_temporal_client()
-        await client.start_pipeline(
-            listing_id=str(listing.id),
-            tenant_id=str(listing.tenant_id),
-            plan=tenant.plan if tenant else "free",
+        slugs = await enabled_addon_slugs(db, listing.id)
+        await retry_listing(
+            db, listing,
+            billing_model=tenant.billing_model if tenant else "legacy",
+            enabled_addons=slugs,
         )
     except Exception:
         logger.exception("Admin pipeline retry trigger failed for listing %s", listing.id)
@@ -160,8 +159,6 @@ async def admin_retry_listing(
             detail="Failed to start pipeline — listing state unchanged",
         )
 
-    # Only update state after workflow is confirmed running
-    listing.state = ListingState.UPLOADING
     await audit_log(
         db, admin_user.id, "retry_listing", "listing", str(listing_id),
         tenant_id=listing.tenant_id,
@@ -169,4 +166,4 @@ async def admin_retry_listing(
     )
     await db.commit()
 
-    return {"listing_id": str(listing.id), "state": "uploading"}
+    return {"listing_id": str(listing.id), "state": listing.state.value}

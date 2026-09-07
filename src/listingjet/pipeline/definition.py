@@ -1,0 +1,82 @@
+"""Declarative listing pipeline. Replaces workflows/listing_pipeline.py.
+
+Each Step becomes one pipeline_jobs row when a listing is enqueued. A row is
+runnable when every `requires` row is satisfied: done, skipped, or (failed and
+that step is optional). The runner never inserts rows mid-flight.
+"""
+from dataclasses import dataclass
+
+_MIN = 60
+
+
+@dataclass(frozen=True)
+class Step:
+    name: str
+    requires: tuple[str, ...] = ()
+    timeout_s: int = 10 * _MIN
+    max_attempts: int = 3
+    optional: bool = False
+    gate: str | None = None
+
+
+PIPELINE: list[Step] = [
+    # Phase 1: analysis
+    Step("ingestion"),
+    Step("vision_tier1", requires=("ingestion",)),
+    Step("property_verification", requires=("ingestion",), timeout_s=2 * _MIN, optional=True),
+    Step("vision_tier2", requires=("vision_tier1",), timeout_s=20 * _MIN),
+    Step("coverage", requires=("vision_tier2",)),
+    Step("virtual_staging", requires=("coverage",), timeout_s=15 * _MIN, optional=True, gate="addon:virtual_staging"),
+    Step("floorplan", requires=("coverage", "virtual_staging"), timeout_s=20 * _MIN),
+    Step("dollhouse_render", requires=("floorplan",), optional=True),
+    Step("packaging", requires=("floorplan", "dollhouse_render", "property_verification")),
+    Step("photo_compliance", requires=("packaging",), optional=True),
+    Step("video", requires=("packaging",), timeout_s=30 * _MIN, optional=True, gate="video"),
+    # Human gate
+    Step("await_review", requires=("packaging",), gate="review"),
+    # Phase 2: post-approval
+    Step("content", requires=("await_review",)),
+    Step("brand", requires=("content",), optional=True),
+    Step("social_content", requires=("content",), optional=True),
+    Step("chapters", requires=("video", "await_review"), optional=True),
+    Step("social_cuts", requires=("video", "await_review"), optional=True),
+    Step("mls_export", requires=("content", "brand"), timeout_s=15 * _MIN),
+    Step("distribution", requires=("mls_export", "social_content", "chapters", "social_cuts", "photo_compliance")),
+    # Phase 3: after delivery, all best-effort
+    Step("microsite", requires=("distribution",), timeout_s=5 * _MIN, optional=True),
+    Step("learning", requires=("distribution",), optional=True),
+    Step("social_event", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
+    Step("health_score", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
+    Step("performance_intelligence", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
+]
+
+
+def validate_pipeline(steps: list[Step]) -> None:
+    names = [s.name for s in steps]
+    if len(names) != len(set(names)):
+        raise ValueError("duplicate step names")
+    known = set(names)
+    for s in steps:
+        for dep in s.requires:
+            if dep not in known:
+                raise ValueError(f"step {s.name!r} requires unknown step {dep!r}")
+    topological_order(steps)  # raises on cycle
+
+
+def topological_order(steps: list[Step]) -> list[str]:
+    deps = {s.name: set(s.requires) for s in steps}
+    order: list[str] = []
+    while deps:
+        ready = sorted(n for n, d in deps.items() if not d)
+        if not ready:
+            raise ValueError(f"cycle among steps: {sorted(deps)}")
+        for n in ready:
+            order.append(n)
+            deps.pop(n)
+        for d in deps.values():
+            d.difference_update(ready)
+    return order
+
+
+validate_pipeline(PIPELINE)
+STEP_INDEX: dict[str, Step] = {s.name: s for s in PIPELINE}

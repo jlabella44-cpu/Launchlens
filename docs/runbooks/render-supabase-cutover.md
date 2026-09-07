@@ -1,13 +1,14 @@
 # Render + Supabase Cutover Runbook (off AWS)
 
 Moves ListingJet's **compute** (ECS Fargate → Render), **database** (RDS → Supabase),
-**cache** (ElastiCache → Upstash), and **workflow engine** (self-hosted Temporal on
-Fargate → Temporal Cloud). Storage (S3 → Cloudflare R2) is covered separately in
-[`r2-cutover.md`](./r2-cutover.md) — do that one first or in parallel.
+and **cache** (ElastiCache → Upstash). The pipeline runs in-process on the worker,
+polling a job table in Postgres (`src/listingjet/pipeline/`) — there is no separate
+workflow-engine service to provision or cut over. Storage (S3 → Cloudflare R2) is
+covered separately in [`r2-cutover.md`](./r2-cutover.md) — do that one first or in parallel.
 
 All the **code** for this is already in place:
 - `render.yaml` — Render blueprint for the API (web) + worker services.
-- `connect_temporal()` in `src/listingjet/temporal_client.py` — adds TLS + API-key auth when `TEMPORAL_API_KEY` is set, used by the client, worker, and health check.
+- `src/listingjet/pipeline/worker.py` — polls the job table; runs standalone via `python -m listingjet.pipeline.worker` or in-process alongside the API.
 - `db_use_pgbouncer` in config — disables asyncpg's prepared-statement cache for the Supabase pooler.
 - `.github/workflows/deploy.yml` — test-gated Render deploy via deploy hooks (replaces the ECS/ECR pipeline).
 
@@ -22,7 +23,7 @@ This runbook is the **operational** side: provisioning the managed services, mov
 
 ## 0. Prerequisites
 
-- Accounts: [Render](https://render.com), [Supabase](https://supabase.com), [Upstash](https://upstash.com), [Temporal Cloud](https://cloud.temporal.io), [Cloudflare](https://cloudflare.com) (for R2 + DNS).
+- Accounts: [Render](https://render.com), [Supabase](https://supabase.com), [Upstash](https://upstash.com), [Cloudflare](https://cloudflare.com) (for R2 + DNS).
 - Local: `psql`, `pg_dump`/`pg_restore` (Postgres 16 client), AWS CLI logged in to the ListingJet account, `rclone` (for R2).
 - The R2 cutover (`r2-cutover.md`) done or in flight.
 
@@ -41,19 +42,9 @@ This runbook is the **operational** side: provisioning the managed services, mov
 1. Create a Redis database (region = US West). Eviction: `noeviction` (we use it for rate-limiting + sessions, not as a cache that can drop keys silently).
 2. Copy the **`rediss://`** URL (TLS) → `REDIS_URL`. `redis.asyncio.from_url` handles `rediss://` natively; no code change.
 
-### 1c. Temporal Cloud
-1. Create a namespace (e.g. `listingjet-prod.<account>`). Region = US West.
-2. **Settings → API Keys → Create** an API key for the namespace.
-3. Record:
-   - `TEMPORAL_HOST` = `<namespace>.<account>.tmprl.cloud:7233`
-   - `TEMPORAL_NAMESPACE` = `<namespace>.<account>`
-   - `TEMPORAL_API_KEY` = the key
-   TLS is enabled automatically by `connect_temporal()` whenever the API key is set.
-4. Temporal has **no workflow state to migrate** — the pipeline is fire-per-listing and the only durable schedules (`demo-cleanup-hourly`, `baseline-aggregation-weekly`) are re-created idempotently by the worker on boot (`_ensure_schedules`). Any listing mid-pipeline at cutover should be drained or re-run (see step 4).
-
-### 1d. Render (compute)
+### 1c. Render (compute)
 1. **New → Blueprint**, point at this repo. Render reads `render.yaml` and proposes `listingjet-api` (web) + `listingjet-worker`.
-2. It also creates the `listingjet-shared` env group. Fill in every `sync: false` key (DB, Redis, Temporal, R2, Stripe, providers, Resend, Sentry — see `.env.production.example`).
+2. It also creates the `listingjet-shared` env group. Fill in every `sync: false` key (DB, Redis, R2, Stripe, providers, Resend, Sentry — see `.env.production.example`).
 3. Create the services but **don't** point DNS at them yet.
 4. **Deploy hooks**: each service → Settings → Deploy Hook. Add to GitHub repo secrets as `RENDER_DEPLOY_HOOK_API` and `RENDER_DEPLOY_HOOK_WORKER` (used by `deploy.yml`). `autoDeploy` is off, so deploys only fire after CI is green.
 
@@ -96,21 +87,21 @@ Sanity check row counts on a few core tables (`tenants`, `users`, `listings`, `c
 
 ## 3. Cut over
 
-1. Confirm the `listingjet-shared` env group on Render has the **Supabase**, **Upstash**, **Temporal Cloud**, and **R2** values filled in.
+1. Confirm the `listingjet-shared` env group on Render has the **Supabase**, **Upstash**, and **R2** values filled in.
 2. Trigger the first Render deploy (push to `main`, or hit the deploy hooks). The API's `preDeployCommand` runs `alembic upgrade head` — a no-op if the restore was current, a safety net otherwise.
-3. Watch both services reach **live**; the API health check (`/health`) must be green (it pings Postgres, Redis, and Temporal).
+3. Watch both services reach **live**; the API health check (`/health`) must be green (it pings Postgres); `/health/deep` also confirms Redis and that the pipeline worker is ticking.
 4. **Repoint the frontend.** `vercel.json` rewrites `/api/*` → `https://api.listingjet.ai`. Update the `api.listingjet.ai` DNS record (Cloudflare) to the Render service's URL/custom domain. Add `api.listingjet.ai` as a custom domain on the `listingjet-api` Render service so its TLS cert provisions.
-5. Re-run any listings that were mid-pipeline at the RDS freeze (their workflows didn't survive the Temporal cluster change). Find them by `listings.status` in (`PROCESSING`, `REVIEW`, `EXPORTING`) and retry from the admin UI.
+5. Re-run any listings that were mid-pipeline at the RDS freeze (their jobs didn't survive the database cutover). Find them by `listings.status` in (`PROCESSING`, `REVIEW`, `EXPORTING`) and retry from the admin UI.
 
 ---
 
 ## 4. Smoke test
 
 - Sign in, create a listing, upload photos (exercises R2 presigned POST + Supabase writes).
-- Watch the pipeline run end-to-end (exercises Temporal Cloud + worker + R2 reads/writes).
+- Watch the pipeline run end-to-end (exercises the worker + R2 reads/writes).
 - Approve + export a listing (MLS bundle presigned URL from R2).
 - Confirm a transactional email arrives (Resend).
-- Tail Render logs for both services — no `StorageError`, no DB connection errors, no Temporal auth errors.
+- Tail Render logs for both services — no `StorageError`, no DB connection errors.
 
 ---
 
@@ -152,5 +143,4 @@ and smoke-test hard before it.
 - **RLS / superuser**: don't run the app as Supabase `postgres` (superuser bypasses RLS,
   which would silently disable tenant isolation). Use a non-superuser `listingjet` role.
 - **Upstash TLS**: the URL is `rediss://` (two s's). A plain `redis://` will fail the TLS handshake.
-- **Temporal Cloud namespace format**: `TEMPORAL_NAMESPACE` is `<namespace>.<account>`, not just `<namespace>`.
 - **Render PORT**: Render injects `PORT`; `entrypoint.sh` already honors it. Don't hardcode 8000.

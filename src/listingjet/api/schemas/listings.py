@@ -139,6 +139,8 @@ class PipelineStepStatus(BaseModel):
     status: str
     completed_at: str | None = None
     progress: str | None = None
+    error: str | None = None
+    attempts: int = 0
 
 
 class PipelineStatusResponse(BaseModel):

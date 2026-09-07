@@ -49,8 +49,8 @@ case "${1:-api}" in
         exec uvicorn listingjet.main:app --host 0.0.0.0 --port "$PORT"
         ;;
     worker)
-        echo "Starting Temporal worker..."
-        exec python -m listingjet.workflows.worker
+        echo "Starting pipeline worker..."
+        exec python -m listingjet.pipeline.worker
         ;;
     test)
         echo "Running tests..."

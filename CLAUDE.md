@@ -2,11 +2,11 @@
 
 ## What this project is
 
-**ListingJet** is a SaaS platform that automates real estate listing media: agents upload property photos and get back MLS export bundles, AI descriptions, branded flyers, social content, a video tour, and a 3D floorplan — all processed through a 14-agent Temporal workflow pipeline.
+**ListingJet** is a SaaS platform that automates real estate listing media: agents upload property photos and get back MLS export bundles, AI descriptions, branded flyers, social content, a video tour, and a 3D floorplan — all processed through a 14-agent pipeline run by an in-process worker polling a Postgres job table (`src/listingjet/pipeline/`).
 
-- **Backend:** FastAPI + Temporal + PostgreSQL + Redis, Python 3.12, Alembic migrations
+- **Backend:** FastAPI + PostgreSQL (job table) + Redis, Python 3.12, Alembic migrations
 - **Frontend:** Next.js 16 (App Router), Tailwind CSS v4, TypeScript
-- **Infra:** Render (API + worker), Supabase Postgres, Upstash Redis, Cloudflare R2 (media), Temporal Cloud — see `render.yaml`. (Migrated off AWS; the CDK in `infra/` is decommission-only — see `infra/README.md`.)
+- **Infra:** Render (API + worker), Supabase Postgres, Upstash Redis, Cloudflare R2 (media) — see `render.yaml`. (Migrated off AWS; the CDK in `infra/` is decommission-only — see `infra/README.md`.)
 - **Tests:** pytest + pytest-cov, vitest for frontend
 
 ---
@@ -43,7 +43,7 @@ expected runtime.
 ## Running the project
 
 ```bash
-# Start all services (postgres, redis, temporal, api, worker, localstack)
+# Start all services (postgres, redis, api, worker, localstack)
 docker-compose up
 
 # Run backend tests
@@ -68,14 +68,12 @@ cd frontend && npm run lint && npx vitest run
 | What | Where |
 |---|---|
 | FastAPI app entry | `main.py` |
-| Temporal worker entry | `worker.py` |
-| Temporal client wrapper | `temporal_client.py` |
+| Pipeline worker entry (standalone: `python -m listingjet.pipeline.worker`) | `pipeline/worker.py` |
+| Job-table definition + runner | `pipeline/` |
 | DB engine / session | `database.py` |
 | Logging + telemetry setup | `logging_config.py`, `telemetry.py` |
 | API routers | `api/` |
 | Per-route Pydantic schemas | `api/schemas/` |
-| Temporal workflows | `workflows/` |
-| Temporal activities | `activities/` |
 | Pipeline agents | `agents/` |
 | SQLAlchemy models | `models/` |
 | Business-logic services | `services/` (auth, billing, credits, email, audit, rate-limit, scrapers, etc.) |
@@ -146,8 +144,8 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 - Email blast endpoint: `POST /listings/{id}/email-blast`
 - Real-time admin usage SSE: `GET /admin/usage-stream` + `UsageDashboard` component
 - 3D dollhouse viewer: `DollhouseViewer` Canvas component wired into `DollhouseCard`
-- `LearningWorkflow` as standalone Temporal workflow (fire-and-forget from pipeline)
-- Workflow cancellation (`TemporalClient.cancel_workflow()`)
+- Learning aggregation as a periodic job on the pipeline worker (fire-and-forget from pipeline)
+- Pipeline job cancellation via the job table
 - Per-user daily quota + configurable plan limits via admin API
 
 ---
@@ -155,11 +153,11 @@ All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notabl
 ## Migration off AWS → Render + Supabase + R2 (in progress)
 
 The platform is moving off AWS to **Render** (API + worker), **Supabase**
-(Postgres), **Upstash** (Redis), **Cloudflare R2** (media), and **Temporal
-Cloud**. The **code + config is done**; what remains is operational (provision
-the accounts, sync data, flip DNS, decommission AWS).
+(Postgres), **Upstash** (Redis), and **Cloudflare R2** (media). The **code +
+config is done**; what remains is operational (provision the accounts, sync
+data, flip DNS, decommission AWS).
 
-- **Compute / DB / cache / Temporal cutover** → `docs/runbooks/render-supabase-cutover.md`
+- **Compute / DB / cache cutover** → `docs/runbooks/render-supabase-cutover.md`
 - **Storage (S3 → R2) cutover** → `docs/runbooks/r2-cutover.md`
 - **Deploy target** → `render.yaml` (Render blueprint); CI is `.github/workflows/deploy.yml` (test-gated Render deploy hooks).
 - **AWS CDK** in `infra/` is **decommission-only** — used solely for the final `cdk destroy`. See `infra/README.md`.

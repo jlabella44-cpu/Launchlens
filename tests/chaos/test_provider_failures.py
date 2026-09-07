@@ -77,7 +77,7 @@ def _make_mock_session(**overrides):
 
 class TestIngestionAgentDBFailure:
     """When the database raises during the transaction, IngestionAgent must
-    not swallow the error — it should propagate so Temporal can retry."""
+    not swallow the error — it should propagate so the job runner can retry."""
 
     @pytest.mark.asyncio
     async def test_commit_failure_propagates(self):
@@ -211,7 +211,7 @@ class TestPhotoComplianceVisionFailure:
 
 class TestContentAgentLLMFailure:
     """ContentAgent does NOT gracefully degrade — an LLM failure must raise
-    so Temporal retries the activity."""
+    so the job runner retries the step."""
 
     @pytest.mark.asyncio
     async def test_llm_provider_error_propagates(self):

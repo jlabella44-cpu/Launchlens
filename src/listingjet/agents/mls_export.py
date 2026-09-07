@@ -101,7 +101,7 @@ class MLSExportAgent(BaseAgent):
                 photos_meta = []
                 photo_files = []  # (filename, bytes)
                 for pkg, asset, vision in rows:
-                    room_label = vision.room_label if vision else "unknown"
+                    room_label = (vision.room_label if vision else None) or "unknown"
                     safe_label = room_label.replace(" ", "_").lower()
                     filename = f"{pkg.position:02d}_{safe_label}_{str(listing_id)[:8]}.jpg"
 

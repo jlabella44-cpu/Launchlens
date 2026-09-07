@@ -2,7 +2,7 @@
 Demo listing cleanup service.
 
 Deletes expired demo listings and their associated assets from both
-the database and S3. Designed to be called by a Temporal cron workflow
+the database and S3. Called by the pipeline worker's periodic loop
 running hourly.
 """
 import logging

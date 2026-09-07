@@ -1,16 +1,19 @@
 import asyncio
+import os
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-import jwt
-import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+os.environ.setdefault("WORKER_ENABLED", "false")  # before any listingjet import: keep the worker loops off in tests
 
-from listingjet.api.deps import get_db_admin
-from listingjet.config import settings
-from listingjet.database import Base, get_db
-from listingjet.main import app
+import jwt  # noqa: E402
+import pytest  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+
+from listingjet.api.deps import get_db_admin  # noqa: E402
+from listingjet.config import settings  # noqa: E402
+from listingjet.database import Base, get_db  # noqa: E402
+from listingjet.main import app  # noqa: E402
 
 TEST_DB_URL = "postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test"
 
@@ -24,11 +27,10 @@ def event_loop():
 
 @pytest.fixture(autouse=True)
 def _mock_external_services():
-    """Bypass all external services in tests: Redis, Temporal, rate limiters.
+    """Bypass all external services in tests: Redis, rate limiters.
 
     Without this:
     - Redis calls block for 2s each (socket timeout) or hang indefinitely
-    - Temporal Client.connect() hangs for 60s+ trying to reach localhost:7233
     - Rate limiter middleware returns 429 on every request
     """
     import listingjet.middleware.rate_limit as rl_mod
@@ -49,23 +51,12 @@ def _mock_external_services():
         __exit__=MagicMock(return_value=False),
     )
 
-    # Mock Temporal client so it never tries to connect to localhost:7233
-    mock_temporal = MagicMock()
-    mock_temporal.start_pipeline = AsyncMock(return_value="mock-workflow-id")
-    mock_temporal.signal_review_completed = AsyncMock()
-
     with (
         patch("listingjet.services.rate_limiter.RateLimiter", return_value=mock_redis),
         patch("listingjet.api.auth._get_lockout_redis", return_value=mock_redis),
         patch("listingjet.services.auth.get_redis", return_value=mock_redis),
         patch("listingjet.services.credits._get_redis", return_value=mock_redis),
         patch("listingjet.services.tenant_bypass._get_redis", return_value=mock_redis),
-        patch("listingjet.temporal_client.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_draft.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_media.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_workflow.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.listings_draft.get_temporal_client", return_value=mock_temporal),
-        patch("listingjet.api.bulk.get_temporal_client", return_value=mock_temporal),
     ):
         yield
 
@@ -122,6 +113,18 @@ async def test_engine():
             ],
         )
     await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def test_session_factory(test_engine):
+    """Session factory bound to the test engine (and its session-scoped event loop).
+
+    Pass this to `admin_session(session_factory=...)` in tests instead of
+    letting it default to `AsyncSessionLocal`, which is bound to the app
+    engine / `DATABASE_URL` — using that inside the test event loop after
+    other tests have used it on other loops causes cross-loop asyncpg errors.
+    """
+    return async_sessionmaker(test_engine, expire_on_commit=False)
 
 
 @pytest.fixture

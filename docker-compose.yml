@@ -67,32 +67,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Temporal ─────────────────────────────────────────────────
-  temporal:
-    image: temporalio/auto-setup:latest
-    environment:
-      - DB=postgres12
-      - DB_PORT=5432
-      - POSTGRES_USER=listingjet
-      - POSTGRES_PWD=password
-      - POSTGRES_SEEDS=postgres
-    ports:
-      - "7233:7233"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # ── Temporal UI ──────────────────────────────────────────────
-  temporal-ui:
-    image: temporalio/ui:latest
-    environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
-    ports:
-      - "8233:8080"
-    depends_on:
-      - temporal
-
   # ── Jaeger (OpenTelemetry traces) ────────────────────────────
   jaeger:
     image: jaegertracing/all-in-one:1.53
@@ -110,7 +84,6 @@ services:
       - DATABASE_URL=postgresql+asyncpg://listingjet:password@postgres:5432/listingjet
       - DATABASE_URL_SYNC=postgresql://listingjet:password@postgres:5432/listingjet
       - JWT_SECRET=docker-dev-secret-change-in-production-xxxxx
-      - TEMPORAL_HOST=temporal:7233
       - REDIS_URL=redis://redis:6379/0
       - APP_ENV=development
       - USE_MOCK_PROVIDERS=true
@@ -125,10 +98,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      temporal:
-        condition: service_started
 
-  # ── ListingJet Temporal Worker ───────────────────────────────
+  # ── ListingJet Pipeline Worker ────────────────────────────────
   worker:
     build: .
     command: worker
@@ -136,7 +107,6 @@ services:
       - DATABASE_URL=postgresql+asyncpg://listingjet:password@postgres:5432/listingjet
       - DATABASE_URL_SYNC=postgresql://listingjet:password@postgres:5432/listingjet
       - JWT_SECRET=docker-dev-secret-change-in-production-xxxxx
-      - TEMPORAL_HOST=temporal:7233
       - REDIS_URL=redis://redis:6379/0
       - APP_ENV=development
       - USE_MOCK_PROVIDERS=true
@@ -154,8 +124,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      temporal:
-        condition: service_started
 
 volumes:
   pgdata:

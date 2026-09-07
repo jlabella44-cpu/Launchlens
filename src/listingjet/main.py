@@ -48,7 +48,7 @@ from listingjet.api import (
     white_label,
 )
 from listingjet.config import settings
-from listingjet.database import AsyncSessionLocal
+from listingjet.database import AsyncSessionLocal, admin_session
 from listingjet.logging_config import setup_logging
 from listingjet.middleware.rate_limit import APIRateLimitMiddleware
 from listingjet.middleware.request_id import RequestIDMiddleware
@@ -104,6 +104,17 @@ async def lifespan(app: FastAPI):
     except Exception:
         logging.getLogger(__name__).warning("Market tracker failed to start — running without it")
 
+    worker_stop = asyncio.Event()
+    worker_tasks: list[asyncio.Task] = []
+    if settings.worker_enabled:
+        from listingjet.pipeline.runner import periodic_loop, worker_loop
+        worker_tasks = [
+            asyncio.create_task(worker_loop(
+                admin_session, stop=worker_stop, concurrency=settings.worker_concurrency,
+                poll_interval_s=settings.worker_poll_interval_s)),
+            asyncio.create_task(periodic_loop(admin_session, stop=worker_stop)),
+        ]
+
     yield
 
     for poller_obj, task_obj in [
@@ -119,6 +130,18 @@ async def lifespan(app: FastAPI):
                 await task_obj
             except (asyncio.CancelledError, Exception):
                 pass
+
+    worker_stop.set()
+    for t in worker_tasks:
+        try:
+            await asyncio.wait_for(t, timeout=30)
+        except asyncio.TimeoutError:
+            # Cancelling is only a request — await the task so its shutdown
+            # path (which requeues whatever it still holds) actually runs.
+            t.cancel()
+            await asyncio.gather(t, return_exceptions=True)
+        except Exception:
+            logging.getLogger(__name__).exception("Pipeline worker task failed during shutdown")
 
     if app.state.redis:
         app.state.redis.close()

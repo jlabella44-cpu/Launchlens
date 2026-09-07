@@ -1,6 +1,5 @@
 # tests/test_api/test_assets.py
 import uuid
-from unittest.mock import AsyncMock, patch
 
 import jwt as pyjwt
 import pytest
@@ -25,11 +24,7 @@ def _auth(token: str) -> dict:
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings_media.get_temporal_client")
-async def test_register_assets(mock_get_client, async_client: AsyncClient):
-    mock_client = AsyncMock()
-    mock_get_client.return_value = mock_client
-
+async def test_register_assets(async_client: AsyncClient):
     token, _ = await _register(async_client)
     create_resp = await async_client.post("/listings", json={
         "address": {"street": "1 Photo St"}, "metadata": {},
@@ -92,13 +87,13 @@ async def test_register_assets_requires_auth(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@patch("listingjet.api.listings_media.get_temporal_client")
-async def test_register_assets_triggers_pipeline(mock_get_client, async_client: AsyncClient):
+async def test_register_assets_triggers_pipeline(async_client: AsyncClient, db_session):
     """Registering assets on a draft listing does NOT auto-start the pipeline.
     Credit-billed tenants start in DRAFT; pipeline starts via explicit /start-pipeline.
     """
-    mock_client = AsyncMock()
-    mock_get_client.return_value = mock_client
+    from sqlalchemy import select
+
+    from listingjet.models.pipeline_job import PipelineJob
 
     token, _ = await _register(async_client)
     create_resp = await async_client.post("/listings", json={
@@ -111,4 +106,7 @@ async def test_register_assets_triggers_pipeline(mock_get_client, async_client: 
     }, headers=_auth(token))
     assert resp.status_code == 201
     # Draft listings don't auto-start — pipeline only triggers on NEW→UPLOADING transition
-    mock_client.start_pipeline.assert_not_called()
+    jobs = (await db_session.execute(
+        select(PipelineJob).where(PipelineJob.listing_id == uuid.UUID(listing_id))
+    )).scalars().all()
+    assert jobs == []

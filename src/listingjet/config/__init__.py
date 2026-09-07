@@ -68,16 +68,10 @@ class Settings(BaseSettings):
     stripe_price_pro: str = ""
     stripe_price_enterprise: str = ""
 
-    # Temporal
-    # For Temporal Cloud set temporal_host to "<namespace>.<account>.tmprl.cloud:7233",
-    # temporal_namespace to "<namespace>.<account>", and temporal_api_key to the
-    # Cloud API key. TLS is implied whenever an API key is set (it can also be
-    # forced on with temporal_tls for mTLS / self-hosted-with-TLS setups).
-    temporal_host: str = "localhost:7233"
-    temporal_namespace: str = "default"
-    temporal_task_queue: str = "listingjet-main"
-    temporal_api_key: str = ""
-    temporal_tls: bool = False
+    # Pipeline worker (runs inside the API process unless worker_enabled=false)
+    worker_enabled: bool = True
+    worker_concurrency: int = 2
+    worker_poll_interval_s: float = 2.0
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
