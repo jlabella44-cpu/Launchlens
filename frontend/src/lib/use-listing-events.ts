@@ -70,6 +70,7 @@ export function useListingEvents(
   useEffect(() => {
     if (!listingId) {
       cleanup();
+      setGaveUp(false);
       return;
     }
 

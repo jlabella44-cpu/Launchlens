@@ -49,7 +49,7 @@ def _session_factory():
     return AsyncSessionLocal()
 
 
-async def _seed_cursor(db: AsyncSession, last_event_id: str | None):
+async def _seed_cursor(db: AsyncSession, listing_id: uuid.UUID, last_event_id: str | None):
     """Resolve a `Last-Event-ID` header into a `(created_at, id)` cursor.
 
     Returns `(None, None)` when there is no header (a fresh connect replays
@@ -63,7 +63,9 @@ async def _seed_cursor(db: AsyncSession, last_event_id: str | None):
         event_uuid = uuid.UUID(last_event_id)
     except (ValueError, AttributeError):
         return datetime.now(timezone.utc), _MIN_UUID
-    event = await db.get(Event, event_uuid)
+    event = (await db.execute(
+        select(Event).where(Event.id == event_uuid, Event.listing_id == str(listing_id))
+    )).scalar_one_or_none()
     if event is None or event.created_at is None:
         return datetime.now(timezone.utc), _MIN_UUID
     return event.created_at, event.id
@@ -85,7 +87,7 @@ async def listing_events(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     tenant_id = str(current_user.tenant_id)
-    start_created, start_id = await _seed_cursor(db, request.headers.get("last-event-id"))
+    start_created, start_id = await _seed_cursor(db, listing_id, request.headers.get("last-event-id"))
 
     async def event_stream():
         yield f"retry: {RETRY_MS}\n\n"
