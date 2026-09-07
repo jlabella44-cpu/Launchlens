@@ -24,5 +24,5 @@ Merge order: #306 → #307 → #308 → #309 → #310 → #311 → #312 → #313
 - Frontend: SSE hook reconnect has no backoff.
 - `services/pii_filter.sanitize_for_prompt` does not recurse into lists.
 - SSE auth passes the access JWT in the `?token=` query string (`api/deps.get_current_user_or_query_token`); it should use a short-lived, single-purpose ticket instead so the long-lived JWT never lands in server/proxy access logs.
-- Watchdog nuance: `pipeline/runner.reclaim_stale` treats only `RUNNING` as active — a job left `QUEUED`/`WAITING` (deferred) past what would be its cut-off is not covered by this path and would be failed rather than reclaimed if that changes without adjusting the query.
+- Watchdog nuance: `pipeline/periodic.fail_stuck_listings` treats only `RUNNING` jobs as active, so a job deferred by backoff past the 6 h cut-off would be failed rather than waited for (backoffs are minutes today).
 - No `LICENSE` file, though the README used to claim MIT — owner decision needed.
