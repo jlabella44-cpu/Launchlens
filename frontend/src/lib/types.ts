@@ -87,7 +87,7 @@ export interface CreateAssetsResponse {
 
 export interface VideoResponse {
   s3_key: string;
-  video_type: "ai_generated" | "user_raw" | "professional";
+  video_type: "tour" | "ai_generated" | "user_raw" | "professional";
   duration_seconds: number | null;
   status: string;
   chapters: Chapter[] | null;

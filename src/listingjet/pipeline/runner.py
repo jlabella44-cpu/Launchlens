@@ -35,8 +35,6 @@ def _gated_off(step: Step, billing_model: str, enabled_addons: list[str]) -> boo
         return False
     if step.gate.startswith("addon:"):
         return step.gate.removeprefix("addon:") not in enabled_addons
-    if step.gate == "video":
-        return billing_model == "credit" and "ai_video_tour" not in enabled_addons
     if step.gate.startswith("feature:"):
         from listingjet import features
         return not features.enabled(step.gate.removeprefix("feature:"))

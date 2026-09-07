@@ -283,6 +283,34 @@ async def test_failed_shot_falls_back_to_ken_burns(ffmpeg_available, db_session)
     assert result["cost_usd"] == pytest.approx(5 * VIDEO_SECOND_RATES[settings.runway_interior_model])
 
 
+@pytest.mark.asyncio
+async def test_unhandled_render_error_propagates(db_session, monkeypatch):
+    """`_render_shot` swallows the failures it knows how to degrade (Ken
+    Burns fallback); anything else it raises is genuinely unhandled and must
+    come back out of `gather(..., return_exceptions=True)` and out of
+    `execute` rather than being silently absorbed."""
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    runway = MockRunwayClient()
+    storage = make_storage_mock()
+    agent = VideoAIAgent(
+        runway=runway, storage=storage,
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+
+    async def boom(*args, **kwargs):
+        raise ValueError("render exploded")
+
+    monkeypatch.setattr(agent, "_render_shot", boom)
+
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    with pytest.raises(ValueError, match="render exploded"):
+        await agent.execute(ctx)
+
+
 @pytest.mark.ffmpeg
 @pytest.mark.asyncio
 async def test_resume_polls_existing_tasks(ffmpeg_available, db_session):

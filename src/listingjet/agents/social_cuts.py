@@ -1,5 +1,6 @@
 """SocialCutAgent — creates platform-specific video clips from a property tour video."""
 
+import asyncio
 import subprocess
 import tempfile
 
@@ -9,6 +10,7 @@ from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.video_asset import VideoAsset
 from listingjet.services.storage import StorageService
+from listingjet.services.video_stitcher import ffmpeg_cmd
 
 from .base import AgentContext, BaseAgent
 
@@ -58,7 +60,7 @@ class VideoCutter:
         try:
             subprocess.run(
                 [
-                    "ffmpeg", "-i", src_path,
+                    ffmpeg_cmd(), "-i", src_path,
                     "-t", str(max_duration),
                     "-vf", (
                         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
@@ -86,55 +88,75 @@ class SocialCutAgent(BaseAgent):
         self._cutter = video_cutter or VideoCutter()
         self._session_factory = session_factory or AsyncSessionLocal
 
+    async def _pick_video(self, session, listing_id) -> VideoAsset | None:
+        videos = (await session.execute(
+            select(VideoAsset)
+            .where(VideoAsset.listing_id == listing_id, VideoAsset.status == "ready")
+            .order_by(VideoAsset.created_at.desc())
+        )).scalars().all()
+        if not videos:
+            return None
+        for video in videos:
+            if video.video_type == "tour":
+                return video
+        return videos[0]
+
     async def execute(self, context: AgentContext) -> dict:
+        # Phase 1: pick the source video and grab just what we need, then
+        # close the session before doing any slow IO/CPU work — a DB session
+        # (and the connection-pool slot behind it) must never sit open across
+        # an ffmpeg subprocess or an S3 round-trip.
         async with self.session_scope(context) as (session, listing_id, tenant_id):
-                listing = await session.get(Listing, listing_id)
-                if not listing:
-                    raise ValueError(f"Listing {listing_id} not found")
+            listing = await session.get(Listing, listing_id)
+            if not listing:
+                raise ValueError(f"Listing {listing_id} not found")
 
-                video = (await session.execute(
-                    select(VideoAsset)
-                    .where(VideoAsset.listing_id == listing_id, VideoAsset.status == "ready")
-                    .order_by(VideoAsset.created_at.desc())
-                    .limit(1)
-                )).scalar_one_or_none()
+            video = await self._pick_video(session, listing_id)
+            if not video:
+                return {"skipped": True, "reason": "No ready video found"}
 
-                if not video:
-                    return {"skipped": True, "reason": "No ready video found"}
+            video_id = video.id
+            source_key = video.s3_key
 
-                # Generate a cut for each platform
-                cuts = []
-                source_bytes = self._storage.download(video.s3_key)
+        # Phase 2: no session open. Downloads, ffmpeg cuts, and uploads all
+        # run in worker threads so the event loop stays free for other jobs.
+        source_bytes = await asyncio.to_thread(self._storage.download, source_key)
 
-                for platform, spec in PLATFORM_SPECS.items():
-                    cut_bytes = self._cutter.create_cut(
-                        source_bytes=source_bytes,
-                        width=spec["width"],
-                        height=spec["height"],
-                        max_duration=spec["max_duration"],
-                    )
+        cuts = []
+        for platform, spec in PLATFORM_SPECS.items():
+            cut_bytes = await asyncio.to_thread(
+                self._cutter.create_cut,
+                source_bytes=source_bytes,
+                width=spec["width"],
+                height=spec["height"],
+                max_duration=spec["max_duration"],
+            )
 
-                    s3_key = self._storage.upload(
-                        key=f"videos/{listing_id}/social/{platform}.mp4",
-                        data=cut_bytes,
-                        content_type="video/mp4",
-                    )
+            s3_key = await asyncio.to_thread(
+                self._storage.upload,
+                key=f"videos/{listing_id}/social/{platform}.mp4",
+                data=cut_bytes,
+                content_type="video/mp4",
+            )
 
-                    cuts.append({
-                        "platform": platform,
-                        "s3_key": s3_key,
-                        "width": spec["width"],
-                        "height": spec["height"],
-                        "max_duration": spec["max_duration"],
-                    })
+            cuts.append({
+                "platform": platform,
+                "s3_key": s3_key,
+                "width": spec["width"],
+                "height": spec["height"],
+                "max_duration": spec["max_duration"],
+            })
 
-                video.social_cuts = cuts
+        # Phase 3: reopen a session to persist results and emit the event.
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
+            video = await session.get(VideoAsset, video_id)
+            video.social_cuts = cuts
 
-                await self.emit(session, context, "social_cuts.completed", {
-                    "listing_id": str(listing_id),
-                    "video_asset_id": str(video.id),
-                    "cut_count": len(cuts),
-                    "platforms": [c["platform"] for c in cuts],
-                })
+            await self.emit(session, context, "social_cuts.completed", {
+                "listing_id": str(listing_id),
+                "video_asset_id": str(video_id),
+                "cut_count": len(cuts),
+                "platforms": [c["platform"] for c in cuts],
+            })
 
-        return {"cut_count": len(cuts), "video_asset_id": str(video.id)}
+        return {"cut_count": len(cuts), "video_asset_id": str(video_id)}
