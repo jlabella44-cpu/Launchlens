@@ -2,71 +2,71 @@
 
 > From raw listing media to launch-ready marketing in minutes.
 
-ListingJet is an AI-powered real estate listing media platform. Photographers and agents upload raw photos; a 15-agent AI pipeline automatically curates, scores, packages, and delivers MLS-compliant bundles, branded flyers, listing descriptions, social captions, floor plan visualizations, and cinematic video tours — all in one workflow.
+ListingJet is an AI-powered real estate listing media platform. Agents and photographers upload raw photos; a 21-step pipeline curates, scores, packages, and delivers MLS-compliant bundles, branded flyers, listing descriptions, social captions, floorplan and 3D dollhouse visualizations, and cinematic video tours in one workflow.
 
 [![CI](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/test.yml/badge.svg)](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/test.yml)
-[![Lint](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/lint.yml/badge.svg)](https://github.com/jlabella44-cpu/Launchlens/actions/workflows/lint.yml)
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         Next.js 16 Frontend                          │
-│    /listings  /listings/[id]  /billing  /admin  /pricing  /demo      │
-└───────────────────────────┬──────────────────────────────────────────┘
-                            │ REST / SSE
-┌───────────────────────────▼──────────────────────────────────────────┐
-│                     FastAPI (Python 3.12)                            │
-│  /auth  /listings  /assets  /billing  /admin  /demo  /webhook/sse    │
-│  Middleware: JWT decode → RLS tenant isolation                       │
-└─────────┬───────────────────────────────────┬────────────────────────┘
-          │ SQLAlchemy 2.0 async              │ Job-table polling
-          ▼                                   ▼
-┌─────────────────────┐        ┌─────────────────────────────────────┐
-│   PostgreSQL 16     │        │      Pipeline Worker (in-process)   │
-│   (RLS enabled)     │        │      src/listingjet/pipeline/       │
-│   10 tables +       │        │  Phase 1: Ingest → Vision → Cover   │
-│   credit_transactions│        │           → Package → AWAIT_REVIEW │
-└─────────────────────┘        │                    │                 │
-                                │             listing approved        │
-┌─────────────────────┐        │                    ▼                 │
-│     Redis 7         │        │  Phase 2: Content ──────────────────┤
-│  Rate limiting      │        │           ├─ Brand (parallel)       │
-│  SSE pub/sub        │        │           └─ Social (Pro+)          │
-└─────────────────────┘        │           → MLS Export → Distribute │
-                                └─────────────────────────────────────┘
-┌──────────────────────────────────────────────────────────────────────┐
-│                          AI Providers                                │
-│  Google Cloud Vision API  │  OpenAI GPT-4V  │  Anthropic Claude     │
-│  Kling AI (video gen)     │  Cloudflare R2 (storage)                │
-└──────────────────────────────────────────────────────────────────────┘
+                 Browser
+                    |
+        +-----------v------------+
+        |  Next.js 16 (Vercel)   |   /api/* rewritten to the Render API
+        |  App Router, React 19  |   media served from NEXT_PUBLIC_MEDIA_HOST
+        +-----------+------------+
+             REST + SSE (/sse/listings/{id}/events)
+        +-----------v--------------------------------+
+        |  FastAPI on Render (one free web service)  |
+        |  API routers + pipeline worker in-process  |
+        |  JWT auth -> RLS tenant isolation          |
+        +--+--------------+--------------+-----------+
+           |              |              |
+   +-------v------+ +-----v------+ +-----v------------+
+   | Supabase     | | Upstash    | | Cloudflare R2    |
+   | Postgres 16  | | Redis      | | media objects    |
+   | RLS,         | | rate limit | | S3-compatible    |
+   | pipeline_jobs| | revocation | |                  |
+   +--------------+ +------------+ +------------------+
+
+   Providers: Anthropic Claude (claude-haiku-4-5 per photo,
+   claude-sonnet-5 for copy and floorplan) - OpenAI gpt-image-1.5
+   (virtual staging, image edits, dollhouse render) - Runway
+   (gen4_turbo interiors, veo3.1_fast exteriors) - Canva (flyers)
+   - Resend (email) - Stripe (billing) - Sentry (errors)
 ```
 
-Deployed on **Render** (API + worker, see `render.yaml`), **Supabase**
-(Postgres), **Upstash** (Redis), and **Cloudflare R2** (media). Pipeline
-code lives under `src/listingjet/pipeline/`.
+The worker is not a separate service. `WORKER_ENABLED` (default `true`) starts the polling loop inside the API process at startup; see `lifespan` in `src/listingjet/main.py`.
 
-### Agent Pipeline (15 agents)
+### Pipeline (21 steps)
 
-| Agent | Phase | Description |
-|-------|-------|-------------|
-| IngestionAgent | 1 | Dedup by file hash, upload to R2 |
-| VisionAgent | 1 | Google Vision tier-1 bulk + GPT-4V tier-2 top 20 |
-| CoverageAgent | 1 | Verify required shot types (exterior, kitchen, etc.) |
-| PackagingAgent | 1 | Score + select top 25 photos → AWAITING_REVIEW |
-| ContentAgent | 2 | Dual-tone listing descriptions (MLS-safe + marketing) via Claude |
-| BrandAgent | 2 | Render branded PDF flyer → R2 |
-| SocialContentAgent | 2 | Instagram + Facebook captions via Claude (Pro+) |
-| MLSExportAgent | 2 | Dual ZIP bundles: MLS-unbranded + Marketing-branded |
-| DistributionAgent | 2 | Final state → DELIVERED, emit pipeline.completed event |
-| PhotoComplianceAgent | 2 | Detect compliance issues (signs, people, branding) |
-| FloorplanAgent | 2 | GPT-4V floorplan analysis → 3D dollhouse JSON |
-| VideoAgent | 2 | Kling AI image-to-video clips → stitched tour |
-| ChapterAgent | 2 | GPT-4V keyframe analysis → chapter markers |
-| SocialCutAgent | 2 | Platform-specific clips (IG, TikTok, FB, YT Shorts) |
-| LearningAgent | 2 | Read override events → update per-tenant photo weights |
+Each step is one row in `pipeline_jobs`. A row becomes runnable when every step it needs is done, skipped, or failed-and-optional. The list is declared in `src/listingjet/pipeline/definition.py`.
+
+| Step | Needs | What it does | Gate |
+|---|---|---|---|
+| `ingestion` | — | Dedupe by file hash, upload originals to R2 | — |
+| `photo_analysis` | `ingestion` | One Claude vision call per photo: room type, quality, hero score, compliance | — |
+| `property_verification` | `ingestion` | Public property data lookup (ATTOM, Walk Score) | optional |
+| `coverage` | `photo_analysis` | Check that the required shot types are present | — |
+| `virtual_staging` | `coverage` | Furnish empty rooms with OpenAI image generation | optional, `addon:virtual_staging` |
+| `floorplan` | `coverage`, `virtual_staging` | Claude floorplan analysis into a DollhouseScene JSON | — |
+| `dollhouse_render` | `floorplan` | Bake the scene into an isometric 3D render | optional |
+| `packaging` | `floorplan`, `dollhouse_render`, `property_verification` | Score and select the delivered photo set | — |
+| `video_baseline` | `packaging` | Free ffmpeg Ken Burns tour with an end card | optional |
+| `video_ai` | `packaging`, `await_review` | Runway clips stitched into a cinematic tour | optional, `addon:ai_video_tour` |
+| `await_review` | `packaging` | Human approval gate | `review` |
+| `content_social` | `await_review` | Listing copy and social captions in one Claude call | — |
+| `brand` | `content_social` | Branded PDF flyer | optional |
+| `social_cuts` | `video_baseline`, `video_ai`, `await_review` | Platform-specific vertical clips | optional |
+| `mls_export` | `content_social`, `brand` | MLS-unbranded and marketing-branded ZIP bundles | — |
+| `distribution` | `mls_export`, `social_cuts` | Mark the listing delivered, emit the completion event | — |
+| `microsite` | `distribution` | Single-property landing page plus QR code | optional, `feature:microsite` |
+| `learning` | `distribution` | Update per-tenant photo weights from review overrides | optional, `feature:learning` |
+| `social_event` | `distribution` | Just-listed listing event and social reminders | optional |
+| `health_score` | `distribution` | Composite listing health score | optional, `feature:health_score` |
+| `performance_intelligence` | `distribution` | Link photo selections to listing outcomes | optional, `feature:performance_intelligence` |
 
 ---
 
@@ -75,20 +75,20 @@ code lives under `src/listingjet/pipeline/`.
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0 async, Alembic |
-| Orchestration | In-process pipeline worker polling a Postgres job table (`src/listingjet/pipeline/`) |
-| Database | PostgreSQL 16 with Row-Level Security |
-| Cache / Queue | Redis 7 (rate limiting, SSE pub/sub) |
-| Storage | Cloudflare R2 (boto3 S3-compatible client) |
+| Orchestration | In-process worker polling the `pipeline_jobs` table (`src/listingjet/pipeline/`) |
+| Database | PostgreSQL 16 with Row-Level Security (Supabase in production) |
+| Cache | Redis 7 for rate limits and token revocation (Upstash in production) |
+| Storage | Cloudflare R2 via the boto3 S3-compatible client |
 | Auth | JWT (PyJWT), bcrypt |
 | Payments | Stripe (checkout, portal, webhooks) |
-| AI Vision | Google Cloud Vision API, OpenAI GPT-4V |
-| AI Content | Anthropic Claude 3 |
-| AI Video | Kling AI |
+| AI vision and copy | Anthropic Claude: `claude-haiku-4-5` per photo, `claude-sonnet-5` for copy and floorplan |
+| AI images | OpenAI `gpt-image-1.5` for virtual staging, image edits, and the dollhouse render |
+| AI video | Runway: `gen4_turbo` for interiors, `veo3.1_fast` for exteriors, stitched with ffmpeg |
+| Templates and email | Canva (flyers), Resend (transactional email) |
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
-| 3D | React Three Fiber, Three.js, Framer Motion |
 | Observability | Sentry |
-| Testing | pytest-asyncio (270+ tests) |
-| CI/CD | GitHub Actions (lint, test, docker build) |
+| Testing | 900+ pytest, vitest |
+| CI/CD | GitHub Actions: test (backend + frontend), docker build |
 
 ---
 
@@ -96,9 +96,10 @@ code lives under `src/listingjet/pipeline/`.
 
 ### Prerequisites
 
-- Docker & Docker Compose
 - Python 3.12
-- Node.js 20+
+- Node.js 22
+- PostgreSQL 16, local or via `docker-compose up postgres`
+- ffmpeg on PATH (used by `video_baseline` and `social_cuts`)
 
 ### 1. Clone and configure
 
@@ -106,40 +107,52 @@ code lives under `src/listingjet/pipeline/`.
 git clone https://github.com/jlabella44-cpu/Launchlens.git
 cd Launchlens
 cp .env.example .env
-# Edit .env — at minimum set DATABASE_URL and JWT_SECRET
 ```
 
-### 2. Start infrastructure
+At a minimum set:
 
 ```bash
-docker compose up -d postgres redis
+DATABASE_URL=postgresql+asyncpg://listingjet:password@localhost:5432/launchlens
+DATABASE_URL_SYNC=postgresql://listingjet:password@localhost:5432/launchlens
+JWT_SECRET=<32 or more random characters>
+REDIS_URL=redis://localhost:6379/0
+USE_MOCK_PROVIDERS=true
+FFMPEG_BIN=ffmpeg
 ```
 
-### 3. Run migrations
+`USE_MOCK_PROVIDERS=true` swaps every AI provider for `src/listingjet/providers/mock.py`, so the pipeline runs end to end with no API keys and no spend. Redis is optional for a first run: the app logs a warning at startup and degrades rate limiting if it cannot connect.
+
+`.env.example` is generated from `Settings`. Run `just env-example` to regenerate it; never edit it by hand.
+
+### 2. Migrate and run
 
 ```bash
 pip install -e ".[dev]"
-python -m alembic upgrade head
+alembic upgrade head
+just dev        # uvicorn listingjet.main:app --reload --port 8000
 ```
 
-### 4. Start the API and worker
+The pipeline worker starts inside the API process. Run it separately only if you set `WORKER_ENABLED=false`:
 
 ```bash
-# Terminal 1 — API server
-uvicorn listingjet.main:app --reload --port 8000
-
-# Terminal 2 — pipeline worker (standalone; the API also runs it in-process
-# unless WORKER_ENABLED=false)
-python -m listingjet.pipeline.worker
+just worker     # python -m listingjet.pipeline.worker
 ```
 
-### 5. (Optional) Start the frontend
+### 3. Frontend
 
 ```bash
 cd frontend
-npm install
-npm run dev
+npm ci
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 # http://localhost:3000
+```
+
+`NEXT_PUBLIC_MEDIA_HOST` is required for a production build (`next build`) and optional in dev.
+
+### Everything at once with Docker
+
+```bash
+docker-compose up
 ```
 
 ### URLs
@@ -147,61 +160,53 @@ npm run dev
 | Service | URL |
 |---------|-----|
 | API | http://localhost:8000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
+| API docs (Swagger, non-production only) | http://localhost:8000/docs |
 | Frontend | http://localhost:3000 |
-
-### Full stack via Docker Compose
-
-```bash
-docker compose up -d
-```
 
 ---
 
 ## Running Tests
 
+The suite talks to a separate Postgres on port 5433 (see `TEST_DB_URL` in `tests/conftest.py`).
+
 ```bash
-# Spin up test database first
-docker compose up -d postgres-test
-
-# Run all tests
-python -m pytest --tb=short -q
-
-# Run specific test module
-python -m pytest tests/test_api/test_listings.py -v
+docker-compose up postgres-test   # or point 5433 at a local cluster
+just test                         # pytest -q, the full suite
+just check                        # ruff plus the non-DB, non-ffmpeg subset (fast)
 ```
 
-The test suite uses a separate PostgreSQL database on port 5433. See `tests/conftest.py` for fixture setup.
+Frontend:
+
+```bash
+cd frontend
+npm run lint && npx tsc --noEmit && npx vitest run
+```
 
 ---
 
 ## API Documentation
 
-Interactive API docs are available at **http://localhost:8000/docs** when the server is running.
-
-Key endpoints:
+Interactive docs are at http://localhost:8000/docs whenever the server runs outside production. Routers mount at their own prefix; there is no `/v1`.
 
 ```
-POST /auth/register          Register new tenant + admin user
-POST /auth/login             JWT login
-POST /listings               Create listing
-POST /listings/{id}/assets   Upload photos → triggers the pipeline job
-POST /listings/{id}/review   Claim for review (IN_REVIEW)
-POST /listings/{id}/approve  Approve → triggers Phase 2 pipeline
-GET  /listings/{id}/export   Download MLS or Marketing ZIP bundle
-GET  /webhook/sse            Server-sent events stream
-POST /billing/checkout       Create Stripe checkout session
-POST /billing/webhook        Stripe webhook receiver
-GET  /admin/tenants          List all tenants (admin only)
-GET  /admin/stats            Platform statistics
-GET  /admin/credits/summary  Credit system overview
+POST /auth/register            Register a tenant and admin user
+POST /auth/login               JWT login
+POST /listings                 Create a listing
+POST /listings/{id}/assets     Upload photos, enqueue the pipeline
+POST /listings/{id}/approve    Approve, releasing the post-review steps
+GET  /listings/{id}/export     Download the MLS or marketing ZIP bundle
+GET  /sse/listings/{id}/events Server-sent pipeline events (?token=<jwt>)
+POST /billing/checkout         Create a Stripe checkout session
+POST /billing/webhook          Stripe webhook receiver
+GET  /admin/tenants            List tenants (admin only)
+GET  /health, /health/deep     Liveness, and DB + Redis + worker tick
 ```
 
 ---
 
 ## Environment Variables
 
-See [`.env.example`](.env.example) for all configuration options with comments.
+See [`.env.example`](.env.example) for every setting with comments. Production values, and where each one comes from, are in the [free-tier setup runbook](docs/runbooks/free-tier-setup.md).
 
 ---
 
@@ -209,39 +214,46 @@ See [`.env.example`](.env.example) for all configuration options with comments.
 
 ```
 src/listingjet/
-  main.py              FastAPI app factory + lifespan
-  config.py            Settings (pydantic-settings, .env)
+  main.py              FastAPI app factory, router mounts, lifespan
+  config/              Settings, ai_rates.py (AI price table), tiers.py (credits)
   database.py          SQLAlchemy engine, sessions, RLS helper
-  agents/              15 AI processing agents (BaseAgent pattern)
-  pipeline/            Job-table definition, runner, and standalone worker entrypoint
-  api/                 FastAPI routers (auth, listings, billing, admin)
+  features.py          FEATURES flag parsing
+  agents/              One class per pipeline step
+  pipeline/            definition.py (the 21 steps), runner.py, steps.py, worker.py
+  api/                 FastAPI routers (auth, listings, billing, admin, sse, ...)
   models/              SQLAlchemy ORM models
-  providers/           AI provider abstractions (Vision, LLM, Template)
-  services/            Business logic (auth, billing, events, metrics)
+  providers/           Claude, OpenAI images, Runway, Canva, and mock adapters
+  services/            Auth, billing, credits, email, audit, rate limiting
   monitoring/          Sentry init
-alembic/versions/      10 database migrations
-tests/                 270+ pytest tests
+alembic/versions/      Migrations, 001 to 056, linear
+tests/                 pytest suite
+scripts/               Seed, smoke, env-example generation, doc link check
 frontend/              Next.js 16 application
 docker/                Init scripts, entrypoint
-.github/workflows/     CI/CD pipelines
+.github/workflows/     test.yml, deploy.yml, docker.yml
 ```
+
+---
+
+## Deployment
+
+Production runs entirely on free tiers: Render (API plus in-process worker), Supabase (Postgres), Upstash (Redis), Cloudflare R2 (media), and Vercel (frontend). The blueprint is [`render.yaml`](render.yaml) and the full provisioning walkthrough is the [free-tier setup runbook](docs/runbooks/free-tier-setup.md). Pushing to `main` triggers `deploy.yml`, which calls the Render deploy hook; Render's `preDeployCommand` runs the Alembic migrations and aborts the deploy if they fail.
 
 ---
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Install dev dependencies: `pip install -e ".[dev]"`
-4. Make changes and add tests
-5. Run linting: `ruff check src/ tests/`
-6. Run tests: `python -m pytest --tb=short -q`
-7. Push and open a pull request
+1. Create a feature branch: `git checkout -b feat/your-feature`
+2. Install dev dependencies: `pip install -e ".[dev]"`
+3. Make changes and add tests
+4. Backend gates: `just check`, then `just test`
+5. Frontend gates: `npm run lint && npx tsc --noEmit && npx vitest run`
+6. Push and open a pull request
 
-All CI checks (lint, test) must pass before merging.
+All CI checks must pass before merging.
 
 ---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. (There is no `LICENSE` file in the repository yet.)
