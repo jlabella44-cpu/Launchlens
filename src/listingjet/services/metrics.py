@@ -1,15 +1,24 @@
 """
 Pipeline-level metrics — tracks agent step durations, failures, provider calls, and costs.
 
-All functions are no-ops in development to avoid CloudWatch calls during local work.
+Metrics are logged via the standard logger (no external metrics backend).
 """
 
 import logging
 import time
 
-from listingjet.monitoring.metrics import emit_metric
-
 logger = logging.getLogger(__name__)
+
+
+def emit_metric(
+    name: str,
+    value: float,
+    unit: str = "Count",
+    dimensions: dict[str, str] | None = None,
+) -> None:
+    """Log a metric line. Replaces the old CloudWatch emitter — metrics are
+    now just structured log lines for external log aggregation."""
+    logger.info("metric name=%s value=%s unit=%s dims=%s", name, value, unit, dimensions or {})
 
 # Estimated cost per provider call in USD (flat per-call heuristic)
 PROVIDER_COSTS: dict[str, float] = {
@@ -17,19 +26,11 @@ PROVIDER_COSTS: dict[str, float] = {
     "claude": 0.05,
     "openai_gpt4v": 0.03,
     "kling": 0.50,
-    "qwen": 0.01,
-    "qwen_vision": 0.005,
-    "gemma": 0.003,
-    "gemma_vision": 0.003,
 }
 
 # Per-1M-token cost in USD: (input_rate, output_rate)
 TOKEN_COSTS: dict[str, tuple[float, float]] = {
     "claude": (3.00, 15.00),
-    "qwen": (0.26, 1.56),      # estimated from Qwen3.5-Plus rates
-    "qwen_vision": (0.26, 1.56),
-    "gemma": (0.14, 0.40),     # Gemma 4 31B via Gemini API
-    "gemma_vision": (0.14, 0.40),
     "openai_gpt4v": (2.50, 10.00),
 }
 

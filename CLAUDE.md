@@ -6,7 +6,7 @@
 
 - **Backend:** FastAPI + PostgreSQL (job table) + Redis, Python 3.12, Alembic migrations
 - **Frontend:** Next.js 16 (App Router), Tailwind CSS v4, TypeScript
-- **Infra:** Render (API + worker), Supabase Postgres, Upstash Redis, Cloudflare R2 (media) — see `render.yaml`. (Migrated off AWS; the CDK in `infra/` is decommission-only — see `infra/README.md`.)
+- **Infra:** Render (API + worker), Supabase Postgres, Upstash Redis, Cloudflare R2 (media) — see `render.yaml`.
 - **Tests:** pytest + pytest-cov, vitest for frontend
 
 ---
@@ -34,16 +34,16 @@ directly. Fallback: the compare URL printed by `git push` also works.
 ## Bash commands
 
 Every `Bash` tool call must pass an explicit `timeout`. The harness default
-of 2 minutes will kill long-running commands (`cdk diff`, `pytest`,
-`docker build`, `npm ci`) silently — always set a ceiling that matches the
-expected runtime.
+of 2 minutes will kill long-running commands (`pytest`, `docker build`,
+`npm ci`) silently — always set a ceiling that matches the expected
+runtime.
 
 ---
 
 ## Running the project
 
 ```bash
-# Start all services (postgres, redis, api, worker, localstack)
+# Start all services (postgres, redis, api, worker)
 docker-compose up
 
 # Run backend tests
@@ -71,16 +71,16 @@ cd frontend && npm run lint && npx vitest run
 | Pipeline worker entry (standalone: `python -m listingjet.pipeline.worker`) | `pipeline/worker.py` |
 | Job-table definition + runner | `pipeline/` |
 | DB engine / session | `database.py` |
-| Logging + telemetry setup | `logging_config.py`, `telemetry.py` |
+| Logging setup | `logging_config.py` |
 | API routers | `api/` |
 | Per-route Pydantic schemas | `api/schemas/` |
 | Pipeline agents | `agents/` |
 | SQLAlchemy models | `models/` |
-| Business-logic services | `services/` (auth, billing, credits, email, audit, rate-limit, scrapers, etc.) |
-| AI/media provider adapters | `providers/` (Claude, OpenAI, Gemma, Canva, ElevenLabs, Kling, Google Vision); generated Canva SDK under `providers/canva_generated/`; prompt templates under `providers/templates/` |
+| Business-logic services | `services/` (auth, billing, credits, email, audit, rate-limit, etc.) |
+| AI/media provider adapters | `providers/` (Claude, OpenAI, Google Vision, Kling, Canva); prompt templates under `providers/templates/` |
 | FastAPI middleware | `middleware/` |
 | Pricing-tier configuration | `config/` (currently `tiers.py`) |
-| Observability (Prometheus + Sentry) | `monitoring/` |
+| Observability (Sentry only) | `monitoring/` |
 | Email templates (Jinja) | `templates/email/` |
 | Utility helpers | `utils/` |
 | Shared schemas (stub) | `schemas/` — empty today; active schemas live under `api/schemas/` |
@@ -89,7 +89,7 @@ cd frontend && npm run lint && npx vitest run
 
 | What | Where |
 |---|---|
-| Alembic migrations | `alembic/versions/` (001→050, linear) |
+| Alembic migrations | `alembic/versions/` (001→054, linear) |
 | Backend pytest suite | `tests/` |
 | Migration / seed / smoke scripts | `scripts/` |
 
@@ -113,57 +113,17 @@ cd frontend && npm run lint && npx vitest run
 
 | What | Where |
 |---|---|
-| CDK stacks | `infra/stacks/` |
 | Dockerfile + compose | `Dockerfile`, `docker-compose.yml`, `docker/` |
 | Design tokens / system | `design-system/listingjet/` |
-| Vercel config | `vercel.json` |
-| Railway config (legacy) | `railway.json` |
+| Frontend Vercel config | `frontend/vercel.json` |
 
 ### Docs & planning
 
 | What | Where |
 |---|---|
 | Master task list | `MASTER_TODO.md` |
-| General TODOs | `TODO.md`, `TODO-video-template.md` |
-| Pre-launch infra checklist | `docs/PRE_LAUNCH_INFRA_CHECKLIST.md` |
 | Other specs, PRDs, handoffs | `docs/` |
 | LLM-friendly project overview | `PROJECT_OVERVIEW_FOR_LLM.md` |
-| Cloud migration notes | `CLOUD_MIGRATION_GUIDE.md` |
-
----
-
-## What's been done (don't redo these)
-
-All P2/P3 feature work is complete. The full list is in `MASTER_TODO.md`. Notable recent work:
-
-- XGBoost phase 2 weight scoring in `weight_manager.py`
-- CI: `test.yml` has frontend job + coverage; `deploy.yml` has Trivy CRITICAL scan + worker image push
-- Release automation: `.releaserc.json` + `release.yml` (semantic-release on `main`)
-- LocalStack in `docker-compose.yml` for local S3 mock
-- MLS image resize profiles (`MLS_PROFILES` in `mls_export.py`)
-- Email blast endpoint: `POST /listings/{id}/email-blast`
-- Real-time admin usage SSE: `GET /admin/usage-stream` + `UsageDashboard` component
-- 3D dollhouse viewer: `DollhouseViewer` Canvas component wired into `DollhouseCard`
-- Learning aggregation as a periodic job on the pipeline worker (fire-and-forget from pipeline)
-- Pipeline job cancellation via the job table
-- Per-user daily quota + configurable plan limits via admin API
-
----
-
-## Migration off AWS → Render + Supabase + R2 (in progress)
-
-The platform is moving off AWS to **Render** (API + worker), **Supabase**
-(Postgres), **Upstash** (Redis), and **Cloudflare R2** (media). The **code +
-config is done**; what remains is operational (provision the accounts, sync
-data, flip DNS, decommission AWS).
-
-- **Compute / DB / cache cutover** → `docs/runbooks/render-supabase-cutover.md`
-- **Storage (S3 → R2) cutover** → `docs/runbooks/r2-cutover.md`
-- **Deploy target** → `render.yaml` (Render blueprint); CI is `.github/workflows/deploy.yml` (test-gated Render deploy hooks).
-- **AWS CDK** in `infra/` is **decommission-only** — used solely for the final `cdk destroy`. See `infra/README.md`.
-
-The old AWS RDS encryption / SES / pre-launch-resize / cost-collection P0 items
-are obsolete under the new stack and have been removed.
 
 ---
 
@@ -171,6 +131,7 @@ are obsolete under the new stack and have been removed.
 
 - **Never push to `main` directly** — go through the feature branch
 - **Never amend published commits** — create new commits
-- **Migration chain is 001→050 linear** — next migration must be `051_...` with `down_revision = "050_tenant_admin_controls"`
+- **Migration head: 054** — next migration must chain off `054_drop_cut_tables`
+- **Feature flags** — `FEATURES=` is a comma-separated env list (see `src/listingjet/features.py`) of: `learning`, `health_score`, `performance_intelligence`, `help_agent`, `microsite`, `webhooks`, `listing_permissions`. All off by default. Routers are selected at app start based on this value, so changing `FEATURES` requires restarting the API and worker processes.
 - Routes are mounted at their router prefix directly (e.g. `/auth/...`, `/listings/...`, `/demo/...`) — there is no `/v1` prefix in the running app despite past plans. Health endpoints (`/health`, `/health/deep`) are at their literal paths; `/ready` is not implemented.
 - The stop hook in `~/.claude/settings.json` will block you from stopping if there are uncommitted changes or unpushed commits — commit and push before ending the session.

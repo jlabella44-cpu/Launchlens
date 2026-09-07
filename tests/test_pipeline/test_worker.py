@@ -197,6 +197,32 @@ async def test_worker_loop_runs_two_jobs_in_parallel(db_session):
 
 
 @pytest.mark.asyncio
+async def test_requeue_owned_refunds_the_attempt(db_session):
+    """Shutdown requeue must not permanently spend an attempt on work that
+    never got to run to completion — only reclaim_stale (crash path) counts
+    against max_attempts."""
+    listing = Listing(tenant_id=uuid.uuid4(), address={"street": "4 Loop St"}, metadata_={},
+                      state=ListingState.UPLOADING)
+    db_session.add(listing)
+    await db_session.flush()
+    await runner.enqueue_pipeline(db_session, listing, billing_model="legacy", enabled_addons=[], steps=STEPS)
+
+    job = await runner.claim_next(db_session, "w1", steps=STEPS)
+    assert job.step == "a"
+    assert job.attempts == 1
+
+    n = await runner.requeue_owned(db_session, "w1")
+    await db_session.commit()
+    assert n == 1
+
+    refreshed = await db_session.get(PipelineJob, job.id)
+    await db_session.refresh(refreshed)
+    assert refreshed.status == JobStatus.QUEUED
+    assert refreshed.locked_by is None
+    assert refreshed.attempts == 0
+
+
+@pytest.mark.asyncio
 async def test_worker_loop_requeues_in_flight_jobs_on_shutdown(db_session):
     """A cancelled shutdown must not strand a job RUNNING until reclaim_stale
     notices it (which can be 2x the step timeout — up to 40 minutes)."""

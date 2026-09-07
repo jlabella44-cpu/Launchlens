@@ -40,20 +40,24 @@ ListingJet is an AI-powered real estate listing media platform. Photographers an
 ┌──────────────────────────────────────────────────────────────────────┐
 │                          AI Providers                                │
 │  Google Cloud Vision API  │  OpenAI GPT-4V  │  Anthropic Claude     │
-│  Kling AI (video gen)     │  AWS S3 (storage)                       │
+│  Kling AI (video gen)     │  Cloudflare R2 (storage)                │
 └──────────────────────────────────────────────────────────────────────┘
 ```
+
+Deployed on **Render** (API + worker, see `render.yaml`), **Supabase**
+(Postgres), **Upstash** (Redis), and **Cloudflare R2** (media). Pipeline
+code lives under `src/listingjet/pipeline/`.
 
 ### Agent Pipeline (15 agents)
 
 | Agent | Phase | Description |
 |-------|-------|-------------|
-| IngestionAgent | 1 | Dedup by file hash, upload to S3 |
+| IngestionAgent | 1 | Dedup by file hash, upload to R2 |
 | VisionAgent | 1 | Google Vision tier-1 bulk + GPT-4V tier-2 top 20 |
 | CoverageAgent | 1 | Verify required shot types (exterior, kitchen, etc.) |
 | PackagingAgent | 1 | Score + select top 25 photos → AWAITING_REVIEW |
 | ContentAgent | 2 | Dual-tone listing descriptions (MLS-safe + marketing) via Claude |
-| BrandAgent | 2 | Render branded PDF flyer → S3 |
+| BrandAgent | 2 | Render branded PDF flyer → R2 |
 | SocialContentAgent | 2 | Instagram + Facebook captions via Claude (Pro+) |
 | MLSExportAgent | 2 | Dual ZIP bundles: MLS-unbranded + Marketing-branded |
 | DistributionAgent | 2 | Final state → DELIVERED, emit pipeline.completed event |
@@ -74,7 +78,7 @@ ListingJet is an AI-powered real estate listing media platform. Photographers an
 | Orchestration | In-process pipeline worker polling a Postgres job table (`src/listingjet/pipeline/`) |
 | Database | PostgreSQL 16 with Row-Level Security |
 | Cache / Queue | Redis 7 (rate limiting, SSE pub/sub) |
-| Storage | AWS S3 (boto3) |
+| Storage | Cloudflare R2 (boto3 S3-compatible client) |
 | Auth | JWT (PyJWT), bcrypt |
 | Payments | Stripe (checkout, portal, webhooks) |
 | AI Vision | Google Cloud Vision API, OpenAI GPT-4V |
@@ -82,7 +86,7 @@ ListingJet is an AI-powered real estate listing media platform. Photographers an
 | AI Video | Kling AI |
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
 | 3D | React Three Fiber, Three.js, Framer Motion |
-| Observability | OpenTelemetry (OTLP), CloudWatch metrics, Sentry |
+| Observability | Sentry |
 | Testing | pytest-asyncio (270+ tests) |
 | CI/CD | GitHub Actions (lint, test, docker build) |
 
@@ -214,7 +218,7 @@ src/listingjet/
   models/              SQLAlchemy ORM models
   providers/           AI provider abstractions (Vision, LLM, Template)
   services/            Business logic (auth, billing, events, metrics)
-  monitoring/          Sentry init, OTel tracing
+  monitoring/          Sentry init
 alembic/versions/      10 database migrations
 tests/                 270+ pytest tests
 frontend/              Next.js 16 application

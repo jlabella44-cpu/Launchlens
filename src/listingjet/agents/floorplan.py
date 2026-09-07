@@ -323,7 +323,7 @@ class FloorplanAgent(BaseAgent):
                 },
             )
 
-        record_cost(self.agent_name, "qwen_vision", floorplan_count)
+        record_cost(self.agent_name, "openai_gpt4v", floorplan_count)
         return {
             "room_count": total_rooms,
             "floor_count": len(floors),

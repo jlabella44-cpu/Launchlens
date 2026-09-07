@@ -4,6 +4,10 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("WORKER_ENABLED", "false")  # before any listingjet import: keep the worker loops off in tests
+os.environ.setdefault(
+    "FEATURES",
+    "learning,health_score,performance_intelligence,help_agent,microsite,webhooks,listing_permissions",
+)  # before any listingjet import: routers are chosen at app-build time in main.py
 
 import jwt  # noqa: E402
 import pytest  # noqa: E402
@@ -56,7 +60,6 @@ def _mock_external_services():
         patch("listingjet.api.auth._get_lockout_redis", return_value=mock_redis),
         patch("listingjet.services.auth.get_redis", return_value=mock_redis),
         patch("listingjet.services.credits._get_redis", return_value=mock_redis),
-        patch("listingjet.services.tenant_bypass._get_redis", return_value=mock_redis),
     ):
         yield
 
@@ -106,7 +109,6 @@ async def test_engine():
             [
                 {"slug": "virtual_staging", "name": "Virtual Staging", "credit_cost": 15, "is_active": True, "metadata": {"styles": ["modern", "contemporary", "minimalist"]}},
                 {"slug": "image_editing", "name": "AI Image Editing", "credit_cost": 5, "is_active": True, "metadata": {"capabilities": ["remove_object", "enhance"]}},
-                {"slug": "cma_report", "name": "CMA Report", "credit_cost": 10, "is_active": True, "metadata": {"format": "html"}},
                 {"slug": "ai_video_tour", "name": "AI Video Tour", "credit_cost": 20, "is_active": True, "metadata": {}},
                 {"slug": "3d_floorplan", "name": "3D Floorplan", "credit_cost": 8, "is_active": True, "metadata": {}},
                 {"slug": "all_addons_bundle", "name": "All Add-ons Bundle", "credit_cost": 30, "is_active": True, "metadata": {"includes": ["ai_video_tour", "virtual_staging", "3d_floorplan"]}},

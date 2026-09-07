@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from listingjet import features
 from listingjet.api.deps import get_current_user, get_db
 from listingjet.api.schemas.performance import (
     HeroInsight,
@@ -27,7 +28,7 @@ from listingjet.models.listing_outcome import ListingOutcome
 from listingjet.models.user import User
 from listingjet.services.outcome_tracker import get_insights
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(features.require_feature("performance_intelligence"))])
 
 
 @router.get("/analytics/performance")

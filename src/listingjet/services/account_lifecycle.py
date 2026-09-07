@@ -11,7 +11,6 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listingjet.models.addon_purchase import AddonPurchase
-from listingjet.models.api_key import APIKey
 from listingjet.models.asset import Asset
 from listingjet.models.audit_log import AuditLog
 from listingjet.models.brand_kit import BrandKit
@@ -35,7 +34,6 @@ _TENANT_SCOPED_TABLES = [
     CreditTransaction,
     CreditAccount,
     AddonPurchase,
-    APIKey,
     AuditLog,
     Event,
     Outbox,

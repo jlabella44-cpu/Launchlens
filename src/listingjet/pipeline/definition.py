@@ -38,16 +38,16 @@ PIPELINE: list[Step] = [
     Step("content", requires=("await_review",)),
     Step("brand", requires=("content",), optional=True),
     Step("social_content", requires=("content",), optional=True),
-    Step("chapters", requires=("video", "await_review"), optional=True),
     Step("social_cuts", requires=("video", "await_review"), optional=True),
     Step("mls_export", requires=("content", "brand"), timeout_s=15 * _MIN),
-    Step("distribution", requires=("mls_export", "social_content", "chapters", "social_cuts", "photo_compliance")),
+    Step("distribution", requires=("mls_export", "social_content", "social_cuts", "photo_compliance")),
     # Phase 3: after delivery, all best-effort
-    Step("microsite", requires=("distribution",), timeout_s=5 * _MIN, optional=True),
-    Step("learning", requires=("distribution",), optional=True),
+    Step("microsite", requires=("distribution",), timeout_s=5 * _MIN, optional=True, gate="feature:microsite"),
+    Step("learning", requires=("distribution",), optional=True, gate="feature:learning"),
     Step("social_event", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
-    Step("health_score", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
-    Step("performance_intelligence", requires=("distribution",), timeout_s=2 * _MIN, optional=True),
+    Step("health_score", requires=("distribution",), timeout_s=2 * _MIN, optional=True, gate="feature:health_score"),
+    Step("performance_intelligence", requires=("distribution",), timeout_s=2 * _MIN, optional=True,
+         gate="feature:performance_intelligence"),
 ]
 
 
@@ -76,6 +76,25 @@ def topological_order(steps: list[Step]) -> list[str]:
         for d in deps.values():
             d.difference_update(ready)
     return order
+
+
+def transitive_requires(name: str, steps: list[Step] = PIPELINE) -> set[str]:
+    """Every step name reachable from `name` by following `requires` edges."""
+    index = {s.name: s for s in steps}
+    seen: set[str] = set()
+    stack = list(index[name].requires)
+    while stack:
+        dep = stack.pop()
+        if dep in seen:
+            continue
+        seen.add(dep)
+        stack.extend(index[dep].requires)
+    return seen
+
+
+def post_review_steps(steps: list[Step] = PIPELINE) -> frozenset[str]:
+    """Names whose transitive requires include the `await_review` gate."""
+    return frozenset(s.name for s in steps if "await_review" in transitive_requires(s.name, steps))
 
 
 validate_pipeline(PIPELINE)

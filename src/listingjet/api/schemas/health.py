@@ -58,38 +58,6 @@ class HealthSummaryResponse(BaseModel):
     bottom_listings: list[HealthSummaryListing]
 
 
-# -- IDX Feed Config Schemas --
-
-class IdxFeedConfigCreate(BaseModel):
-    name: str = Field(..., max_length=255)
-    base_url: str = Field(..., max_length=500)
-    api_key: str = Field(..., max_length=500)
-    board_id: str | None = Field(None, max_length=100)
-    poll_interval_minutes: int = Field(60, ge=15, le=1440)
-
-
-class IdxFeedConfigUpdate(BaseModel):
-    name: str | None = Field(None, max_length=255)
-    base_url: str | None = Field(None, max_length=500)
-    api_key: str | None = Field(None, max_length=500)
-    board_id: str | None = Field(None, max_length=100)
-    poll_interval_minutes: int | None = Field(None, ge=15, le=1440)
-    status: str | None = Field(None, pattern="^(active|disabled)$")
-
-
-class IdxFeedConfigResponse(BaseModel):
-    id: uuid.UUID
-    name: str
-    base_url: str
-    board_id: str | None
-    poll_interval_minutes: int
-    last_polled_at: datetime | None
-    status: str
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
 # -- Health Weights Schemas --
 
 class HealthWeightsResponse(BaseModel):

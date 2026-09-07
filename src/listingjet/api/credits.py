@@ -39,7 +39,6 @@ SERVICE_NAMES: dict[str, str] = {
     "virtual_staging": "Virtual Staging",
     "3d_floorplan": "3D Floorplan",
     "image_editing": "AI Image Editing",
-    "cma_report": "CMA Report",
     "photo_compliance": "Photo Compliance",
     "social_media_cuts": "Social Media Cuts",
     "microsite": "Microsite",

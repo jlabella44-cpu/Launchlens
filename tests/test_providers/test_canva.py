@@ -1,10 +1,9 @@
 # tests/test_providers/test_canva.py
 """Tests for CanvaTemplateProvider — Canva Connect autofill + export flow.
 
-Uses the generated Canva client API functions. Mocks are applied to the
-generated module-level async functions rather than raw httpx calls.
+Mocks are applied to `CanvaClient` (the thin httpx client) rather than
+raw HTTP calls or a generated SDK.
 """
-from http import HTTPStatus
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,279 +20,117 @@ SAMPLE_DATA = {
     "primary_color": "#2563EB",
 }
 
-# ---------------------------------------------------------------------------
-# Helpers to build mock Response objects matching the generated client shape
-# ---------------------------------------------------------------------------
-
 _GEN = "listingjet.providers.canva"
 
 
-def _ok_response(parsed):
-    """Build a mock Response with status 200 and a parsed model."""
-    resp = MagicMock()
-    resp.status_code = HTTPStatus.OK
-    resp.parsed = parsed
-    return resp
+def _make_client_mock(
+    *,
+    upload_job_id="upload_1",
+    upload_status="success",
+    upload_asset_id="asset_abc",
+    upload_side_effect=None,
+    autofill_job_id="af_1",
+    autofill_status="success",
+    autofill_design_id="design_abc",
+    export_job_id="ex_1",
+    export_status="success",
+    export_urls=None,
+    pdf_bytes=b"%PDF-rendered",
+):
+    """Build an AsyncMock CanvaClient instance with normalised return shapes."""
+    export_urls = export_urls if export_urls is not None else ["https://canva.com/export/flyer.pdf"]
 
+    client = AsyncMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=None)
 
-def _make_autofill_create_parsed(job_id: str = "af_1"):
-    """Mock CreateDesignAutofillJobResponse."""
-    parsed = MagicMock()
-    parsed.job.id = job_id
-    return parsed
+    if upload_side_effect is not None:
+        client.create_url_asset_upload = AsyncMock(side_effect=upload_side_effect)
+    else:
+        client.create_url_asset_upload = AsyncMock(return_value=upload_job_id)
+    client.get_url_asset_upload = AsyncMock(
+        return_value={"status": upload_status, "asset_id": upload_asset_id}
+    )
 
+    client.create_autofill = AsyncMock(return_value=autofill_job_id)
+    client.get_autofill = AsyncMock(
+        return_value={"status": autofill_status, "design_id": autofill_design_id}
+    )
 
-def _make_autofill_poll_parsed(status: str, design_id: str | None = None):
-    """Mock GetDesignAutofillJobResponse."""
-    parsed = MagicMock()
-    parsed.job.status.value = status
-    if design_id:
-        parsed.job.result.design.id = design_id
-    return parsed
+    client.create_export = AsyncMock(return_value=export_job_id)
+    client.get_export = AsyncMock(
+        return_value={"status": export_status, "urls": export_urls}
+    )
 
+    client.download = AsyncMock(return_value=pdf_bytes)
 
-def _make_export_create_parsed(job_id: str = "ex_1"):
-    """Mock CreateDesignExportJobResponse."""
-    parsed = MagicMock()
-    parsed.job.id = job_id
-    return parsed
-
-
-def _make_export_poll_parsed(status: str, url: str | None = None):
-    """Mock GetDesignExportJobResponse."""
-    parsed = MagicMock()
-    parsed.job.status.value = status
-    if url:
-        parsed.job.urls = [url]
-    return parsed
-
-
-def _make_upload_create_parsed(job_id: str = "upload_1"):
-    """Mock CreateUrlAssetUploadJobResponse."""
-    parsed = MagicMock()
-    parsed.job.id = job_id
-    return parsed
-
-
-def _make_upload_poll_parsed(status: str, asset_id: str | None = None):
-    """Mock GetUrlAssetUploadJobResponse."""
-    parsed = MagicMock()
-    parsed.job.status.value = status
-    if asset_id:
-        parsed.job.asset.id = asset_id
-    return parsed
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+    return client
 
 
 @pytest.mark.asyncio
 async def test_render_calls_autofill_then_export():
     """Full flow with hero image: upload asset, autofill template, export PDF."""
-    # Set up mock returns for each generated API call
-    mock_create_upload = AsyncMock(
-        return_value=_ok_response(_make_upload_create_parsed("upload_1"))
-    )
-    mock_poll_upload = AsyncMock(
-        return_value=_ok_response(_make_upload_poll_parsed("success", "asset_abc"))
-    )
-    mock_create_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_create_parsed("af_1"))
-    )
-    mock_poll_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_poll_parsed("success", "design_abc"))
-    )
-    mock_create_export = AsyncMock(
-        return_value=_ok_response(_make_export_create_parsed("ex_1"))
-    )
-    mock_poll_export = AsyncMock(
-        return_value=_ok_response(_make_export_poll_parsed("success", "https://canva.com/export/flyer.pdf"))
-    )
+    mock_client = _make_client_mock(pdf_bytes=b"%PDF-rendered")
 
-    # Mock the PDF download via raw httpx
-    mock_http_client = AsyncMock()
-    mock_http_resp = MagicMock()
-    mock_http_resp.content = b"%PDF-rendered"
-    mock_http_resp.raise_for_status = MagicMock()
-    mock_http_client.get = AsyncMock(return_value=mock_http_resp)
-    mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
-    mock_http_client.__aexit__ = AsyncMock(return_value=None)
-
-    with (
-        patch(f"{_GEN}.create_url_asset_upload_job.asyncio_detailed", mock_create_upload),
-        patch(f"{_GEN}.get_url_asset_upload_job.asyncio_detailed", mock_poll_upload),
-        patch(f"{_GEN}.create_design_autofill_job.asyncio_detailed", mock_create_autofill),
-        patch(f"{_GEN}.get_design_autofill_job.asyncio_detailed", mock_poll_autofill),
-        patch(f"{_GEN}.create_design_export_job.asyncio_detailed", mock_create_export),
-        patch(f"{_GEN}.get_design_export_job.asyncio_detailed", mock_poll_export),
-        patch(f"{_GEN}.httpx.AsyncClient", return_value=mock_http_client),
-        patch(f"{_GEN}.AuthenticatedClient") as mock_auth_cls,
-    ):
-        mock_client_inst = MagicMock()
-        mock_client_inst.__aenter__ = AsyncMock(return_value=mock_client_inst)
-        mock_client_inst.__aexit__ = AsyncMock(return_value=None)
-        mock_auth_cls.return_value = mock_client_inst
-
+    with patch(f"{_GEN}.CanvaClient", return_value=mock_client):
         provider = CanvaProvider(api_key="test_key")
         result = await provider.render(template_id="tmpl_1", data=SAMPLE_DATA)
 
     assert result == b"%PDF-rendered"
     # Verify all API stages were called
-    mock_create_upload.assert_called_once()
-    mock_poll_upload.assert_called_once()
-    mock_create_autofill.assert_called_once()
-    mock_poll_autofill.assert_called_once()
-    mock_create_export.assert_called_once()
-    mock_poll_export.assert_called_once()
+    mock_client.create_url_asset_upload.assert_called_once()
+    mock_client.get_url_asset_upload.assert_called_once()
+    mock_client.create_autofill.assert_called_once()
+    mock_client.get_autofill.assert_called_once()
+    mock_client.create_export.assert_called_once()
+    mock_client.get_export.assert_called_once()
+    mock_client.download.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_render_without_hero_image_skips_upload():
     """When no hero_image_url is provided, asset upload is skipped."""
     data = {**SAMPLE_DATA, "hero_image_url": None}
+    mock_client = _make_client_mock(pdf_bytes=b"%PDF-fake")
 
-    mock_create_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_create_parsed("af_1"))
-    )
-    mock_poll_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_poll_parsed("success", "d1"))
-    )
-    mock_create_export = AsyncMock(
-        return_value=_ok_response(_make_export_create_parsed("ex_1"))
-    )
-    mock_poll_export = AsyncMock(
-        return_value=_ok_response(_make_export_poll_parsed("success", "https://canva.com/out.pdf"))
-    )
-    mock_create_upload = AsyncMock()
-
-    mock_http_client = AsyncMock()
-    mock_http_resp = MagicMock()
-    mock_http_resp.content = b"%PDF-fake"
-    mock_http_resp.raise_for_status = MagicMock()
-    mock_http_client.get = AsyncMock(return_value=mock_http_resp)
-    mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
-    mock_http_client.__aexit__ = AsyncMock(return_value=None)
-
-    with (
-        patch(f"{_GEN}.create_url_asset_upload_job.asyncio_detailed", mock_create_upload),
-        patch(f"{_GEN}.create_design_autofill_job.asyncio_detailed", mock_create_autofill),
-        patch(f"{_GEN}.get_design_autofill_job.asyncio_detailed", mock_poll_autofill),
-        patch(f"{_GEN}.create_design_export_job.asyncio_detailed", mock_create_export),
-        patch(f"{_GEN}.get_design_export_job.asyncio_detailed", mock_poll_export),
-        patch(f"{_GEN}.httpx.AsyncClient", return_value=mock_http_client),
-        patch(f"{_GEN}.AuthenticatedClient") as mock_auth_cls,
-    ):
-        mock_client_inst = MagicMock()
-        mock_client_inst.__aenter__ = AsyncMock(return_value=mock_client_inst)
-        mock_client_inst.__aexit__ = AsyncMock(return_value=None)
-        mock_auth_cls.return_value = mock_client_inst
-
+    with patch(f"{_GEN}.CanvaClient", return_value=mock_client):
         provider = CanvaProvider(api_key="tok")
         result = await provider.render(template_id="tmpl_1", data=data)
 
     assert result == b"%PDF-fake"
-    # Upload should NOT have been called
-    mock_create_upload.assert_not_called()
-    # Autofill + export should still run
-    mock_create_autofill.assert_called_once()
-    mock_create_export.assert_called_once()
+    mock_client.create_url_asset_upload.assert_not_called()
+    mock_client.create_autofill.assert_called_once()
+    mock_client.create_export.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_render_passes_token_to_authenticated_client():
-    """AuthenticatedClient is constructed with the correct token."""
-    mock_create_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_create_parsed())
-    )
-    mock_poll_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_poll_parsed("success", "d1"))
-    )
-    mock_create_export = AsyncMock(
-        return_value=_ok_response(_make_export_create_parsed())
-    )
-    mock_poll_export = AsyncMock(
-        return_value=_ok_response(_make_export_poll_parsed("success", "https://canva.com/out.pdf"))
-    )
+async def test_render_passes_token_to_canva_client():
+    """CanvaClient is constructed with the correct token."""
+    mock_client = _make_client_mock(pdf_bytes=b"%PDF-ok")
 
-    mock_http_client = AsyncMock()
-    mock_http_resp = MagicMock()
-    mock_http_resp.content = b"%PDF-ok"
-    mock_http_resp.raise_for_status = MagicMock()
-    mock_http_client.get = AsyncMock(return_value=mock_http_resp)
-    mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
-    mock_http_client.__aexit__ = AsyncMock(return_value=None)
-
-    with (
-        patch(f"{_GEN}.create_design_autofill_job.asyncio_detailed", mock_create_autofill),
-        patch(f"{_GEN}.get_design_autofill_job.asyncio_detailed", mock_poll_autofill),
-        patch(f"{_GEN}.create_design_export_job.asyncio_detailed", mock_create_export),
-        patch(f"{_GEN}.get_design_export_job.asyncio_detailed", mock_poll_export),
-        patch(f"{_GEN}.httpx.AsyncClient", return_value=mock_http_client),
-        patch(f"{_GEN}.AuthenticatedClient") as mock_auth_cls,
-    ):
-        mock_client_inst = MagicMock()
-        mock_client_inst.__aenter__ = AsyncMock(return_value=mock_client_inst)
-        mock_client_inst.__aexit__ = AsyncMock(return_value=None)
-        mock_auth_cls.return_value = mock_client_inst
-
+    with patch(f"{_GEN}.CanvaClient", return_value=mock_client) as mock_client_cls:
         data_no_hero = {**SAMPLE_DATA, "hero_image_url": None}
         provider = CanvaProvider(api_key="secret_key")
         await provider.render(template_id="tmpl_1", data=data_no_hero)
 
-    # Verify AuthenticatedClient was constructed with the right token
-    mock_auth_cls.assert_called_once()
-    call_kwargs = mock_auth_cls.call_args
+    mock_client_cls.assert_called_once()
+    call_kwargs = mock_client_cls.call_args
     assert call_kwargs.kwargs.get("token") == "secret_key"
 
 
 @pytest.mark.asyncio
 async def test_render_hero_upload_failure_still_renders():
     """If hero asset upload fails, render continues without the asset."""
-    mock_create_upload = AsyncMock(side_effect=Exception("upload failed"))
-
-    mock_create_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_create_parsed())
-    )
-    mock_poll_autofill = AsyncMock(
-        return_value=_ok_response(_make_autofill_poll_parsed("success", "d1"))
-    )
-    mock_create_export = AsyncMock(
-        return_value=_ok_response(_make_export_create_parsed())
-    )
-    mock_poll_export = AsyncMock(
-        return_value=_ok_response(_make_export_poll_parsed("success", "https://canva.com/out.pdf"))
+    mock_client = _make_client_mock(
+        upload_side_effect=Exception("upload failed"), pdf_bytes=b"%PDF-ok"
     )
 
-    mock_http_client = AsyncMock()
-    mock_http_resp = MagicMock()
-    mock_http_resp.content = b"%PDF-ok"
-    mock_http_resp.raise_for_status = MagicMock()
-    mock_http_client.get = AsyncMock(return_value=mock_http_resp)
-    mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
-    mock_http_client.__aexit__ = AsyncMock(return_value=None)
-
-    with (
-        patch(f"{_GEN}.create_url_asset_upload_job.asyncio_detailed", mock_create_upload),
-        patch(f"{_GEN}.create_design_autofill_job.asyncio_detailed", mock_create_autofill),
-        patch(f"{_GEN}.get_design_autofill_job.asyncio_detailed", mock_poll_autofill),
-        patch(f"{_GEN}.create_design_export_job.asyncio_detailed", mock_create_export),
-        patch(f"{_GEN}.get_design_export_job.asyncio_detailed", mock_poll_export),
-        patch(f"{_GEN}.httpx.AsyncClient", return_value=mock_http_client),
-        patch(f"{_GEN}.AuthenticatedClient") as mock_auth_cls,
-    ):
-        mock_client_inst = MagicMock()
-        mock_client_inst.__aenter__ = AsyncMock(return_value=mock_client_inst)
-        mock_client_inst.__aexit__ = AsyncMock(return_value=None)
-        mock_auth_cls.return_value = mock_client_inst
-
+    with patch(f"{_GEN}.CanvaClient", return_value=mock_client):
         provider = CanvaProvider(api_key="tok")
         result = await provider.render(template_id="tmpl_1", data=SAMPLE_DATA)
 
     assert result == b"%PDF-ok"
-    # Upload was attempted (hero_image_url was set) but failed gracefully
-    mock_create_upload.assert_called_once()
+    mock_client.create_url_asset_upload.assert_called_once()
 
 
 @pytest.mark.asyncio

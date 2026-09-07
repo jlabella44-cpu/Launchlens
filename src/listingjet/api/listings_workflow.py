@@ -15,7 +15,6 @@ from listingjet.api.schemas.listings import (
     RejectRequest,
 )
 from listingjet.database import get_db
-from listingjet.models.asset import Asset
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.scoring_event import ScoringEvent
 from listingjet.models.tenant import Tenant
@@ -29,9 +28,6 @@ from listingjet.services.pipeline_start import enabled_addon_slugs
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Simple in-process cache for engagement scores (computed once per listing, never changes)
-_engagement_cache: dict[str, tuple] = {}
 
 
 @router.post("/{listing_id}/review", response_model=ActionResponse)
@@ -357,7 +353,7 @@ async def get_pipeline_status(
         pipeline_steps = [
             "ingestion", "vision_tier1", "vision_tier2", "coverage",
             "floorplan", "packaging", "compliance", "review",
-            "content", "brand", "social_content", "chapters",
+            "content", "brand", "social_content",
             "social_cuts", "mls_export", "watermark", "distribution",
         ]
 
@@ -393,36 +389,12 @@ async def get_pipeline_status(
                     s["status"] = "in_progress"
                 break
 
-    # Engagement prediction + features — cached to avoid recomputation on every poll
-    engagement_score = None
-    detected_features = []
-    packaged_states = {"awaiting_review", "in_review", "approved", "exporting", "delivered"}
-    if state_val in packaged_states:
-        cache_key = f"engagement:{listing_id}"
-        cached = _engagement_cache.get(cache_key)
-        if cached:
-            engagement_score, detected_features = cached
-        else:
-            from listingjet.models.vision_result import VisionResult
-            from listingjet.services.engagement_score import predict_engagement
-            from listingjet.services.feature_tags import extract_features
-
-            vision_results = (await db.execute(
-                select(VisionResult)
-                .join(Asset, VisionResult.asset_id == Asset.id)
-                .where(Asset.listing_id == listing_id, VisionResult.tier == 1)
-            )).scalars().all()
-
-            engagement_score = predict_engagement(vision_results)
-            detected_features = extract_features(vision_results)
-            _engagement_cache[cache_key] = (engagement_score, detected_features)
-
     return {
         "listing_id": str(listing.id),
         "listing_state": state_val,
         "steps": steps,
-        "engagement_score": engagement_score,
-        "detected_features": detected_features,
+        "engagement_score": None,
+        "detected_features": [],
     }
 
 
@@ -454,8 +426,9 @@ async def run_compliance_scan(
 
     from listingjet.agents.base import AgentContext
     from listingjet.agents.photo_compliance import PhotoComplianceAgent
+    from listingjet.database import admin_session
 
-    agent = PhotoComplianceAgent()
+    agent = PhotoComplianceAgent(session_factory=admin_session)
     ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
     report = await agent.execute(ctx)
     return report

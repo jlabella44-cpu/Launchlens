@@ -55,7 +55,7 @@ def test_clamp():
     assert _clamp(75.6) == 75
 
 
-# -- Media score tests (sync logic tested via engagement_score equivalence) --
+# -- Media score tests --
 
 @pytest.mark.asyncio
 async def test_calculate_media_score_no_results():

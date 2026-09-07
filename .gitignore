@@ -36,5 +36,3 @@ coverage/
 .cache/
 tmp/
 uv.lock
-cdk.out/
-infra/cdk.out/

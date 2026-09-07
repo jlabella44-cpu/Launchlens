@@ -1,4 +1,4 @@
-"""Test listing health score and IDX feed config API endpoints."""
+"""Test listing health score API endpoints."""
 import uuid
 
 import jwt as pyjwt
@@ -66,54 +66,6 @@ async def test_update_health_weights_enterprise_only(async_client, test_engine):
     resp = await async_client.patch(
         "/settings/health-weights",
         json={"media": 0.5, "content": 0.2, "velocity": 0.1, "syndication": 0.1, "market": 0.1},
-        headers=_auth(token),
-    )
-    assert resp.status_code == 403
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="Requires cross-request session persistence — test fixture rolls back between API calls")
-async def test_idx_feed_crud_pro(async_client, test_engine):
-    """Pro users can create, list, and delete 1 IDX feed."""
-    token, _ = await _register(async_client, test_engine, plan="pro")
-
-    # Create
-    resp = await async_client.post(
-        "/settings/idx-feed",
-        json={"name": "Test MLS", "base_url": "https://api.testmls.com", "api_key": "test-key-123"},
-        headers=_auth(token),
-    )
-    assert resp.status_code == 201
-    feed = resp.json()
-    assert feed["name"] == "Test MLS"
-    assert feed["status"] == "active"
-    feed_id = feed["id"]
-
-    # List
-    resp = await async_client.get("/settings/idx-feed", headers=_auth(token))
-    assert resp.status_code == 200
-    assert len(resp.json()) >= 1
-
-    # Pro: second feed should fail
-    resp = await async_client.post(
-        "/settings/idx-feed",
-        json={"name": "Second MLS", "base_url": "https://api.other.com", "api_key": "key2"},
-        headers=_auth(token),
-    )
-    assert resp.status_code == 409
-
-    # Delete
-    resp = await async_client.delete(f"/settings/idx-feed/{feed_id}", headers=_auth(token))
-    assert resp.status_code == 204
-
-
-@pytest.mark.asyncio
-async def test_idx_feed_starter_blocked(async_client, test_engine):
-    """Starter plan cannot create IDX feeds."""
-    token, _ = await _register(async_client, test_engine, plan="starter")
-    resp = await async_client.post(
-        "/settings/idx-feed",
-        json={"name": "MLS", "base_url": "https://api.mls.com", "api_key": "key"},
         headers=_auth(token),
     )
     assert resp.status_code == 403

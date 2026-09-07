@@ -87,9 +87,7 @@ async def register(body: RegisterRequest, request: Request, _rl=Depends(rate_lim
     await db.commit()
     await db.refresh(user)
 
-    # Send welcome drip email #1 (fire-and-forget)
-    # Full drip sequence: welcome_drip_1 (now), _2 (day 1), _3 (day 3), _4 (day 5), _5 (day 10)
-    # Subsequent drips are triggered by a scheduled task (see services/drip_scheduler.py)
+    # Send welcome email (fire-and-forget)
     try:
         from listingjet.services.email import get_email_service
         email_svc = get_email_service()

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useBranding } from "@/contexts/branding-context";
+import { useFeature } from "@/hooks/use-features";
 
 export function Nav() {
   const { user, logout } = useAuth();
@@ -15,6 +16,8 @@ export function Nav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const performanceIntelligenceEnabled = useFeature("performance_intelligence");
+  const healthScoreEnabled = useFeature("health_score");
 
   const linkClass = (href: string) => {
     const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -56,8 +59,8 @@ export function Nav() {
           {user && <Link href="/dashboard" className={linkClass("/dashboard")}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass("/listings")}>Listings</Link>}
           {user && <Link href="/analytics" className={linkClass("/analytics")}>Analytics</Link>}
-          {user && <Link href="/analytics/performance" className={linkClass("/analytics/performance")}>Performance</Link>}
-          {user && <Link href="/health" className={linkClass("/health")}>Health</Link>}
+          {user && performanceIntelligenceEnabled && <Link href="/analytics/performance" className={linkClass("/analytics/performance")}>Performance</Link>}
+          {user && healthScoreEnabled && <Link href="/health" className={linkClass("/health")}>Health</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass("/review")}>Review</Link>
           )}
@@ -94,7 +97,7 @@ export function Nav() {
           {user && <Link href="/dashboard" className={linkClass("/dashboard")} onClick={() => setMenuOpen(false)}>Dashboard</Link>}
           {user && <Link href="/listings" className={linkClass("/listings")} onClick={() => setMenuOpen(false)}>Listings</Link>}
           {user && <Link href="/analytics" className={linkClass("/analytics")} onClick={() => setMenuOpen(false)}>Analytics</Link>}
-          {user && <Link href="/health" className={linkClass("/health")} onClick={() => setMenuOpen(false)}>Health</Link>}
+          {user && healthScoreEnabled && <Link href="/health" className={linkClass("/health")} onClick={() => setMenuOpen(false)}>Health</Link>}
           {user && (user.role === "admin" || user.role === "superadmin") && (
             <Link href="/review" className={linkClass("/review")} onClick={() => setMenuOpen(false)}>Review</Link>
           )}

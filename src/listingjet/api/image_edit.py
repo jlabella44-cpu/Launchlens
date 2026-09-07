@@ -182,6 +182,7 @@ async def auto_fix_compliance(
     """
     from listingjet.agents.base import AgentContext
     from listingjet.agents.photo_compliance import PhotoComplianceAgent
+    from listingjet.database import admin_session
 
     listing = (await db.execute(
         select(Listing).where(Listing.id == listing_id, Listing.tenant_id == current_user.tenant_id)
@@ -190,7 +191,7 @@ async def auto_fix_compliance(
         raise HTTPException(status_code=404, detail="Listing not found")
 
     # Run compliance check first
-    compliance_agent = PhotoComplianceAgent()
+    compliance_agent = PhotoComplianceAgent(session_factory=admin_session)
     ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(current_user.tenant_id))
     report = await compliance_agent.execute(ctx)
 

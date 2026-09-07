@@ -10,7 +10,7 @@ occupied the window and nothing was ever claimable.
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.pipeline_job import JobStatus, PipelineJob
@@ -92,6 +92,70 @@ async def test_listings_parked_at_review_do_not_starve_the_queue(db_session):
     # The other three are still parked, untouched.
     for listing in listings[:3]:
         assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
+
+
+@pytest.mark.asyncio
+async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_claim(db_session):
+    """Regression at scale: with CLAIM_CANDIDATE_LIMIT=500 and 11 unsatisfiable
+    post-approval rows per parked listing (content, brand, social_content,
+    social_cuts, mls_export, distribution, microsite, learning, social_event,
+    health_score, performance_intelligence — all QUEUED with every test
+    feature flag on), 50 parked listings alone fill the whole candidate window
+    (550 rows) with rows that can never run until a human approves them. A
+    fresh listing's `ingestion` row must still be claimable on the very first
+    `claim_next` call, not merely "eventually"."""
+    factory = make_session_factory(db_session)
+    listings = [await _listing(db_session, f"{i} Parked Ave") for i in range(50)]
+
+    # Drain everything runnable: every listing walks up to its review gate,
+    # leaving ~12 unsatisfiable post-approval rows per listing at the head of
+    # the candidate scan.
+    drained = 0
+    while (job := await runner.claim_next(db_session, "w1")) is not None:
+        await runner.run_job(factory, job.id, functions=FUNCTIONS)
+        drained += 1
+        assert drained < 2000, "drain did not terminate"
+    for listing in listings:
+        assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
+
+    fresh = await _listing(db_session, "fresh listing")
+    job = await runner.claim_next(db_session, "w1")
+    assert job is not None, "queue deadlocked behind 50 listings parked at the review gate"
+    assert (job.listing_id, job.step) == (fresh.id, "ingestion")
+
+
+@pytest.mark.asyncio
+async def test_pre_review_steps_remain_claimable_for_a_parked_listing(db_session):
+    """`post_review_steps` must only capture steps that transitively require
+    `await_review`. `photo_compliance` and `video` hang directly off
+    `packaging` (not `await_review`), so they must stay claimable even while
+    the listing's `await_review` row sits WAITING right alongside them —
+    the exclusion in `claim_next` must not sweep them in too."""
+    listing = await _listing(db_session, "1 Pending Ave")
+    # Mark every step through packaging DONE directly (skip actually running
+    # them), leaving photo_compliance and video exactly as enqueue_pipeline
+    # created them — QUEUED — alongside await_review, which enqueue_pipeline
+    # always creates as WAITING for a gate="review" step.
+    await db_session.execute(
+        update(PipelineJob)
+        .where(PipelineJob.listing_id == listing.id,
+               PipelineJob.step.in_(["ingestion", "vision_tier1", "property_verification",
+                                      "vision_tier2", "coverage", "virtual_staging",
+                                      "floorplan", "dollhouse_render", "packaging"]))
+        .values(status=JobStatus.DONE)
+    )
+    await db_session.commit()
+    assert await _status(db_session, listing.id, "await_review") == JobStatus.WAITING
+    assert await _status(db_session, listing.id, "photo_compliance") == JobStatus.QUEUED
+    assert await _status(db_session, listing.id, "video") == JobStatus.QUEUED
+
+    claimed_steps = set()
+    for _ in range(2):
+        job = await runner.claim_next(db_session, "w1")
+        assert job is not None, "photo_compliance/video wrongly excluded for a parked listing"
+        assert job.listing_id == listing.id
+        claimed_steps.add(job.step)
+    assert claimed_steps == {"photo_compliance", "video"}
 
 
 @pytest.mark.asyncio

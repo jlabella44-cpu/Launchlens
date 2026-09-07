@@ -165,9 +165,9 @@ class VisionAgent(BaseAgent):
         return {"tier1_count": tier1_count, "tier2_count": tier2_count}
 
     async def run_tier2(self, context: AgentContext) -> int:
-        """Run Qwen 3.6 Plus (or GPT-4V fallback) on top hero candidates from Tier 1."""
+        """Run OpenAI Vision (GPT-4V) on top hero candidates from Tier 1."""
         count = await self._run_tier2_inner(context)
-        record_cost(self.agent_name, "qwen_vision", count)
+        record_cost(self.agent_name, "openai_gpt4v", count)
         return count
 
     async def _run_tier2_inner(self, context) -> int:

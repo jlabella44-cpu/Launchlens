@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from listingjet.services.metrics import StepTimer
-from listingjet.telemetry import agent_span
 
 
 def strip_markdown_fences(text: str) -> str:
@@ -77,16 +76,10 @@ class BaseAgent(ABC):
     async def execute(self, context: AgentContext): ...
 
     async def instrumented_execute(self, context: AgentContext) -> dict:
-        """Wrap execute() with OpenTelemetry tracing and step metrics."""
-        async with agent_span(self.agent_name, context.listing_id, context.tenant_id) as span:
-            with StepTimer(self.agent_name):
-                await self._check_ai_consent(context)
-                result = await self.execute(context)
-                if span and isinstance(result, dict):
-                    for key, value in result.items():
-                        if isinstance(value, (int, float, bool, str)):
-                            span.set_attribute(f"result.{key}", value)
-                return result
+        """Wrap execute() with step metrics."""
+        with StepTimer(self.agent_name):
+            await self._check_ai_consent(context)
+            return await self.execute(context)
 
     async def handle_failure(self, error: Exception, context: "AgentContext", session=None) -> None:
         """

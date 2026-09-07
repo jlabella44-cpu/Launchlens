@@ -15,7 +15,6 @@ from listingjet.api.schemas.listings import (
 from listingjet.database import get_db
 from listingjet.models.addon_purchase import AddonPurchase
 from listingjet.models.asset import Asset
-from listingjet.models.cma_report import CMAReport
 from listingjet.models.dollhouse_scene import DollhouseScene
 from listingjet.models.event import Event
 from listingjet.models.health_score_history import HealthScoreHistory
@@ -318,7 +317,6 @@ async def delete_listing(
         PerformanceEvent,
         ListingMicrosite,
         PropertyData,
-        CMAReport,
         DollhouseScene,
         ImportJob,
         AddonPurchase,

@@ -14,7 +14,7 @@
 #
 # Exit 0 on all green; exit 1 at first failure.
 # Designed for CI hook after deploy.yml, or operator run after a manual
-# cdk deploy.
+# Render deploy.
 
 set -euo pipefail
 

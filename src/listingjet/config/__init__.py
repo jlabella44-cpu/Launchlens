@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"  # comma-separated allowed origins
+    # Comma-separated deferred features to enable; see listingjet.features
+    features: str = ""
     # Reverse proxies in front of the app. Defaults to 0 (fail closed: ignores
     # X-Forwarded-For). Render needs 1; render.yaml sets TRUSTED_PROXY_COUNT=1.
     trusted_proxy_count: int = 0
@@ -89,9 +91,6 @@ class Settings(BaseSettings):
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
 
-    # CloudWatch metrics — opt-in. Set true on AWS deploys; off everywhere else.
-    cloudwatch_enabled: bool = False
-
     # Monitoring
     sentry_dsn: str = ""
     git_sha: str = ""
@@ -100,37 +99,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_vision_api_key: str = ""
-    qwen_api_key: str = ""
-    gemini_api_key: str = ""
     use_mock_providers: bool = False
-
-    # LLM / Vision provider routing (values: "claude", "qwen", "gemma")
-    llm_provider: str = "claude"
-    vision_provider_tier1: str = "google"  # "google" | "gemma" | "qwen"
-    vision_provider_tier2: str = "openai"  # "openai" | "qwen" | "gemma"
-    # Per-agent overrides, JSON: {"llm": {"floorplan": "qwen"}, "vision": {"photo_compliance": "gemma"}}
-    agent_model_routing: str = ""
-    # Per-tenant overrides, JSON: {"<tenant_uuid>": {"llm": "claude"}}
-    tenant_model_routing: str = ""
-    # Enable fallback chain: try primary provider, fall back to Claude on failure
-    llm_fallback_enabled: bool = False
-    # Self-host / alt endpoint for Gemma (e.g. http://localhost:11434/v1 for Ollama)
-    gemma_base_url: str = ""
-    gemma_model: str = "gemma-4-31b-it"
-    # Qwen DashScope context caching (discounts repeated system prompts)
-    qwen_enable_cache: bool = False
 
     # Google OAuth
     google_oauth_client_id: str = ""
 
-    # OpenTelemetry
-    otel_exporter_endpoint: str = ""  # Empty = disabled
-
-    # RESO MLS
-    reso_api_url: str = ""
-    reso_api_key: str = ""
-
-    # Field-level encryption (Fernet key for IDX API keys, etc.)
+    # Field-level encryption (Fernet key for tenant secrets, etc.)
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     field_encryption_key: str = ""
 
@@ -174,10 +148,6 @@ class Settings(BaseSettings):
     canva_redirect_uri: str = "https://api.listingjet.ai/auth/canva/callback"
     canva_frontend_redirect: str = "https://listingjet.ai/settings/brand-kit"
 
-    # ElevenLabs (voiceover)
-    elevenlabs_api_key: str = ""
-    elevenlabs_voice_id: str = ""
-
     # Email / Notifications
     smtp_host: str = ""
     smtp_port: int = 587
@@ -199,14 +169,6 @@ class Settings(BaseSettings):
     walk_score_api_key: str = ""
     property_lookup_cache_ttl: int = 86400  # 24h
     property_verification_enabled: bool = True
-    scraper_rate_limit_seconds: int = 5
-
-    # Repliers (MLS data aggregator — https://docs.repliers.io)
-    # Used for real CMA comparables; falls back to synthetic data when unset.
-    repliers_api_key: str = ""
-    repliers_api_base: str = "https://api.repliers.io"
-    repliers_cma_enabled: bool = False
-    repliers_timeout_seconds: int = 10
 
 
 settings = Settings()

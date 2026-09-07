@@ -11,6 +11,7 @@ import { TimelineChart } from "@/components/analytics/timeline-chart";
 import { StateBreakdown } from "@/components/analytics/state-breakdown";
 import { CreditHistory } from "@/components/analytics/credit-history";
 import { PerformanceIntelligence } from "@/components/analytics/performance-intelligence";
+import { useFeature } from "@/hooks/use-features";
 import apiClient from "@/lib/api-client";
 import type {
   AnalyticsOverview,
@@ -27,6 +28,7 @@ function AnalyticsContent() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
   const [tab, setTab] = useState<Tab>("overview");
+  const performanceIntelligenceEnabled = useFeature("performance_intelligence");
 
   useEffect(() => {
     async function fetchAll() {
@@ -104,7 +106,7 @@ function AnalyticsContent() {
         <div className="flex gap-1 p-1 bg-white/5 rounded-lg w-fit">
           {([
             { key: "overview" as Tab, label: "Overview" },
-            { key: "performance" as Tab, label: "Performance" },
+            ...(performanceIntelligenceEnabled ? [{ key: "performance" as Tab, label: "Performance" }] : []),
           ]).map((t) => (
             <button
               key={t.key}
@@ -120,7 +122,7 @@ function AnalyticsContent() {
           ))}
         </div>
 
-        {tab === "performance" ? (
+        {tab === "performance" && performanceIntelligenceEnabled ? (
           <PerformanceIntelligence />
         ) : overview?.total_listings === 0 ? (
           <GlassCard tilt={false}>

@@ -110,3 +110,16 @@ def test_is_satisfied_rules():
         assert runner.is_satisfied(PipelineJob(step="y", status=status), req) is expected
     assert runner.is_satisfied(PipelineJob(step="x", status=JobStatus.FAILED), step) is True
     assert runner.is_satisfied(PipelineJob(step="y", status=JobStatus.FAILED), req) is False
+
+
+@pytest.mark.asyncio
+async def test_feature_gate_skips_step_when_flag_off(db_session):
+    from unittest.mock import patch
+
+    from listingjet import features
+    listing = await _listing(db_session)
+    steps = [Step("a"), Step("m", requires=("a",), optional=True, gate="feature:microsite")]
+    with patch.object(features.settings, "features", ""):
+        await runner.enqueue_pipeline(db_session, listing, billing_model="legacy", enabled_addons=[], steps=steps)
+    jobs = await _jobs(db_session, listing.id)
+    assert jobs["m"].status == JobStatus.SKIPPED
