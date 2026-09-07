@@ -20,7 +20,7 @@ def _captions(raw: str) -> dict[str, str]:
     except (TypeError, ValueError):
         return {"storyteller": raw} if raw else {}
     if isinstance(hooks, list):
-        return {h["style"]: h["caption"] for h in hooks if isinstance(h, dict) and h.get("style")}
+        return {h["style"]: h.get("caption", "") for h in hooks if isinstance(h, dict) and h.get("style")}
     return {"storyteller": raw}
 
 

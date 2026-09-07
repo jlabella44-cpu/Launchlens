@@ -1,10 +1,12 @@
 import json
 
+import pydantic
 import pytest
 from sqlalchemy import select
 
 from listingjet.agents.base import AgentContext
 from listingjet.agents.content_social import (
+    _TONE_SYSTEM_PROMPTS,
     ContentSocial,
     ContentSocialAgent,
     FacebookCopy,
@@ -201,3 +203,60 @@ def test_tone_to_config():
     assert _tone_to_config(20) == "utility"
     assert _tone_to_config(50) == "balanced"
     assert _tone_to_config(90) == "high_flair"
+
+
+def test_hook_style_rejects_invalid_value():
+    with pytest.raises(pydantic.ValidationError):
+        Hook(style="bogus", caption="x")
+
+
+def test_content_social_schema_enumerates_hook_styles():
+    schema = ContentSocial.model_json_schema()
+    defs = schema.get("$defs", schema.get("definitions", {}))
+    hook_schema = defs["Hook"]
+    style_schema = hook_schema["properties"]["style"]
+    # Literal fields may show up as an inline enum or via $ref to an enum def.
+    if "enum" in style_schema:
+        enum_values = style_schema["enum"]
+    else:
+        ref = style_schema["$ref"].split("/")[-1]
+        enum_values = defs[ref]["enum"]
+    assert set(enum_values) == set(STYLES)
+
+
+@pytest.mark.asyncio
+async def test_metadata_coerces_null_language_and_bad_tone_intensity(db_session, listing, assets):
+    listing.metadata_ = {**(listing.metadata_ or {}), "language": None, "tone_intensity": "loud"}
+    await db_session.flush()
+    mock = MockClaudeClient()
+    mock.responses[ContentSocial] = [_copy()]
+    seen = {}
+    orig = mock.complete_json
+
+    async def spy(prompt, schema, **kw):
+        seen["system"] = kw.get("system")
+        return await orig(prompt, schema, **kw)
+
+    mock.complete_json = spy
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await _agent(db_session, mock).execute(ctx)
+
+    assert result["language"] == "en"
+    assert seen["system"] == _TONE_SYSTEM_PROMPTS["balanced"]
+
+
+@pytest.mark.asyncio
+async def test_cta_truncated_to_500_chars_on_save(db_session, listing, assets):
+    long_cta = "x" * 600
+    copy = _copy()
+    copy.instagram.cta = long_cta
+    mock = MockClaudeClient()
+    mock.responses[ContentSocial] = [copy]
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    await _agent(db_session, mock).execute(ctx)
+
+    row = (await db_session.execute(
+        select(SocialContent).where(SocialContent.listing_id == listing.id, SocialContent.platform == "instagram")
+    )).scalars().first()
+    assert len(row.cta) == 500
+    assert row.cta == long_cta[:500]

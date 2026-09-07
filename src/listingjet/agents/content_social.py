@@ -1,6 +1,7 @@
 """Listing copy and social captions in one Sonnet 5 call."""
 import json
 import logging
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
@@ -23,12 +24,13 @@ from .base import AgentContext, BaseAgent
 
 logger = logging.getLogger(__name__)
 
-HOOK_STYLES = ("storyteller", "data_driven", "luxury_minimalist", "urgency", "lifestyle")
+HookStyle = Literal["storyteller", "data_driven", "luxury_minimalist", "urgency", "lifestyle"]
+HOOK_STYLES = get_args(HookStyle)
 PLATFORMS = ["instagram", "facebook", "tiktok"]
 
 
 class Hook(BaseModel):
-    style: str = Field(description="one of: " + ", ".join(HOOK_STYLES))
+    style: HookStyle = Field(description="one of: " + ", ".join(HOOK_STYLES))
     caption: str = ""
 
 
@@ -189,7 +191,9 @@ class ContentSocialAgent(BaseAgent):
             )).scalar_one_or_none()
             voice_samples = list((brand_kit.voice_samples or [])[:3]) if brand_kit else []
 
-            language = meta.get("language", "en")
+            language = meta.get("language") or "en"
+            if not isinstance(language, str):
+                language = "en"
             if language == "en":
                 tenant = await session.get(Tenant, tenant_id)
                 if tenant and tenant.preferred_language and tenant.preferred_language != "en":
@@ -215,7 +219,11 @@ class ContentSocialAgent(BaseAgent):
             f"Write ALL text in {lang_name.upper()}. Do not include any English text."
             if language != "en" else ""
         )
-        system = _TONE_SYSTEM_PROMPTS[_tone_to_config(int(meta.get("tone_intensity", 50)))]
+        try:
+            tone_intensity = int(meta.get("tone_intensity", 50))
+        except (TypeError, ValueError):
+            tone_intensity = 50
+        system = _TONE_SYSTEM_PROMPTS[_tone_to_config(tone_intensity)]
         prompt = _PROMPT.format(
             fha_rules=_FHA_RULES,
             language_instruction=language_instruction,
@@ -243,18 +251,20 @@ class ContentSocialAgent(BaseAgent):
             fha_passed = result.passed
 
         # ---- save ----
+        ig_cta = copy.instagram.cta[:500] if copy.instagram.cta else copy.instagram.cta
+        fb_cta = copy.facebook.cta[:500] if copy.facebook.cta else copy.facebook.cta
         async with self.session_scope(context) as (session, listing_id, tenant_id):
             await session.execute(delete(SocialContent).where(SocialContent.listing_id == listing_id))
             session.add_all([
                 SocialContent(
                     listing_id=listing_id, tenant_id=tenant_id, platform="instagram",
                     caption=json.dumps([h.model_dump() for h in copy.instagram.hooks]),
-                    hashtags=copy.instagram.hashtags, cta=copy.instagram.cta,
+                    hashtags=copy.instagram.hashtags, cta=ig_cta,
                 ),
                 SocialContent(
                     listing_id=listing_id, tenant_id=tenant_id, platform="facebook",
                     caption=json.dumps([h.model_dump() for h in copy.facebook.hooks]),
-                    hashtags=None, cta=copy.facebook.cta,
+                    hashtags=None, cta=fb_cta,
                 ),
                 SocialContent(
                     listing_id=listing_id, tenant_id=tenant_id, platform="tiktok",

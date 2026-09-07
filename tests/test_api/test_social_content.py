@@ -136,3 +136,24 @@ async def test_social_content_legacy_plain_text_caption(async_client: AsyncClien
     assert resp.status_code == 200
     body = resp.json()
     assert body["instagram_captions"] == {"storyteller": "A plain legacy caption, not JSON."}
+
+
+@pytest.mark.asyncio
+async def test_social_content_legacy_hook_missing_caption(async_client: AsyncClient, db_session):
+    token, tenant_id = await _register(async_client)
+    listing_id = await _create_listing(async_client, token)
+
+    db_session.add(SocialContent(
+        tenant_id=tenant_id,
+        listing_id=listing_id,
+        platform="instagram",
+        caption=json.dumps([{"style": "storyteller"}]),
+        hashtags=None,
+        cta=None,
+    ))
+    await db_session.commit()
+
+    resp = await async_client.get(f"/listings/{listing_id}/social-content", headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["instagram_captions"] == {"storyteller": ""}
