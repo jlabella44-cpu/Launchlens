@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from listingjet.agents.base import AgentContext
-from listingjet.agents.video_ai import VideoAIAgent
+from listingjet.agents.video_ai import TRANSITION_S, VideoAIAgent
 from listingjet.config import settings
 from listingjet.models.asset import Asset
 from listingjet.models.brand_kit import BrandKit
@@ -15,7 +15,7 @@ from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers.mock import MockRunwayClient
 from listingjet.providers.runway import RunwayError
-from listingjet.services.video_stitcher import probe_size
+from listingjet.services.video_stitcher import probe_duration, probe_size
 from tests.test_agents.conftest import make_session_factory
 from tests.test_agents.test_video_baseline import make_storage_mock
 
@@ -217,6 +217,48 @@ async def test_expired_output_url_falls_back_to_ken_burns(ffmpeg_available, db_s
 
 @pytest.mark.ffmpeg
 @pytest.mark.asyncio
+async def test_corrupt_clip_falls_back_to_ken_burns(ffmpeg_available, db_session):
+    """A downloaded clip that ffprobe can't read (corrupt/unplayable, not a
+    dead URL) must degrade that shot to Ken Burns instead of blowing up the
+    whole run — see the widened except in `_render_shot`."""
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    runway = MockRunwayClient()
+    real_download = runway.download
+
+    async def bad_download(url):
+        # the exterior is submitted first, so it holds mock-task-1
+        if url.endswith("mock-task-1"):
+            return b"not an mp4"
+        return await real_download(url)
+
+    runway.download = bad_download
+
+    storage = make_storage_mock()
+    agent = VideoAIAgent(
+        runway=runway, storage=storage,
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["status"] == "ready"
+    assert result["runway_clips"] == 1
+    assert result["fallback_clips"] == 1
+
+    row = (await db_session.execute(
+        select(VideoAsset).where(VideoAsset.listing_id == listing.id)
+    )).scalars().one()
+    clips = row.metadata_["clips"]
+    assert clips[0]["source"] == "ken_burns"
+    assert clips[1]["source"] == "runway"
+
+
+@pytest.mark.ffmpeg
+@pytest.mark.asyncio
 async def test_endcard_uses_tenant_brand_kit(ffmpeg_available, db_session, monkeypatch):
     """The paid tier must brand its end card, not fall back to the neutral default."""
     import listingjet.agents.video_ai as video_ai_module
@@ -246,6 +288,48 @@ async def test_endcard_uses_tenant_brand_kit(ffmpeg_available, db_session, monke
     spy.assert_called_once_with(
         brokerage_name="Acme Realty", agent_name="Jane Doe", primary_color="#FF00AA",
     )
+
+
+@pytest.mark.ffmpeg
+@pytest.mark.asyncio
+async def test_blank_endcard_skips_concat(ffmpeg_available, db_session, monkeypatch):
+    """`generate_endcard` returning b"" (e.g. font/rendering failure) must not
+    be handed to ffmpeg — the tour should ship as the shots reel alone,
+    mirroring `video_baseline.build_tour`'s `if endcard_png` guard."""
+    import listingjet.agents.video_ai as video_ai_module
+
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    monkeypatch.setattr(video_ai_module, "generate_endcard", lambda **kwargs: b"")
+
+    runway = MockRunwayClient()
+    storage = make_storage_mock()
+    agent = VideoAIAgent(
+        runway=runway, storage=storage,
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["status"] == "ready"
+
+    import os
+    import tempfile
+
+    video_bytes = storage.uploads[result["s3_key"]]
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "out.mp4")
+        with open(p, "wb") as f:
+            f.write(video_bytes)
+        duration = probe_duration(p)
+
+    # 2 runway clips (6s exterior on veo3.1_fast / gen4_turbo interior 5s, but
+    # MockRunwayClient always returns a 2s clip) crossfaded, no end card added.
+    expected_duration = 2 * 2.0 - TRANSITION_S
+    assert abs(duration - expected_duration) < 0.3
 
 
 @pytest.mark.ffmpeg
@@ -283,6 +367,62 @@ async def test_failed_shot_falls_back_to_ken_burns(ffmpeg_available, db_session)
     assert result["cost_usd"] == pytest.approx(5 * VIDEO_SECOND_RATES[settings.runway_interior_model])
 
 
+@pytest.mark.ffmpeg
+@pytest.mark.asyncio
+async def test_injected_runway_client_is_not_closed(ffmpeg_available, db_session):
+    """An injected client is owned by its caller — the agent must not close
+    it out from under them."""
+    from unittest.mock import AsyncMock
+
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    runway = MockRunwayClient()
+    runway.aclose = AsyncMock()
+    storage = make_storage_mock()
+    agent = VideoAIAgent(
+        runway=runway, storage=storage,
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["status"] == "ready"
+    runway.aclose.assert_not_called()
+
+
+@pytest.mark.ffmpeg
+@pytest.mark.asyncio
+async def test_self_constructed_runway_client_is_closed(ffmpeg_available, db_session, monkeypatch):
+    """When the agent builds its own Runway client (no injection), it must
+    close it after `execute` — whether or not the run succeeded."""
+    from unittest.mock import AsyncMock
+
+    import listingjet.agents.video_ai as video_ai_module
+
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    built_client = MockRunwayClient()
+    built_client.aclose = AsyncMock(wraps=built_client.aclose)
+    monkeypatch.setattr(video_ai_module, "get_runway", lambda: built_client)
+
+    storage = make_storage_mock()
+    agent = VideoAIAgent(
+        storage=storage,
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["status"] == "ready"
+    built_client.aclose.assert_called_once()
+
+
 @pytest.mark.asyncio
 async def test_unhandled_render_error_propagates(db_session, monkeypatch):
     """`_render_shot` swallows the failures it knows how to degrade (Ken
@@ -313,11 +453,13 @@ async def test_unhandled_render_error_propagates(db_session, monkeypatch):
 
 @pytest.mark.ffmpeg
 @pytest.mark.asyncio
-async def test_resume_polls_existing_tasks(ffmpeg_available, db_session):
+async def test_resume_polls_existing_tasks(ffmpeg_available, db_session, monkeypatch):
+    import listingjet.agents.video_ai as video_ai_module
+
     listing = await _make_listing(db_session)
     asset_a = await _package_asset(db_session, listing, 0, room="exterior")
-    await _package_asset(db_session, listing, 1, room="kitchen")
-    await _package_asset(db_session, listing, 2, room="primary_bedroom")
+    asset_b = await _package_asset(db_session, listing, 1, room="kitchen")
+    asset_c = await _package_asset(db_session, listing, 2, room="primary_bedroom")
 
     db_session.add(VideoAsset(
         tenant_id=listing.tenant_id, listing_id=listing.id,
@@ -328,6 +470,27 @@ async def test_resume_polls_existing_tasks(ffmpeg_available, db_session):
     await db_session.flush()
 
     runway = MockRunwayClient()
+    # asset_a's task id ("mock-task-99") was never actually submitted through
+    # this runway instance, so route its polling to the same resolved task.
+    real_get_task = runway.get_task
+
+    async def get_task(task_id):
+        if task_id == "mock-task-99":
+            return {"status": "SUCCEEDED", "output": ["mock://clip/mock-task-99"]}
+        return await real_get_task(task_id)
+
+    runway.get_task = get_task
+
+    from listingjet.services.metrics import record_video_seconds as real_record_video_seconds
+
+    recorded_calls = []
+
+    def spy_record_video_seconds(model, billed_s, agent_name):
+        recorded_calls.append((model, billed_s))
+        return real_record_video_seconds(model, billed_s, agent_name)
+
+    monkeypatch.setattr(video_ai_module, "record_video_seconds", spy_record_video_seconds)
+
     storage = make_storage_mock()
     agent = VideoAIAgent(
         runway=runway, storage=storage,
@@ -341,11 +504,17 @@ async def test_resume_polls_existing_tasks(ffmpeg_available, db_session):
     assert len(runway.submitted) == 2  # asset_a was NOT resubmitted
     assert all(s["model"] == settings.runway_interior_model for s in runway.submitted)
 
+    # Cost is only recorded for the two newly-submitted shots (asset_b,
+    # asset_c) — asset_a resumed from a prior run and must not be re-billed.
+    assert len(recorded_calls) == 2
+    assert all(model == settings.runway_interior_model for model, _ in recorded_calls)
+
     row = (await db_session.execute(
         select(VideoAsset).where(VideoAsset.listing_id == listing.id)
     )).scalars().one()
     assert row.metadata_["runway_tasks"][str(asset_a.id)] == "mock-task-99"
     assert len(row.metadata_["runway_tasks"]) == 3
+    assert {str(asset_b.id), str(asset_c.id)} <= set(row.metadata_["runway_tasks"])
 
 
 @pytest.mark.asyncio
@@ -356,8 +525,12 @@ async def test_task_ids_persisted_before_polling(db_session):
 
     runway = MockRunwayClient()
 
+    # LookupError, not RuntimeError: `_render_shot`'s except clause now also
+    # catches RuntimeError (surfaced ffmpeg/ffprobe failures, see change 3),
+    # so this simulated crash must use a type outside that degrade path to
+    # keep testing "an unhandled polling failure still propagates".
     async def _boom(task_id, *, timeout_s=900.0, poll_s=5.0):
-        raise RuntimeError("polling exploded")
+        raise LookupError("polling exploded")
 
     runway.wait = _boom
 
@@ -369,7 +542,7 @@ async def test_task_ids_persisted_before_polling(db_session):
     )
     ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
 
-    with pytest.raises(RuntimeError, match="polling exploded"):
+    with pytest.raises(LookupError, match="polling exploded"):
         await agent.execute(ctx)
 
     row = (await db_session.execute(

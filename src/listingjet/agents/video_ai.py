@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import subprocess
 import tempfile
 from dataclasses import dataclass
 
@@ -105,6 +106,7 @@ class VideoAIAgent(BaseAgent):
         width: int = 1920,
         height: int = 1080,
     ):
+        self._owns_runway = runway is None
         self._runway = runway or get_runway()
         self._storage = storage or get_storage()
         self._stitcher = stitcher or VideoStitcher()
@@ -157,6 +159,13 @@ class VideoAIAgent(BaseAgent):
     # ------------------------------------------------------------------ #
 
     async def execute(self, context: AgentContext) -> dict:
+        try:
+            return await self._execute(context)
+        finally:
+            if self._owns_runway and hasattr(self._runway, "aclose"):
+                await self._runway.aclose()
+
+    async def _execute(self, context: AgentContext) -> dict:
         async with self.session_scope(context) as (session, listing_id, tenant_id):
             listing = await session.get(Listing, listing_id)
             if not listing:
@@ -191,12 +200,14 @@ class VideoAIAgent(BaseAgent):
 
         # --- submit anything we don't already have a task id for -------- #
         tasks: dict[str, str] = {}
+        resumed_asset_ids: set[str] = set()
         submitted_new = False
         for shot in shots:
             asset_id = str(shot.asset.id)
             resumed = known_tasks.get(asset_id)
             if resumed:
                 tasks[asset_id] = resumed
+                resumed_asset_ids.add(asset_id)
                 continue
             model, duration, audio = self.model_for(shot.kind)
             key = shot.asset.proxy_path or shot.asset.file_path
@@ -234,8 +245,8 @@ class VideoAIAgent(BaseAgent):
                     raise outcome
 
             cost_usd = 0.0
-            for clip in rendered:
-                if clip["source"] == "runway":
+            for shot, clip in zip(shots, rendered):
+                if clip["source"] == "runway" and str(shot.asset.id) not in resumed_asset_ids:
                     cost_usd += record_video_seconds(
                         clip["model"], clip["billed_s"], self.agent_name,
                     )
@@ -351,7 +362,7 @@ class VideoAIAgent(BaseAgent):
                 "path": out_path, "duration_s": actual_s, "billed_s": float(duration),
                 "source": "runway", "model": model,
             }
-        except (RunwayError, asyncio.TimeoutError) as exc:
+        except (RunwayError, asyncio.TimeoutError, subprocess.CalledProcessError, RuntimeError, OSError) as exc:
             logger.warning(
                 "Runway shot failed for asset %s (task %s): %s — falling back to Ken Burns",
                 shot.asset.id, task_id, exc,
@@ -386,12 +397,16 @@ class VideoAIAgent(BaseAgent):
             height=self._height,
         )
 
+        png = generate_endcard(**brand)
+        if not png:
+            return shots_bytes
+
         shots_path = os.path.join(tmpdir, "shots.mp4")
         with open(shots_path, "wb") as f:
             f.write(shots_bytes)
         endcard_path = os.path.join(tmpdir, "endcard.mp4")
         endcard_clip(
-            generate_endcard(**brand), endcard_path,
+            png, endcard_path,
             duration_s=ENDCARD_DURATION, width=self._width, height=self._height,
         )
         return self._stitcher.stitch(

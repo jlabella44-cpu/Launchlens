@@ -30,22 +30,35 @@ def _run(cmd: list[str]) -> None:
         raise RuntimeError(f"ffmpeg failed ({proc.returncode}): {proc.stderr.decode(errors='replace')[-2000:]}")
 
 
+def _run_probe(cmd: list[str]) -> bytes:
+    """Run an ffprobe command, returning stdout on success.
+
+    On failure, raise `RuntimeError` carrying the last 2000 chars of stderr
+    (mentioning ffprobe) instead of letting a raw `CalledProcessError` (whose
+    message doesn't include stderr) escape.
+    """
+    proc = subprocess.run(cmd, capture_output=True)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"ffprobe failed ({proc.returncode}): {proc.stderr.decode(errors='replace')[-2000:]}"
+        )
+    return proc.stdout
+
+
 def probe_duration(path: str) -> float:
-    proc = subprocess.run(
+    stdout = _run_probe(
         [ffprobe_cmd(), "-v", "error", "-show_entries", "format=duration", "-of", "json", path],
-        capture_output=True, check=True,
     )
-    return float(json.loads(proc.stdout)["format"]["duration"])
+    return float(json.loads(stdout)["format"]["duration"])
 
 
 def probe_size(path: str) -> tuple[int, int]:
     """Return the (width, height) of a video file's first video stream."""
-    proc = subprocess.run(
+    stdout = _run_probe(
         [ffprobe_cmd(), "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=width,height", "-of", "json", path],
-        capture_output=True, check=True,
     )
-    stream = json.loads(proc.stdout)["streams"][0]
+    stream = json.loads(stdout)["streams"][0]
     return int(stream["width"]), int(stream["height"])
 
 
@@ -161,7 +174,7 @@ class VideoStitcher:
 
             cmd.extend([output_path])
 
-            subprocess.run(cmd, capture_output=True, check=True)
+            _run(cmd)
 
             with open(output_path, "rb") as f:
                 return f.read()
@@ -216,14 +229,14 @@ class VideoStitcher:
             normalized = []
             for i, clip in enumerate(clip_paths):
                 norm_path = os.path.join(tmpdir, f"norm_{i}.mp4")
-                subprocess.run([
+                _run([
                     ffmpeg_cmd(), "-y", "-i", clip,
                     "-vf", f"scale={output_width}:{output_height}:force_original_aspect_ratio=decrease,"
                            f"pad={output_width}:{output_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
                     "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                     "-pix_fmt", "yuv420p", "-an",
                     norm_path,
-                ], capture_output=True, check=True)
+                ])
                 normalized.append(norm_path)
 
             # Pass 2: concat demuxer (stream-copy, minimal memory)
@@ -233,10 +246,10 @@ class VideoStitcher:
                     f.write(f"file '{path}'\n")
 
             output_path = os.path.join(tmpdir, "output.mp4")
-            subprocess.run([
+            _run([
                 ffmpeg_cmd(), "-y", "-f", "concat", "-safe", "0",
                 "-i", concat_list, "-c", "copy", output_path,
-            ], capture_output=True, check=True)
+            ])
 
             with open(output_path, "rb") as f:
                 return f.read()

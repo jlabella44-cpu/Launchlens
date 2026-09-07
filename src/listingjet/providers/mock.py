@@ -8,6 +8,16 @@ from pydantic import BaseModel
 
 from .base import ImageEditProvider, TemplateProvider, VirtualStagingProvider
 
+# Per-schema field overrides applied on top of the generic type-shape
+# defaults below, keyed by schema class name. Used to keep mock output
+# realistic for schemas whose downstream consumers filter on specific field
+# values (e.g. `PhotoAnalysis.quality`/`.is_photo` against
+# `agents.packaging.MIN_QUALITY_SCORE`) without changing the Pydantic
+# schema's own field defaults.
+_SCHEMA_DEFAULT_OVERRIDES: dict[str, dict] = {
+    "PhotoAnalysis": {"is_photo": True, "quality": 85, "hero_score": 75},
+}
+
 
 def _defaults_for(schema: type[BaseModel], seed: int = 0) -> dict:
     """Build a dict of schema-shaped default values for a Pydantic model.
@@ -39,6 +49,7 @@ def _defaults_for(schema: type[BaseModel], seed: int = 0) -> dict:
             data[name] = field.default
         else:
             data[name] = None
+    data.update(_SCHEMA_DEFAULT_OVERRIDES.get(schema.__name__, {}))
     return data
 
 class MockImageEditProvider(ImageEditProvider):

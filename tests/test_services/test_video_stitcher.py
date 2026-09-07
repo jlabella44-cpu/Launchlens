@@ -52,3 +52,10 @@ def test_stitch_xfade_single_clip_passthrough(ffmpeg_available, png, tmp_path):
     p = vs.build_still_clip(png("s.png"), str(tmp_path / "s.mp4"), duration_s=1.0, width=320, height=180)
     data = vs.VideoStitcher().stitch_xfade([(p, 1.0)])
     assert data == open(p, "rb").read()
+
+
+def test_probe_duration_raises_runtime_error_with_stderr(ffmpeg_available):
+    with pytest.raises(RuntimeError) as exc_info:
+        vs.probe_duration("does-not-exist.mp4")
+    message = str(exc_info.value)
+    assert "ffprobe" in message or "does-not-exist" in message

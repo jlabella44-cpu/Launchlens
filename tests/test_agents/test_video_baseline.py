@@ -194,6 +194,39 @@ async def test_rerun_updates_same_row(ffmpeg_available, db_session):
 
 
 @pytest.mark.asyncio
+async def test_rerun_merges_metadata_instead_of_replacing(ffmpeg_available, db_session):
+    """A pre-existing metadata_ key (e.g. runway_tasks from an in-flight AI
+    upgrade) must survive a baseline rerun, not be clobbered wholesale."""
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    existing = VideoAsset(
+        tenant_id=listing.tenant_id, listing_id=listing.id,
+        s3_key=f"videos/{listing.id}/tour.mp4", video_type="tour",
+        duration_seconds=0, status="processing", clip_count=0, chapters=[],
+        metadata_={"runway_tasks": {"a": "t1"}},
+    )
+    db_session.add(existing)
+    await db_session.flush()
+
+    storage = make_storage_mock()
+    agent = VideoBaselineAgent(
+        storage=storage, session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["status"] == "ready"
+    row = (await db_session.execute(
+        select(VideoAsset).where(VideoAsset.listing_id == listing.id)
+    )).scalars().one()
+    assert row.metadata_["runway_tasks"] == {"a": "t1"}
+    assert row.metadata_["tier"] == "baseline"
+
+
+@pytest.mark.asyncio
 async def test_caps_at_max_photos(ffmpeg_available, db_session):
     listing = await _make_listing(db_session)
     for i in range(12):

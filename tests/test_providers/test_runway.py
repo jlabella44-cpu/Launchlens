@@ -118,6 +118,39 @@ async def test_image_to_video_raises_on_400_with_no_retry(httpx_mock: HTTPXMock)
 
 
 @pytest.mark.asyncio
+async def test_image_to_video_retries_on_503_then_succeeds(httpx_mock: HTTPXMock, monkeypatch):
+    monkeypatch.setattr("listingjet.providers.runway.asyncio.sleep", AsyncMock())
+
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api.dev.runwayml.com/v1/image_to_video",
+        status_code=503,
+        text="service unavailable",
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api.dev.runwayml.com/v1/image_to_video",
+        status_code=503,
+        text="service unavailable",
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api.dev.runwayml.com/v1/image_to_video",
+        json={"id": "t1"},
+    )
+
+    client = RunwayClient(api_key="k")
+    task_id = await client.image_to_video(
+        "https://s3.example.com/photo.jpg", "prompt", model="gen4_turbo", duration=5,
+    )
+
+    assert task_id == "t1"
+    assert len(httpx_mock.get_requests()) == 3
+
+    await client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_wait_polls_until_succeeded(httpx_mock: HTTPXMock, monkeypatch):
     monkeypatch.setattr("listingjet.providers.runway.asyncio.sleep", AsyncMock())
 

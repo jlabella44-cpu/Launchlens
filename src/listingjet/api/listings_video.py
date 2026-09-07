@@ -11,6 +11,7 @@ from listingjet.database import get_db
 from listingjet.models.listing import Listing
 from listingjet.models.user import User
 from listingjet.models.video_asset import VideoAsset
+from listingjet.services.video_select import pick_tour_video
 
 router = APIRouter()
 
@@ -27,12 +28,7 @@ async def get_video(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    video = (await db.execute(
-        select(VideoAsset)
-        .where(VideoAsset.listing_id == listing.id, VideoAsset.status == "ready")
-        .order_by(VideoAsset.created_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
+    video = await pick_tour_video(db, listing.id)
     if not video:
         raise HTTPException(status_code=404, detail="No video available")
 
@@ -61,12 +57,7 @@ async def get_video_social_cuts(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    video = (await db.execute(
-        select(VideoAsset)
-        .where(VideoAsset.listing_id == listing.id, VideoAsset.status == "ready")
-        .order_by(VideoAsset.created_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
+    video = await pick_tour_video(db, listing.id)
 
     if not video or not video.social_cuts:
         return []

@@ -4,12 +4,11 @@ import asyncio
 import subprocess
 import tempfile
 
-from sqlalchemy import select
-
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.listing import Listing
 from listingjet.models.video_asset import VideoAsset
 from listingjet.services.storage import StorageService
+from listingjet.services.video_select import pick_tour_video
 from listingjet.services.video_stitcher import ffmpeg_cmd
 
 from .base import AgentContext, BaseAgent
@@ -89,17 +88,7 @@ class SocialCutAgent(BaseAgent):
         self._session_factory = session_factory or AsyncSessionLocal
 
     async def _pick_video(self, session, listing_id) -> VideoAsset | None:
-        videos = (await session.execute(
-            select(VideoAsset)
-            .where(VideoAsset.listing_id == listing_id, VideoAsset.status == "ready")
-            .order_by(VideoAsset.created_at.desc())
-        )).scalars().all()
-        if not videos:
-            return None
-        for video in videos:
-            if video.video_type == "tour":
-                return video
-        return videos[0]
+        return await pick_tour_video(session, listing_id)
 
     async def execute(self, context: AgentContext) -> dict:
         # Phase 1: pick the source video and grab just what we need, then

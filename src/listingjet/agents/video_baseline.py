@@ -156,7 +156,7 @@ async def upsert_tour_asset(
         existing.duration_seconds = int(round(duration_s))
         existing.clip_count = clip_count
         existing.chapters = chapters
-        existing.metadata_ = metadata
+        existing.metadata_ = {**(existing.metadata_ or {}), **metadata}
         existing.status = "ready"
         existing.video_type = "tour"
         video_asset = existing
