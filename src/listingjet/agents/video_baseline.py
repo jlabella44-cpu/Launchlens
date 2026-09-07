@@ -116,7 +116,10 @@ def build_tour(
                 f.write(photo_video_bytes)
             endcard_path = os.path.join(tmpdir, "endcard.mp4")
             endcard_clip(endcard_png, endcard_path, duration_s=ENDCARD_DURATION, width=width, height=height)
-            final_bytes = stitcher.stitch([photo_video_path, endcard_path], ["cut"])
+            final_bytes = stitcher.stitch(
+                [photo_video_path, endcard_path], ["cut"],
+                output_width=width, output_height=height,
+            )
 
         chapters = [
             {"time": int(round(c["start_s"])), "label": c["room"] or "photo"}

@@ -197,3 +197,18 @@ async def test_mock_runway_download_returns_playable_clip(ffmpeg_available):
         Path(path).write_bytes(data)
         duration = probe_duration(path)
     assert duration == pytest.approx(2.0, abs=0.3)
+
+
+@pytest.mark.asyncio
+async def test_download_raises_runway_error_on_expired_url(httpx_mock: HTTPXMock):
+    """Output URLs expire in 24-48h. A dead one must surface as RunwayError so
+    callers can degrade the same way they do for a dead task."""
+    httpx_mock.add_response(
+        method="GET", url="https://cdn.runwayml.com/expired.mp4", status_code=403,
+    )
+
+    client = RunwayClient(api_key="k")
+    with pytest.raises(RunwayError, match="download failed"):
+        await client.download("https://cdn.runwayml.com/expired.mp4")
+
+    await client.aclose()

@@ -13,7 +13,7 @@ from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
-from listingjet.services.video_stitcher import VideoStitcher, probe_duration
+from listingjet.services.video_stitcher import VideoStitcher, probe_duration, probe_size
 from tests.test_agents.conftest import make_session_factory
 
 pytestmark = pytest.mark.ffmpeg
@@ -129,6 +129,31 @@ async def test_builds_tour_from_packaged_photos(ffmpeg_available, db_session):
     assert row.metadata_["tier"] == "baseline"
     assert len(row.metadata_["clips"]) == 3
     assert all(c["source"] == "ken_burns" for c in row.metadata_["clips"])
+
+
+@pytest.mark.asyncio
+async def test_tour_keeps_requested_resolution(ffmpeg_available, db_session):
+    """The end-card concat must not silently downscale the reel: VideoStitcher.stitch
+    defaults to 1280x720, so the agent's width/height have to reach it."""
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    storage = make_storage_mock()
+    agent = VideoBaselineAgent(
+        storage=storage, session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "out.mp4")
+        with open(p, "wb") as f:
+            f.write(storage.uploads[result["s3_key"]])
+        assert probe_size(p) == (320, 180)
 
 
 @pytest.mark.asyncio

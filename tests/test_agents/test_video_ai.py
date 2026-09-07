@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import select
@@ -7,11 +8,14 @@ from listingjet.agents.base import AgentContext
 from listingjet.agents.video_ai import VideoAIAgent
 from listingjet.config import settings
 from listingjet.models.asset import Asset
+from listingjet.models.brand_kit import BrandKit
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
 from listingjet.providers.mock import MockRunwayClient
+from listingjet.providers.runway import RunwayError
+from listingjet.services.video_stitcher import probe_size
 from tests.test_agents.conftest import make_session_factory
 from tests.test_agents.test_video_baseline import make_storage_mock
 
@@ -160,6 +164,88 @@ async def test_generates_and_stitches(ffmpeg_available, db_session):
     assert all(c["source"] == "runway" for c in row.metadata_["clips"])
     assert all(c["model"] for c in row.metadata_["clips"])
     assert [c["label"] for c in row.chapters] == ["exterior", "kitchen", "primary_bedroom"]
+
+    # the end-card concat must not downscale the reel to VideoStitcher's 1280x720 default
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "out.mp4")
+        with open(p, "wb") as f:
+            f.write(storage.uploads[expected_key])
+        assert probe_size(p) == (320, 180)
+
+
+@pytest.mark.ffmpeg
+@pytest.mark.asyncio
+async def test_expired_output_url_falls_back_to_ken_burns(ffmpeg_available, db_session):
+    """A dead download (expired output URL) degrades that one shot, like a dead task."""
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    runway = MockRunwayClient()
+    real_download = runway.download
+
+    async def flaky_download(url):
+        # the exterior is submitted first, so it holds mock-task-1
+        if url.endswith("mock-task-1"):
+            raise RunwayError("Runway download failed: 403 expired")
+        return await real_download(url)
+
+    runway.download = flaky_download
+
+    storage = make_storage_mock()
+    agent = VideoAIAgent(
+        runway=runway, storage=storage,
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["status"] == "ready"
+    assert result["runway_clips"] == 1
+    assert result["fallback_clips"] == 1
+
+    row = (await db_session.execute(
+        select(VideoAsset).where(VideoAsset.listing_id == listing.id)
+    )).scalars().one()
+    clips = row.metadata_["clips"]
+    assert clips[0]["source"] == "ken_burns"
+    assert clips[1]["source"] == "runway"
+
+
+@pytest.mark.ffmpeg
+@pytest.mark.asyncio
+async def test_endcard_uses_tenant_brand_kit(ffmpeg_available, db_session, monkeypatch):
+    """The paid tier must brand its end card, not fall back to the neutral default."""
+    import listingjet.agents.video_ai as video_ai_module
+    from listingjet.services.endcard import generate_endcard
+
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+    db_session.add(BrandKit(
+        tenant_id=listing.tenant_id, brokerage_name="Acme Realty",
+        agent_name="Jane Doe", primary_color="#FF00AA",
+    ))
+    await db_session.flush()
+
+    spy = MagicMock(side_effect=generate_endcard)
+    monkeypatch.setattr(video_ai_module, "generate_endcard", spy)
+
+    agent = VideoAIAgent(
+        runway=MockRunwayClient(), storage=make_storage_mock(),
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    assert result["status"] == "ready"
+    spy.assert_called_once_with(
+        brokerage_name="Acme Realty", agent_name="Jane Doe", primary_color="#FF00AA",
+    )
 
 
 @pytest.mark.ffmpeg

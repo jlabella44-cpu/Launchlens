@@ -38,6 +38,7 @@ from listingjet.agents.video_template import (
 from listingjet.config import settings
 from listingjet.database import AsyncSessionLocal
 from listingjet.models.asset import Asset
+from listingjet.models.brand_kit import BrandKit
 from listingjet.models.listing import Listing
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.video_asset import VideoAsset
@@ -156,7 +157,7 @@ class VideoAIAgent(BaseAgent):
     # ------------------------------------------------------------------ #
 
     async def execute(self, context: AgentContext) -> dict:
-        async with self.session_scope(context) as (session, listing_id, _tenant_id):
+        async with self.session_scope(context) as (session, listing_id, tenant_id):
             listing = await session.get(Listing, listing_id)
             if not listing:
                 raise ValueError(f"Listing {listing_id} not found")
@@ -172,6 +173,15 @@ class VideoAIAgent(BaseAgent):
 
             existing = await self._existing_tour(session, listing_id)
             known_tasks: dict[str, str] = dict((existing.metadata_ or {}).get("runway_tasks") or {}) if existing else {}
+
+            brand_kit = (await session.execute(
+                select(BrandKit).where(BrandKit.tenant_id == tenant_id).limit(1)
+            )).scalar_one_or_none()
+            brand = {
+                "brokerage_name": (brand_kit.brokerage_name if brand_kit else None) or "",
+                "agent_name": (brand_kit.agent_name if brand_kit else None) or "",
+                "primary_color": (brand_kit.primary_color if brand_kit else None) or "#2563EB",
+            }
 
         shots = self.select_shots(rows) if rows else []
         if not shots:
@@ -211,10 +221,17 @@ class VideoAIAgent(BaseAgent):
         # --- render every shot (Runway, or Ken Burns on failure) -------- #
         semaphore = asyncio.Semaphore(self._concurrency)
         with tempfile.TemporaryDirectory() as tmpdir:
+            # return_exceptions so one shot blowing up cannot tear this temp
+            # directory down while its siblings are still writing into it.
+            # _render_shot swallows the failures it can degrade (see below), so
+            # anything that comes back here is genuinely unhandled — re-raise it.
             rendered = await asyncio.gather(*[
                 self._render_shot(shot, tasks[str(shot.asset.id)], semaphore, tmpdir, i)
                 for i, shot in enumerate(shots)
-            ])
+            ], return_exceptions=True)
+            for outcome in rendered:
+                if isinstance(outcome, BaseException):
+                    raise outcome
 
             cost_usd = 0.0
             for clip in rendered:
@@ -223,7 +240,7 @@ class VideoAIAgent(BaseAgent):
                         clip["model"], clip["billed_s"], self.agent_name,
                     )
 
-            video_bytes = await asyncio.to_thread(self._stitch, rendered, tmpdir)
+            video_bytes = await asyncio.to_thread(self._stitch, rendered, tmpdir, brand)
             await asyncio.to_thread(self._storage.upload_bytes, video_bytes, s3_key, "video/mp4")
 
             probe_path = os.path.join(tmpdir, "final_check.mp4")
@@ -317,25 +334,30 @@ class VideoAIAgent(BaseAgent):
         model, duration, _audio = self.model_for(shot.kind)
         out_path = os.path.join(tmpdir, f"shot_{index}.mp4")
 
-        async with semaphore:
-            try:
-                urls = await self._runway.wait(task_id, timeout_s=POLL_TIMEOUT_S)
-                if not urls:
-                    raise RunwayError(f"Runway task {task_id} succeeded with no output")
+        # The semaphore bounds real work — the transfer and the ffmpeg fallback.
+        # Polling is idle HTTP against an already-submitted job, so holding a
+        # slot across it would cap us at `concurrency` renders in flight for no
+        # reason (and stall a finished shot behind a slow one).
+        try:
+            urls = await self._runway.wait(task_id, timeout_s=POLL_TIMEOUT_S)
+            if not urls:
+                raise RunwayError(f"Runway task {task_id} succeeded with no output")
+            async with semaphore:
                 data = await self._runway.download(urls[0])
                 with open(out_path, "wb") as f:
                     f.write(data)
                 actual_s = await asyncio.to_thread(probe_duration, out_path)
-                return {
-                    "path": out_path, "duration_s": actual_s, "billed_s": float(duration),
-                    "source": "runway", "model": model,
-                }
-            except (RunwayError, asyncio.TimeoutError) as exc:
-                logger.warning(
-                    "Runway shot failed for asset %s (task %s): %s — falling back to Ken Burns",
-                    shot.asset.id, task_id, exc,
-                )
+            return {
+                "path": out_path, "duration_s": actual_s, "billed_s": float(duration),
+                "source": "runway", "model": model,
+            }
+        except (RunwayError, asyncio.TimeoutError) as exc:
+            logger.warning(
+                "Runway shot failed for asset %s (task %s): %s — falling back to Ken Burns",
+                shot.asset.id, task_id, exc,
+            )
 
+        async with semaphore:
             key = shot.asset.proxy_path or shot.asset.file_path
             photo = await asyncio.to_thread(self._storage.download, key)
             ext = os.path.splitext(key)[1] or ".jpg"
@@ -353,7 +375,7 @@ class VideoAIAgent(BaseAgent):
                 "source": "ken_burns", "model": None,
             }
 
-    def _stitch(self, rendered: list[dict], tmpdir: str) -> bytes:
+    def _stitch(self, rendered: list[dict], tmpdir: str, brand: dict) -> bytes:
         """Crossfade the shots together and append the end card. Sync — run in a thread."""
         music_path = settings.video_music_path if settings.video_music_enabled else None
         shots_bytes = self._stitcher.stitch_xfade(
@@ -369,10 +391,13 @@ class VideoAIAgent(BaseAgent):
             f.write(shots_bytes)
         endcard_path = os.path.join(tmpdir, "endcard.mp4")
         endcard_clip(
-            generate_endcard(), endcard_path,
+            generate_endcard(**brand), endcard_path,
             duration_s=ENDCARD_DURATION, width=self._width, height=self._height,
         )
-        return self._stitcher.stitch([shots_path, endcard_path], ["cut"])
+        return self._stitcher.stitch(
+            [shots_path, endcard_path], ["cut"],
+            output_width=self._width, output_height=self._height,
+        )
 
     def _manifest(self, shots: list[Shot], rendered: list[dict]) -> tuple[list[dict], list[dict]]:
         """Build the clip manifest and chapter marks from the *actual* durations."""

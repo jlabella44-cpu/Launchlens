@@ -38,6 +38,17 @@ def probe_duration(path: str) -> float:
     return float(json.loads(proc.stdout)["format"]["duration"])
 
 
+def probe_size(path: str) -> tuple[int, int]:
+    """Return the (width, height) of a video file's first video stream."""
+    proc = subprocess.run(
+        [ffprobe_cmd(), "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height", "-of", "json", path],
+        capture_output=True, check=True,
+    )
+    stream = json.loads(proc.stdout)["streams"][0]
+    return int(stream["width"]), int(stream["height"])
+
+
 _KB_EXPR = [
     # zoom in on centre
     ("min(zoom+0.0015,1.25)", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),

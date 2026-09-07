@@ -153,11 +153,19 @@ class RunwayClient:
             interval = min(interval * _POLL_GROWTH, _MAX_POLL_INTERVAL_S)
 
     async def download(self, url: str) -> bytes:
-        """Download rendered video bytes from an (expiring) output URL."""
-        async with httpx.AsyncClient(timeout=_DOWNLOAD_TIMEOUT) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            return resp.content
+        """Download rendered video bytes from an (expiring) output URL.
+
+        Output URLs expire within 24-48h, so a late download 403s. Callers
+        treat a dead clip the same as a dead task, so the httpx failure is
+        re-raised as RunwayError rather than leaking a transport exception.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=_DOWNLOAD_TIMEOUT) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                return resp.content
+        except httpx.HTTPError as exc:
+            raise RunwayError(f"Runway download failed for {url}: {exc}") from exc
 
     async def aclose(self) -> None:
         await self._client.aclose()
