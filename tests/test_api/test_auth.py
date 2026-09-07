@@ -172,7 +172,7 @@ async def test_refresh_with_token_in_json_body(async_client: AsyncClient):
     # Tokens may be byte-identical to the registration pair when the refresh
     # lands in the same JWT-second window — assert validity, not novelty.
     assert decode_token(body["access_token"])["type"] == "access"
-    assert decode_token(body["refresh_token"])["type"] == "refresh"
+    assert decode_token(body["refresh_token"], expected_type="refresh")["type"] == "refresh"
 
 
 @pytest.mark.asyncio
@@ -293,3 +293,32 @@ async def test_get_db_admin_resets_admin_flag_on_every_transaction(monkeypatch):
 
     remaining = list(session.sync_session.dispatch.after_begin)
     assert listener not in remaining, "listener must be removed on session teardown"
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_rejected_as_bearer(async_client: AsyncClient):
+    """A refresh token must not authenticate API requests (review finding: 7-day refresh works as bearer)."""
+    email = f"test-{uuid.uuid4()}@example.com"
+    reg = await async_client.post("/auth/register", json={
+        "email": email, "password": "ValidPass1!", "name": "Reg", "company_name": "Reg LLC",
+        "plan_tier": "free",
+    })
+    assert reg.status_code == 200
+    refresh = reg.json()["refresh_token"]
+
+    resp = await async_client.get("/listings", headers={"Authorization": f"Bearer {refresh}"})
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Wrong token type"
+
+
+def test_decode_token_rejects_wrong_type():
+    user = User(id=uuid.uuid4(), tenant_id=uuid.uuid4(), email="t@example.com",
+                password_hash="x", role=UserRole.ADMIN)
+    from listingjet.services.auth import create_refresh_token
+    refresh = create_refresh_token(user)
+    with pytest.raises(HTTPException) as exc:
+        decode_token(refresh)
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "Wrong token type"
+    # Explicitly asking for a refresh token still works
+    assert decode_token(refresh, expected_type="refresh")["type"] == "refresh"

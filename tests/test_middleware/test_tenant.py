@@ -73,3 +73,15 @@ async def test_tenant_a_cannot_see_tenant_b_listings(async_client):
     # Tenant A should not see it
     resp = await async_client.get(f"/listings/{listing_b_id}", headers={"Authorization": f"Bearer {token_a}"})
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_middleware_rejects_refresh_token(async_client: AsyncClient):
+    email = f"test-{uuid.uuid4()}@example.com"
+    reg = await async_client.post("/auth/register", json={
+        "email": email, "password": "TestPass1!", "name": "Tester", "company_name": "TestCo",
+        "plan_tier": "free",
+    })
+    refresh = reg.json()["refresh_token"]
+    resp = await async_client.get("/listings", headers={"Authorization": f"Bearer {refresh}"})
+    assert resp.status_code == 401

@@ -46,14 +46,8 @@ def _get_demo_limiter() -> RateLimiter:
 
 
 def _get_client_ip(request: Request) -> str:
-    from listingjet.middleware.rate_limit import TRUSTED_PROXY_COUNT
-    if TRUSTED_PROXY_COUNT > 0:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            parts = [p.strip() for p in forwarded.split(",")]
-            idx = max(0, len(parts) - TRUSTED_PROXY_COUNT)
-            return parts[idx]
-    return request.client.host if request.client else "unknown"
+    from listingjet.middleware.rate_limit import extract_client_ip
+    return extract_client_ip(request)
 
 
 @router.post("/create", status_code=201, response_model=DemoCreateResponse)

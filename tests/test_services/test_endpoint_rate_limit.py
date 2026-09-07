@@ -100,7 +100,7 @@ async def test_rate_limit_uses_ip_when_no_tenant():
     del request.state.tenant_id
 
     with patch(_RL_PATCH, return_value=mock_limiter), \
-         patch("listingjet.middleware.rate_limit._extract_client_ip", return_value="1.2.3.4"):
+         patch("listingjet.middleware.rate_limit.extract_client_ip", return_value="1.2.3.4"):
         await dep(request)
 
     key = mock_limiter.acquire.call_args.kwargs.get("key", mock_limiter.acquire.call_args[1].get("key", ""))

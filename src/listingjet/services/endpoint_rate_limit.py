@@ -62,8 +62,8 @@ def rate_limit(limit: int, period: int = 60, key_func: Callable | None = None):
                     return
                 key = f"tenant:{tenant_id}"
             else:
-                from listingjet.middleware.rate_limit import _extract_client_ip
-                key = f"ip:{_extract_client_ip(request)}"
+                from listingjet.middleware.rate_limit import extract_client_ip
+                key = f"ip:{extract_client_ip(request)}"
 
         endpoint_key = f"{request.url.path}:{key}"
 

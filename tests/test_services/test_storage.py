@@ -1,3 +1,5 @@
+import base64
+import json
 from unittest.mock import patch
 
 import boto3
@@ -69,3 +71,16 @@ def test_r2_endpoint_and_creds_passed_to_boto3():
             assert kwargs["aws_access_key_id"] == "AKIA-r2"
             assert kwargs["aws_secret_access_key"] == "secret-r2"
             assert kwargs["region_name"] == "auto"
+
+
+def test_presigned_upload_rejects_disallowed_type(s3_service):
+    with pytest.raises(ValueError, match="not allowed"):
+        s3_service.presigned_upload_url(key="k", content_type="image/gif")
+
+
+def test_presigned_upload_enforces_size_and_type(s3_service):
+    post = s3_service.presigned_upload_url(key="k", content_type="image/jpeg")
+    assert post["fields"]["Content-Type"] == "image/jpeg"
+    # The policy is a base64 JSON document; the size range must be in it.
+    policy = json.loads(base64.b64decode(post["fields"]["policy"]))
+    assert ["content-length-range", 1, s3_service.MAX_UPLOAD_SIZE] in policy["conditions"]
