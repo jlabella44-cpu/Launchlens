@@ -82,5 +82,8 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://listingjet:password@localhost:5433/listingjet_test
         run: alembic upgrade head
 
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Run tests
         run: pytest --tb=short -q --timeout=30

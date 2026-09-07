@@ -1,4 +1,5 @@
 # tests/test_api/test_video.py
+import datetime
 import uuid
 
 import jwt as pyjwt
@@ -6,6 +7,7 @@ import pytest
 from httpx import AsyncClient
 
 from listingjet.config import settings
+from listingjet.models.video_asset import VideoAsset
 
 
 async def _register(client: AsyncClient) -> tuple[str, str]:
@@ -79,3 +81,36 @@ async def test_video_upload_rejects_bad_s3_key(async_client: AsyncClient):
 async def test_video_requires_auth(async_client: AsyncClient):
     resp = await async_client.get(f"/listings/{uuid.uuid4()}/video")
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_video_prefers_tour_over_newer_professional(async_client: AsyncClient, db_session):
+    """A newer `professional` upload must not shadow the pipeline's own
+    `tour` video — `pick_tour_video` prefers `tour` regardless of recency,
+    matching `SocialCutAgent._pick_video`."""
+    token, tenant_id = await _register(async_client)
+    create_resp = await async_client.post("/listings", json={
+        "address": {"street": "Tour Priority St"}, "metadata": {},
+    }, headers=_auth(token))
+    listing_id = create_resp.json()["id"]
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    db_session.add(VideoAsset(
+        tenant_id=tenant_id, listing_id=listing_id,
+        s3_key=f"videos/{listing_id}/tour.mp4", video_type="tour",
+        status="ready", duration_seconds=30,
+        created_at=now - datetime.timedelta(hours=1),
+    ))
+    db_session.add(VideoAsset(
+        tenant_id=tenant_id, listing_id=listing_id,
+        s3_key=f"videos/{listing_id}/professional.mp4", video_type="professional",
+        status="ready", duration_seconds=90,
+        created_at=now,
+    ))
+    await db_session.commit()
+
+    resp = await async_client.get(f"/listings/{listing_id}/video", headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["video_type"] == "tour"
+    assert body["s3_key"] == f"videos/{listing_id}/tour.mp4"

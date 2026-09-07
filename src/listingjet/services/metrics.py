@@ -7,7 +7,7 @@ Metrics are logged via the standard logger (no external metrics backend).
 import logging
 import time
 
-from listingjet.config.ai_rates import IMAGE_CALL_RATES, LEGACY_CALL_RATES, TOKEN_RATES
+from listingjet.config.ai_rates import IMAGE_CALL_RATES, TOKEN_RATES, VIDEO_SECOND_RATES
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ _LEGACY_PROVIDER_COSTS: dict[str, float] = {
     "claude": 0.05,
 }
 
-# New mapping keyed by model id (images and legacy video)
-PROVIDER_COSTS: dict[str, float] = {**IMAGE_CALL_RATES, **LEGACY_CALL_RATES}
+# Per-call cost keyed by model id (images; video is billed per second instead)
+PROVIDER_COSTS: dict[str, float] = dict(IMAGE_CALL_RATES)
 
 
 def emit_metric(
@@ -118,11 +118,33 @@ def record_image_call(model_id: str, label: str) -> None:
     emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
 
 
+def record_video_seconds(model_id: str, seconds: float, agent: str) -> float:
+    """Record generated video seconds and compute estimated cost from VIDEO_SECOND_RATES.
+
+    model_id is the Runway model identifier (e.g. "gen4_turbo", "veo3.1_fast").
+    Returns the estimated cost in USD. If model_id is unknown, logs a warning
+    once per id and records (and returns) cost 0.
+    """
+    rate = VIDEO_SECOND_RATES.get(model_id)
+    if rate is None:
+        if model_id not in _warned_unknown_model_ids:
+            logger.warning("Unknown model_id in record_video_seconds: %s", model_id)
+            _warned_unknown_model_ids.add(model_id)
+        cost = 0.0
+    else:
+        cost = rate * seconds
+
+    dims = {"model": model_id, "agent": agent}
+    emit_metric("VideoSecondsGenerated", seconds, unit="Seconds", dimensions=dims)
+    emit_metric("EstimatedCost", cost, unit="None", dimensions=dims)
+    return cost
+
+
 def record_cost(agent_name: str, provider_name: str, call_count: int = 1) -> None:
     """Record estimated cost for provider usage within an agent.
 
     provider_name can be either an old provider label (claude, etc.)
-    or a model id (gpt-image-1.5, kling, etc.).
+    or a model id (gpt-image-1.5, etc.).
     """
     # Try new model id keys first, then fall back to legacy provider labels
     cost_per_call = PROVIDER_COSTS.get(provider_name) or _LEGACY_PROVIDER_COSTS.get(provider_name, 0)

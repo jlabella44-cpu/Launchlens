@@ -7,7 +7,8 @@ import apiClient from "@/lib/api-client";
 import type { VideoResponse, Chapter } from "@/lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
-  ai_generated: "AI Generated",
+  tour: "Property Tour",
+  ai_generated: "Property Tour", // legacy alias — pre-rename video_type value
   professional: "Professional",
   user_raw: "User Upload",
 };

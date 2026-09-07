@@ -39,6 +39,17 @@ def get_virtual_staging_provider() -> VirtualStagingProvider:
     return OpenAIVirtualStagingProvider()
 
 
+def get_runway():
+    """Return the raw Runway client, or a mock when USE_MOCK_PROVIDERS is set."""
+    if settings.use_mock_providers:
+        from .mock import MockRunwayClient
+        return MockRunwayClient()
+    if not settings.runway_api_key:
+        raise RuntimeError("RUNWAY_API_KEY is not set")
+    from .runway import RunwayClient
+    return RunwayClient()
+
+
 def get_template_provider() -> TemplateProvider:
     if settings.use_mock_providers:
         from .mock import MockTemplateProvider
