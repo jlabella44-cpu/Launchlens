@@ -35,7 +35,6 @@ vendor/
 coverage/
 .cache/
 tmp/
-uv.lock
 
 # SDD scratch (ledgers, briefs, review packages)
 .superpowers/

@@ -249,3 +249,17 @@ async def two_tenants(async_client, db_session):
         {"Authorization": f"Bearer {make_jwt(tenant_b)}"},
         str(listing.id),
     )
+
+
+# Fixtures that touch Postgres, directly or transitively (pytest expands
+# `fixturenames` to include fixtures-of-fixtures, so depending on `db_session`
+# via another fixture — e.g. `listing`, `assets`, `two_tenants` — still counts).
+_DB_FIXTURE_NAMES = {"db_session", "async_client", "test_engine"}
+
+
+def pytest_collection_modifyitems(items):
+    """Auto-mark any test whose fixtures touch Postgres with `db`, so CI can
+    run `pytest -m "not db"` without a database available."""
+    for item in items:
+        if _DB_FIXTURE_NAMES.intersection(getattr(item, "fixturenames", ())):
+            item.add_marker(pytest.mark.db)
