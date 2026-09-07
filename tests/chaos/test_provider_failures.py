@@ -14,6 +14,7 @@ import pytest
 from listingjet.agents.base import AgentContext
 from listingjet.agents.content_social import ContentSocialAgent
 from listingjet.agents.ingestion import IngestionAgent
+from listingjet.providers.claude import ProviderOutputError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -192,6 +193,42 @@ class TestContentSocialAgentLLMFailure:
         agent = ContentSocialAgent(claude=failing_claude, session_factory=factory)
 
         with pytest.raises(ConnectionError, match="Failed to connect"):
+            await agent.execute(ctx)
+
+        rows = (await db_session.execute(
+            select(SocialContent).where(SocialContent.listing_id == listing.id)
+        )).scalars().all()
+        assert rows == []
+        evt = (await db_session.execute(
+            select(Outbox).where(Outbox.event_type == "content_social.completed")
+        )).scalars().first()
+        assert evt is None
+
+    @pytest.mark.asyncio
+    async def test_claude_provider_output_error_propagates(self, db_session):
+        """A refused/unstructured Claude response should propagate cleanly."""
+        from sqlalchemy import select
+
+        from listingjet.models.listing import Listing, ListingState
+        from listingjet.models.outbox import Outbox
+        from listingjet.models.social_content import SocialContent
+
+        listing = Listing(
+            tenant_id=uuid.uuid4(), address={"street": "3 Chaos St"},
+            metadata_={"beds": 4, "baths": 3},
+            state=ListingState.AWAITING_REVIEW,
+        )
+        db_session.add(listing)
+        await db_session.flush()
+
+        failing_claude = AsyncMock()
+        failing_claude.complete_json.side_effect = ProviderOutputError("refused")
+
+        factory = _make_session_factory(db_session)
+        ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+        agent = ContentSocialAgent(claude=failing_claude, session_factory=factory)
+
+        with pytest.raises(ProviderOutputError, match="refused"):
             await agent.execute(ctx)
 
         rows = (await db_session.execute(

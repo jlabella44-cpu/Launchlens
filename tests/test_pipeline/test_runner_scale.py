@@ -108,8 +108,9 @@ async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_
     listings = [await _listing(db_session, f"{i} Parked Ave") for i in range(55)]
 
     # Drain everything runnable: every listing walks up to its review gate,
-    # leaving ~12 unsatisfiable post-approval rows per listing at the head of
-    # the candidate scan.
+    # leaving ~10 unsatisfiable post-approval rows per listing (55 listings x
+    # 10 rows = 550 > the 500-row CLAIM_CANDIDATE_LIMIT) at the head of the
+    # candidate scan.
     drained = 0
     while (job := await runner.claim_next(db_session, "w1")) is not None:
         await runner.run_job(factory, job.id, functions=FUNCTIONS)
@@ -120,7 +121,7 @@ async def test_many_parked_listings_do_not_delay_a_fresh_listing_past_the_first_
 
     fresh = await _listing(db_session, "fresh listing")
     job = await runner.claim_next(db_session, "w1")
-    assert job is not None, "queue deadlocked behind 50 listings parked at the review gate"
+    assert job is not None, "queue deadlocked behind 55 listings parked at the review gate"
     assert (job.listing_id, job.step) == (fresh.id, "ingestion")
 
 
