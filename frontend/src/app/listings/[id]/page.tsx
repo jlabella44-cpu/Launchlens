@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -26,6 +26,8 @@ import { useListingEvents } from "@/lib/use-listing-events";
 import type { PipelineStep } from "@/lib/types";
 
 const ERROR_MAX_CHARS = 200;
+/** Collapse a burst of SSE events into a single refetch. */
+const SSE_REFETCH_DEBOUNCE_MS = 300;
 
 function truncateError(text: string): string {
   return text.length > ERROR_MAX_CHARS
@@ -57,7 +59,10 @@ function ListingDetail() {
 
   // Live pipeline updates. Polling below is only the fallback when the
   // SSE stream is not connected.
-  const { connected, lastEvent, events } = useListingEvents(id);
+  const { connected, lastEvent, events, gaveUp } = useListingEvents(id);
+  /** Trailing debounce for the SSE-driven refetch (a pipeline step can emit
+   *  several events in a burst; one refetch is enough). */
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -97,8 +102,17 @@ function ListingDetail() {
   }, [fetchData]);
 
   useEffect(() => {
-    if (lastEvent) fetchData();
+    if (!lastEvent) return;
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    refetchTimer.current = setTimeout(() => {
+      refetchTimer.current = null;
+      fetchData();
+    }, SSE_REFETCH_DEBOUNCE_MS);
   }, [lastEvent, fetchData]);
+
+  useEffect(() => () => {
+    if (refetchTimer.current) clearTimeout(refetchTimer.current);
+  }, []);
 
   const listingState = listing?.state;
   useEffect(() => {
@@ -242,6 +256,15 @@ function ListingDetail() {
 
         {/* Pipeline Status */}
         <div className="mb-8 space-y-4">
+          {gaveUp && (
+            <p
+              data-testid="live-updates-unavailable"
+              role="status"
+              className="text-xs text-[var(--color-text-secondary)]"
+            >
+              Live updates unavailable — refresh to see the latest.
+            </p>
+          )}
           <PipelineStatus state={listing.state} />
           <PipelineProgress
             listingId={id}

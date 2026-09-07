@@ -40,6 +40,15 @@ describe("ApiClient", () => {
     expect(req.headers.get("Authorization")).toBe("Bearer my-jwt");
   });
 
+  it("sends no ngrok header — there is no ngrok in this architecture", async () => {
+    apiClient.setToken("my-jwt");
+    mockFetch.mockResolvedValue(jsonResponse([]));
+
+    await apiClient.getListings();
+
+    expect(lastRequest().headers.get("ngrok-skip-browser-warning")).toBeNull();
+  });
+
   it("throws on error response", async () => {
     mockFetch.mockResolvedValue(jsonResponse({ detail: "Invalid token" }, 401));
 

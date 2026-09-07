@@ -31,10 +31,18 @@ export const PIPELINE_EVENT_TYPES: string[] = PIPELINE_STEP_EVENTS.flatMap(
 );
 
 /**
+ * Consecutive `onerror` callbacks (with no `onopen` in between) after which
+ * we stop letting EventSource retry. Without this the browser reconnects
+ * forever against an endpoint that is down, and every attempt costs a
+ * request.
+ */
+const MAX_CONSECUTIVE_ERRORS = 5;
+
+/**
  * React hook for consuming real-time pipeline events via SSE.
  *
  * Usage:
- *   const { events, connected, lastEvent } = useListingEvents(listingId);
+ *   const { events, connected, lastEvent, gaveUp } = useListingEvents(listingId);
  */
 export function useListingEvents(
   listingId: string | null,
@@ -45,7 +53,11 @@ export function useListingEvents(
   const [events, setEvents] = useState<ListingEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<ListingEvent | null>(null);
+  const [gaveUp, setGaveUp] = useState(false);
   const sourceRef = useRef<EventSource | null>(null);
+  /** Event ids already applied — the server replays on reconnect. */
+  const seenRef = useRef<Set<string>>(new Set());
+  const errorCountRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (sourceRef.current) {
@@ -60,6 +72,10 @@ export function useListingEvents(
       cleanup();
       return;
     }
+
+    seenRef.current = new Set();
+    errorCountRef.current = 0;
+    setGaveUp(false);
 
     // Key must match `auth-context.tsx`'s storage key, or this always
     // reads null and the stream silently falls back to unauthenticated
@@ -76,11 +92,17 @@ export function useListingEvents(
     const source = new EventSource(url);
     sourceRef.current = source;
 
-    source.onopen = () => setConnected(true);
-
-    source.onmessage = (e) => {
+    /**
+     * Apply one event, ignoring anything already seen. The SSE `id:` is the
+     * identity when present (it survives a reconnect replay); otherwise fall
+     * back to type + timestamp.
+     */
+    const record = (e: MessageEvent) => {
       try {
         const event: ListingEvent = JSON.parse(e.data);
+        const key = e.lastEventId || `${event.event_type}|${event.timestamp}`;
+        if (seenRef.current.has(key)) return;
+        seenRef.current.add(key);
         setEvents((prev) => [...prev, event]);
         setLastEvent(event);
       } catch {
@@ -88,20 +110,25 @@ export function useListingEvents(
       }
     };
 
+    source.onopen = () => {
+      errorCountRef.current = 0;
+      setConnected(true);
+    };
+
+    source.onmessage = record;
+
     for (const eventType of PIPELINE_EVENT_TYPES) {
-      source.addEventListener(eventType, (e: MessageEvent) => {
-        try {
-          const event: ListingEvent = JSON.parse(e.data);
-          setEvents((prev) => [...prev, event]);
-          setLastEvent(event);
-        } catch {
-          // skip
-        }
-      });
+      source.addEventListener(eventType, record as EventListener);
     }
 
     source.onerror = () => {
       setConnected(false);
+      errorCountRef.current += 1;
+      if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
+        source.close();
+        setGaveUp(true);
+        return;
+      }
       if (!reconnect) {
         source.close();
       }
@@ -114,7 +141,8 @@ export function useListingEvents(
   const reset = useCallback(() => {
     setEvents([]);
     setLastEvent(null);
+    seenRef.current = new Set();
   }, []);
 
-  return { events, connected, lastEvent, reset };
+  return { events, connected, lastEvent, gaveUp, reset };
 }

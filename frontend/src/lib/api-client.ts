@@ -111,7 +111,6 @@ class ApiClient {
       this._authMiddleware = {
         async onRequest({ request }) {
           request.headers.set("Authorization", `Bearer ${token}`);
-          request.headers.set("ngrok-skip-browser-warning", "true");
           return request;
         },
       };
@@ -141,7 +140,6 @@ class ApiClient {
   ): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
       ...(options.headers as Record<string, string>),
     };
 
@@ -758,7 +756,6 @@ class ApiClient {
   async sendHelpMessage(message: string, sessionId?: string): Promise<Response> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
     };
     if (this.token) {
       headers["Authorization"] = `Bearer ${this.token}`;

@@ -14,7 +14,8 @@ const STATUS_ICON: Record<string, { icon: string; color: string; bg: string }> =
   skipped: { icon: "–", color: "text-slate-400", bg: "bg-slate-50" },
 };
 
-const POLLING_STATES = ["uploading", "analyzing", "generating", "exporting"];
+// Real `ListingState` values only — see src/listingjet/models/listing.py.
+const POLLING_STATES = ["uploading", "analyzing", "exporting"];
 const POLL_INTERVAL = 10_000;
 const ERROR_MAX_CHARS = 200;
 

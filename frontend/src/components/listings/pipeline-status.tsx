@@ -6,13 +6,16 @@
  * Ingest → Analyze → Review → Create → Delivered
  */
 
-// Only real listing states appear here — see the `state` values the backend
-// sets in src/listingjet/pipeline/runner.py.
-const STAGES = [
+// Only real listing states appear here, and between STAGES and ERROR_STATES
+// every member of `ListingState` (src/listingjet/models/listing.py) is
+// covered — otherwise getStageIndex returns -1 and the tracker renders with
+// no stage marked at all.
+export const STAGES = [
   {
     key: "ingest",
     label: "Ingest",
-    states: ["new", "uploading"],
+    // `draft` and `demo` are pre-pipeline states: both sit at Ingest.
+    states: ["draft", "demo", "new", "uploading"],
   },
   {
     key: "analyze",
@@ -36,9 +39,9 @@ const STAGES = [
   },
 ];
 
-const ERROR_STATES = new Set(["failed", "pipeline_timeout", "cancelled"]);
+export const ERROR_STATES = new Set(["failed", "pipeline_timeout", "cancelled"]);
 
-function getStageIndex(state: string): number {
+export function getStageIndex(state: string): number {
   for (let i = 0; i < STAGES.length; i++) {
     if (STAGES[i].states.includes(state)) return i;
   }

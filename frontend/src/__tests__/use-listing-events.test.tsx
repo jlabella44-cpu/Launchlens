@@ -31,10 +31,10 @@ class StubEventSource {
     this.closed = true;
   }
 
-  /** Test helper: fire a named SSE event. */
-  emit(type: string, data: unknown) {
+  /** Test helper: fire a named SSE event, optionally with an SSE `id:`. */
+  emit(type: string, data: unknown, id = "") {
     for (const fn of this.listeners[type] || []) {
-      fn({ data: JSON.stringify(data) } as MessageEvent);
+      fn({ data: JSON.stringify(data), lastEventId: id } as MessageEvent);
     }
   }
 
@@ -44,7 +44,7 @@ class StubEventSource {
 }
 
 function Probe({ id }: { id: string | null }) {
-  const { connected, events, lastEvent } = useListingEvents(id, {
+  const { connected, events, lastEvent, gaveUp } = useListingEvents(id, {
     baseUrl: "http://localhost:8000",
   });
   return (
@@ -52,6 +52,7 @@ function Probe({ id }: { id: string | null }) {
       <span data-testid="connected">{String(connected)}</span>
       <span data-testid="count">{events.length}</span>
       <span data-testid="last">{lastEvent?.event_type ?? "none"}</span>
+      <span data-testid="gaveup">{String(gaveUp)}</span>
     </div>
   );
 }
@@ -145,5 +146,73 @@ describe("useListingEvents", () => {
   it("opens nothing without a listing id", () => {
     render(<Probe id={null} />);
     expect(StubEventSource.instances).toHaveLength(0);
+  });
+
+  it("collapses repeats of the same event id", () => {
+    render(<Probe id="listing-1" />);
+    const payload = {
+      event_type: "packaging.completed",
+      payload: {},
+      timestamp: "2026-09-07T00:00:00Z",
+    };
+
+    act(() => {
+      source().emit("packaging.completed", payload, "evt-1");
+      source().emit("packaging.completed", payload, "evt-1");
+      source().emit("packaging.completed", payload, "evt-1");
+    });
+
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+
+    act(() => {
+      source().emit("packaging.completed", payload, "evt-2");
+    });
+    expect(screen.getByTestId("count")).toHaveTextContent("2");
+  });
+
+  it("falls back to type + timestamp when the frame carries no id", () => {
+    render(<Probe id="listing-1" />);
+    const payload = {
+      event_type: "brand.completed",
+      payload: {},
+      timestamp: "2026-09-07T00:00:00Z",
+    };
+
+    act(() => {
+      source().emit("brand.completed", payload);
+      source().emit("brand.completed", payload);
+    });
+
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+  });
+
+  it("gives up after 5 consecutive errors", () => {
+    render(<Probe id="listing-1" />);
+
+    act(() => {
+      for (let i = 0; i < 4; i++) source().onerror?.(new Event("error"));
+    });
+    expect(source().closed).toBe(false);
+    expect(screen.getByTestId("gaveup")).toHaveTextContent("false");
+
+    act(() => {
+      source().onerror?.(new Event("error"));
+    });
+    expect(source().closed).toBe(true);
+    expect(screen.getByTestId("gaveup")).toHaveTextContent("true");
+    expect(screen.getByTestId("connected")).toHaveTextContent("false");
+  });
+
+  it("an onopen between errors resets the counter", () => {
+    render(<Probe id="listing-1" />);
+
+    act(() => {
+      for (let i = 0; i < 4; i++) source().onerror?.(new Event("error"));
+      source().onopen?.(new Event("open"));
+      for (let i = 0; i < 4; i++) source().onerror?.(new Event("error"));
+    });
+
+    expect(source().closed).toBe(false);
+    expect(screen.getByTestId("gaveup")).toHaveTextContent("false");
   });
 });
