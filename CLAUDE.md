@@ -1,180 +1,76 @@
-# ListingJet — Claude Code Session Guide
+# ListingJet — agent guide
 
-## What this project is
+ListingJet turns raw property photos into MLS bundles, branded flyers, listing copy, social captions, a video tour, and a 3D dollhouse render. The work is a 21-step pipeline declared in `src/listingjet/pipeline/definition.py`: enqueueing a listing inserts one `pipeline_jobs` row per step, and a worker running in-process inside the API polls that table, honouring each step's `requires` edges, `optional` flag, and `gate` (`review`, `addon:*`, `feature:*`). There is no Temporal and no queue broker.
 
-**ListingJet** is a SaaS platform that automates real estate listing media: agents upload property photos and get back MLS export bundles, AI descriptions, branded flyers, social content, a video tour, and a 3D floorplan — all processed through a 14-agent pipeline run by an in-process worker polling a Postgres job table (`src/listingjet/pipeline/`).
+## Stack
 
-- **Backend:** FastAPI + PostgreSQL (job table) + Redis, Python 3.12, Alembic migrations
-- **Frontend:** Next.js 16 (App Router), Tailwind CSS v4, TypeScript
-- **Infra:** Render (single free-tier web service; the worker runs in-process via `WORKER_ENABLED`, not a separate Render service), Supabase Postgres, Upstash Redis, Cloudflare R2 (media) — see `render.yaml`.
-- **Tests:** pytest + pytest-cov, vitest for frontend
+- Backend: Python 3.12, FastAPI, SQLAlchemy 2.0 async, Alembic, Postgres 16, Redis.
+- Frontend: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4.
+- Hosting: Render (one free web service, worker in-process), Supabase Postgres, Upstash Redis, Cloudflare R2, Vercel for the frontend.
+- Tests: pytest (903 passing at the last full run) and vitest (66 passing).
 
----
+## Branching and PRs
 
-## Branching
+Create a fresh feature branch per task off `main`, named for the work (`fix/`, `feat/`, `docs/`, `chore/`). Push it, open a PR, and do not merge to `main` without an explicit green light. Never push to `main` directly and never amend published commits. `gh pr create` works on this machine; the compare URL printed by `git push` is the fallback.
 
-Create a **fresh feature branch per task** off `main`. Name it for the work
-(`fix/…`, `feat/…`, `docs/…`, `chore/…`). Push, open a PR, do not merge to
-`main` without an explicit green light.
+## Working rules
 
-```bash
-git checkout main
-git pull --ff-only origin main
-git checkout -b <branch-name>
-# …work…
-git push -u origin <branch-name>
-```
+- Every `Bash` tool call must pass an explicit `timeout`. The 2-minute default kills `pytest`, `docker build`, and `npm ci` silently.
+- Commit and push before ending a session. The stop hook blocks on uncommitted changes or unpushed commits.
+- `.env.example` is generated from `Settings.model_fields` by `scripts/gen_env_example.py`. Never hand-edit it. Regenerate after adding or removing a setting, then run `just env-check`; the drift check is a hard gate in CI.
 
-Do **not** push to `main` directly and do **not** amend published commits.
-`gh pr create` works on this machine (verified 2026-04-17) — use it
-directly. Fallback: the compare URL printed by `git push` also works.
-
----
-
-## Bash commands
-
-Every `Bash` tool call must pass an explicit `timeout`. The harness default
-of 2 minutes will kill long-running commands (`pytest`, `docker build`,
-`npm ci`) silently — always set a ceiling that matches the expected
-runtime.
-
----
-
-## Running the project
-
-A `justfile` at the repo root wraps the common commands. On Windows (no
-POSIX `just` runtime), call the `.venv/Scripts/*` binaries directly instead
-of `just <target>`:
+## Commands
 
 ```bash
 just check       # ruff check src tests alembic + pytest -m "not db and not ffmpeg" -q
-just test        # pytest -q (full suite)
-just dev          # uvicorn listingjet.main:app --reload --port 8000
-just worker       # python -m listingjet.pipeline.worker
-just env-check    # scripts/gen_env_example.py --check (fails if .env.example is stale)
+just test        # pytest -q (needs Postgres on 5433 and ffmpeg for full green)
+just dev         # uvicorn listingjet.main:app --reload --port 8000
+just worker      # python -m listingjet.pipeline.worker (standalone; rarely needed)
+just env-check   # scripts/gen_env_example.py --check
 
-# Windows equivalents (no `just` runtime):
-.venv/Scripts/ruff.exe check src tests alembic
+# Windows (no POSIX `just` runtime) — call the venv binaries directly:
+.venv/Scripts/ruff.exe check src tests alembic scripts
 .venv/Scripts/pytest.exe -m "not db and not ffmpeg" -q
 .venv/Scripts/python.exe -m uvicorn listingjet.main:app --reload --port 8000
 .venv/Scripts/python.exe -m listingjet.pipeline.worker
 .venv/Scripts/python.exe scripts/gen_env_example.py --check
 ```
 
-```bash
-# Start all services (postgres, redis, api — worker runs in-process via
-# WORKER_ENABLED=true, already set for the api service in docker-compose.yml)
-docker-compose up
-
-# Run backend tests
-pip install -e ".[dev]"
-python -m pytest --tb=short -q
-
-# Run frontend
-cd frontend && npm ci && npm run dev
-
-# Run frontend tests
-cd frontend && npm run lint && npx vitest run
-```
-
-`.env.example` is **generated** — `scripts/gen_env_example.py` derives it
-from `Settings.model_fields`; never hand-edit it. Regenerate with
-`scripts/gen_env_example.py` (no flag) after adding/removing a setting, and
-run `--check` to verify it's current — `test.yml`'s `backend` job runs
-`python scripts/gen_env_example.py --check` as a hard gate, so a stale
-`.env.example` fails CI.
-
----
-
 ## CI
 
-One workflow, `.github/workflows/test.yml` ("Test"), runs on every PR and
-on push to `main`: a `backend` job (Postgres test DB on 5433 + Redis
-services, Alembic migrations, ffmpeg, `ruff check src tests alembic
-scripts`, the `.env.example` drift check, `pytest`) and a `frontend` job (`npm ci`,
-lint, `tsc --noEmit`, `vitest run`, `npm run build`). `deploy.yml` triggers
-the Render deploy hook only on push to `main` (API service only — the
-worker runs in-process inside that same service via `WORKER_ENABLED`, so
-there's no separate worker deploy). `docker.yml` builds the Docker image
-(no push) on every PR and on push to `main`, to catch Dockerfile breakage
-before merge. `lint.yml` was removed — Ruff now runs inside `test.yml`'s
-`backend` job.
+`.github/workflows/test.yml` runs on every PR and on push to `main`: a `backend` job (Postgres on 5433, Redis, Alembic, ffmpeg, `ruff check src tests alembic scripts`, the `.env.example` drift check, `pytest`) and a `frontend` job (`npm ci`, lint, `tsc --noEmit`, `vitest run`, `npm run build`). `.github/workflows/deploy.yml` hits the Render deploy hook (`RENDER_DEPLOY_HOOK_API`) on push to `main` only. `.github/workflows/docker.yml` builds the Docker image without pushing it, on every PR and on push to `main`.
 
----
+## Where things live
 
-## Key file locations
-
-> **Package naming:** the repo directory is `launchlens` and the PostgreSQL DB name is `launchlens`, but the Python package, Docker user, and all branding are `listingjet` (renamed 2026-03-29, commit `4c94d1f`). Anything under `src/launchlens/` or `design-system/launchlens/` is pre-rename cruft and has been removed — do **not** recreate those paths.
-
-### Backend — `src/listingjet/`
+The repo directory is `launchlens` and the local DB is named `launchlens`, but the Python package, Docker user, and all branding are `listingjet`. Do not recreate `src/launchlens/`.
 
 | What | Where |
 |---|---|
-| FastAPI app entry | `main.py` |
-| Pipeline worker entry (standalone: `python -m listingjet.pipeline.worker`) | `pipeline/worker.py` |
-| Job-table definition + runner | `pipeline/` |
-| DB engine / session | `database.py` |
-| Logging setup | `logging_config.py` |
-| API routers | `api/` |
-| Per-route Pydantic schemas | `api/schemas/` |
-| Pipeline agents | `agents/` |
-| SQLAlchemy models | `models/` |
-| Business-logic services | `services/` (auth, billing, credits, email, audit, rate-limit, etc.) |
-| AI/media provider adapters | `providers/` (Claude (text + vision), OpenAI images, Runway video, Canva) |
-| FastAPI middleware | `middleware/` |
-| Pricing-tier configuration | `config/` (currently `tiers.py`) |
-| Observability (Sentry only) | `monitoring/` |
-| Email templates (Jinja) | `templates/email/` |
-| Utility helpers | `utils/` |
-| Shared schemas (stub) | `schemas/` — empty today; active schemas live under `api/schemas/` |
+| FastAPI app factory, router mounts, lifespan | `src/listingjet/main.py` |
+| Pipeline definition: the `Step(...)` list, `requires`, gates | `src/listingjet/pipeline/definition.py` |
+| Job claiming, retries, gate evaluation; standalone worker entrypoint | `src/listingjet/pipeline/runner.py`, `pipeline/worker.py` |
+| Step implementations, one class per step | `src/listingjet/agents/` |
+| Providers: Claude text and vision, OpenAI images, Runway, Canva; `mock.py` when `USE_MOCK_PROVIDERS=true` | `src/listingjet/providers/` |
+| HTTP routers and per-route schemas | `src/listingjet/api/`, `api/schemas/` |
+| SQLAlchemy models | `src/listingjet/models/` |
+| Business logic: auth, billing, credits, email, audit, rate limit | `src/listingjet/services/` |
+| Feature flags | `src/listingjet/features.py` |
+| `Settings`, AI price table, credit tiers | `src/listingjet/config/` (`__init__.py`, `ai_rates.py`, `tiers.py`) |
+| Migrations, linear 001 to 056 | `alembic/versions/` |
+| Backend test suite | `tests/` |
+| Frontend App Router code; `lib/generated/api.d.ts` via `npm run generate-api` | `frontend/src/` |
+| Seed, smoke, and env-generation scripts | `scripts/` |
 
-### Backend support
+## Constraints and gotchas
 
-| What | Where |
-|---|---|
-| Alembic migrations | `alembic/versions/` (001→056, linear) |
-| Backend pytest suite | `tests/` |
-| Migration / seed / smoke scripts | `scripts/` |
+- Migration head is `056_video_asset_metadata`. Chain the next migration off it.
+- `FEATURES=` is a comma-separated list of `learning`, `health_score`, `performance_intelligence`, `help_agent`, `microsite`, `webhooks`, `listing_permissions`. All off by default. Routers are selected at app start, so changing it requires restarting the API.
+- Routers mount at their own prefix (`/auth`, `/listings`, `/admin`, and so on). There is no `/v1`. Health is at `/health` and `/health/deep`; `/ready` does not exist. Exception: the SSE stream is at `GET /sse/listings/{id}/events` (with `?token=`), because `api/listing_events.py` already owns `GET /listings/{id}/events`.
+- The worker runs inside the API process (`WORKER_ENABLED`, default true). There is no separate worker service on Render.
+- Render's free tier sleeps when idle, which pauses the worker and the hourly watchdog with it. Supabase free pauses a project after 7 idle days.
+- ffmpeg must be on PATH or pointed at by `FFMPEG_BIN`; `video_baseline` and `social_cuts` shell out to it.
+- With `USE_MOCK_PROVIDERS=true` every photo comes back `is_photo=True` at quality 85, so coverage and packaging never reject anything in a mock run.
 
-### Frontend — `frontend/src/`
+## Docs
 
-| What | Where |
-|---|---|
-| App Router pages | `app/` (incl. `admin/`, `analytics/`, `billing/`, `changelog/`, `demo/[id]/`, `faq/`, `review/`, `support/`, `terms/`, `privacy/`, `onboarding/`, `accept-invite/`, `settings/team/`) |
-| Components (root) | `components/` |
-| shadcn/ui primitives | `components/ui/` |
-| Layout components | `components/layout/` |
-| Analytics components | `components/analytics/` |
-| Notification components | `components/notifications/` |
-| Listing creation wizard | `components/listings/creation-wizard/` |
-| React context providers | `contexts/` |
-| Custom React hooks | `hooks/` |
-| Client-side helpers | `lib/` (generated API client under `lib/generated/`) |
-| Frontend tests | `__tests__/` |
-
-### Infra & ops
-
-| What | Where |
-|---|---|
-| Dockerfile + compose | `Dockerfile`, `docker-compose.yml`, `docker/` |
-| Design tokens / system | `design-system/listingjet/` |
-| Frontend Vercel config | `frontend/vercel.json` |
-
-### Docs & planning
-
-| What | Where |
-|---|---|
-| Master task list | `MASTER_TODO.md` |
-| Other specs, PRDs, handoffs | `docs/` |
-| LLM-friendly project overview | `PROJECT_OVERVIEW_FOR_LLM.md` |
-
----
-
-## Important constraints
-
-- **Never push to `main` directly** — go through the feature branch
-- **Never amend published commits** — create new commits
-- **Migration head: 056** — next migration must chain off `056_video_asset_metadata`
-- **Feature flags** — `FEATURES=` is a comma-separated env list (see `src/listingjet/features.py`) of: `learning`, `health_score`, `performance_intelligence`, `help_agent`, `microsite`, `webhooks`, `listing_permissions`. All off by default. Routers are selected at app start based on this value, so changing `FEATURES` requires restarting the API and worker processes.
-- Routes are mounted at their router prefix directly (e.g. `/auth/...`, `/listings/...`, `/demo/...`) — there is no `/v1` prefix in the running app despite past plans. Health endpoints (`/health`, `/health/deep`) are at their literal paths; `/ready` is not implemented. **Exception:** the SSE pipeline-events stream in `api/sse.py` is mounted at `/sse` (`GET /sse/listings/{id}/events`), not under `/listings`, because `api/listing_events.py` already owns `GET /listings/{id}/events` for an unrelated feature (social-reminder events). Frontend code must build the SSE URL with the `/sse` prefix.
-- The stop hook in `~/.claude/settings.json` will block you from stopping if there are uncommitted changes or unpushed commits — commit and push before ending the session.
+[README.md](README.md) · [free-tier setup runbook](docs/runbooks/free-tier-setup.md) · [design spec](docs/superpowers/specs/2026-09-05-free-tier-rework-design.md) · [MASTER_TODO.md](MASTER_TODO.md)

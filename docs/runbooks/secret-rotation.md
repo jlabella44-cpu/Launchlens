@@ -1,8 +1,8 @@
 # Secret Rotation Runbook
 
-All application secrets for ListingJet live in **AWS Secrets Manager** under the secret id `listingjet/app` (region `us-east-1`). ECS task definitions read from this secret via the CDK `services.py` stack. Local development uses `.env`.
+All production secrets for ListingJet live in the Render environment group **`listingjet-shared`** (Render dashboard, Environment Groups). The `listingjet-api` service pulls the group in via `fromGroup` in [`render.yaml`](../../render.yaml); the pipeline worker runs inside that same service, so there is exactly one process to restart. Local development uses `.env`. Provisioning each of these from scratch is covered in [`free-tier-setup.md`](free-tier-setup.md).
 
-This runbook covers every key in `listingjet/app`: when to rotate, how to rotate, downtime risk, and the exact cutover procedure.
+This runbook covers every secret in the group: when to rotate, how to rotate, downtime risk, and the exact cutover procedure.
 
 ---
 
@@ -10,54 +10,39 @@ This runbook covers every key in `listingjet/app`: when to rotate, how to rotate
 
 | Key | Cadence | Downtime risk | Notes |
 |---|---|---|---|
-| `RESEND_API_KEY` | 90 days or on compromise | None | Regenerate + paste |
-| `OPENAI_API_KEY` | 90 days | None | Regenerate + paste |
-| `ANTHROPIC_API_KEY` | 90 days | None | Regenerate + paste |
-| `GOOGLE_VISION_API_KEY` | 180 days | None | Regenerate + paste |
-| `KLING_ACCESS_KEY` / `KLING_SECRET_KEY` | 180 days | None | Rotate together |
-| `SENTRY_DSN` | Never (unless compromised) | None | DSNs are not sensitive auth tokens |
-| `STRIPE_SECRET_KEY` | Only on compromise | **Medium** — requires coordinated cutover | |
-| `STRIPE_WEBHOOK_SECRET` | Only on compromise or endpoint change | **Medium** — webhooks fail during swap | |
-| `JWT_SECRET` | Only on compromise | **High** — logs out all users | |
-| `DATABASE_URL` (password) | Yearly or on compromise | **High** — coordinated RDS + secret + task redeploy | |
-| `FIELD_ENCRYPTION_KEY` (Fernet, for IDX) | Never rotate without migration | **Critical** — breaks IDX feeds | Requires re-encrypting all rows |
+| `RESEND_API_KEY` | 90 days or on compromise | None | Regenerate and paste |
+| `OPENAI_API_KEY` | 90 days | None | Regenerate and paste |
+| `ANTHROPIC_API_KEY` | 90 days | None | Regenerate and paste |
+| `RUNWAY_API_KEY` | 180 days | None | Regenerate and paste |
+| `GOOGLE_API_KEY` | 180 days | None | Drive listing import only |
+| `CANVA_API_KEY` / `CANVA_CLIENT_SECRET` | 180 days | None | Only the `brand` step, which is optional |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Yearly or on compromise | **Medium** — all media reads and writes | Rotate as a pair |
+| `SENTRY_DSN` | Never unless compromised | None | A DSN is not an auth token |
+| `STRIPE_SECRET_KEY` | Only on compromise | **Medium** — needs a coordinated cutover | |
+| `STRIPE_WEBHOOK_SECRET` | Only on compromise or endpoint change | **Medium** — webhooks fail during the swap | |
+| `JWT_SECRET` | Only on compromise | **High** — logs out every user | |
+| `DATABASE_URL` / `DATABASE_URL_SYNC` (password) | Yearly or on compromise | **High** — coordinated Supabase and Render change | |
+| `FIELD_ENCRYPTION_KEY` (Fernet) | Never rotate without a migration | **Critical** — breaks encrypted tenant secrets | Requires re-encrypting every row |
 
-Golden rule: **don't rotate for the sake of rotating.** Every rotation is a cutover. Only do it on schedule or on known compromise.
+Golden rule: **do not rotate for the sake of rotating.** Every rotation is a cutover. Do it on schedule or on known compromise, not on a whim.
 
 ---
 
 ## Universal cutover procedure
 
-Most rotations follow this pattern. Steps vary only in how you generate the new key (step 1).
+Most rotations follow this pattern. Only step 1, generating the new key, varies.
 
-**Preflight**
-```powershell
-aws secretsmanager get-secret-value --secret-id listingjet/app --query SecretString --output text > $env:TEMP\app.json
-notepad $env:TEMP\app.json
-```
-Add or replace the key/value pair. Save, close.
+1. Generate the new key at the provider. **Do not revoke the old one yet.**
+2. Render dashboard, Environment Groups, `listingjet-shared`, edit the key, Save.
+3. Saving an env group triggers a redeploy of every service linked to it. If it does not, or you want to force it: `listingjet-api`, Manual Deploy, "Deploy latest commit". Render reads environment variables at process start, so a running instance keeps the old value until it is replaced.
+4. Wait for the deploy to reach **live**, then verify:
+   ```bash
+   curl -fsS https://<service>.onrender.com/health/deep
+   ```
+   `/health/deep` covers Postgres, Redis, and the worker tick. Then smoke test whatever the rotated key actually authenticates against: send an email, run a listing through the pipeline, hit a Stripe test endpoint.
+5. **Revoke the old key** at the provider only after verification. Revoking first turns a failed deploy into an outage.
 
-**Push**
-```powershell
-aws secretsmanager put-secret-value --secret-id listingjet/app --secret-string (Get-Content $env:TEMP\app.json -Raw)
-Remove-Item $env:TEMP\app.json
-```
-
-**Force ECS to pick up the new value** — ECS only re-reads secrets on task start, so running tasks still hold the old key until they're replaced:
-```powershell
-aws ecs update-service --cluster listingjet --service listingjet-api --force-new-deployment
-aws ecs update-service --cluster listingjet --service listingjet-worker --force-new-deployment
-```
-
-**Verify**
-```powershell
-aws ecs describe-services --cluster listingjet --services listingjet-api listingjet-worker --query "services[*].[serviceName,runningCount,desiredCount,deployments[0].rolloutState]"
-```
-Wait until `rolloutState` is `COMPLETED` on both.
-
-Then smoke test whatever the key authenticates against (send an email, hit a Stripe test endpoint, run a vision call).
-
-**Revoke the old key** at the provider dashboard **only after** verification. If you revoke first and the deploy fails, you have downtime.
+Note that the free Render plan sleeps an idle service. If the service is asleep, the first request after a rotation both wakes it and picks up the new value; give it about 30 seconds before deciding something is broken.
 
 ---
 
@@ -65,148 +50,156 @@ Then smoke test whatever the key authenticates against (send an email, hit a Str
 
 ### RESEND_API_KEY
 
-**Generate:** https://resend.com/api-keys → Create API key → scope: "Sending access" only → copy.
-**Verify after deploy:** Trigger a pipeline complete email on a test listing, or run the smoke test script at `scripts/smoke_resend.py` (if present).
-**Downtime risk:** None. Old key still works until revoked.
+**Generate:** https://resend.com/api-keys, Create API key, scope "Sending access" only.
+**Verify:** trigger a pipeline-complete email on a test listing, or run `scripts/smoke_resend.py`.
+**Downtime risk:** none. The old key works until revoked.
 
-### OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_VISION_API_KEY
+### OPENAI_API_KEY / ANTHROPIC_API_KEY
 
 **Generate:**
 - OpenAI: https://platform.openai.com/api-keys
 - Anthropic: https://console.anthropic.com/settings/keys
-- Google Vision: https://console.cloud.google.com/apis/credentials (restrict to Vision API)
 
-**Verify:** Retry a listing through the pipeline — it will hit T1 (vision) and description generation (LLM) on restart.
-**Downtime risk:** None. Old key works until revoked.
-**Cost note:** Rotation has no billing impact; usage stays under the same org/project.
+**Verify:** run one listing through the pipeline. `photo_analysis` and `content_social` hit Anthropic; `virtual_staging`, `image_edit`, and `dollhouse_render` hit OpenAI images.
+**Downtime risk:** none. The old key works until revoked.
+**Cost note:** rotation has no billing impact; usage stays in the same org or project.
 
-### KLING_ACCESS_KEY / KLING_SECRET_KEY
+### RUNWAY_API_KEY
 
-**Generate:** https://klingai.com dashboard → API → regenerate access + secret pair.
-**Must rotate as a pair.** Kling signs requests with both; partial rotation fails.
-**Verify:** Submit a test video clip via the smoke script or retry a listing that needs video.
-**Downtime risk:** None if done together.
+**Generate:** Runway developer portal, API keys, create a new key for the same organization so the prepaid credit balance carries over.
+**Verify:** run a listing with the `ai_video_tour` add-on enabled and confirm `video_ai` completes. That step is optional, so a bad key shows up as a skipped video and a failed job row, not a failed listing — check `pipeline_jobs` rather than the listing state.
+**Downtime risk:** none.
+**Cost note:** generated clip URLs expire in 24 to 48 hours, but the agent downloads each clip immediately, so a rotation never invalidates already-delivered media.
+
+### GOOGLE_API_KEY
+
+Used only for the Google Drive listing-import path.
+
+**Generate:** https://console.cloud.google.com/apis/credentials, restrict the key to the Drive API.
+**Verify:** import a listing from a Drive folder link.
+**Downtime risk:** none. Nothing in the pipeline depends on it.
+
+### CANVA_API_KEY / CANVA_CLIENT_SECRET
+
+`CANVA_API_KEY` is the platform key used for flyer rendering. `CANVA_CLIENT_SECRET` (with `CANVA_CLIENT_ID`) backs the per-tenant OAuth connection at `/auth/canva/callback`.
+
+**Generate:** Canva developer portal, your integration, Keys.
+**Rotating `CANVA_CLIENT_SECRET` invalidates existing tenant OAuth grants** — tenants have to reconnect Canva from Settings, Brand Kit. Announce it before rotating.
+**Verify:** run a listing and confirm the `brand` step produces a flyer. `brand` is optional, so a broken key degrades to "no flyer" rather than a failed listing.
+**Downtime risk:** none for `CANVA_API_KEY`; low but user-visible for `CANVA_CLIENT_SECRET`.
+
+### S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY (Cloudflare R2)
+
+**Medium risk — every upload, presigned URL, and download uses these.**
+
+**Generate:** Cloudflare dashboard, R2, Manage R2 API Tokens, Create API token. Permissions "Object Read & Write", scoped to the `listingjet-media` bucket. Copy the Access Key ID and Secret; they are shown once. The endpoint URL does not change, so `S3_ENDPOINT_URL` stays as it is.
+**Rotate as a pair.** Half a credential pair is a broken credential pair.
+**Verify:** upload a photo through the creation wizard (presigned POST), open a listing gallery (presigned GET), and delete an asset. Tail the Render logs for `StorageError`.
+**Downtime risk:** any in-flight presigned URL signed with the old key keeps working until it expires; new signing uses the new key immediately after the restart. Revoke the old token only after a clean upload and gallery load.
 
 ### SENTRY_DSN
 
-A Sentry DSN is technically a project identifier, not an auth secret. It authorizes event submission only, not read access. **Do not rotate casually.** Rotate only if you're moving projects or have confirmed abuse (spam events on your project quota).
+A DSN is a project identifier that authorizes event submission, not read access. **Do not rotate casually.** Rotate only when moving projects or after confirmed abuse of your event quota.
 
 ### STRIPE_SECRET_KEY
 
 **Medium risk — read the whole section before starting.**
 
-**Generate:** https://dashboard.stripe.com/apikeys → "Create restricted key" (never use an unrestricted live key in prod).
-**Required scopes for ListingJet:**
-- Customers: read/write
-- Subscriptions: read/write
-- Checkout Sessions: read/write
-- Payment Intents: read
-- Prices: read
-- Products: read
-- Webhooks: read
-- Invoices: read
+**Generate:** https://dashboard.stripe.com/apikeys, "Create restricted key". Never put an unrestricted live key in production.
+**Required scopes:** Customers read/write, Subscriptions read/write, Checkout Sessions read/write, Payment Intents read, Prices read, Products read, Webhooks read, Invoices read.
 
 **Cutover:**
-1. Create the new restricted key (do not revoke the old one yet)
-2. Paste into Secrets Manager
-3. Force-deploy ECS (procedure above)
-4. In a separate terminal, watch logs: `aws logs tail /listingjet/api --follow --filter-pattern stripe`
-5. Once you see successful Stripe calls with the new key (any checkout, plan fetch, or webhook), revoke the old key in Stripe dashboard
+1. Create the new restricted key. Do not revoke the old one.
+2. Paste it into `listingjet-shared` and let the redeploy run.
+3. Watch the Render service logs for the first successful Stripe call: any checkout, plan fetch, or webhook.
+4. Revoke the old key in the Stripe dashboard.
 
-**If anything fails mid-cutover:** do **not** revoke the old key. Roll back the secret value to the old key, force-deploy again, triage.
-
-**In-flight risk:** Customers mid-checkout during the swap may see one failed payment. Stripe retries. Schedule during low traffic (Tuesday 2-4am CT is typical).
+**If anything fails mid-cutover:** do not revoke the old key. Put the old value back, redeploy, and triage.
+**In-flight risk:** a customer mid-checkout during the restart may see one failed payment. Stripe retries. Schedule for low traffic.
 
 ### STRIPE_WEBHOOK_SECRET
 
-Rotate **only** when you rotate the webhook endpoint itself in the Stripe dashboard. The secret is tied 1:1 to a specific webhook URL in Stripe.
+Rotate **only** when you rotate the webhook endpoint itself. The secret is tied one-to-one to a specific webhook URL in Stripe.
 
-**Cutover — this is a choreographed swap:**
-1. In Stripe dashboard, go to Developers → Webhooks → your endpoint → "Roll secret"
-2. Stripe gives you an expiration window (default 24h) where **both old and new secrets validate signatures**
-3. During that window: paste new secret into Secrets Manager + force-deploy ECS
-4. Verify webhooks are processing: check `/admin` audit log for recent `stripe.*` events
-5. After verification, before the expiration window closes, confirm in Stripe that the old secret is invalidated
+**Cutover — a choreographed swap:**
+1. Stripe dashboard, Developers, Webhooks, your endpoint, "Roll secret".
+2. Stripe gives you an expiration window (default 24 hours) during which **both** secrets validate signatures.
+3. Inside that window, paste the new secret into `listingjet-shared` and let the redeploy run.
+4. Verify webhooks are processing: check the `/admin` audit log for recent `stripe.*` events.
+5. Before the window closes, confirm in Stripe that the old secret is invalidated.
 
-**If you miss the window:** Stripe webhooks will start returning 400 at your endpoint and Stripe will retry with exponential backoff, then give up. Customers will see delayed subscription state. You have ~24h of grace, don't waste it.
+**If you miss the window:** the endpoint starts returning 400, Stripe retries with backoff and then gives up, and subscription state goes stale. You have about 24 hours of grace, do not waste it.
 
 ### JWT_SECRET
 
-**High risk — only rotate on compromise.**
+**High risk — rotate only on compromise.**
 
-Rotating this invalidates:
-- All existing JWT access tokens (users get 401 on next request)
-- All existing refresh tokens (users get logged out, must re-authenticate)
-- Any pending password reset / email verification tokens signed with the old secret
+Rotating invalidates every access token (401 on the next request), every refresh token (everyone is logged out), and any pending password-reset or email-verification token signed with the old secret.
 
 **Cutover:**
-1. Announce planned downtime to users (even 60s of "please log in again" is user-visible)
-2. Generate a new strong secret:
-   ```powershell
+1. Announce the interruption. Even 60 seconds of "please log in again" is user-visible.
+2. Generate a new secret:
+   ```bash
    python -c "import secrets; print(secrets.token_urlsafe(64))"
    ```
-3. Push to Secrets Manager + force-deploy
-4. Every active user is logged out at next request
-5. Clear the Redis JWT blocklist (old blocklist entries are for tokens signed with the old secret and are harmless but wasteful):
+3. Paste into `listingjet-shared`, let the redeploy run.
+4. Every active user is logged out at their next request.
+5. Clear the Redis revocation entries. They refer to tokens signed with the old secret and are now dead weight:
+   ```bash
+   redis-cli --tls -u "$REDIS_URL" --scan --pattern "jwt:blocked:*" | xargs redis-cli --tls -u "$REDIS_URL" del
    ```
-   redis-cli --scan --pattern "jwt:blocked:*" | xargs redis-cli del
-   ```
+   Upstash counts every one of those commands against the free daily quota, so on a large keyspace let them expire on their own instead.
 
-**Never rotate as a "quarterly hygiene" task.** Only on confirmed leak.
+**Never rotate this as quarterly hygiene.** Only on a confirmed leak.
 
-### DATABASE_URL
+### DATABASE_URL / DATABASE_URL_SYNC
 
-**High risk — coordinated multi-system cutover.**
+**High risk — coordinated Supabase and Render change.**
 
-The DATABASE_URL in `listingjet/app` is a legacy override. The primary path is `db_secret = db_instance.secret` in the CDK, which points at the RDS-managed master secret (`ListingJetDatabase/Secret/...`).
+Both URLs carry the password for the `listingjet` role. `DATABASE_URL` is the transaction pooler on port 6543 (with `DB_USE_PGBOUNCER=true`); `DATABASE_URL_SYNC` is the direct connection on port 5432 that Alembic uses. They must be rotated together and must never point at the Supabase `postgres` superuser, which bypasses RLS and silently disables tenant isolation.
 
-**If rotating the RDS master password:**
-1. Use AWS Secrets Manager rotation (automatic) — go to Secrets Manager → RDS secret → "Rotate" → "Immediately"
-2. AWS Secrets Manager rotation lambda handles a dual-password window where both old and new are valid
-3. Force-deploy ECS after the rotation completes
-4. Verify connectivity: `curl https://api.listingjet.ai/health`
+**Cutover:**
+1. In the Supabase SQL editor: `ALTER ROLE listingjet WITH PASSWORD '<new password>';`
+2. Immediately update **both** keys in `listingjet-shared` and save. The window between the `ALTER ROLE` and the redeploy finishing is real downtime, so do these back to back.
+3. Verify: `curl -fsS https://<service>.onrender.com/health/deep`.
+4. Update your own `.env` and any local tooling that used the old password.
 
-**If rotating a legacy DATABASE_URL override:**
-1. The secret should probably be deleted entirely — prefer the RDS-managed path
-2. File a ticket to remove the override; don't maintain a legacy rotation procedure
-
-**Do not** manually `ALTER USER ... WITH PASSWORD` on RDS without using the rotation lambda — the window between DB password change and secret update is instant downtime.
+**Do not** change the password and then walk away. There is no dual-password window on Supabase.
 
 ### FIELD_ENCRYPTION_KEY (Fernet)
 
 **Do not rotate without a migration script.**
 
-Rotating without re-encrypting existing rows means any data encrypted with this key becomes unreadable — the old ciphertext can't be decrypted with the new key.
+Anything encrypted with this key becomes unreadable if you swap it: old ciphertext cannot be decrypted with a new key.
 
-**Correct rotation procedure (if ever needed):**
-1. Add `FIELD_ENCRYPTION_KEY_OLD` as a second secret
-2. Deploy code that supports *read from either key, write with new key*
-3. Write a migration: decrypt every row with old key, re-encrypt with new key
-4. Run migration in production
-5. Deploy code that removes the old-key read path
-6. Delete `FIELD_ENCRYPTION_KEY_OLD` from Secrets Manager
+**Correct procedure, if it is ever genuinely needed:**
+1. Add `FIELD_ENCRYPTION_KEY_OLD` as a second value.
+2. Deploy code that reads with either key and writes with the new one.
+3. Write a migration that decrypts every affected row with the old key and re-encrypts with the new one.
+4. Run it in production.
+5. Deploy code that drops the old-key read path.
+6. Delete `FIELD_ENCRYPTION_KEY_OLD` from the group.
 
-This is a full code-change cycle, not a secret swap. Plan at least a week.
+This is a full code-change cycle, not a secret swap. Plan a week.
 
 ---
 
 ## Emergency rotation (known compromise)
 
-If a key is *actively* compromised (appeared in a public repo, screenshot, Slack channel, etc.):
+If a key is *actively* compromised — pasted into a public repo, a screenshot, a Slack channel:
 
-1. **Revoke first, ask questions later** — for zero-downtime keys (Resend, OpenAI, Anthropic, Vision, Kling, Sentry): revoke immediately at the provider, then rotate. A brief error spike is better than ongoing abuse.
-2. **For high-risk keys** (Stripe, JWT, DB): open an incident channel before touching anything. The rotation is worse than the compromise unless you're certain active abuse is happening.
-3. After rotation, audit usage logs on the provider side for abuse fingerprints (unexpected regions, unexpected models, spending anomalies).
+1. **Revoke first, ask questions later** for the zero-downtime keys: Resend, OpenAI, Anthropic, Runway, Google, Canva, Sentry. A brief error spike beats ongoing abuse.
+2. **For the high-risk keys** — Stripe, JWT, database, R2 — open an incident channel before touching anything. An unplanned rotation is often worse than the compromise unless you are certain abuse is happening.
+3. After rotating, audit the provider's usage logs for abuse fingerprints: unexpected regions, unexpected models, spending anomalies.
 
 ---
 
 ## Automating: future work
 
-- [ ] Enable AWS Secrets Manager automatic rotation for the RDS master secret (built-in lambda)
-- [ ] Add a CloudWatch alarm on `listingjet/app` secret age — warn at 90 days per key
-- [ ] Add a pre-deploy smoke test script per provider under `scripts/smoke_<provider>.py` that validates each rotated key end-to-end before `force-new-deployment`
+- [ ] Add a smoke script per provider under `scripts/smoke_<provider>.py` that validates a rotated key before the redeploy, alongside the existing `scripts/smoke_resend.py`.
+- [ ] Track key age somewhere durable. Render environment groups have no age metadata, so today this is a calendar reminder.
 
 ---
 
-**Last reviewed:** 2026-04-10
+**Last reviewed:** 2026-09-07
 **Owner:** Jeff

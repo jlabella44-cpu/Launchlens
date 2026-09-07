@@ -13,8 +13,8 @@
 #   - Redis     -> Upstash             (REDIS_URL, rediss:// TLS)
 #   - Storage   -> Cloudflare R2       (S3_ENDPOINT_URL + S3_* keys)
 #
-# First-time setup and the full cutover steps are in
-# docs/runbooks/render-supabase-cutover.md.
+# First-time setup, account-by-account, is in
+# docs/runbooks/free-tier-setup.md.
 
 services:
   - type: web
