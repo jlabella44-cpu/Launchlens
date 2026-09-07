@@ -75,6 +75,7 @@ def build_tour(
     transition_s: float = 0.5,
     music_path: str | None = None,
     music_db: float = -18.0,
+    stitcher: VideoStitcher | None = None,
 ) -> tuple[bytes, list[dict], list[dict]]:
     """Build the Ken Burns tour video from local image paths. Pure/sync — run under `to_thread`.
 
@@ -91,7 +92,7 @@ def build_tour(
     if not photo_paths_rooms:
         raise ValueError("No photos to build a tour from")
 
-    stitcher = VideoStitcher()
+    stitcher = stitcher or VideoStitcher()
     with tempfile.TemporaryDirectory() as tmpdir:
         photo_clips: list[tuple[str, float]] = []
         clips_manifest: list[dict] = []
@@ -254,6 +255,7 @@ class VideoBaselineAgent(BaseAgent):
                 width=self._width,
                 height=self._height,
                 music_path=music_path,
+                stitcher=self._stitcher,
             )
 
             s3_key = f"videos/{listing_id}/tour.mp4"

@@ -13,7 +13,7 @@ from listingjet.models.listing import Listing, ListingState
 from listingjet.models.package_selection import PackageSelection
 from listingjet.models.video_asset import VideoAsset
 from listingjet.models.vision_result import VisionResult
-from listingjet.services.video_stitcher import probe_duration
+from listingjet.services.video_stitcher import VideoStitcher, probe_duration
 from tests.test_agents.conftest import make_session_factory
 
 pytestmark = pytest.mark.ffmpeg
@@ -272,3 +272,40 @@ def test_select_baseline_photos_helper():
     ]
     selected = select_baseline_photos(rows, max_photos=10)
     assert [a.file_path for a, _vr in selected] == ["photo_0.jpg", "photo_4.jpg"]
+
+
+@pytest.mark.asyncio
+async def test_injected_stitcher_is_used(ffmpeg_available, db_session):
+    """A stitcher injected into the agent's constructor must actually be used
+    by build_tour, not shadowed by a fresh VideoStitcher() built internally."""
+    listing = await _make_listing(db_session)
+    await _package_asset(db_session, listing, 0, room="exterior")
+    await _package_asset(db_session, listing, 1, room="kitchen")
+
+    storage = make_storage_mock()
+    real_stitcher = VideoStitcher()
+    spy_stitcher = MagicMock(wraps=real_stitcher)
+    spy_stitcher.stitch_xfade = MagicMock(wraps=real_stitcher.stitch_xfade)
+
+    agent = VideoBaselineAgent(
+        storage=storage, stitcher=spy_stitcher,
+        session_factory=make_session_factory(db_session),
+        width=320, height=180,
+    )
+    ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+    result = await agent.execute(ctx)
+
+    spy_stitcher.stitch_xfade.assert_called_once()
+    assert result["status"] == "ready"
+
+    video_bytes = storage.uploads[result["s3_key"]]
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "out.mp4")
+        with open(p, "wb") as f:
+            f.write(video_bytes)
+        duration = probe_duration(p)
+
+    expected_duration = 2 * 3.0 - 1 * 0.5 + 5
+    assert abs(duration - expected_duration) < 0.3
