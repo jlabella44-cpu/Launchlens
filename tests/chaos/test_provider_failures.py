@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from listingjet.agents.base import AgentContext
-from listingjet.agents.content import ContentAgent
+from listingjet.agents.content_social import ContentSocialAgent
 from listingjet.agents.ingestion import IngestionAgent
 
 # ---------------------------------------------------------------------------
@@ -119,99 +119,86 @@ class TestIngestionAgentDBFailure:
 # tests/test_agents/test_photo_analysis.py.
 
 # ---------------------------------------------------------------------------
-# 3. ContentAgent — LLM provider failure should raise cleanly
+# 3. ContentSocialAgent — Claude failure should raise cleanly
 # ---------------------------------------------------------------------------
 
-class TestContentAgentLLMFailure:
-    """ContentAgent does NOT gracefully degrade — an LLM failure must raise
-    so the job runner retries the step."""
+class TestContentSocialAgentLLMFailure:
+    """ContentSocialAgent does NOT gracefully degrade — a Claude failure must
+    raise so the job runner retries the step, and no SocialContent rows or
+    completion event should be written."""
 
     @pytest.mark.asyncio
-    async def test_llm_provider_error_propagates(self):
-        """If the LLM provider raises, ContentAgent must not swallow it."""
-        failing_llm = AsyncMock()
-        failing_llm.complete.side_effect = RuntimeError(
-            "OpenAI API rate limit exceeded"
+    async def test_claude_provider_error_propagates(self, db_session):
+        """If Claude raises, ContentSocialAgent must not swallow it."""
+        from sqlalchemy import select
+
+        from listingjet.models.listing import Listing, ListingState
+        from listingjet.models.outbox import Outbox
+        from listingjet.models.social_content import SocialContent
+
+        listing = Listing(
+            tenant_id=uuid.uuid4(), address={"street": "1 Chaos St"},
+            metadata_={"beds": 3, "baths": 2, "sqft": 1800},
+            state=ListingState.AWAITING_REVIEW,
+        )
+        db_session.add(listing)
+        await db_session.flush()
+
+        failing_claude = AsyncMock()
+        failing_claude.complete_json.side_effect = RuntimeError(
+            "Claude API rate limit exceeded"
         )
 
-        listing_id = uuid.uuid4()
-        mock_listing = MagicMock()
-        mock_listing.id = listing_id
-        mock_listing.metadata_ = {"beds": 3, "baths": 2, "sqft": 1800}
-
-        vr_result = MagicMock()
-        vr_result.scalars.return_value.all.return_value = []
-
-        session = _make_mock_session()
-        session.get.return_value = mock_listing
-        session.execute.return_value = vr_result
-
-        factory = _make_session_factory(session)
-        ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(uuid.uuid4()))
-
-        agent = ContentAgent(llm_provider=failing_llm, session_factory=factory)
+        factory = _make_session_factory(db_session)
+        ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+        agent = ContentSocialAgent(claude=failing_claude, session_factory=factory)
 
         with pytest.raises(RuntimeError, match="rate limit exceeded"):
             await agent.execute(ctx)
 
-    @pytest.mark.asyncio
-    async def test_llm_returns_invalid_json_falls_back(self):
-        """If the LLM returns garbage, the agent falls back to listing metadata
-        description rather than crashing the workflow.
-        """
-        broken_llm = AsyncMock()
-        broken_llm.complete.return_value = "this is not json at all"
-
-        listing_id = uuid.uuid4()
-        mock_listing = MagicMock()
-        mock_listing.id = listing_id
-        mock_listing.metadata_ = {
-            "beds": 3,
-            "baths": 2,
-            "description": "Charming three-bedroom home with a sunny backyard.",
-        }
-
-        vr_result = MagicMock()
-        vr_result.scalars.return_value.all.return_value = []
-
-        session = _make_mock_session()
-        session.get.return_value = mock_listing
-        session.execute.return_value = vr_result
-
-        factory = _make_session_factory(session)
-        ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(uuid.uuid4()))
-
-        agent = ContentAgent(llm_provider=broken_llm, session_factory=factory)
-
-        result = await agent.execute(ctx)
-        assert result["mls_safe"] == mock_listing.metadata_["description"]
-        assert result["marketing"] == mock_listing.metadata_["description"]
-        assert result["fha_passed"] is False
+        rows = (await db_session.execute(
+            select(SocialContent).where(SocialContent.listing_id == listing.id)
+        )).scalars().all()
+        assert rows == []
+        evt = (await db_session.execute(
+            select(Outbox).where(Outbox.event_type == "content_social.completed")
+        )).scalars().first()
+        assert evt is None
 
     @pytest.mark.asyncio
-    async def test_llm_connection_error_propagates(self):
+    async def test_claude_connection_error_propagates(self, db_session):
         """A network-level connection error should propagate cleanly."""
-        failing_llm = AsyncMock()
-        failing_llm.complete.side_effect = ConnectionError(
-            "Failed to connect to api.openai.com"
+        from sqlalchemy import select
+
+        from listingjet.models.listing import Listing, ListingState
+        from listingjet.models.outbox import Outbox
+        from listingjet.models.social_content import SocialContent
+
+        listing = Listing(
+            tenant_id=uuid.uuid4(), address={"street": "2 Chaos St"},
+            metadata_={"beds": 2, "baths": 1},
+            state=ListingState.AWAITING_REVIEW,
+        )
+        db_session.add(listing)
+        await db_session.flush()
+
+        failing_claude = AsyncMock()
+        failing_claude.complete_json.side_effect = ConnectionError(
+            "Failed to connect to api.anthropic.com"
         )
 
-        listing_id = uuid.uuid4()
-        mock_listing = MagicMock()
-        mock_listing.id = listing_id
-        mock_listing.metadata_ = {"beds": 2, "baths": 1}
-
-        vr_result = MagicMock()
-        vr_result.scalars.return_value.all.return_value = []
-
-        session = _make_mock_session()
-        session.get.return_value = mock_listing
-        session.execute.return_value = vr_result
-
-        factory = _make_session_factory(session)
-        ctx = AgentContext(listing_id=str(listing_id), tenant_id=str(uuid.uuid4()))
-
-        agent = ContentAgent(llm_provider=failing_llm, session_factory=factory)
+        factory = _make_session_factory(db_session)
+        ctx = AgentContext(listing_id=str(listing.id), tenant_id=str(listing.tenant_id))
+        agent = ContentSocialAgent(claude=failing_claude, session_factory=factory)
 
         with pytest.raises(ConnectionError, match="Failed to connect"):
             await agent.execute(ctx)
+
+        rows = (await db_session.execute(
+            select(SocialContent).where(SocialContent.listing_id == listing.id)
+        )).scalars().all()
+        assert rows == []
+        evt = (await db_session.execute(
+            select(Outbox).where(Outbox.event_type == "content_social.completed")
+        )).scalars().first()
+        assert evt is None
