@@ -80,15 +80,18 @@ cd frontend && npm run lint && npx vitest run
 `.env.example` is **generated** — `scripts/gen_env_example.py` derives it
 from `Settings.model_fields`; never hand-edit it. Regenerate with
 `scripts/gen_env_example.py` (no flag) after adding/removing a setting, and
-run `--check` to verify it's current (this is also a CI/gate check).
+run `--check` to verify it's current — `test.yml`'s `backend` job runs
+`python scripts/gen_env_example.py --check` as a hard gate, so a stale
+`.env.example` fails CI.
 
 ---
 
 ## CI
 
 One workflow, `.github/workflows/test.yml` ("Test"), runs on every PR and
-on push to `main`: a `backend` job (Postgres + Redis services, Alembic
-migrations, ffmpeg, `ruff check`, `pytest`) and a `frontend` job (`npm ci`,
+on push to `main`: a `backend` job (Postgres test DB on 5433 + Redis
+services, Alembic migrations, ffmpeg, `ruff check src tests alembic
+scripts`, the `.env.example` drift check, `pytest`) and a `frontend` job (`npm ci`,
 lint, `tsc --noEmit`, `vitest run`, `npm run build`). `deploy.yml` triggers
 the Render deploy hook only on push to `main` (API service only — the
 worker runs in-process inside that same service via `WORKER_ENABLED`, so
