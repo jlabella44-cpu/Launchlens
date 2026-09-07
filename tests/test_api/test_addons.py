@@ -140,6 +140,56 @@ async def test_activate_addon_insufficient_credits_402(async_client: AsyncClient
 
 
 @pytest.mark.asyncio
+async def test_activate_addon_on_delivered_listing_requeues_pipeline(async_client: AsyncClient, db_session):
+    """Buying an add-on after the listing was already delivered must queue the
+    gated step (and its dependents) to re-run — see runner.enqueue_addon_steps."""
+    import uuid as uuid_mod
+
+    from sqlalchemy import select
+
+    from listingjet.models.listing import Listing, ListingState
+    from listingjet.models.pipeline_job import JobStatus, PipelineJob
+    from listingjet.pipeline import runner
+
+    token, tenant_id = await _register(async_client)
+    await _fund_account(db_session, tenant_id, amount=10)
+    listing_id = await _create_listing(async_client, token)
+
+    listing = await db_session.get(Listing, uuid_mod.UUID(listing_id))
+    await runner.enqueue_pipeline(db_session, listing, billing_model="legacy", enabled_addons=[])
+    sibs = await runner._siblings(db_session, listing.id)
+    for name in ["ingestion", "photo_analysis", "property_verification", "coverage",
+                 "floorplan", "dollhouse_render", "packaging", "video_baseline",
+                 "await_review", "content_social", "brand", "social_cuts",
+                 "mls_export", "distribution"]:
+        sibs[name].status = JobStatus.DONE
+        sibs[name].result = {}
+    listing.state = ListingState.DELIVERED
+    await db_session.commit()
+
+    resp = await async_client.post(
+        f"/addons/listings/{listing_id}/addons",
+        json={"addon_slug": "ai_video_tour"},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+
+    video_ai_status = (await db_session.execute(select(PipelineJob.status).where(
+        PipelineJob.listing_id == listing.id, PipelineJob.step == "video_ai"))).scalar_one()
+    distribution_status = (await db_session.execute(select(PipelineJob.status).where(
+        PipelineJob.listing_id == listing.id, PipelineJob.step == "distribution"))).scalar_one()
+    assert video_ai_status == JobStatus.QUEUED
+    assert distribution_status == JobStatus.QUEUED
+    # db_session is expire_on_commit=False, and this session already holds a
+    # cached (now-stale) `listing`, so re-query rather than `.get()` it, to
+    # actually see the other session's committed write.
+    refreshed_state = (await db_session.execute(
+        select(Listing.state).where(Listing.id == listing.id)
+    )).scalar_one()
+    assert refreshed_state == ListingState.EXPORTING
+
+
+@pytest.mark.asyncio
 async def test_activate_addon_not_found(async_client: AsyncClient, db_session):
     token, tenant_id = await _register(async_client)
     await _fund_account(db_session, tenant_id)

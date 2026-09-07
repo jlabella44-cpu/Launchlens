@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
-from listingjet.api.deps import get_current_user
+from listingjet.api.deps import get_current_user_or_query_token
 from listingjet.database import get_db
 from listingjet.models.event import Event
 from listingjet.models.listing import Listing
@@ -37,7 +37,7 @@ async def listing_events(
     listing_id: uuid.UUID,
     request: Request,
     _rl=Depends(rate_limit(5, 60)),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_query_token),
     db: AsyncSession = Depends(get_db),
 ):
     """SSE stream of pipeline events for a listing."""

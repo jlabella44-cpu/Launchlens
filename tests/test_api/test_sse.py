@@ -76,6 +76,19 @@ async def test_sse_returns_404_for_missing_listing(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_sse_rejects_bad_query_token(async_client: AsyncClient):
+    """Route-level check: an invalid ?token= is rejected before streaming starts
+    (fails fast, so it doesn't hit the SSE-hangs-in-CI issue above)."""
+    listing_id = str(uuid.uuid4())
+    resp = await async_client.get(
+        f"/sse/listings/{listing_id}/events",
+        params={"token": "not-a-real-jwt"},
+        timeout=3.0,
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_sse_returns_403_for_other_tenant_listing(async_client: AsyncClient):
     """A listing owned by another tenant returns 403."""
     token_a, _ = await _register(async_client)
@@ -112,3 +125,48 @@ async def test_sse_streams_retry_directive(async_client: AsyncClient):
 
     first = "".join(chunks)
     assert "retry:" in first
+
+
+# --- get_current_user_or_query_token: unit-level (no streaming, no hang risk) ---
+
+
+async def _resolve_current_user(async_client, db_session, *, token_param=None, credentials=None):
+    from starlette.requests import Request
+
+    from listingjet.api.deps import get_current_user_or_query_token
+
+    request = Request({"type": "http", "headers": [], "query_string": b""})
+    return await get_current_user_or_query_token(
+        request, token=token_param, credentials=credentials, db=db_session,
+    )
+
+
+@pytest.mark.asyncio
+async def test_query_token_dependency_accepts_valid_token(async_client: AsyncClient, db_session):
+    """Same validation path as get_current_user, with the query value as the
+    last fallback — a bare ?token= must resolve the same user."""
+    token, _ = await _register(async_client)
+    user = await _resolve_current_user(async_client, db_session, token_param=token)
+    assert user is not None
+
+
+@pytest.mark.asyncio
+async def test_query_token_dependency_rejects_bad_token(async_client: AsyncClient, db_session):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc_info:
+        await _resolve_current_user(async_client, db_session, token_param="not-a-real-jwt")
+    assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_query_token_dependency_prefers_header_over_query(async_client: AsyncClient, db_session):
+    """A valid Authorization header must win even when a (bad) query token is present."""
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    token, _ = await _register(async_client)
+    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    user = await _resolve_current_user(
+        async_client, db_session, token_param="not-a-real-jwt", credentials=creds,
+    )
+    assert user is not None

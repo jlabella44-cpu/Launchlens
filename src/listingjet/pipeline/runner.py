@@ -14,7 +14,7 @@ from sqlalchemy.orm import aliased
 
 from listingjet.models.listing import Listing, ListingState
 from listingjet.models.pipeline_job import JobStatus, PipelineJob
-from listingjet.pipeline.definition import PIPELINE, Step, post_review_steps
+from listingjet.pipeline.definition import PIPELINE, Step, post_review_steps, transitive_requires
 from listingjet.pipeline.steps import STEP_FUNCTIONS, StepContext
 
 logger = logging.getLogger(__name__)
@@ -226,13 +226,14 @@ def _describe(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"[:2000]
 
 
-async def fail_listing(session: AsyncSession, listing_id, *, step: str, error: str) -> None:
+async def fail_listing(session: AsyncSession, listing_id, *, step: str, error: str,
+                       state: ListingState = ListingState.FAILED) -> None:
     from listingjet.services.events import emit_event
 
     listing = await session.get(Listing, listing_id)
     if listing is None:
         return
-    listing.state = ListingState.FAILED
+    listing.state = state
     await session.execute(
         update(PipelineJob)
         .where(PipelineJob.listing_id == listing_id,
@@ -392,6 +393,72 @@ async def retry_listing(session: AsyncSession, listing: Listing, *, steps: list[
     return n
 
 
+_ADDON_RESETTABLE = (JobStatus.SKIPPED, JobStatus.FAILED, JobStatus.CANCELLED)
+
+
+async def enqueue_addon_steps(session: AsyncSession, listing: Listing, slug: str, *,
+                              steps: list[Step] = PIPELINE) -> int:
+    """Re-run the pipeline steps gated by an add-on bought after the listing was
+    already enqueued (or already delivered).
+
+    For every step gated on `addon:{slug}` (e.g. `video_ai`, `virtual_staging`):
+    a missing job is inserted QUEUED, and a SKIPPED/FAILED/CANCELLED job is reset
+    to QUEUED (attempts=0, run_after=now). Every step that transitively depends
+    on one of those gated steps and is currently DONE/SKIPPED is reset the same
+    way, so the pipeline re-runs everything downstream. Returns the number of
+    rows touched. If the listing had already reached DELIVERED, it's moved back
+    to EXPORTING so the UI shows processing again; `distribution` restores
+    DELIVERED once the re-run completes.
+    """
+    gate = f"addon:{slug}"
+    gated_steps = [s for s in steps if s.gate == gate]
+    if not gated_steps:
+        return 0
+    gated_names = {s.name for s in gated_steps}
+
+    sibs = await _siblings(session, listing.id)
+    now = _now()
+    touched = 0
+
+    def _reset(job: PipelineJob) -> None:
+        nonlocal touched
+        job.status = JobStatus.QUEUED
+        job.attempts = 0
+        job.error = None
+        job.locked_by = None
+        job.run_after = now
+        touched += 1
+
+    for step in gated_steps:
+        job = sibs.get(step.name)
+        if job is None:
+            job = PipelineJob(
+                tenant_id=listing.tenant_id, listing_id=listing.id, step=step.name,
+                status=JobStatus.QUEUED, max_attempts=step.max_attempts, run_after=now,
+                payload={"billing_model": "legacy", "enabled_addons": [slug]},
+            )
+            session.add(job)
+            sibs[step.name] = job
+            touched += 1
+        elif job.status in _ADDON_RESETTABLE:
+            _reset(job)
+
+    for step in steps:
+        if step.name in gated_names:
+            continue
+        job = sibs.get(step.name)
+        if job is None or job.status not in SATISFIED:
+            continue
+        if transitive_requires(step.name, steps) & gated_names:
+            _reset(job)
+
+    if touched and listing.state == ListingState.DELIVERED:
+        listing.state = ListingState.EXPORTING
+
+    await session.flush()
+    return touched
+
+
 async def cancel_listing_jobs(session: AsyncSession, listing_id) -> int:
     res = await session.execute(
         update(PipelineJob)
@@ -528,10 +595,15 @@ async def periodic_loop(session_factory, *, stop: asyncio.Event) -> None:
     open their own admin sessions internally. Each task's last-run time is
     kept in memory only — a restart simply re-runs it, which is harmless.
     """
-    from listingjet.pipeline.periodic import run_baseline_aggregation, run_demo_cleanup
+    from listingjet.config import settings
+    from listingjet.pipeline.periodic import fail_stuck_listings, run_baseline_aggregation, run_demo_cleanup
+
+    async def _fail_stuck_listings() -> int:
+        return await fail_stuck_listings(session_factory, max_age_hours=settings.pipeline_timeout_hours)
 
     schedule = [("demo_cleanup", run_demo_cleanup, timedelta(hours=1)),
-                ("baseline_aggregation", run_baseline_aggregation, timedelta(days=7))]
+                ("baseline_aggregation", run_baseline_aggregation, timedelta(days=7)),
+                ("stuck_listings", _fail_stuck_listings, timedelta(hours=1))]
     # Last-run times are in-memory only, so a restart re-runs anything unseeded.
     # Demo cleanup at boot is cheap and idempotent; the weekly baseline
     # aggregation scans every tenant's learning weights, so seed it as if it had

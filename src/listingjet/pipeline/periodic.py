@@ -56,3 +56,59 @@ async def run_baseline_aggregation() -> dict:
                 updated += 1
 
     return {"updated": updated, "room_labels": len(rows)}
+
+
+async def fail_stuck_listings(session_factory=None, *, max_age_hours: int) -> int:
+    """Fail any listing whose pipeline has been silently stuck for too long.
+
+    A listing in UPLOADING/ANALYZING/EXPORTING with no RUNNING job and whose
+    newest `pipeline_jobs.updated_at` is older than `max_age_hours` has no
+    worker actively making progress on it and none queued to reclaim it (that's
+    `reclaim_stale`'s job, and it only handles RUNNING rows) — most likely a bug
+    silently dropped every job for the listing without ever failing it. Moves
+    the listing to PIPELINE_TIMEOUT via `runner.fail_listing` (which also
+    cancels any still-QUEUED/WAITING rows) and returns the number failed.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func, select
+
+    from listingjet.database import admin_session
+    from listingjet.models.listing import Listing, ListingState
+    from listingjet.models.pipeline_job import JobStatus, PipelineJob
+    from listingjet.pipeline.runner import _now, fail_listing
+
+    cutoff = _now() - timedelta(hours=max_age_hours)
+    stuck_states = (ListingState.UPLOADING, ListingState.ANALYZING, ListingState.EXPORTING)
+
+    async with admin_session(session_factory) as session:
+        stats = (
+            select(
+                PipelineJob.listing_id,
+                func.max(PipelineJob.updated_at).label("newest"),
+                func.bool_or(PipelineJob.status == JobStatus.RUNNING).label("has_running"),
+            )
+            .group_by(PipelineJob.listing_id)
+            .subquery()
+        )
+        listings = (await session.execute(
+            select(Listing)
+            .join(stats, stats.c.listing_id == Listing.id)
+            .where(
+                Listing.state.in_(stuck_states),
+                stats.c.has_running.is_(False),
+                stats.c.newest < cutoff,
+            )
+        )).scalars().all()
+
+        count = 0
+        for listing in listings:
+            await fail_listing(
+                session, listing.id, step="pipeline",
+                error=f"pipeline timeout after {max_age_hours}h",
+                state=ListingState.PIPELINE_TIMEOUT,
+            )
+            count += 1
+        await session.commit()
+
+    return count
