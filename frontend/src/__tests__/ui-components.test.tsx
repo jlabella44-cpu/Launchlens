@@ -5,14 +5,19 @@ import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 describe("Badge", () => {
-  it("renders state label", () => {
+  it("renders the themed label for a known state", () => {
     render(<Badge state="approved" />);
-    expect(screen.getByText("approved")).toBeInTheDocument();
+    expect(screen.getByText("Cleared for Takeoff")).toBeInTheDocument();
   });
 
-  it("formats underscored states", () => {
+  it("renders the themed label for an underscored state", () => {
     render(<Badge state="awaiting_review" />);
-    expect(screen.getByText("awaiting review")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting Clearance")).toBeInTheDocument();
+  });
+
+  it("falls back to the de-underscored state name when unlabelled", () => {
+    render(<Badge state="pending_ops" />);
+    expect(screen.getByText("pending ops")).toBeInTheDocument();
   });
 });
 

@@ -11,9 +11,24 @@ export interface ListingEvent {
 interface UseListingEventsOptions {
   /** Auto-reconnect on connection loss. Default: true */
   reconnect?: boolean;
-  /** Base API URL. Default: http://localhost:8000 */
+  /** Base API URL. Default: NEXT_PUBLIC_API_URL, else "/api". */
   baseUrl?: string;
 }
+
+/**
+ * Event names the SSE endpoint forwards. Mirrors `_PIPELINE_EVENTS` in
+ * `src/listingjet/api/sse.py`; the backend also forwards any `*.failed`
+ * event, so each step name is subscribed in both flavours.
+ */
+const PIPELINE_STEP_EVENTS = [
+  "ingestion", "photo_analysis", "photo_compliance", "coverage", "packaging",
+  "content_social", "brand", "mls_export", "video_baseline", "video_ai",
+  "social_cuts", "pipeline",
+] as const;
+
+export const PIPELINE_EVENT_TYPES: string[] = PIPELINE_STEP_EVENTS.flatMap(
+  (name) => [`${name}.completed`, `${name}.failed`],
+);
 
 /**
  * React hook for consuming real-time pipeline events via SSE.
@@ -66,15 +81,7 @@ export function useListingEvents(
       }
     };
 
-    // Listen for named pipeline events
-    const pipelineEvents = [
-      "ingestion.completed", "photo_analysis.completed", "photo_compliance.completed",
-      "coverage.completed", "packaging.completed", "content_social.completed",
-      "brand.completed", "mls_export.completed",
-      "pipeline.completed", "video_baseline.completed", "video_ai.completed",
-    ];
-
-    for (const eventType of pipelineEvents) {
+    for (const eventType of PIPELINE_EVENT_TYPES) {
       source.addEventListener(eventType, (e: MessageEvent) => {
         try {
           const event: ListingEvent = JSON.parse(e.data);

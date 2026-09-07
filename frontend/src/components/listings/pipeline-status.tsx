@@ -3,19 +3,21 @@
 /**
  * Simplified 5-stage horizontal pipeline tracker.
  *
- * Upload → Analyze → Review → Create → Delivered
+ * Ingest → Analyze → Review → Create → Delivered
  */
 
+// Only real listing states appear here — see the `state` values the backend
+// sets in src/listingjet/pipeline/runner.py.
 const STAGES = [
   {
-    key: "upload",
-    label: "Upload",
+    key: "ingest",
+    label: "Ingest",
     states: ["new", "uploading"],
   },
   {
     key: "analyze",
     label: "Analyze",
-    states: ["analyzing", "coverage", "floorplan", "packaging", "compliance"],
+    states: ["analyzing"],
   },
   {
     key: "review",
@@ -25,7 +27,7 @@ const STAGES = [
   {
     key: "create",
     label: "Create",
-    states: ["content", "brand_social", "chapters", "social_cuts", "mls_export", "exporting"],
+    states: ["exporting"],
   },
   {
     key: "delivered",
